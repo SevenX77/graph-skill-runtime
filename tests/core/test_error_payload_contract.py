@@ -18,11 +18,10 @@ from graph_agent.core.loader import SkillLoader
 from graph_agent.runtime.state_mapper import StateMapper
 from graph_agent.tools.builtin.read_reference import read_declared_reference
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ERROR_SPEC = (
     REPO_ROOT
     / "docs"
-    / "engine"
     / "mvp1"
     / "01-contract"
     / "03-compile-rules"
@@ -297,7 +296,7 @@ def test_error_payload_requires_nonempty_message() -> None:
 
 def test_engine_source_has_no_coarse_error_code_literals() -> None:
     coarse_codes = {f"[F-v3-{suffix}]" for suffix in ("route", "io", "graph", "actions", "purity")}
-    source_root = REPO_ROOT / "packages" / "graph-agent" / "src" / "graph_agent"
+    source_root = REPO_ROOT / "src" / "graph_agent"
     occurrences: list[str] = []
     for path in source_root.rglob("*.py"):
         text = path.read_text(encoding="utf-8")

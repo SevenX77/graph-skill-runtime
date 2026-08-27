@@ -10,8 +10,8 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator, ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPO_ROOT / "packages/graph-agent"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = REPO_ROOT
 FIXTURES = PACKAGE_ROOT / "tests/fixtures/round28"
 
 SCHEMA_PATH = PACKAGE_ROOT / "spec/round28-manifest-schema.yaml"
@@ -20,8 +20,8 @@ SOURCE_MAP_PATH = PACKAGE_ROOT / "spec/source_file_map.yaml"
 CONTRACT_MAP_PATH = PACKAGE_ROOT / "spec/contract_map.yaml"
 VALIDATOR_PATH = PACKAGE_ROOT / "scripts/validate_round28_manifest.py"
 CODEOWNERS_PATH = REPO_ROOT / ".github/CODEOWNERS"
-CHECKLIST_PATH = REPO_ROOT / "docs/engine/feature-compliance-checklist.md"
-PUBLIC_API_CONTRACT_PATH = REPO_ROOT / "docs/engine/public-api-contract.md"
+CHECKLIST_PATH = REPO_ROOT / "docs/feature-compliance-checklist.md"
+PUBLIC_API_CONTRACT_PATH = REPO_ROOT / "docs/public-api-contract.md"
 PUBLIC_API_TEST_PATH = PACKAGE_ROOT / "tests/test_public_api_contract.py"
 EXEMPTIONS_PATH = PACKAGE_ROOT / "tests/contract-exemptions.yaml"
 OLD_HASH_LOCK_PATH = PACKAGE_ROOT / "tests/test_skill_spec_hash_lock.py"
@@ -214,7 +214,7 @@ def test_task5_targeted_tests_are_collected_from_manifest_nodeids() -> None:
 
 def test_task6_codeowners_and_frozen_checklist_are_concrete() -> None:
     codeowners = _read(CODEOWNERS_PATH)
-    assert "docs/engine/feature-compliance-checklist.md @SevenX77" in codeowners
+    assert "docs/feature-compliance-checklist.md @SevenX77" in codeowners
     frontmatter = _frontmatter(CHECKLIST_PATH)
     assert frontmatter.get("status") == "FROZEN"
     assert "DO NOT EDIT: Golden principle contract baseline" in _read(CHECKLIST_PATH)
@@ -313,10 +313,6 @@ def test_feature_classification_reverse_mapping() -> None:
 
 
 def test_cutover_discipline_quantifies_overlap() -> None:
-    tasks = _read(REPO_ROOT / ".kiro/specs/engine-mvp0-rebuild-v030/round-28-feature-checklist-redesign/tasks.md")
-    assert "24h" in tasks
-    assert "1 个独立 PR" in tasks
-
     result = _run_validator(FIXTURES / "invalid_cutover_overlap_missing_attestation.yaml")
     assert result.returncode != 0
     assert "R28_CUTOVER_OVERLAP_ATTESTATION_MISSING" in result.stderr

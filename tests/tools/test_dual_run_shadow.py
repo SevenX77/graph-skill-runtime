@@ -7,9 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-TOOL_PATH = REPO_ROOT / "packages" / "graph-agent" / "tools" / "dual_run_shadow.py"
-HELLO_WORLD = REPO_ROOT / "skills" / "hello-world"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+TOOL_PATH = REPO_ROOT / "tools" / "dual_run_shadow.py"
 
 
 def _load_tool():
@@ -22,17 +21,62 @@ def _load_tool():
 
 
 @pytest.mark.tier1
-def test_dual_run_shadow_hello_world_idempotency(tmp_path: Path) -> None:
+def test_dual_run_shadow_logic_skill_idempotency(tmp_path: Path) -> None:
     tool = _load_tool()
+    skill_root = tmp_path / "skill"
+    (skill_root / "phases" / "main" / "actions").mkdir(parents=True)
+    (skill_root / "GRAPH.md").write_text(
+        """---
+schema_version: "v0.3.0"
+name: shadow-smoke
+io:
+  inputs:
+    type: object
+    required: [text]
+    properties:
+      text: {type: string}
+  outputs:
+    type: object
+    required: [answer]
+    properties:
+      answer: {type: string}
+phases: [main]
+---
+<phase depends_on="input" output>main</phase>
+""",
+        encoding="utf-8",
+    )
+    (skill_root / "phases" / "main" / "LOGIC.md").write_text(
+        """---
+io:
+  inputs:
+    type: object
+    required: [text]
+    properties:
+      text: {type: string}
+  outputs:
+    type: object
+    required: [answer]
+    properties:
+      answer: {type: string}
+actions: [echo]
+validator: false
+---
+<action>echo</action>
+""",
+        encoding="utf-8",
+    )
+    (skill_root / "phases" / "main" / "actions" / "echo.py").write_text(
+        "def echo(inputs):\n    return {'answer': inputs['text']}\n",
+        encoding="utf-8",
+    )
     output_path = tmp_path / "shadow.json"
 
     exit_code = tool.main(
         [
-            str(HELLO_WORLD),
+            str(skill_root),
             "--input-json",
-            '{"user_name":"Ada"}',
-            "--chat-fixture",
-            "hello-world",
+            '{"text":"Ada"}',
             "--output",
             str(output_path),
         ]
@@ -44,7 +88,7 @@ def test_dual_run_shadow_hello_world_idempotency(tmp_path: Path) -> None:
     assert report["shadow_reference"] == "v21_repeat_run"
     assert report["match"] is True
     assert report["diff"] == {"missing": [], "extra": [], "mismatch": []}
-    assert report["outputs"]["run_a"]["data"]["greet"]["greeting"] == "Hello, Ada!"
+    assert report["outputs"]["run_a"]["data"]["phase_outputs"]["main"] == {"answer": "Ada"}
 
 
 def test_dual_run_shadow_passes_explicit_resolver_to_compile_and_assemble(

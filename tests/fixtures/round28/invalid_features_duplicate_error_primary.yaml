@@ -6,7 +6,7 @@ features:
       evidence: runtime phase
     sources: [skill-spec]
     core_paths:
-      - path: packages/graph-agent/src/graph_agent/core/runner.py
+      - path: src/graph_agent/core/runner.py
     error_codes_primary: ["[F-v3-engine-skill-loader]"]
     error_codes_secondary: []
     events_primary: [RunStartedEvent]
@@ -21,7 +21,7 @@ features:
       evidence: runtime phase
     sources: [skill-spec]
     core_paths:
-      - path: packages/graph-agent/src/graph_agent/core/harness.py
+      - path: src/graph_agent/core/harness.py
     error_codes_primary: ["[F-v3-engine-skill-loader]"]
     error_codes_secondary: []
     events_primary: [PhaseStartEvent]

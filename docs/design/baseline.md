@@ -4,7 +4,7 @@ doc: baseline
 role: baseline
 status: drafted
 binds_alignment: ./v1-alignment.md
-binds_code: ../../../packages/graph-agent; ../../../apps/studio/backend/app/agents; ../../../apps/studio/backend/app/services/runtime_config.py
+binds_code: https://github.com/SevenX77/agent-harness/tree/3564b49e/packages/graph-agent; https://github.com/SevenX77/agent-harness/tree/3564b49e/apps/studio/backend/app/agents; https://github.com/SevenX77/agent-harness/blob/3564b49e/apps/studio/backend/app/services/runtime_config.py
 updated: 2026-08-27
 ---
 
@@ -14,11 +14,11 @@ updated: 2026-08-27
 
 ## 1. 当前产品与分发形态
 
-当前 engine 位于 [`packages/graph-agent`](../../../packages/graph-agent)，Python distribution 名为 `graph-agent`，版本为 `0.3.1`，要求 Python 3.11 或更高版本。它是 monorepo 的 `uv` workspace 成员，还不是独立仓库。
+当前 engine 位于 [`packages/graph-agent`](https://github.com/SevenX77/agent-harness/tree/3564b49e/packages/graph-agent)，Python distribution 名为 `graph-agent`，版本为 `0.3.1`，要求 Python 3.11 或更高版本。它是 monorepo 的 `uv` workspace 成员，还不是独立仓库。
 
 当前 `pyproject.toml` 没有 `[project.scripts]`，因此安装包不提供稳定 console script。现有 argparse 入口只能通过 `python -m graph_agent` 到达；它不能被视为未来 `gskill` CLI 已经存在。
 
-[`graph_agent.__all__`](../../../packages/graph-agent/src/graph_agent/__init__.py) 当前精确导出 24 个名字：
+[`graph_agent.__all__`](https://github.com/SevenX77/agent-harness/blob/3564b49e/packages/graph-agent/src/graph_agent/__init__.py) 当前精确导出 24 个名字：
 
 - 执行与预测：`run_skill`、`predict_skill`、`resume_skill`、`evaluate_golden_baseline`、`RunResult`、`PathDiff`、`PhaseRecord`；
 - 产物运行：`compile_artifact`、`run_artifact`、`predict_artifact`；
@@ -55,7 +55,7 @@ updated: 2026-08-27
 | CLI | 只有 `python -m graph_agent` 的旧 argparse 入口 | 没有稳定命令名、机器可读输出、能力探测或版本化 CLI 契约 |
 | 分发 | monorepo workspace package | 尚无独立 repo、PyPI release、wheel 验证和跨平台安装证据 |
 
-旧 [`packages/graph-agent/README.md`](../../../packages/graph-agent/README.md) 还曾把不存在的 `GraphAgentHarness` 写成公共外层、混写 24/21 个导出、把根入口描述成 `SKILL.md`，并遗漏必填的绝对 `workspace_dir`。这些是文档漂移，不是活代码的新契约。
+旧 [`packages/graph-agent/README.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/packages/graph-agent/README.md) 还曾把不存在的 `GraphAgentHarness` 写成公共外层、混写 24/21 个导出、把根入口描述成 `SKILL.md`，并遗漏必填的绝对 `workspace_dir`。这些是文档漂移，不是活代码的新契约。
 
 ## 4. 当前文件格式契约
 
@@ -70,7 +70,7 @@ updated: 2026-08-27
 
 ## 5. 当前 Studio runtime config
 
-[`runtime_config.py`](../../../apps/studio/backend/app/services/runtime_config.py) 当前生成 `studio.runtime_config.v2`，默认形状如下：
+[`runtime_config.py`](https://github.com/SevenX77/agent-harness/blob/3564b49e/apps/studio/backend/app/services/runtime_config.py) 当前生成 `studio.runtime_config.v2`，默认形状如下：
 
 ```yaml
 schema_version: studio.runtime_config.v2
@@ -92,16 +92,16 @@ artifacts: []
 
 ## 6. 当前 MoirAI 能力与资产
 
-MoirAI 的当前能力链不是 [命名与人格叙事](../../strategy/moirai-copilot-persona-narrative.md)。当前产品需求、设计、完成状态与追加裁决分别位于：
+MoirAI 的当前能力链不是 [命名与人格叙事](https://github.com/SevenX77/agent-harness/blob/3564b49e/docs/strategy/moirai-copilot-persona-narrative.md)。当前产品需求、设计、完成状态与追加裁决分别位于：
 
-- [`requirements.md`](../../../.kiro/specs/studio-moirai-agent-system/requirements.md)
-- [`design.md`](../../../.kiro/specs/studio-moirai-agent-system/design.md)
-- [`tasks.md`](../../../.kiro/specs/studio-moirai-agent-system/tasks.md)
-- [`decision-2026-08-07-golden-case-authoring.md`](../../../.kiro/specs/studio-moirai-agent-system/decision-2026-08-07-golden-case-authoring.md)
-- [`decision-2026-08-07-run-terminal-output-contract-and-cli-read-tier.md`](../../../.kiro/specs/studio-moirai-agent-system/decision-2026-08-07-run-terminal-output-contract-and-cli-read-tier.md)
-- [`decision-2026-08-15-per-runtime-dispatch-operating-rules.md`](../../../.kiro/specs/studio-moirai-agent-system/decision-2026-08-15-per-runtime-dispatch-operating-rules.md)
+- [`requirements.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/.kiro/specs/studio-moirai-agent-system/requirements.md)
+- [`design.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/.kiro/specs/studio-moirai-agent-system/design.md)
+- [`tasks.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/.kiro/specs/studio-moirai-agent-system/tasks.md)
+- [`decision-2026-08-07-golden-case-authoring.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/.kiro/specs/studio-moirai-agent-system/decision-2026-08-07-golden-case-authoring.md)
+- [`decision-2026-08-07-run-terminal-output-contract-and-cli-read-tier.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/.kiro/specs/studio-moirai-agent-system/decision-2026-08-07-run-terminal-output-contract-and-cli-read-tier.md)
+- [`decision-2026-08-15-per-runtime-dispatch-operating-rules.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/.kiro/specs/studio-moirai-agent-system/decision-2026-08-15-per-runtime-dispatch-operating-rules.md)
 
-活资产位于 [`apps/studio/backend/app/agents`](../../../apps/studio/backend/app/agents)：
+活资产位于 [`apps/studio/backend/app/agents`](https://github.com/SevenX77/agent-harness/tree/3564b49e/apps/studio/backend/app/agents)：
 
 - 4 个 role：MoirAI、Clotho、Lachesis、Atropos；
 - 8 个 skill：`moirai-intro`、`brainstorming`、`domain-analysis`、`graph-design`、`agent-prompt-design`、`compile-error-repair`、`eval-judgement`、`web-research`；

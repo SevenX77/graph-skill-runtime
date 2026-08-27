@@ -11,7 +11,7 @@ account from (observed 2026-08-08 on exp-b-round7 run
 * the tokens were never folded into the run's metrics;
 * the micro events carried no ``parent_node_id`` / ``node_type``, so they could
   not be attributed to the agent node they came from
-  (docs/engine/mvp1/02-mechanism/06-seam/02-observability/mvp1-alignment.md §8 #1);
+  (docs/mvp1/02-mechanism/06-seam/02-observability/mvp1-alignment.md §8 #1);
 * the resolved model was dropped, although the provider puts it on the message.
 """
 

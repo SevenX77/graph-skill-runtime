@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 SONARCLOUD_PROPERTIES = REPO_ROOT / ".sonarcloud.properties"
 LEGACY_SONAR_PROPERTIES = REPO_ROOT / "sonar-project.properties"
 
@@ -44,15 +44,12 @@ def test_sonarcloud_properties_classifies_tests_and_excludes_non_product_code() 
     properties = _read_sonarcloud_properties()
 
     test_inclusions = properties["sonar.test.inclusions"].split(",")
-    assert "**/tests/**" in test_inclusions
+    assert "tests/**" in test_inclusions
     assert "**/conftest.py" in test_inclusions
-    assert "**/*.test.ts" in test_inclusions
-    assert "**/*.test.tsx" in test_inclusions
 
     exclusions = properties["sonar.exclusions"].split(",")
-    assert "code-diagnostics/**" in exclusions
     assert "**/__pycache__/**" in exclusions
+    assert ".venv/**" in exclusions
 
     cpd_exclusions = properties["sonar.cpd.exclusions"].split(",")
-    assert "skills/**" in cpd_exclusions
-    assert "**/tests/**" in cpd_exclusions
+    assert "tests/**" in cpd_exclusions

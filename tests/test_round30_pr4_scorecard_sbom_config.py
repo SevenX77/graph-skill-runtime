@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 SCORECARD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scorecard.yml"
 SBOM_SCRIPT = REPO_ROOT / "scripts" / "generate_sbom.sh"
 LICENSE_SCRIPT = REPO_ROOT / "scripts" / "check_licenses.sh"

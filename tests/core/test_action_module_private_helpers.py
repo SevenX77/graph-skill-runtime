@@ -9,7 +9,7 @@ Neither name appears in its phase's `LOGIC.md` `actions:` list, and neither is
 ever dispatched. The engine still called both "an action" and enforced the
 action signature on them.
 
-Cause (`packages/graph-agent/src/graph_agent/core/loader.py`):
+Cause (`src/graph_agent/core/loader.py`):
 
 - `:1419-1429` `_load_action_dir` iterates `_module_functions(module)` and
   registers/validates EVERY module-level function found in the file.
@@ -27,8 +27,8 @@ Why that is wrong — dispatch is declaration-driven, never file-driven:
 - `loader.py:2802-2809` `_validate_logic_actions_declared` additionally pins the
   frontmatter list to the body `<action>` order, so the declaration is exact.
 
-Design source — `docs/engine/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3, the
-format SSOT that `docs/engine/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md:26-30`
+Design source — `docs/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3, the
+format SSOT that `docs/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md:26-30`
 defers to:
 
     | `actions` | yes | list[string] | action 名注册表 |
@@ -39,7 +39,7 @@ The signature rule is scoped to `<action_name>` — the declared name. Nothing i
 the design says the `actions/` module is a flat namespace holding only actions.
 
 Purity stays file-wide by design:
-`docs/engine/mvp1/01-contract/03-compile-rules/mvp1-alignment.md:79` scopes it to
+`docs/mvp1/01-contract/03-compile-rules/mvp1-alignment.md:79` scopes it to
 the "action/tool Python 文件" — the FILE, not the function — so a helper's
 impurity must still be a compile FATAL.
 """

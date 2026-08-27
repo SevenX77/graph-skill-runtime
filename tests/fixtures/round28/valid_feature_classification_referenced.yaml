@@ -8,7 +8,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/runner.py
+  - path: src/graph_agent/core/runner.py
   error_codes_primary:
   - '[F-v3-runtime-phase-failed]'
   error_codes_secondary: []
@@ -32,7 +32,7 @@ features:
   - run_skill
 source_file_map:
   files:
-  - path: packages/graph-agent/src/graph_agent/core/runner.py
+  - path: src/graph_agent/core/runner.py
     classification: feature
     feature_ids:
     - F-runtime-execution

@@ -1478,7 +1478,7 @@ def _load_action_dir(
     """Bind each DECLARED action name to the same-named function in `actions/*.py`.
 
     The `actions:` list is the action registry (format SSOT
-    `docs/engine/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3: "actions | list[string] |
+    `docs/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3: "actions | list[string] |
     action 名注册表", and the file "必须导出同名函数"), and it is also the only thing
     `graph_assembler._build_logic_node` ever dispatches. So the declaration decides
     which module-level functions are actions; every other function in the file is an
@@ -1486,7 +1486,7 @@ def _load_action_dir(
     does not apply to it.
 
     Purity deliberately keeps a wider, file-level scope
-    (`docs/engine/mvp1/01-contract/03-compile-rules/mvp1-alignment.md:79` scopes it to
+    (`docs/mvp1/01-contract/03-compile-rules/mvp1-alignment.md:79` scopes it to
     the "action/tool Python 文件"): a helper can be impure just as easily as an action.
     """
     declared = dict.fromkeys(declared_actions)

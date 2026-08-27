@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPO_ROOT / "packages/graph-agent"
-MATRIX_PATH = REPO_ROOT / "docs/engine/feature-compliance-checklist.md"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = REPO_ROOT
+MATRIX_PATH = REPO_ROOT / "docs/feature-compliance-checklist.md"
 FEATURES_PATH = PACKAGE_ROOT / "spec/features.yaml"
 EXPECTED_FEATURE_COUNT = 36
 EXPECTED_CHECKLIST_H3_COUNT = 35
 EXPECTED_COVERAGE_COUNT = 35
 COVERAGE_RE = re.compile(
-    r"\[Covered By: (?P<path>packages/graph-agent/tests/[^:\]]+)::(?:(?P<class>[A-Za-z0-9_]+)::)?(?P<test>test_[A-Za-z0-9_]+)(?:\[[^\]]+\])?\]"
+    r"\[Covered By: (?P<path>tests/[^:\]]+)::(?:(?P<class>[A-Za-z0-9_]+)::)?(?P<test>test_[A-Za-z0-9_]+)(?:\[[^\]]+\])?\]"
 )
 
 

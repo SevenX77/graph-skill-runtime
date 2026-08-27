@@ -10,9 +10,9 @@ from typing import Any
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPO_ROOT / "packages/graph-agent"
-DEFAULT_SOURCE_INCLUDE_GLOBS = ("packages/graph-agent/src/graph_agent/**/*.py",)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = REPO_ROOT
+DEFAULT_SOURCE_INCLUDE_GLOBS = ("src/graph_agent/**/*.py",)
 DEFAULT_SOURCE_EXCLUDE_GLOBS: tuple[str, ...] = ()
 VENDOR_ONLY_SYMBOLS = {
     "AgentSkillDef",
@@ -80,7 +80,7 @@ def _actual_src_files(source_map: dict[str, Any] | None = None) -> set[str]:
 
 
 def _public_api_symbols() -> set[str]:
-    contract = (REPO_ROOT / "docs/engine/public-api-contract.md").read_text(encoding="utf-8")
+    contract = (REPO_ROOT / "docs/public-api-contract.md").read_text(encoding="utf-8")
     return {
         match.group(1)
         for match in re.finditer(r"^## ([A-Za-z_][A-Za-z0-9_]*)$", contract, re.MULTILINE)
@@ -89,7 +89,7 @@ def _public_api_symbols() -> set[str]:
 
 
 def _error_codes() -> set[str]:
-    text = (REPO_ROOT / "docs/engine/skill-spec/11-error-code-spec.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs/skill-spec/11-error-code-spec.md").read_text(encoding="utf-8")
     codes = set(re.findall(r"`(\[F-v3-[a-z0-9-]+\])`", text))
     return {code for code in codes if "<" not in code and "*" not in code}
 
@@ -119,6 +119,8 @@ def _validate_collectable_tests(features: list[dict[str, Any]], errors: list[str
         ["uv", "run", "pytest", "--collect-only", "-q", *nodeids],
         cwd=PACKAGE_ROOT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )

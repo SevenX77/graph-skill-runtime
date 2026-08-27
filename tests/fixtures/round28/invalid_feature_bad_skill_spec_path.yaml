@@ -6,9 +6,9 @@ feature_boundary:
 sources:
   - skill-spec
 skill_spec_sections:
-  - docs/engine/skill-spec/05-finish-task-spec.md#workflow-finish-mode
+  - docs/skill-spec/05-finish-task-spec.md#workflow-finish-mode
 core_paths:
-  - path: packages/graph-agent/src/graph_agent/cognitive/finish_task.py
+  - path: src/graph_agent/cognitive/finish_task.py
 error_codes_primary: []
 error_codes_secondary: []
 events_primary: []

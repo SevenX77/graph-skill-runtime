@@ -71,7 +71,7 @@ validator: false
 """
 
 # The function is named after the declared action, per format SSOT
-# `docs/engine/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3 ("文件必须导出同名函数").
+# `docs/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3 ("文件必须导出同名函数").
 # It used to be `run`, the mvp0 entrypoint convention
 # (`docs/engine/mvp0/skill-spec/03-logic-md-spec.md:94`), which no compile rule
 # caught while undeclared module functions were being registered as actions.

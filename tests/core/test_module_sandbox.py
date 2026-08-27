@@ -179,13 +179,27 @@ def test_pydantic_forward_ref_rebuild_failure_is_fail_loud(tmp_path: Path) -> No
         ModuleSandbox(search_paths=[tmp_path]).import_class("broken_schemas.Broken")
 
 
-def test_loader_pipeline_resolves_skill_forward_ref_segment_class() -> None:
+def test_loader_pipeline_resolves_skill_forward_ref_segment_class(tmp_path: Path) -> None:
     """V2.1 keeps reusable schemas in ``skills/shared`` instead of dotted
     ``script.models`` phase metadata; the sandbox path still rebuilds
     future-annotation models end-to-end.
     """
-    repo_root = Path(__file__).resolve().parents[4]
-    schema_cls = ModuleSandbox(search_paths=[repo_root / "skills"]).import_class(
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "schemas.py").write_text(
+        "from __future__ import annotations\n"
+        "from pydantic import BaseModel\n"
+        "class ParagraphSegment(BaseModel):\n"
+        "    index: int\n"
+        "    type: str\n"
+        "    start_line: int\n"
+        "    end_line: int\n"
+        "    content: str\n"
+        "    confidence: float\n"
+        "    children: list[ParagraphSegment] = []\n",
+        encoding="utf-8",
+    )
+    schema_cls = ModuleSandbox(search_paths=[tmp_path]).import_class(
         "shared.schemas.ParagraphSegment"
     )
 

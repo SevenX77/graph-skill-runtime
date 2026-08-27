@@ -14,7 +14,7 @@ public_api_symbols:
   parse_skill_file:
     feature_ids: [F-vendor-contract-debt]
 skill_spec_sections:
-  docs/engine/skill-spec/12-compile-runtime-flow-spec.md#运行时引擎流 (Run-time Workflow):
+  docs/skill-spec/12-compile-runtime-flow-spec.md#运行时引擎流 (Run-time Workflow):
     feature_ids: [F-runtime-execution]
 consumer_files:
   - kind: live-consumer

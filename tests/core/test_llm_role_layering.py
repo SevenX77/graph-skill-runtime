@@ -1,6 +1,6 @@
 """llm_role layering: graph-level default + per-node use_graph_llm_role switch.
 
-Design source: docs/engine/skill-spec/00-FORMAT-GROUND-TRUTH.md — GRAPH.md
+Design source: docs/skill-spec/00-FORMAT-GROUND-TRUTH.md — GRAPH.md
 ``llm_role`` is the whole-graph default role; SKILL.md ``llm_role`` overrides
 it; ``use_graph_llm_role: true`` inverts the priority so the graph default
 wins while the node's own value stays untouched in the file.

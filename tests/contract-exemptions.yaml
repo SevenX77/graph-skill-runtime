@@ -12,7 +12,7 @@
 #     fields:
 #       - some_field
 #     hashes:
-#       - docs/engine/skill-spec/example.md
+#       - docs/skill-spec/example.md
 #     expires_or_cleanup: "Remove after PR-124 migration lands."
 
 version: "1"
@@ -24,7 +24,7 @@ exemptions:
     symbols: []
     fields: []
     hashes:
-      - docs/engine/public-api-contract.md
+      - docs/public-api-contract.md
     affected_features:
       - F-public-api-contract
     replacement_feature_ids:

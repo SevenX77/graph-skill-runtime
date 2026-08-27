@@ -10,10 +10,7 @@ from graph_agent.core.loader import SkillLoader
 from graph_agent.core.manifest import AgentNodeAST, SubgraphNodeAST
 from graph_agent.core.validator_contract import VALIDATOR_ERROR_CODES, VALIDATOR_SIGNATURE
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-GAMMA0_SPEC_DIR = (
-    REPO_ROOT / ".kiro/specs/engine-mvp0-rebuild-v030/round-10-PR-gamma0-contract-patch"
-)
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _write(path: Path, text: str) -> None:
@@ -206,13 +203,7 @@ def test_γ0_3_middleware_order_contract_constant_exists() -> None:
     )
 
 
-def test_γ0_4_validator_signature_and_error_placeholders_are_documented() -> None:
-    docs = "\n".join(path.read_text(encoding="utf-8") for path in GAMMA0_SPEC_DIR.glob("*.md"))
-
-    assert "def validate(output: dict, state_slice: dict, **kwargs) -> None | dict" in docs
-    assert "[F-v3-agent-validator-failed]" in docs
-    assert "[F-v3-subgraph-validator-failed]" in docs
-    assert "[F-v3-logic-validator-failed]" in docs
+def test_γ0_4_validator_signature_and_error_placeholders_are_public_constants() -> None:
     assert (
         VALIDATOR_SIGNATURE
         == "def validate(output: dict, state_slice: dict, **kwargs) -> None | dict"
@@ -224,16 +215,14 @@ def test_γ0_4_validator_signature_and_error_placeholders_are_documented() -> No
     )
 
 
-def test_γ0_5_docs_ship_gates_match_source_contract() -> None:
-    tasks = (GAMMA0_SPEC_DIR / "tasks.md").read_text(encoding="utf-8")
-    manifest = (REPO_ROOT / "packages/graph-agent/src/graph_agent/core/manifest.py").read_text(
+def test_γ0_5_source_contract_matches_public_constants() -> None:
+    manifest = (REPO_ROOT / "src/graph_agent/core/manifest.py").read_text(
         encoding="utf-8"
     )
     middleware_init = (
-        REPO_ROOT / "packages/graph-agent/src/graph_agent/middleware/__init__.py"
+        REPO_ROOT / "src/graph_agent/middleware/__init__.py"
     ).read_text(encoding="utf-8")
 
-    assert "AgentNodeAST` 不再含 `exit_contract` 字段" in tasks
     assert "class AgentNodeAST" in manifest
     agent_block = manifest.split("class AgentNodeAST", 1)[1].split("class SkillNodeAST", 1)[0]
     if "class SkillNodeAST" not in manifest:

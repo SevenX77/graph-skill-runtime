@@ -12,11 +12,10 @@ import pytest
 from graph_agent.core.exceptions import ErrorPayload, GraphAgentError
 from graph_agent.core.result import RunResult
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ERROR_SPEC = (
     REPO_ROOT
     / "docs"
-    / "engine"
     / "mvp1"
     / "01-contract"
     / "03-compile-rules"

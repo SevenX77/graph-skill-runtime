@@ -9,7 +9,7 @@ consumer_files:
   - kind: live-consumer
     path: apps/studio/backend/app/services/run_manager.py
 core_paths:
-  - path: packages/graph-agent/src/graph_agent/callbacks/tracing.py
+  - path: src/graph_agent/callbacks/tracing.py
 error_codes_primary: []
 error_codes_secondary: []
 events_primary:

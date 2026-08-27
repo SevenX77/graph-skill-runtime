@@ -5,29 +5,29 @@ from pathlib import Path
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 EXEMPTIONS_PATH = Path(__file__).with_name("contract-exemptions.yaml")
 
 EXPECTED_CONTRACT_HASHES = {
-    "docs/engine/mvp0/skill-spec/00-FORMAT-GROUND-TRUTH.md": "083f158bdb4c6ae3bea7b5b66ce1d57e1897a668c81dac757a2ddb2bf067af0e",
-    "docs/engine/mvp0/skill-spec/01-physical-layout.md": "9478f81d9d8552227c82c440f6b047dc587652fcaa21200b0f38e3a93dcd8cc4",
-    "docs/engine/mvp0/skill-spec/02-graph-md-spec.md": "d9202117a473cf055a58bcff29e454e7551a1438d1cecdd90ccac50e28646b6c",
-    "docs/engine/mvp0/skill-spec/03-logic-md-spec.md": "f979921e9076b14a499d5dff257c7728afbe741b4e1d2ab642bed3fb0a369298",
-    "docs/engine/mvp0/skill-spec/04-subgraph-md-spec.md": "2440be9949793cb5717ed1cb29712896c174fa71e8c1bfc48b41099a4ac33f3e",
-    "docs/engine/mvp0/skill-spec/05-agent-md-spec.md": "51541ec8a805313c840c518130fe4ccf3615507614c0acf256f68102602f5b05",
-    "docs/engine/mvp0/skill-spec/06-cognitive-template-spec.md": "8e7a942df4bef5f7c95812ec4a0886ee140a55c33ce49ff1b2328158d9203090",
-    "docs/engine/mvp0/skill-spec/07-mention-syntax-spec.md": "ed8802373a1169fc0e4482f458e164d4153687b8a9123ca41da4d0284eadcc8d",
-    "docs/engine/mvp0/skill-spec/08-resource-mechanisms-spec.md": "b52777065d6eb5a90a4e7be99d492b4e45f36317de80428dbb48499d59c6ad3b",
-    "docs/engine/mvp0/skill-spec/09-builtin-modules-spec.md": "dac431f0a28d11448ea72193814ad4cb1c4cdb36cc1e09cc6fb9dfb7c11413d1",
-    "docs/engine/mvp0/skill-spec/10-skill-resolver-protocol-spec.md": "9cc8f9a3df095623b67c74a353838c63825fae678e77a94593a18716cded660c",
+    "docs/mvp0/skill-spec/00-FORMAT-GROUND-TRUTH.md": "083f158bdb4c6ae3bea7b5b66ce1d57e1897a668c81dac757a2ddb2bf067af0e",
+    "docs/mvp0/skill-spec/01-physical-layout.md": "9478f81d9d8552227c82c440f6b047dc587652fcaa21200b0f38e3a93dcd8cc4",
+    "docs/mvp0/skill-spec/02-graph-md-spec.md": "d9202117a473cf055a58bcff29e454e7551a1438d1cecdd90ccac50e28646b6c",
+    "docs/mvp0/skill-spec/03-logic-md-spec.md": "f979921e9076b14a499d5dff257c7728afbe741b4e1d2ab642bed3fb0a369298",
+    "docs/mvp0/skill-spec/04-subgraph-md-spec.md": "2440be9949793cb5717ed1cb29712896c174fa71e8c1bfc48b41099a4ac33f3e",
+    "docs/mvp0/skill-spec/05-agent-md-spec.md": "51541ec8a805313c840c518130fe4ccf3615507614c0acf256f68102602f5b05",
+    "docs/mvp0/skill-spec/06-cognitive-template-spec.md": "8e7a942df4bef5f7c95812ec4a0886ee140a55c33ce49ff1b2328158d9203090",
+    "docs/mvp0/skill-spec/07-mention-syntax-spec.md": "ed8802373a1169fc0e4482f458e164d4153687b8a9123ca41da4d0284eadcc8d",
+    "docs/mvp0/skill-spec/08-resource-mechanisms-spec.md": "b52777065d6eb5a90a4e7be99d492b4e45f36317de80428dbb48499d59c6ad3b",
+    "docs/mvp0/skill-spec/09-builtin-modules-spec.md": "dac431f0a28d11448ea72193814ad4cb1c4cdb36cc1e09cc6fb9dfb7c11413d1",
+    "docs/mvp0/skill-spec/10-skill-resolver-protocol-spec.md": "9cc8f9a3df095623b67c74a353838c63825fae678e77a94593a18716cded660c",
     # Re-pinned 2026-08-19 (an-error-code-either-fires-or-leaves): the eleven
     # adjudicated-out zero-emitter codes left the table (decision doc
     # .kiro/specs/decision-2026-08-19-an-error-code-either-fires-or-leaves.md;
     # pre-release, no-backward-compat, registry + mvp1 table updated in the
     # same PR — same pattern as the 2026-08-15 event-family re-pin below).
-    "docs/engine/mvp0/skill-spec/11-error-code-spec.md": "5bcb4f70d864ae7d392fe1d4c357d0269c0b88424cc726c7f5a7762d7c024509",
-    "docs/engine/mvp0/skill-spec/12-compile-runtime-flow-spec.md": "0c632cbc7edbad3e741bf4a3676d08e68852ea2311f10624503d20f84d598223",
-    "docs/engine/mvp0/skill-spec/README.md": "dc16c4c4caade48e027700f91ce666779b07f9a053ed3b8bda9f957fa6053b30",
+    "docs/mvp0/skill-spec/11-error-code-spec.md": "5bcb4f70d864ae7d392fe1d4c357d0269c0b88424cc726c7f5a7762d7c024509",
+    "docs/mvp0/skill-spec/12-compile-runtime-flow-spec.md": "0c632cbc7edbad3e741bf4a3676d08e68852ea2311f10624503d20f84d598223",
+    "docs/mvp0/skill-spec/README.md": "dc16c4c4caade48e027700f91ce666779b07f9a053ed3b8bda9f957fa6053b30",
     # Re-pinned 2026-08-15 (PR E, legacy execution family removal): the
     # CallbackEvent union dropped the ten zero-emitter event classes
     # (ValidationPass/ValidationFail/Retry/RetryExhausted/ModelResolved/
@@ -35,9 +35,11 @@ EXPECTED_CONTRACT_HASHES = {
     # and the stale LLMFallbackEvent entry that never existed in code
     # (decision doc §5; pre-release, no-backward-compat, all consumers
     # updated in the same PR).
-    "docs/engine/mvp0/public-api-contract.md": "68075217ba4c57feff2a5dce9b4d4e506d2a52095a4b2e891f0558baa60cd243",
-    "docs/engine/mvp0/feature-compliance-checklist.md": "77ea3efd4c6dfed5a09f496a82a1ba7ff3d2832ad1dc92ba9ac1f5cb759dc5c7",
-    "packages/graph-agent/spec/round28-manifest-schema.yaml": "bcdf70ea0469fe02adff8e2c20e03f813195c1eaa0e4c325f8987cb6cfed5481",
+    "docs/mvp0/public-api-contract.md": "68075217ba4c57feff2a5dce9b4d4e506d2a52095a4b2e891f0558baa60cd243",
+    "docs/mvp0/feature-compliance-checklist.md": "77ea3efd4c6dfed5a09f496a82a1ba7ff3d2832ad1dc92ba9ac1f5cb759dc5c7",
+    # Re-pinned at standalone extraction: repository-relative examples changed
+    # from packages/graph-agent/... to src/... without changing the schema.
+    "spec/round28-manifest-schema.yaml": "e642706de673a00d2356b28e84f59b5df68a124547460cb50b322c31e5ffc2ad",
 }
 
 

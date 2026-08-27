@@ -20,8 +20,17 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from langchain_core.messages import AIMessage  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 from graph_agent import LocalWorkspaceResolver, assemble_graph, compile_skill  # noqa: E402
+
+_VOLATILE_FLOW_FIELDS = {
+    "phase_execution_ids",
+    "run_id",
+    "sub_run_id",
+    "thread_id",
+    "trace_path",
+}
 
 
 class FakeHelloWorldChatModel:
@@ -109,7 +118,10 @@ def _run_v21(
         skill_resolver=resolver,
     ).graph
     result = graph.invoke({"data": dict(input_data), "flow": {}, "messages": [], "run_id": run_id})
-    normalized = _normalize({"data": result.get("data", {}), "flow": result.get("flow", {})})
+    flow = _normalize(result.get("flow", {}))
+    if isinstance(flow, dict):
+        flow = {key: value for key, value in flow.items() if key not in _VOLATILE_FLOW_FIELDS}
+    normalized = _normalize({"data": result.get("data", {}), "flow": flow})
     return normalized if isinstance(normalized, dict) else {}
 
 
@@ -148,6 +160,12 @@ def _diff_into(left: Any, right: Any, path: str, diff: dict[str, list[dict[str, 
 
 
 def _normalize(value: Any) -> Any:
+    if isinstance(value, BaseModel):
+        return _normalize(value.model_dump(mode="json"))
+    if isinstance(value, dict):
+        return {str(key): _normalize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_normalize(item) for item in value]
     return json.loads(json.dumps(value, ensure_ascii=False, sort_keys=True, default=str))
 
 

@@ -9,8 +9,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/__main__.py
-  - path: packages/graph-agent/src/graph_agent/settings.py
+  - path: src/graph_agent/__main__.py
+  - path: src/graph_agent/settings.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -29,7 +29,7 @@ features:
   - source-file-map
   contract_status: vendor-only-debt
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/__init__.py
+  - path: src/graph_agent/__init__.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -54,7 +54,7 @@ features:
   - source-file-map
   contract_status: vendor-only
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/compiler.py
+  - path: src/graph_agent/core/compiler.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -74,7 +74,7 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/parser.py
+  - path: src/graph_agent/core/parser.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -92,8 +92,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/loader.py
-  - path: packages/graph-agent/src/graph_agent/core/manifest.py
+  - path: src/graph_agent/core/loader.py
+  - path: src/graph_agent/core/manifest.py
   error_codes_primary:
   - '[F-v3-graph-dataflow-source-missing]'
   - '[F-v3-graph-depends-unknown]'
@@ -139,9 +139,9 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/graph_assembler.py
-  - path: packages/graph-agent/src/graph_agent/core/loader.py
-  - path: packages/graph-agent/src/graph_agent/core/manifest.py
+  - path: src/graph_agent/core/graph_assembler.py
+  - path: src/graph_agent/core/loader.py
+  - path: src/graph_agent/core/manifest.py
   error_codes_primary:
   - '[F-v3-iterate-accumulate-fields-missing]'
   - '[F-v3-iterate-over-not-list]'
@@ -163,7 +163,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/actions.py
+  - path: src/graph_agent/core/actions.py
   error_codes_primary:
   - '[F-v3-logic-action-dir-missing]'
   - '[F-v3-logic-action-entrypoint-missing]'
@@ -197,8 +197,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/builtin_subagents/reference_reader.py
-  - path: packages/graph-agent/src/graph_agent/core/subagents.py
+  - path: src/graph_agent/core/builtin_subagents/reference_reader.py
+  - path: src/graph_agent/core/subagents.py
   error_codes_primary:
   - '[F-v3-agent-subgraph-invalid]'
   - '[F-v3-subgraph-io-schema-invalid]'
@@ -227,7 +227,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/__init__.py
+  - path: src/graph_agent/__init__.py
   error_codes_primary:
   - '[F-v3-agent-body-tag-unknown]'
   - '[F-v3-agent-example-invalid]'
@@ -264,7 +264,7 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/mentions.py
+  - path: src/graph_agent/core/mentions.py
   error_codes_primary:
   - '[F-v3-mention-syntax-invalid]'
   - '[F-v3-mention-target-not-found]'
@@ -284,8 +284,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/tools/builtin/read_example.py
-  - path: packages/graph-agent/src/graph_agent/tools/builtin/read_reference.py
+  - path: src/graph_agent/tools/builtin/read_example.py
+  - path: src/graph_agent/tools/builtin/read_reference.py
   error_codes_primary:
   - '[F-v3-reference-reader-failed]'
   - '[F-v3-resource-example-id-invalid]'
@@ -315,8 +315,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/local_workspace_resolver.py
-  - path: packages/graph-agent/src/graph_agent/core/skill_resolver_protocol.py
+  - path: src/graph_agent/core/local_workspace_resolver.py
+  - path: src/graph_agent/core/skill_resolver_protocol.py
   error_codes_primary:
   - '[F-v3-resolver-interface-invalid]'
   - '[F-v3-resolver-missing]'
@@ -343,7 +343,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/compiler.py
+  - path: src/graph_agent/core/compiler.py
   error_codes_primary:
   - '[F-v3-compile-depth-exceeded]'
   - '[F-v3-compile-recursion-cycle]'
@@ -365,7 +365,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/cognitive/context_facade.py
+  - path: src/graph_agent/cognitive/context_facade.py
   error_codes_primary:
   - '[F-v3-runtime-phase-failed]'
   error_codes_secondary: []
@@ -401,8 +401,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/io_manager.py
-  - path: packages/graph-agent/src/graph_agent/core/run_context.py
+  - path: src/graph_agent/core/io_manager.py
+  - path: src/graph_agent/core/run_context.py
   error_codes_primary:
   - '[F-v3-runtime-state-mapping-failed]'
   error_codes_secondary: []
@@ -429,8 +429,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/cache.py
-  - path: packages/graph-agent/src/graph_agent/core/checkpointer.py
+  - path: src/graph_agent/core/cache.py
+  - path: src/graph_agent/core/checkpointer.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -447,8 +447,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/callbacks/base.py
-  - path: packages/graph-agent/src/graph_agent/callbacks/emit.py
+  - path: src/graph_agent/callbacks/base.py
+  - path: src/graph_agent/callbacks/emit.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:
@@ -469,7 +469,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/callbacks/tracing.py
+  - path: src/graph_agent/callbacks/tracing.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -490,8 +490,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/error_registry.py
-  - path: packages/graph-agent/src/graph_agent/core/exceptions.py
+  - path: src/graph_agent/core/error_registry.py
+  - path: src/graph_agent/core/exceptions.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:
@@ -528,7 +528,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/cognitive/critic.py
+  - path: src/graph_agent/cognitive/critic.py
   error_codes_primary:
   - '[F-v3-cognitive-output-schema-invalid]'
   error_codes_secondary: []
@@ -556,7 +556,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/models/__init__.py
+  - path: src/graph_agent/models/__init__.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:
@@ -584,7 +584,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/skill_tool_factory.py
+  - path: src/graph_agent/core/skill_tool_factory.py
   error_codes_primary:
   - '[F-v3-tool-argument-invalid]'
   error_codes_secondary: []
@@ -608,8 +608,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/cognitive/finish_task.py
-  - path: packages/graph-agent/src/graph_agent/middleware/exit_control.py
+  - path: src/graph_agent/cognitive/finish_task.py
+  - path: src/graph_agent/middleware/exit_control.py
   error_codes_primary:
   - '[F-v3-agent-exit-control-failed]'
   error_codes_secondary: []
@@ -635,8 +635,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/cognitive/md2json.py
-  - path: packages/graph-agent/src/graph_agent/cognitive/md_patch.py
+  - path: src/graph_agent/cognitive/md2json.py
+  - path: src/graph_agent/cognitive/md_patch.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -654,7 +654,7 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/module_sandbox.py
+  - path: src/graph_agent/core/module_sandbox.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -676,7 +676,7 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/tools/builtin/read_file.py
+  - path: src/graph_agent/tools/builtin/read_file.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -694,8 +694,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/middleware/__init__.py
-  - path: packages/graph-agent/src/graph_agent/middleware/factory.py
+  - path: src/graph_agent/middleware/__init__.py
+  - path: src/graph_agent/middleware/factory.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -717,13 +717,13 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/middleware/cognitive_flow.py
-  - path: packages/graph-agent/src/graph_agent/middleware/execution_control.py
-  - path: packages/graph-agent/src/graph_agent/middleware/loop_detection.py
-  - path: packages/graph-agent/src/graph_agent/middleware/protocol_validation.py
-  - path: packages/graph-agent/src/graph_agent/middleware/runtime_input.py
-  - path: packages/graph-agent/src/graph_agent/middleware/tool_error.py
-  - path: packages/graph-agent/src/graph_agent/middleware/tool_history.py
+  - path: src/graph_agent/middleware/cognitive_flow.py
+  - path: src/graph_agent/middleware/execution_control.py
+  - path: src/graph_agent/middleware/loop_detection.py
+  - path: src/graph_agent/middleware/protocol_validation.py
+  - path: src/graph_agent/middleware/runtime_input.py
+  - path: src/graph_agent/middleware/tool_error.py
+  - path: src/graph_agent/middleware/tool_history.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:
@@ -747,9 +747,9 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/_predict_internal/exporter.py
-  - path: packages/graph-agent/src/graph_agent/core/_predict_internal/golden_eval.py
-  - path: packages/graph-agent/src/graph_agent/core/_predict_internal/hash.py
+  - path: src/graph_agent/core/_predict_internal/exporter.py
+  - path: src/graph_agent/core/_predict_internal/golden_eval.py
+  - path: src/graph_agent/core/_predict_internal/hash.py
   error_codes_primary:
   - '[F-v3-golden-stale-fields]'
   error_codes_secondary: []
@@ -779,8 +779,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/callbacks/serialize.py
-  - path: packages/graph-agent/src/graph_agent/core/graph_serializer.py
+  - path: src/graph_agent/callbacks/serialize.py
+  - path: src/graph_agent/core/graph_serializer.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -802,7 +802,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/graph_assembler.py
+  - path: src/graph_agent/core/graph_assembler.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -823,8 +823,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/bootstrap.py
-  - path: packages/graph-agent/src/graph_agent/patches/__init__.py
+  - path: src/graph_agent/bootstrap.py
+  - path: src/graph_agent/patches/__init__.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -847,8 +847,8 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/callbacks/logging_cb.py
-  - path: packages/graph-agent/src/graph_agent/callbacks/metrics.py
+  - path: src/graph_agent/callbacks/logging_cb.py
+  - path: src/graph_agent/callbacks/metrics.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary: []
@@ -869,7 +869,7 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/cognitive/clarification_middleware.py
+  - path: src/graph_agent/cognitive/clarification_middleware.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:
@@ -890,7 +890,7 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/tools/builtin/parallel_map.py
+  - path: src/graph_agent/tools/builtin/parallel_map.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:
@@ -910,8 +910,8 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: packages/graph-agent/src/graph_agent/examples/hello_world/script/greet.py
-  - path: packages/graph-agent/src/graph_agent/io/manager.py
+  - path: src/graph_agent/examples/hello_world/script/greet.py
+  - path: src/graph_agent/io/manager.py
   error_codes_primary: []
   error_codes_secondary: []
   events_primary:

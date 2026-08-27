@@ -14,7 +14,7 @@ from pathlib import Path
 import yaml
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 CODECOV_CONFIG = REPO_ROOT / "codecov.yml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 ROOT_PYPROJECT = REPO_ROOT / "pyproject.toml"
@@ -36,24 +36,21 @@ def test_codecov_yml_declares_report_only_status_and_flags() -> None:
     assert patch_default["threshold"] == "1%"
 
     flags = config["flags"]
-    assert "apps/studio/backend/app/" in flags["backend"]["paths"]
-    assert "packages/graph-agent/src/graph_agent/" in flags["graph-agent"]["paths"]
+    assert "src/graph_agent/" in flags["runtime"]["paths"]
 
     comment = config["comment"]
     assert "layout" in comment
     assert "behavior" in comment
 
 
-def test_ci_uploads_backend_and_graph_agent_coverage_to_codecov() -> None:
+def test_ci_uploads_runtime_coverage_to_codecov() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "codecov/codecov-action@v7" in workflow
     assert "token: ${{ secrets.CODECOV_TOKEN }}" in workflow
-    assert "files: coverage-backend.xml" in workflow
-    assert "files: coverage-graph-agent.xml" in workflow
-    assert "flags: backend" in workflow
-    assert "flags: graph-agent" in workflow
-    assert workflow.count("fail_ci_if_error: false") >= 2
+    assert "files: coverage-runtime.xml" in workflow
+    assert "flags: runtime" in workflow
+    assert "fail_ci_if_error: false" in workflow
 
 
 def test_root_pyproject_enables_coverage_runtime_options() -> None:

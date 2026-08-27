@@ -1,12 +1,18 @@
 [project]
 name = "graph-agent"
 version = "0.3.1"
-description = "Document-driven LLM agent harness SDK"
+description = "Document-driven graph skill runtime extracted from agent-harness"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -39,17 +45,6 @@ dev = [
     "pre-commit>=3.6",
     "pip-audit>=2.7.3,<3.0.0",
 ]
-studio = [
-    "fastapi>=0.115",
-    "uvicorn>=0.30",
-    "watchdog>=4.0",
-]
-e2e = [
-    "playwright>=1.40",
-    "pytest-playwright>=0.5",
-    "websockets>=12",
-]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -58,16 +53,27 @@ build-backend = "hatchling.build"
 packages = ["src/graph_agent"]
 
 [tool.pytest.ini_options]
+minversion = "9.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = ["--import-mode=importlib"]
+consider_namespace_packages = true
 markers = [
     "tier1: core smoke-tier tests for fast PR confidence",
 ]
 
+[project.urls]
+Repository = "https://github.com/SevenX77/graph-skill-runtime"
+Issues = "https://github.com/SevenX77/graph-skill-runtime/issues"
+
 [tool.ruff]
-extend = "../../pyproject.toml"
+line-length = 120
+target-version = "py311"
 
 [tool.ruff.lint]
+select = ["E", "F", "B", "I", "UP", "PLW1514"]
+preview = true
+explicit-preview-rules = true
 extend-select = ["C901"]
 
 [tool.ruff.lint.mccabe]
@@ -84,6 +90,30 @@ max-complexity = 10
 "tests/**" = ["E501"]
 "tests/test_round30_pr*_*.py" = ["I001"]
 
+[tool.mypy]
+python_version = "3.11"
+strict = true
+explicit_package_bases = true
+mypy_path = ["src"]
+exclude = ["tests", "scripts"]
+
 [[tool.mypy.overrides]]
 module = "langgraph.checkpoint.postgres.*"
+ignore_missing_imports = true
+
+[tool.coverage.run]
+relative_files = true
+parallel = true
+source = ["src/graph_agent"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+[[tool.mypy.overrides]]
+module = ["jsonschema", "jsonschema.*", "langchain_anthropic", "yaml", "yaml.*"]
 ignore_missing_imports = true

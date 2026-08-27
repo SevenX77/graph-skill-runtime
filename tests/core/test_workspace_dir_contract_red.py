@@ -72,22 +72,9 @@ def _public_callable(name: str) -> Callable[..., Any]:
     return value
 
 
-_PR_E_VERB_XFAIL = pytest.mark.xfail(
-    reason=(
-        "predict_skill/evaluate_golden_baseline are introduced in PR-E; "
-        "PR-B only blocks on existing run_skill workspace_dir behavior"
-    ),
-    strict=False,
-)
-
-
 @pytest.mark.parametrize(
     "name",
-    [
-        "run_skill",
-        pytest.param("predict_skill", marks=_PR_E_VERB_XFAIL),
-        pytest.param("evaluate_golden_baseline", marks=_PR_E_VERB_XFAIL),
-    ],
+    ["run_skill", "predict_skill", "evaluate_golden_baseline"],
 )
 def test_public_engine_entrypoints_require_workspace_dir_argument(name: str) -> None:
     entrypoint = _public_callable(name)

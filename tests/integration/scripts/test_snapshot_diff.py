@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 # The script is not a package — import the module by path.
-_SCRIPT_DIR = Path(__file__).resolve().parents[5] / "scripts"
+_SCRIPT_DIR = Path(__file__).resolve().parents[3] / "scripts"
 sys.path.insert(0, str(_SCRIPT_DIR))
 
 import snapshot_diff  # noqa: E402

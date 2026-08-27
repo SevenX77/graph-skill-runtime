@@ -9,14 +9,14 @@ from pathlib import Path
 import pytest
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DOCS_ROOT = REPO_ROOT / "docs" / "engine" / "mvp1"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DOCS_ROOT = REPO_ROOT / "docs" / "mvp1"
 HASH_LOCK_PATH = DOCS_ROOT / "_audited-ready-hashes.json"
 EXEMPTIONS_PATH = DOCS_ROOT / "_doc-exemptions.yaml"
 HASH_LOCK_REMEDIATION = (
     "revert unapproved doc edits; or with owner approval update "
-    "docs/engine/mvp1/_audited-ready-hashes.json; or add a temporary exemption "
-    "to docs/engine/mvp1/_doc-exemptions.yaml with file, sha256, reason, and owner_approval"
+    "docs/mvp1/_audited-ready-hashes.json; or add a temporary exemption "
+    "to docs/mvp1/_doc-exemptions.yaml with file, sha256, reason, and owner_approval"
 )
 
 
@@ -33,7 +33,7 @@ def _assert_safe_relative_path(value: object, *, context: str) -> str:
     assert isinstance(value, str) and value, f"{context} must include a non-empty file path"
     relative_path = Path(value)
     assert not relative_path.is_absolute() and ".." not in relative_path.parts, (
-        f"{context} path must stay relative to docs/engine/mvp1: {value}"
+        f"{context} path must stay relative to docs/mvp1: {value}"
     )
     return value
 

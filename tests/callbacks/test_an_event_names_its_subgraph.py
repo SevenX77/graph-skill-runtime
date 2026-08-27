@@ -136,7 +136,7 @@ class _GatewayRouteDecisionStandIn:
     """The shape the gateway actually puts on the wire.
 
     Written out here rather than imported: the engine does not depend on the
-    gateway (`packages/graph-agent/pyproject.toml` lists neither it nor
+    gateway (`pyproject.toml` lists neither it nor
     anything that pulls it in), which is the whole reason the two sides state
     this contract twice. A test that imported the real class would be testing a
     dependency the engine is not allowed to have.

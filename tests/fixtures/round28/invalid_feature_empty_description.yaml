@@ -6,7 +6,7 @@ feature_boundary:
 sources:
   - public-api
 core_paths:
-  - path: packages/graph-agent/src/graph_agent/core/runner.py
+  - path: src/graph_agent/core/runner.py
 error_codes_primary: []
 error_codes_secondary: []
 events_primary: []

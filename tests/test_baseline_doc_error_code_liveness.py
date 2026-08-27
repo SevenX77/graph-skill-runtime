@@ -1,15 +1,15 @@
 """Engine `baseline.md` docs must not present a dead error code as a live gate.
 
-A `baseline.md` under `docs/engine/mvp1/` has exactly one job: describe the
+A `baseline.md` under `docs/mvp1/` has exactly one job: describe the
 CURRENT implementation state. So when such a doc cites an `[F-v3-*]` error code
 as something the engine raises, the engine source must actually contain an
 emission site for it. A code that exists only in
-`packages/graph-agent/src/graph_agent/core/error_registry.py` is registry
+`src/graph_agent/core/error_registry.py` is registry
 metadata, not a live gate, and a baseline doc must say so explicitly.
 
 Observable defect this test reproduces (状态 before the fix)
 -----------------------------------------------------------
-`docs/engine/mvp1/02-mechanism/04-run-outer/01-graph-exec/baseline.md:54` said:
+`docs/mvp1/02-mechanism/04-run-outer/01-graph-exec/baseline.md:54` said:
 
     - **子图 outputs 仍严校**(编译期):同函数继续要求父 `SUBGRAPH.md io.outputs`
       与子 `GRAPH.md io.outputs` 整个 schema 相等;不一致报
@@ -24,14 +24,14 @@ Both statements are false. The gate was deleted on 2026-06-20 by commit
 `cad7dbc0` ("feat(engine): relax subgraph io.outputs 1:1 compile gate
 (n2-iopanel#30)"), whose diff removes the `parent_outputs != child_outputs`
 comparison and its `_fatal(...)` call from `_validate_subgraph_io_contracts` in
-`packages/graph-agent/src/graph_agent/core/loader.py`. That commit's message
+`src/graph_agent/core/loader.py`. That commit's message
 states the retention rule this test encodes:
 
     The error code is retained in the registry (no longer emitted) to preserve
     the round28 registry<->owner bijection + len==97 count.
 
 Mechanical confirmation on the tree this test was written against:
-`grep -rn "outputs do not match" packages/graph-agent/src/` returns nothing, and
+`grep -rn "outputs do not match" src/` returns nothing, and
 `[F-v3-subgraph-io-mismatch]` appears in engine source only at
 `error_registry.py:95`.
 
@@ -58,10 +58,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-ENGINE_SRC_ROOT = REPO_ROOT / "packages" / "graph-agent" / "src" / "graph_agent"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ENGINE_SRC_ROOT = REPO_ROOT / "src" / "graph_agent"
 ERROR_REGISTRY_PATH = ENGINE_SRC_ROOT / "core" / "error_registry.py"
-BASELINE_DOCS_ROOT = REPO_ROOT / "docs" / "engine" / "mvp1"
+BASELINE_DOCS_ROOT = REPO_ROOT / "docs" / "mvp1"
 
 ERROR_CODE_PATTERN = re.compile(r"\[F-v3-[a-z0-9-]+\]")
 

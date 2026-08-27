@@ -6,7 +6,7 @@ features:
       evidence: callback event ownership
     sources: [public-api]
     core_paths:
-      - path: packages/graph-agent/src/graph_agent/callbacks/events.py
+      - path: src/graph_agent/callbacks/events.py
     error_codes_primary:
       - "[F-v3-runtime-phase-failed]"
       - "[F-v3-graph-phase-cycle]"

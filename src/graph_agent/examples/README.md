@@ -27,7 +27,7 @@ uv run python3 -c "
 from graph_agent import run_skill
 
 result = run_skill(
-    'packages/graph-agent/src/graph_agent/examples/hello_world/SKILL.md',
+    'src/graph_agent/examples/hello_world/SKILL.md',
     initial_context={'user_name': 'Developer'}
 )
 print('Result:', result)
