@@ -52,17 +52,17 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from graph_agent.callbacks.events import CallbackEvent
-from graph_agent.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from graph_agent.core.runner import run_skill
-from graph_agent.core.state import (
+from graph_skill_runtime.callbacks.events import CallbackEvent
+from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.core.state import (
     BusinessData,
     FrameworkState,
     WorkflowState,
     merge_flow_channel,
 )
-from graph_agent.middleware.nudge_policy import PLANNING_NUDGE
-from graph_agent.runtime.state_mapper import PhaseWrapper, StateMapper
+from graph_skill_runtime.middleware.nudge_policy import PLANNING_NUDGE
+from graph_skill_runtime.runtime.state_mapper import PhaseWrapper, StateMapper
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"

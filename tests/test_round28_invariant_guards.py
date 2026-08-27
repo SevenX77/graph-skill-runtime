@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from graph_agent.cognitive.prompt import apply_v030_cognitive_template
-from graph_agent.core.error_registry import ERROR_REGISTRY
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.module_sandbox import ModuleSandbox
-from graph_agent.runtime.state import BlackboardState, blackboard_data_merge
+from graph_skill_runtime.cognitive.prompt import apply_v030_cognitive_template
+from graph_skill_runtime.core.error_registry import ERROR_REGISTRY
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.module_sandbox import ModuleSandbox
+from graph_skill_runtime.runtime.state import BlackboardState, blackboard_data_merge
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FEATURES_PATH = REPO_ROOT / "spec/features.yaml"

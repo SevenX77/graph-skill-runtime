@@ -5,14 +5,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from graph_agent.core._predict_internal.models import (
+from graph_skill_runtime.core._predict_internal.models import (
     GoldenCase,
     HeuristicStub,
     PathDiff,
     PhaseRecord,
     PredictResult,
 )
-from graph_agent.core._predict_internal.strategy import MockLLMParam
+from graph_skill_runtime.core._predict_internal.strategy import MockLLMParam
 
 
 def _golden_case() -> GoldenCase:

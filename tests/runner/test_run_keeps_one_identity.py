@@ -15,8 +15,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core.runner import resume_skill, run_skill
-from graph_agent.io.run_layout import runs_root
+from graph_skill_runtime.core.runner import resume_skill, run_skill
+from graph_skill_runtime.io.run_layout import runs_root
 
 
 def _write(path: Path, text: str) -> None:

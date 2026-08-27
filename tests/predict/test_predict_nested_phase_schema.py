@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import graph_agent
+from graph_skill_runtime.core.runner import predict_skill
 
 _CHILD_GRAPH = """---
 schema_version: "v0.3.0"
@@ -115,7 +115,7 @@ def test_predict_gives_the_stub_the_schema_of_a_phase_inside_a_subgraph(
     schema-less `{"value": "<mock_unknown>"}` placeholder."""
     skill = _nested_skill(tmp_path)
 
-    result = graph_agent.predict_skill(skill, workspace_dir=tmp_path / "ws", topic="mirrors")
+    result = predict_skill(skill, workspace_dir=tmp_path / "ws", topic="mirrors")
 
     assert result.success, f"predict failed: {result.error}"
     assert "headline" in result.context, (
@@ -191,7 +191,7 @@ def test_same_phase_name_in_two_subgraphs_each_gets_its_own_schema(tmp_path: Pat
     _write(parent / "child_b" / "GRAPH.md", _SECOND_CHILD_GRAPH)
     _write(parent / "child_b" / "phases" / "write" / "SKILL.md", _SECOND_CHILD_AGENT)
 
-    result = graph_agent.predict_skill(parent, workspace_dir=tmp_path / "ws", topic="mirrors")
+    result = predict_skill(parent, workspace_dir=tmp_path / "ws", topic="mirrors")
 
     assert result.success, f"predict failed: {result.error}"
     assert "headline" in result.context and "verdict" in result.context, (

@@ -23,8 +23,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphCompileError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphCompileError
 
 GRAPH_TEMPLATE = """---
 schema_version: "v0.3.0"

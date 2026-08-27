@@ -6,7 +6,7 @@ features:
       evidence: error code ownership
     sources: [skill-spec]
     core_paths:
-      - path: src/graph_agent/core/error_registry.py
+      - path: src/graph_skill_runtime/core/error_registry.py
     error_codes_primary:
       - "[F-v3-runtime-phase-failed]"
     error_codes_secondary: []

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from graph_agent.cognitive.context_facade import Context
+from graph_skill_runtime.cognitive.context_facade import Context
 
 
 def test_context_supports_minimal_dict_access() -> None:

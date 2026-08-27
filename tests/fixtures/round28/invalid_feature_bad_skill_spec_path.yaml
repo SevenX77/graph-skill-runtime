@@ -8,7 +8,7 @@ sources:
 skill_spec_sections:
   - docs/skill-spec/05-finish-task-spec.md#workflow-finish-mode
 core_paths:
-  - path: src/graph_agent/cognitive/finish_task.py
+  - path: src/graph_skill_runtime/cognitive/finish_task.py
 error_codes_primary: []
 error_codes_secondary: []
 events_primary: []

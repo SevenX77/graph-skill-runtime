@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
 
 
 def test_legacy_schema_20_skill_file_is_not_compilable_v030_root(

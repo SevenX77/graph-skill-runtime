@@ -13,10 +13,10 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.runner import run_skill
-from graph_agent.middleware.nudge_policy import PLANNING_NUDGE
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.middleware.nudge_policy import PLANNING_NUDGE
 
 
 class Recorder:

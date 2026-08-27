@@ -24,8 +24,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from graph_agent.callbacks.emit import _RunSpendLedger, _TraceJsonlSink
-from graph_agent.callbacks.events import LLMCallEvent, PhaseStartEvent
+from graph_skill_runtime.callbacks.emit import _RunSpendLedger, _TraceJsonlSink
+from graph_skill_runtime.callbacks.events import LLMCallEvent, PhaseStartEvent
 
 
 def _lines(path: Path) -> list[dict[str, object]]:

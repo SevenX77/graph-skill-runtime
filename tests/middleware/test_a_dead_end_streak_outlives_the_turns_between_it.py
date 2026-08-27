@@ -29,10 +29,10 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, ToolMessage
 
-from graph_agent.callbacks.base import Callback
-from graph_agent.callbacks.events import DeadEndPrunedEvent
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.middleware.execution_control import ExecutionControlMiddleware
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.callbacks.events import DeadEndPrunedEvent
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.middleware.execution_control import ExecutionControlMiddleware
 
 
 class _RecordingCallback(Callback):

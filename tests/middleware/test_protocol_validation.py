@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.core.schema_engine import SchemaEngine, SchemaObject
-from graph_agent.core.state import (
+from graph_skill_runtime.core.schema_engine import SchemaEngine, SchemaObject
+from graph_skill_runtime.core.state import (
     BusinessData,
     FrameworkState,
     WorkflowState,
 )
-from graph_agent.middleware.protocol_validation import (
+from graph_skill_runtime.middleware.protocol_validation import (
     ProtocolValidationError,
     ProtocolValidationMiddleware,
 )

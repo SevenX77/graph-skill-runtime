@@ -1,10 +1,10 @@
-"""Shared fixtures + import-time invariants for the graph_agent suite.
+"""Shared fixtures + import-time invariants for the graph_skill_runtime suite.
 
 The middleware-chain topological order regression test lives in
-``tests/graph_agent/middleware/test_chain_topology.py`` so pytest
+``tests/graph_skill_runtime/middleware/test_chain_topology.py`` so pytest
 collects it as part of the full suite (``conftest.py`` is treated as
 a fixtures file and tests inside it do not run during a full
-``pytest tests/graph_agent/`` invocation). The import below acts as
+``pytest tests/graph_skill_runtime/`` invocation). The import below acts as
 an import-time sanity check — if the middleware package fails to
 import (e.g., a missing module after a refactor), every test in the
 suite errors out at collection rather than producing a confusing
@@ -25,7 +25,7 @@ import pytest
 # interpreter startup) — call sites still pass encoding="utf-8" explicitly.
 os.environ.setdefault("PYTHONUTF8", "1")
 
-from graph_agent.core.skill_resolver_protocol import SkillResolutionError, validate_skill_id
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError, validate_skill_id
 
 # Import-time sanity: ensure the MVP-3 middleware package is importable
 # before any test runs. The actual ordering assertions live in the

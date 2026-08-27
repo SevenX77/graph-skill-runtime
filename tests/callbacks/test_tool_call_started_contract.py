@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from graph_agent.callbacks.events import CallbackEvent, ToolCallEvent, ToolCallStartedEvent
+from graph_skill_runtime.callbacks.events import CallbackEvent, ToolCallEvent, ToolCallStartedEvent
 
 
 def test_tool_call_event_requires_a_tool_call_id() -> None:

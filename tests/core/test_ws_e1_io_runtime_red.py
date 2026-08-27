@@ -9,9 +9,9 @@ from typing import Any
 
 import pytest
 
-from graph_agent.callbacks.events import InputFileInjectedEvent
-from graph_agent.core.result import RunResult
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.callbacks.events import InputFileInjectedEvent
+from graph_skill_runtime.core.result import RunResult
+from graph_skill_runtime.core.runner import run_skill
 
 RAW_BUSINESS_MD = "## main\n- answer: raw ok\n\n<!-- preserve-me -->\n\n- note: keep spacing"
 
@@ -424,7 +424,7 @@ def test_file_import_io_errors_are_stable_and_do_not_become_business_input(
 def test_markdown_artifact_uses_validated_business_data_md_instead_of_parsed_json(
     tmp_path: Path,
 ) -> None:
-    from graph_agent.io.artifact_manifest import write_manifest_artifacts
+    from graph_skill_runtime.io.artifact_manifest import write_manifest_artifacts
 
     artifacts_dir = tmp_path / "artifacts"
     blackboard = {

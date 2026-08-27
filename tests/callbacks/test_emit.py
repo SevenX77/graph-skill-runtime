@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from graph_agent.callbacks.emit import _safe_emit_event
-from graph_agent.callbacks.events import PhaseStartEvent
+from graph_skill_runtime.callbacks.emit import _safe_emit_event
+from graph_skill_runtime.callbacks.events import PhaseStartEvent
 
 
 class _RaisingCallback:

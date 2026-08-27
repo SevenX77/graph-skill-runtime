@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_agent.callbacks.events import (
+from graph_skill_runtime.callbacks.events import (
     BlackboardReduceEvent,
     EdgeEndEvent,
     EdgeStartEvent,
@@ -22,7 +22,7 @@ from graph_agent.callbacks.events import (
     PhaseEndEvent,
     PhaseStartEvent,
 )
-from graph_agent.core.edge_transition import (
+from graph_skill_runtime.core.edge_transition import (
     active_edge_transition_var,
     active_phase_execution_id,
     close_edge_transition,
@@ -30,7 +30,7 @@ from graph_agent.core.edge_transition import (
     transition_identity,
     wrap_edge_transition,
 )
-from graph_agent.core.state import BusinessData, FrameworkState, merge_flow_channel
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, merge_flow_channel
 
 
 class _Recorder:
@@ -290,7 +290,7 @@ class TestOperationsBelongToTheSegment:
 
 class TestBlackboardReduceIsAttributed:
     def test_reduce_names_its_segment_instead_of_a_null_upstream(self) -> None:
-        from graph_agent.core.graph_assembler import _emit_blackboard_reduce
+        from graph_skill_runtime.core.graph_assembler import _emit_blackboard_reduce
 
         rec = _Recorder()
 

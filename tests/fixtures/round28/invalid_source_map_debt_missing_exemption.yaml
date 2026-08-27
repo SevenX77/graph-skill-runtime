@@ -1,4 +1,4 @@
 files:
-  - path: src/graph_agent/legacy.py
+  - path: src/graph_skill_runtime/legacy.py
     classification: debt
     feature_ids: []

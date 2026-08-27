@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_agent.core._predict_internal.path_diff import compute_diff
+from graph_skill_runtime.core._predict_internal.path_diff import compute_diff
 
 
 def test_compute_diff_identical_paths() -> None:

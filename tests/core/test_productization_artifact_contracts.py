@@ -24,7 +24,7 @@ def _fields(cls: type[Any]) -> set[str]:
 
 
 def _artifact_ref() -> Any:
-    artifacts = importlib.import_module("graph_agent.core.artifacts")
+    artifacts = importlib.import_module("graph_skill_runtime.core.artifacts")
     ArtifactRef = artifacts.ArtifactRef
     return ArtifactRef(
         artifact_id="artifact-runner-demo",
@@ -37,7 +37,7 @@ def _artifact_ref() -> Any:
 
 
 def test_artifact_ref_and_compiled_manifest_define_frozen_identity_contract() -> None:
-    artifacts = importlib.import_module("graph_agent.core.artifacts")
+    artifacts = importlib.import_module("graph_skill_runtime.core.artifacts")
 
     ArtifactRef = artifacts.ArtifactRef
     CompiledArtifactManifest = artifacts.CompiledArtifactManifest
@@ -119,7 +119,7 @@ def test_runtime_requests_require_idempotency_key_and_never_accept_skill_path(
     class_name: str,
     kwargs: dict[str, Any],
 ) -> None:
-    adapters = importlib.import_module("graph_agent.core.adapter_contracts")
+    adapters = importlib.import_module("graph_skill_runtime.core.adapter_contracts")
     request_cls = getattr(adapters, class_name)
     request_fields = _fields(request_cls)
 
@@ -139,7 +139,7 @@ def test_runtime_requests_require_idempotency_key_and_never_accept_skill_path(
 
 
 def test_run_session_exposes_event_result_and_status_refs_without_source_path() -> None:
-    adapters = importlib.import_module("graph_agent.core.adapter_contracts")
+    adapters = importlib.import_module("graph_skill_runtime.core.adapter_contracts")
     RunSession = adapters.RunSession
 
     assert {
@@ -163,7 +163,7 @@ def test_run_session_exposes_event_result_and_status_refs_without_source_path() 
 
 
 def test_runtime_requests_and_session_reject_skill_path() -> None:
-    adapters = importlib.import_module("graph_agent.core.adapter_contracts")
+    adapters = importlib.import_module("graph_skill_runtime.core.adapter_contracts")
     RunArtifactRequest = adapters.RunArtifactRequest
     PredictArtifactRequest = adapters.PredictArtifactRequest
     ResumeRequest = adapters.ResumeRequest

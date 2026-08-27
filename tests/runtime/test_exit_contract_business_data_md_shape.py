@@ -13,8 +13,8 @@ import re
 
 from pydantic import BaseModel
 
-from graph_agent.cognitive.prompt import apply_v030_cognitive_template
-from graph_agent.tools.md_to_json import parse_md
+from graph_skill_runtime.cognitive.prompt import apply_v030_cognitive_template
+from graph_skill_runtime.tools.md_to_json import parse_md
 
 _SCHEMA = {
     "type": "object",

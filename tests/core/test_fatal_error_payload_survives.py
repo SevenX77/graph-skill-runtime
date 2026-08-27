@@ -22,9 +22,9 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-from graph_agent.core.adapter_contracts import RunArtifactRequest
-from graph_agent.core.artifacts import ArtifactRef
-from graph_agent.core.exceptions import GraphAgentFatalError, make_error_payload
+from graph_skill_runtime.core.adapter_contracts import RunArtifactRequest
+from graph_skill_runtime.core.artifacts import ArtifactRef
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError, make_error_payload
 
 
 def _request(idempotency_key: str) -> RunArtifactRequest:
@@ -56,7 +56,7 @@ def _fatal(_: RunArtifactRequest) -> dict[str, Any]:
 
 
 def test_a_fatal_keeps_the_code_it_raised_itself_with() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
 
     result = runner.run_artifact(_request("idem-fatal-1"), artifact_executor=_fatal)
 
@@ -69,7 +69,7 @@ def test_a_fatal_keeps_the_code_it_raised_itself_with() -> None:
 
 def test_a_fatal_keeps_where_it_happened() -> None:
     """The code alone does not locate it — the phase and field must survive too."""
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
 
     result = runner.run_artifact(_request("idem-fatal-2"), artifact_executor=_fatal)
 
@@ -81,7 +81,7 @@ def test_a_fatal_keeps_where_it_happened() -> None:
 
 def test_an_exception_with_no_payload_still_reads_unclassified() -> None:
     """The fallback must stay in place for exceptions that never named themselves."""
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
 
     def _bare(_: RunArtifactRequest) -> dict[str, Any]:
         raise RuntimeError("something the engine cannot classify")

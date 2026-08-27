@@ -7,9 +7,9 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-import graph_agent.bootstrap as bootstrap_module
-from graph_agent.bootstrap import Bootstrap
-from graph_agent.settings import Settings
+import graph_skill_runtime.bootstrap as bootstrap_module
+from graph_skill_runtime.bootstrap import Bootstrap
+from graph_skill_runtime.settings import Settings
 
 
 def test_apply_patches_calls_central_patch_entry_once(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -44,17 +44,17 @@ def test_load_settings_round_trip_from_overrides(monkeypatch: pytest.MonkeyPatch
     settings = bootstrap.load_settings(
         {
             "OPENAI_API_KEY": "sk-test",
-            "GRAPH_AGENT_MODEL_PROVIDER": "openai",
-            "GRAPH_AGENT_DEFAULT_ROLE": "fast",
-            "GRAPH_AGENT_LOG_LEVEL": "debug",
-            "GRAPH_AGENT_DEBUG": "yes",
+            "GRAPH_SKILL_RUNTIME_MODEL_PROVIDER": "openai",
+            "GRAPH_SKILL_RUNTIME_DEFAULT_ROLE": "fast",
+            "GRAPH_SKILL_RUNTIME_LOG_LEVEL": "debug",
+            "GRAPH_SKILL_RUNTIME_DEBUG": "yes",
         }
     )
 
     assert settings == Settings(
         openai_api_key="sk-test",
-        graph_agent_model_provider="openai",
-        graph_agent_default_role="fast",
+        graph_skill_runtime_model_provider="openai",
+        graph_skill_runtime_default_role="fast",
         log_level="DEBUG",
         debug_mode=True,
     )
@@ -64,30 +64,30 @@ def test_load_settings_round_trip_from_overrides(monkeypatch: pytest.MonkeyPatch
 
 def test_settings_from_env_reads_process_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
-    monkeypatch.setenv("GRAPH_AGENT_PERSONA_PATH", "/tmp/personas")
+    monkeypatch.setenv("GRAPH_SKILL_RUNTIME_PERSONA_PATH", "/tmp/personas")
     monkeypatch.setenv("STUDIO_CHECKPOINTER", "memory")
-    monkeypatch.setenv("GRAPH_AGENT_CHECKPOINTER_DB", "/tmp/checkpoints.sqlite")
+    monkeypatch.setenv("GRAPH_SKILL_RUNTIME_CHECKPOINTER_DB", "/tmp/checkpoints.sqlite")
 
     settings = Settings.from_env()
 
     assert settings.anthropic_api_key == "anthropic-key"
-    assert settings.graph_agent_persona_path == "/tmp/personas"
+    assert settings.graph_skill_runtime_persona_path == "/tmp/personas"
     assert settings.studio_checkpointer == "memory"
-    assert settings.graph_agent_checkpointer_db == "/tmp/checkpoints.sqlite"
+    assert settings.graph_skill_runtime_checkpointer_db == "/tmp/checkpoints.sqlite"
 
 
 def test_settings_overrides_do_not_mutate_environ(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("GRAPH_AGENT_MODEL", raising=False)
+    monkeypatch.delenv("GRAPH_SKILL_RUNTIME_MODEL", raising=False)
 
-    settings = Settings.from_env({"GRAPH_AGENT_MODEL": "gpt-test"})
+    settings = Settings.from_env({"GRAPH_SKILL_RUNTIME_MODEL": "gpt-test"})
 
-    assert settings.graph_agent_model == "gpt-test"
-    assert "GRAPH_AGENT_MODEL" not in os.environ
+    assert settings.graph_skill_runtime_model == "gpt-test"
+    assert "GRAPH_SKILL_RUNTIME_MODEL" not in os.environ
 
 
 def test_settings_invalid_bool_raises() -> None:
     with pytest.raises(ValueError, match="Invalid boolean value"):
-        Settings.from_env({"GRAPH_AGENT_DEBUG": "maybe"})
+        Settings.from_env({"GRAPH_SKILL_RUNTIME_DEBUG": "maybe"})
 
 
 def test_settings_is_frozen() -> None:

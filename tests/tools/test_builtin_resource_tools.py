@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentFatalError, SkillLoadError
-from graph_agent.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError, SkillLoadError
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 
 class CaptureToolsChatModel:

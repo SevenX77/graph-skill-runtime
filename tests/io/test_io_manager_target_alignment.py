@@ -1,7 +1,7 @@
 """IOManager target contract (MVP1 r3): ``file`` is the only per-field target.
 
 Artifact persistence moved wholly to the host runtime_config ``artifacts`` manifest
-(``graph_agent.io.artifact_manifest``); the former per-field
+(``graph_skill_runtime.io.artifact_manifest``); the former per-field
 ``target: 'artifact'`` and its ``artifact_manager`` legacy alias were deleted
 in the same change (no-backward-compat).
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.io.manager import IOManager
+from graph_skill_runtime.io.manager import IOManager
 
 
 def test_io_manager_rejects_non_dict_io_config() -> None:

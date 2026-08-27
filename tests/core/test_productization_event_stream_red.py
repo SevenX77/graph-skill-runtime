@@ -4,11 +4,11 @@ import importlib
 
 import pytest
 
-from graph_agent.core.event_contracts import make_event_envelope
+from graph_skill_runtime.core.event_contracts import make_event_envelope
 
 
 def _stream_buffer(*, capacity: int = 10):
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
     return event_contracts.EventStreamBuffer(stream_id="stream-run-1", capacity=capacity)
 
 
@@ -41,7 +41,7 @@ def test_event_stream_resumes_from_cursor_and_deduplicates_seq() -> None:
 
 
 def test_event_stream_gap_and_expired_cursor_are_explicit_errors() -> None:
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
     stream = _stream_buffer(capacity=2)
     stream.append(make_event_envelope(stream_id="stream-run-1", seq=1, run_id="run-1", event_type="a", payload={}))
 
@@ -60,7 +60,7 @@ def test_event_stream_gap_and_expired_cursor_are_explicit_errors() -> None:
 
 
 def test_event_stream_backpressure_and_out_of_order_handling_are_explicit() -> None:
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
     stream = _stream_buffer(capacity=1)
     stream.append(make_event_envelope(stream_id="stream-run-1", seq=1, run_id="run-1", event_type="a", payload={}))
 

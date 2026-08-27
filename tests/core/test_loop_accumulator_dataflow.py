@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
 
 _GRAPH = """---
 schema_version: "v0.3.0"

@@ -18,10 +18,10 @@ from pathlib import Path
 
 import pytest
 
-import graph_agent
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.runtime.state_mapper import StateMapper
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.runner import predict_skill
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.runtime.state_mapper import StateMapper
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"
@@ -86,7 +86,7 @@ def validator_skill(tmp_path: Path) -> Path:
 def test_predict_with_stub_mock_downgrades_validator_failure_and_records_it(
     validator_skill: Path, tmp_path: Path
 ) -> None:
-    result = graph_agent.predict_skill(
+    result = predict_skill(
         validator_skill,
         workspace_dir=tmp_path / "ws",
         topic="mirrors",
@@ -109,7 +109,7 @@ def test_predict_with_manual_override_keeps_validator_strict(
     """P1 manual/Copilot output is authored, not fabricated — a validator that
     rejects it is a true signal and must stay fatal."""
     with pytest.raises(GraphAgentFatalError) as exc_info:
-        graph_agent.predict_skill(
+        predict_skill(
             validator_skill,
             workspace_dir=tmp_path / "ws",
             mock_llm={"main": {"answer": "an authored answer"}},

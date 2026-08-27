@@ -11,9 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core.graph_assembler import _AgentSystemPrompt, _resolve_phase_chat_model
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.manifest import (
+from graph_skill_runtime.core.graph_assembler import _AgentSystemPrompt, _resolve_phase_chat_model
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.manifest import (
     AgentNodeAST,
     GraphManifest,
     PhaseIOSchema,
@@ -150,7 +150,7 @@ def test_effective_role_switch_on_without_graph_default_falls_back() -> None:
     ast = AgentNodeAST(
         mode="agent", role="r", goal="g", llm_role="analyst", use_graph_llm_role=True, io=_MINIMAL_IO
     )
-    assert effective_llm_role(ast, None) == "graph_agent"
+    assert effective_llm_role(ast, None) == "graph_skill_runtime"
 
 
 def test_effective_role_switch_off_node_wins() -> None:
@@ -165,7 +165,7 @@ def test_effective_role_switch_off_without_node_inherits_graph() -> None:
 
 def test_effective_role_both_unset_uses_conventional_default() -> None:
     ast = AgentNodeAST(mode="agent", role="r", goal="g", io=_MINIMAL_IO)
-    assert effective_llm_role(ast, None) == "graph_agent"
+    assert effective_llm_role(ast, None) == "graph_skill_runtime"
 
 
 # --- the resolver receives the effective role, not the raw node value ---

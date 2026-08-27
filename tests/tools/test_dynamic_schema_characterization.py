@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.tools.dynamic_schema import (
+from graph_skill_runtime.tools.dynamic_schema import (
     OutputExampleParseError,
     _build_type_runtime,
     parse_output_example,

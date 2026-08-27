@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from graph_agent.core.graph_serializer import serialize_graph_topology
-from graph_agent.core.manifest import GraphPhaseRef, PhaseIOSchema
+from graph_skill_runtime.core.graph_serializer import serialize_graph_topology
+from graph_skill_runtime.core.manifest import GraphPhaseRef, PhaseIOSchema
 
 
 def _ref(phase_id: str, depends_on: list[str]) -> GraphPhaseRef:

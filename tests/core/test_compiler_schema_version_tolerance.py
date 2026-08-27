@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
 
 
 def _write_v030_skill(root: Path, schema_version_literal: str) -> None:

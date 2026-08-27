@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.core.cache import compute_cache_key
+from graph_skill_runtime.core.cache import compute_cache_key
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"

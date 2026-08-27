@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.cognitive.md2json import _coerce_value
+from graph_skill_runtime.cognitive.md2json import _coerce_value
 
 # These cases were written by 7a25b5d8 (2026-05-29) to pin the THEN-current
 # behaviour of nine helpers while a C901 complexity refactor split them apart —

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_agent.core.blackboard_contract import (
+from graph_skill_runtime.core.blackboard_contract import (
     blackboard_fields_at_output,
     undeclared_output_names,
 )

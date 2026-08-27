@@ -6,13 +6,13 @@ physical middleware skeletons.
 
 from __future__ import annotations
 
-from graph_agent.middleware import MVP0_MIDDLEWARE_ORDER_CONTRACT
+from graph_skill_runtime.middleware import MVP0_MIDDLEWARE_ORDER_CONTRACT
 
 
 def test_beta_factory_builds_six_middlewares_in_contract_order() -> None:
     """Unit: factory must consume MVP0_MIDDLEWARE_ORDER_CONTRACT as source of truth."""
 
-    from graph_agent.middleware.factory import build_middleware_chain
+    from graph_skill_runtime.middleware.factory import build_middleware_chain
 
     chain = build_middleware_chain(
         io_manager=object(),
@@ -37,7 +37,7 @@ def test_beta_factory_builds_six_middlewares_in_contract_order() -> None:
 def test_beta_factory_does_not_copy_a_parallel_order_list() -> None:
     """Unit: PR β must not maintain a second hard-coded middleware order."""
 
-    import graph_agent.middleware.factory as factory
+    import graph_skill_runtime.middleware.factory as factory
 
     assert factory.MIDDLEWARE_ORDER_CONTRACT is MVP0_MIDDLEWARE_ORDER_CONTRACT
 
@@ -47,9 +47,9 @@ def test_beta_tracing_tool_error_loop_detection_skeletons_are_physical_classes()
 
     from langchain.agents.middleware import AgentMiddleware
 
-    from graph_agent.middleware.loop_detection import LoopDetectionMiddleware
-    from graph_agent.middleware.tool_error import ToolErrorHandlingMiddleware
-    from graph_agent.middleware.tracing import TracingMiddleware
+    from graph_skill_runtime.middleware.loop_detection import LoopDetectionMiddleware
+    from graph_skill_runtime.middleware.tool_error import ToolErrorHandlingMiddleware
+    from graph_skill_runtime.middleware.tracing import TracingMiddleware
 
     assert issubclass(TracingMiddleware, AgentMiddleware)
     assert issubclass(ToolErrorHandlingMiddleware, AgentMiddleware)

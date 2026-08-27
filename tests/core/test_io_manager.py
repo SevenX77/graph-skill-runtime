@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 
-from graph_agent.core.io_manager import HoistResult, IODef, IOManager
-from graph_agent.core.state import BusinessData
+from graph_skill_runtime.core.io_manager import HoistResult, IODef, IOManager
+from graph_skill_runtime.core.state import BusinessData
 
 
 def test_io_def_frozen() -> None:

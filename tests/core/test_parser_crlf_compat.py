@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_agent.core.parser import parse_markdown_parts
+from graph_skill_runtime.core.parser import parse_markdown_parts
 
 
 def test_parse_markdown_parts_accepts_crlf_on_disk(tmp_path):

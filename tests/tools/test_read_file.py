@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.tools.builtin.read_file import make_read_file_tool
+from graph_skill_runtime.tools.builtin.read_file import make_read_file_tool
 
 
 class TestReadFileBuiltin:

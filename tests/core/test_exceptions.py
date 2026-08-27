@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.core.exceptions import (
+from graph_skill_runtime.core.exceptions import (
     ArtifactError,
     CheckpointError,
     ContractValidationError,

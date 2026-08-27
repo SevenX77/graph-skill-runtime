@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.callbacks.events import InterruptedEvent
-from graph_agent.core.result import PausedRunPoint, RunResult
+from graph_skill_runtime.callbacks.events import InterruptedEvent
+from graph_skill_runtime.core.result import PausedRunPoint, RunResult
 
 
 def test_a_paused_run_says_where_it_stopped_and_why() -> None:

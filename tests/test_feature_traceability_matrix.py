@@ -11,9 +11,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPO_ROOT
 MATRIX_PATH = REPO_ROOT / "docs/feature-compliance-checklist.md"
 FEATURES_PATH = PACKAGE_ROOT / "spec/features.yaml"
-EXPECTED_FEATURE_COUNT = 36
-EXPECTED_CHECKLIST_H3_COUNT = 35
-EXPECTED_COVERAGE_COUNT = 35
 COVERAGE_RE = re.compile(
     r"\[Covered By: (?P<path>tests/[^:\]]+)::(?:(?P<class>[A-Za-z0-9_]+)::)?(?P<test>test_[A-Za-z0-9_]+)(?:\[[^\]]+\])?\]"
 )
@@ -37,12 +34,12 @@ def test_feature_matrix_lifecycle_items_reference_existing_collectable_tests() -
     text = MATRIX_PATH.read_text(encoding="utf-8")
     features = yaml.safe_load(FEATURES_PATH.read_text(encoding="utf-8"))["features"]
 
-    feature_count = len(re.findall(r"^### ", text, flags=re.MULTILINE))
+    checklist_ids = re.findall(r"^### (F-[a-z0-9-]+):", text, flags=re.MULTILINE)
+    manifest_ids = [feature["id"] for feature in features]
     refs = _coverage_refs()
     assert "## Manifest Features" in text
-    assert len(features) == EXPECTED_FEATURE_COUNT
-    assert feature_count == EXPECTED_CHECKLIST_H3_COUNT
-    assert len(refs) == EXPECTED_COVERAGE_COUNT
+    assert checklist_ids == manifest_ids
+    assert len(refs) == len(features)
 
     nodeids: list[str] = []
     for relative_path, test_name, class_name in refs:

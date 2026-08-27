@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from graph_agent.core.state import (
+from graph_skill_runtime.core.state import (
     BusinessData,
     FrameworkState,
     StateManager,

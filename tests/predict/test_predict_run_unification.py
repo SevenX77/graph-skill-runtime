@@ -6,11 +6,11 @@ from typing import Any
 
 import pytest
 
-from graph_agent.callbacks.events import PhaseEndEvent, PhaseStartEvent
-from graph_agent.core import runner as runner_module
-from graph_agent.core._predict_internal.strategy import HeuristicStubStrategy
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.io.run_layout import predicts_root, runs_root
+from graph_skill_runtime.callbacks.events import PhaseEndEvent, PhaseStartEvent
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.core._predict_internal.strategy import HeuristicStubStrategy
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.io.run_layout import predicts_root, runs_root
 
 
 class _DumpData:
@@ -99,7 +99,7 @@ def test_predict_reuses_run_v030_skill_dict_single_path(
         }
 
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
     monkeypatch.setattr(runner_module, "_run_v030_skill_dict", fake_run_v030_skill_dict)
@@ -126,7 +126,7 @@ def test_predict_context_threaded_to_assemble_graph(
     received_predict_contexts: list[Any] = []
 
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
 
@@ -134,7 +134,7 @@ def test_predict_context_threaded_to_assemble_graph(
         received_predict_contexts.append(kwargs.get("predict_context"))
         return _FakeAssembler({})
 
-    monkeypatch.setattr("graph_agent.core.graph_assembler.assemble_graph", fake_assemble_graph)
+    monkeypatch.setattr("graph_skill_runtime.core.graph_assembler.assemble_graph", fake_assemble_graph)
 
     runner_module._run_v030_skill_dict(
         skill_root,
@@ -169,9 +169,9 @@ def test_predict_root_output_schema_validated_like_run(
     }
     compiled = _compiled_with_outputs(output_schema)
 
-    monkeypatch.setattr("graph_agent.core.compiler.compile_skill", lambda *_args, **_kwargs: compiled)
+    monkeypatch.setattr("graph_skill_runtime.core.compiler.compile_skill", lambda *_args, **_kwargs: compiled)
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.assemble_graph",
+        "graph_skill_runtime.core.graph_assembler.assemble_graph",
         lambda *_args, **_kwargs: _FakeAssembler({"other": "missing text"}),
     )
 
@@ -230,11 +230,11 @@ def test_predict_wrapper_still_returns_path_diff_and_deadlock(
         }
 
     monkeypatch.setattr(
-        "graph_agent.core._predict_internal.strategy.MockStrategy.from_param",
+        "graph_skill_runtime.core._predict_internal.strategy.MockStrategy.from_param",
         fake_strategy_from_param,
     )
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
     monkeypatch.setattr(runner_module, "_run_v030_skill_dict", fake_run_v030_skill_dict)

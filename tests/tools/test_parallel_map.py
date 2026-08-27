@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-from graph_agent.tools.builtin.parallel_map import parallel_map
+from graph_skill_runtime.tools.builtin.parallel_map import parallel_map
 
-parallel_map_module = importlib.import_module("graph_agent.tools.builtin.parallel_map")
+parallel_map_module = importlib.import_module("graph_skill_runtime.tools.builtin.parallel_map")
 
 
 class Collector:

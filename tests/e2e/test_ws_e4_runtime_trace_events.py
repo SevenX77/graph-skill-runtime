@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from graph_agent.callbacks.events import InputDispatchEvent
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.callbacks.events import InputDispatchEvent
+from graph_skill_runtime.core.runner import run_skill
 
 from ..ws_e4_runtime_skills import write_serial_two_phase_skill
 

@@ -36,7 +36,7 @@ def test_codecov_yml_declares_report_only_status_and_flags() -> None:
     assert patch_default["threshold"] == "1%"
 
     flags = config["flags"]
-    assert "src/graph_agent/" in flags["runtime"]["paths"]
+    assert "src/graph_skill_runtime/" in flags["runtime"]["paths"]
 
     comment = config["comment"]
     assert "layout" in comment

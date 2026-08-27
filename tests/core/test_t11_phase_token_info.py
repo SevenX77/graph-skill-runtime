@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.loader import get_phase_token_info
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.loader import get_phase_token_info
 
 
 def _write_v030_phase_token_skill(root: Path) -> None:

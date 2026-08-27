@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from graph_agent.callbacks.events import LLMCallEvent, PhaseEndEvent, PhaseStartEvent
-from graph_agent.core._predict_internal.tracing import (
+from graph_skill_runtime.callbacks.events import LLMCallEvent, PhaseEndEvent, PhaseStartEvent
+from graph_skill_runtime.core._predict_internal.tracing import (
     PredictTracingCallback,
     clear_mock_source_cache,
     record_mock_source,

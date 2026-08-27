@@ -20,12 +20,12 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from graph_agent.core.llm_provider import (
+from graph_skill_runtime.core.llm_provider import (
     FakeLLMProvider,
     LLMProviderChatModel,
     LLMProviderChunk,
 )
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 class RecordingCallback:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_agent.callbacks.events import InterruptedEvent, ResumedEvent
+from graph_skill_runtime.callbacks.events import InterruptedEvent, ResumedEvent
 
 
 def test_hitl_events_expose_checkpoint_and_namespace_contract() -> None:

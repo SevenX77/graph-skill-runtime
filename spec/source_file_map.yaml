@@ -1,344 +1,490 @@
 config:
+  complete_inventory: true
   include_globs:
-  - src/graph_agent/**/*.py
+  - src/graph_skill_runtime/**/*.py
   exclude_globs: []
 files:
-- path: src/graph_agent/__init__.py
-  classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/__main__.py
+- path: src/graph_skill_runtime/__init__.py
   classification: feature
   feature_ids:
-  - F-public-api-surface
-- path: src/graph_agent/bootstrap.py
+  - F-typed-runtime-facade
+- path: src/graph_skill_runtime/__main__.py
+  classification: feature
+  feature_ids:
+  - F-runtime-cli-adapter
+- path: src/graph_skill_runtime/adapters/__init__.py
+  classification: detail
+  feature_id: F-runtime-application-service
+- path: src/graph_skill_runtime/adapters/cli.py
+  classification: feature
+  feature_ids:
+  - F-runtime-cli-adapter
+- path: src/graph_skill_runtime/adapters/engine.py
+  classification: feature
+  feature_ids:
+  - F-current-engine-adapter
+- path: src/graph_skill_runtime/adapters/mcp.py
+  classification: feature
+  feature_ids:
+  - F-runtime-mcp-adapter
+- path: src/graph_skill_runtime/adapters/snapshots.py
+  classification: feature
+  feature_ids:
+  - F-run-snapshot-persistence
+- path: src/graph_skill_runtime/application/__init__.py
+  classification: detail
+  feature_id: F-runtime-application-service
+- path: src/graph_skill_runtime/application/config.py
+  classification: feature
+  feature_ids:
+  - F-runtime-config-resolution
+- path: src/graph_skill_runtime/application/service.py
+  classification: feature
+  feature_ids:
+  - F-runtime-application-service
+- path: src/graph_skill_runtime/bootstrap.py
   classification: feature
   feature_ids:
   - F-runtime-compatibility-patches
-- path: src/graph_agent/callbacks/__init__.py
-  classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/callbacks/base.py
-  classification: feature
-  feature_ids:
-  - F-callback-event-stream
-- path: src/graph_agent/callbacks/emit.py
-  classification: feature
-  feature_ids:
-  - F-callback-event-stream
-- path: src/graph_agent/callbacks/events.py
+- path: src/graph_skill_runtime/callbacks/__init__.py
   classification: detail
   feature_id: F-callback-event-stream
-- path: src/graph_agent/callbacks/logging_cb.py
+- path: src/graph_skill_runtime/callbacks/base.py
+  classification: feature
+  feature_ids:
+  - F-callback-event-stream
+- path: src/graph_skill_runtime/callbacks/emit.py
+  classification: feature
+  feature_ids:
+  - F-callback-event-stream
+- path: src/graph_skill_runtime/callbacks/events.py
+  classification: detail
+  feature_id: F-callback-event-stream
+- path: src/graph_skill_runtime/callbacks/logging_cb.py
   classification: feature
   feature_ids:
   - F-observability-metrics
-- path: src/graph_agent/callbacks/metrics.py
+- path: src/graph_skill_runtime/callbacks/metrics.py
   classification: feature
   feature_ids:
   - F-observability-metrics
-- path: src/graph_agent/callbacks/serialize.py
+- path: src/graph_skill_runtime/callbacks/serialize.py
   classification: feature
   feature_ids:
   - F-serialization-output
-- path: src/graph_agent/callbacks/tracing.py
+- path: src/graph_skill_runtime/callbacks/tracing.py
   classification: feature
   feature_ids:
   - F-callback-tracing
-- path: src/graph_agent/cognitive/__init__.py
+- path: src/graph_skill_runtime/callbacks/token_accounting.py
+  classification: feature
+  feature_ids:
+  - F-observability-metrics
+- path: src/graph_skill_runtime/cognitive/__init__.py
   classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/cognitive/clarification_middleware.py
+  feature_id: F-agent-phase-orchestration
+- path: src/graph_skill_runtime/cognitive/clarification_middleware.py
   classification: feature
   feature_ids:
   - F-clarification-flow
-- path: src/graph_agent/cognitive/context_facade.py
+- path: src/graph_skill_runtime/cognitive/context_facade.py
   classification: feature
   feature_ids:
   - F-runtime-execution
-- path: src/graph_agent/cognitive/critic.py
+- path: src/graph_skill_runtime/cognitive/critic.py
   classification: feature
   feature_ids:
   - F-llm-prompt-assembly
-- path: src/graph_agent/cognitive/finish_task.py
+- path: src/graph_skill_runtime/cognitive/finish_task.py
   classification: feature
   feature_ids:
   - F-finish-task-validation
-- path: src/graph_agent/cognitive/md2json.py
+- path: src/graph_skill_runtime/cognitive/md2json.py
   classification: feature
   feature_ids:
   - F-md-patch
-- path: src/graph_agent/cognitive/md_patch.py
+- path: src/graph_skill_runtime/cognitive/md_patch.py
   classification: feature
   feature_ids:
   - F-md-patch
-- path: src/graph_agent/cognitive/prompt.py
+- path: src/graph_skill_runtime/cognitive/prompt.py
   classification: detail
   feature_id: F-llm-prompt-assembly
-- path: src/graph_agent/config/__init__.py
+- path: src/graph_skill_runtime/composition.py
+  classification: feature
+  feature_ids:
+  - F-runtime-application-service
+- path: src/graph_skill_runtime/config/__init__.py
   classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/core/__init__.py
+  feature_id: F-current-engine-adapter
+- path: src/graph_skill_runtime/domain/__init__.py
   classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/core/_predict_internal/__init__.py
+  feature_id: F-typed-runtime-facade
+- path: src/graph_skill_runtime/domain/models.py
+  classification: feature
+  feature_ids:
+  - F-typed-runtime-facade
+- path: src/graph_skill_runtime/core/__init__.py
+  classification: detail
+  feature_id: F-current-engine-adapter
+- path: src/graph_skill_runtime/core/_predict_internal/__init__.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/exporter.py
+- path: src/graph_skill_runtime/core/_predict_internal/exporter.py
   classification: feature
   feature_ids:
   - F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/golden_eval.py
+- path: src/graph_skill_runtime/core/_predict_internal/golden_eval.py
   classification: feature
   feature_ids:
   - F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/hash.py
+- path: src/graph_skill_runtime/core/_predict_internal/hash.py
   classification: feature
   feature_ids:
   - F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/interception.py
+- path: src/graph_skill_runtime/core/_predict_internal/interception.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/models.py
+- path: src/graph_skill_runtime/core/_predict_internal/models.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/path_diff.py
+- path: src/graph_skill_runtime/core/_predict_internal/path_diff.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/strategy.py
+- path: src/graph_skill_runtime/core/_predict_internal/strategy.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/stub.py
+- path: src/graph_skill_runtime/core/_predict_internal/stub.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/_predict_internal/tracing.py
+- path: src/graph_skill_runtime/core/_predict_internal/tracing.py
   classification: detail
   feature_id: F-predict-internal-mocking
-- path: src/graph_agent/core/actions.py
+- path: src/graph_skill_runtime/core/actions.py
   classification: feature
   feature_ids:
   - F-logic-action-execution
-- path: src/graph_agent/core/authored_text.py
+- path: src/graph_skill_runtime/core/adapter_contracts.py
+  classification: detail
+  feature_id: F-runtime-execution
+- path: src/graph_skill_runtime/core/artifacts.py
+  classification: feature
+  feature_ids:
+  - F-storage-io
+- path: src/graph_skill_runtime/core/authored_text.py
   classification: detail
   feature_id: F-md-frontmatter-parsing
-- path: src/graph_agent/core/builtin_subagents/__init__.py
+- path: src/graph_skill_runtime/core/builtin_subagents/__init__.py
   classification: detail
   feature_id: F-subgraph-delegation
-- path: src/graph_agent/core/builtin_subagents/reference_reader.py
+- path: src/graph_skill_runtime/core/builtin_subagents/reference_reader.py
   classification: feature
   feature_ids:
   - F-subgraph-delegation
-- path: src/graph_agent/core/cache.py
+- path: src/graph_skill_runtime/core/blackboard_contract.py
+  classification: feature
+  feature_ids:
+  - F-state-blackboard
+- path: src/graph_skill_runtime/core/cache.py
   classification: feature
   feature_ids:
   - F-checkpoint-persistence
-- path: src/graph_agent/core/checkpointer.py
+- path: src/graph_skill_runtime/core/checkpointer.py
   classification: feature
   feature_ids:
   - F-checkpoint-persistence
-- path: src/graph_agent/core/compiler.py
+- path: src/graph_skill_runtime/core/checkpoint_validity.py
+  classification: feature
+  feature_ids:
+  - F-checkpoint-persistence
+- path: src/graph_skill_runtime/core/compiler.py
   classification: feature
   feature_ids:
   - F-compile-runtime-flow
-- path: src/graph_agent/core/error_registry.py
+- path: src/graph_skill_runtime/core/edge_transition.py
+  classification: feature
+  feature_ids:
+  - F-runtime-execution
+- path: src/graph_skill_runtime/core/error_registry.py
   classification: feature
   feature_ids:
   - F-error-code-recovery
-- path: src/graph_agent/core/exceptions.py
+- path: src/graph_skill_runtime/core/event_contracts.py
+  classification: feature
+  feature_ids:
+  - F-callback-event-stream
+- path: src/graph_skill_runtime/core/exceptions.py
   classification: feature
   feature_ids:
   - F-error-code-recovery
-- path: src/graph_agent/core/graph_assembler.py
+- path: src/graph_skill_runtime/core/graph_assembler.py
   classification: feature
   feature_ids:
   - F-graph-assembly
-- path: src/graph_agent/core/graph_serializer.py
+  - F-iterate-runtime
+  - F-agent-phase-orchestration
+- path: src/graph_skill_runtime/core/graph_serializer.py
   classification: feature
   feature_ids:
   - F-serialization-output
-- path: src/graph_agent/core/harness.py
-  classification: detail
-  feature_id: F-runtime-execution
-- path: src/graph_agent/core/io_manager.py
+- path: src/graph_skill_runtime/core/io_manager.py
   classification: feature
   feature_ids:
   - F-state-blackboard
-- path: src/graph_agent/core/loader.py
-  classification: feature
-  feature_ids:
-  - F-graph-skill-loading
-- path: src/graph_agent/core/local_workspace_resolver.py
-  classification: feature
-  feature_ids:
-  - F-skill-resolution
-- path: src/graph_agent/core/manifest.py
-  classification: feature
-  feature_ids:
-  - F-graph-skill-loading
-- path: src/graph_agent/core/mentions.py
-  classification: feature
-  feature_ids:
-  - F-mention-resolution
-- path: src/graph_agent/core/module_sandbox.py
-  classification: feature
-  feature_ids:
-  - F-tool-sandbox-permission
-- path: src/graph_agent/core/parser.py
-  classification: feature
-  feature_ids:
-  - F-md-frontmatter-parsing
-- path: src/graph_agent/core/purity.py
-  classification: detail
-  feature_id: F-logic-action-execution
-- path: src/graph_agent/core/result.py
-  classification: detail
-  feature_id: F-runtime-execution
-- path: src/graph_agent/core/run_context.py
-  classification: feature
-  feature_ids:
-  - F-state-blackboard
-- path: src/graph_agent/core/runner.py
-  classification: detail
-  feature_id: F-runtime-execution
-- path: src/graph_agent/core/schema_engine.py
-  classification: detail
-  feature_id: F-runtime-execution
-- path: src/graph_agent/core/serialize.py
-  classification: detail
-  feature_id: F-serialization-output
-- path: src/graph_agent/core/skill_resolver_protocol.py
-  classification: feature
-  feature_ids:
-  - F-skill-resolution
-- path: src/graph_agent/core/skill_tool_factory.py
-  classification: feature
-  feature_ids:
-  - F-tool-call-binding
-- path: src/graph_agent/core/state.py
-  classification: detail
-  feature_id: F-state-blackboard
-- path: src/graph_agent/core/subagents.py
-  classification: feature
-  feature_ids:
-  - F-subgraph-delegation
-- path: src/graph_agent/core/template.py
-  classification: detail
-  feature_id: F-compile-runtime-flow
-- path: src/graph_agent/core/validator_contract.py
-  classification: detail
-  feature_id: F-logic-action-execution
-- path: src/graph_agent/core/validators/__init__.py
-  classification: detail
-  feature_id: F-logic-action-execution
-- path: src/graph_agent/examples/hello_world/script/__init__.py
-  classification: detail
-  feature_id: F-storage-io
-- path: src/graph_agent/examples/hello_world/script/greet.py
-  classification: feature
-  feature_ids:
-  - F-storage-io
-- path: src/graph_agent/io/__init__.py
-  classification: detail
-  feature_id: F-storage-io
-- path: src/graph_agent/io/manager.py
-  classification: feature
-  feature_ids:
-  - F-storage-io
-- path: src/graph_agent/io/skill_analyzer.py
-  classification: detail
-  feature_id: F-storage-io
-- path: src/graph_agent/io/storage.py
-  classification: detail
-  feature_id: F-storage-io
-- path: src/graph_agent/middleware/__init__.py
-  classification: detail
-  feature_id: F-middleware-mounting
-- path: src/graph_agent/middleware/cognitive_flow.py
-  classification: feature
-  feature_ids:
-  - F-middleware-mounting
-- path: src/graph_agent/middleware/execution_control.py
-  classification: feature
-  feature_ids:
-  - F-middleware-mounting
-- path: src/graph_agent/middleware/factory.py
-  classification: detail
-  feature_id: F-middleware-mounting
-- path: src/graph_agent/middleware/loop_detection.py
-  classification: detail
-  feature_id: F-middleware-mounting
-- path: src/graph_agent/middleware/protocol_validation.py
-  classification: detail
-  feature_id: F-middleware-mounting
-- path: src/graph_agent/middleware/tool_error.py
-  classification: detail
-  feature_id: F-middleware-mounting
-- path: src/graph_agent/middleware/tracing.py
-  classification: detail
-  feature_id: F-middleware-mounting
-- path: src/graph_agent/models/__init__.py
+- path: src/graph_skill_runtime/core/llm_provider.py
   classification: feature
   feature_ids:
   - F-llm-execution
-- path: src/graph_agent/models/reasoning_patch.py
+- path: src/graph_skill_runtime/core/loader.py
+  classification: feature
+  feature_ids:
+  - F-graph-skill-loading
+  - F-iterate-runtime
+  - F-agent-phase-orchestration
+- path: src/graph_skill_runtime/core/local_workspace_resolver.py
+  classification: feature
+  feature_ids:
+  - F-skill-resolution
+- path: src/graph_skill_runtime/core/manifest.py
+  classification: feature
+  feature_ids:
+  - F-graph-skill-loading
+  - F-iterate-runtime
+- path: src/graph_skill_runtime/core/mentions.py
+  classification: feature
+  feature_ids:
+  - F-mention-resolution
+- path: src/graph_skill_runtime/core/module_sandbox.py
+  classification: feature
+  feature_ids:
+  - F-tool-sandbox-permission
+- path: src/graph_skill_runtime/core/parser.py
+  classification: feature
+  feature_ids:
+  - F-md-frontmatter-parsing
+- path: src/graph_skill_runtime/core/purity.py
+  classification: detail
+  feature_id: F-logic-action-execution
+- path: src/graph_skill_runtime/core/result.py
+  classification: detail
+  feature_id: F-runtime-execution
+- path: src/graph_skill_runtime/core/result_contracts.py
+  classification: feature
+  feature_ids:
+  - F-runtime-execution
+- path: src/graph_skill_runtime/core/run_context.py
+  classification: feature
+  feature_ids:
+  - F-state-blackboard
+- path: src/graph_skill_runtime/core/runtime_state.py
+  classification: feature
+  feature_ids:
+  - F-state-blackboard
+- path: src/graph_skill_runtime/core/runner.py
+  classification: detail
+  feature_id: F-runtime-execution
+- path: src/graph_skill_runtime/core/schema_engine.py
+  classification: detail
+  feature_id: F-runtime-execution
+- path: src/graph_skill_runtime/core/serialize.py
+  classification: detail
+  feature_id: F-serialization-output
+- path: src/graph_skill_runtime/core/skill_resolver_protocol.py
+  classification: feature
+  feature_ids:
+  - F-skill-resolution
+- path: src/graph_skill_runtime/core/skill_tool_factory.py
+  classification: feature
+  feature_ids:
+  - F-tool-call-binding
+- path: src/graph_skill_runtime/core/state.py
+  classification: detail
+  feature_id: F-state-blackboard
+- path: src/graph_skill_runtime/core/storage_contracts.py
+  classification: feature
+  feature_ids:
+  - F-storage-io
+- path: src/graph_skill_runtime/core/subagents.py
+  classification: feature
+  feature_ids:
+  - F-subgraph-delegation
+- path: src/graph_skill_runtime/core/template.py
+  classification: detail
+  feature_id: F-compile-runtime-flow
+- path: src/graph_skill_runtime/core/topology_projection.py
+  classification: feature
+  feature_ids:
+  - F-graph-assembly
+- path: src/graph_skill_runtime/core/validator_contract.py
+  classification: detail
+  feature_id: F-logic-action-execution
+- path: src/graph_skill_runtime/core/validators/__init__.py
+  classification: detail
+  feature_id: F-logic-action-execution
+- path: src/graph_skill_runtime/examples/hello_world/script/__init__.py
+  classification: detail
+  feature_id: F-storage-io
+- path: src/graph_skill_runtime/examples/hello_world/script/greet.py
+  classification: feature
+  feature_ids:
+  - F-storage-io
+- path: src/graph_skill_runtime/io/__init__.py
+  classification: detail
+  feature_id: F-storage-io
+- path: src/graph_skill_runtime/io/artifact_manifest.py
+  classification: feature
+  feature_ids:
+  - F-storage-io
+- path: src/graph_skill_runtime/io/manager.py
+  classification: feature
+  feature_ids:
+  - F-storage-io
+- path: src/graph_skill_runtime/io/run_layout.py
+  classification: feature
+  feature_ids:
+  - F-storage-io
+- path: src/graph_skill_runtime/io/skill_analyzer.py
+  classification: detail
+  feature_id: F-storage-io
+- path: src/graph_skill_runtime/io/storage.py
+  classification: detail
+  feature_id: F-storage-io
+- path: src/graph_skill_runtime/middleware/__init__.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+  - F-middleware-ordering
+- path: src/graph_skill_runtime/middleware/cognitive_flow.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/compaction.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/execution_control.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/exit_control.py
+  classification: feature
+  feature_ids:
+  - F-finish-task-validation
+- path: src/graph_skill_runtime/middleware/factory.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+  - F-middleware-ordering
+- path: src/graph_skill_runtime/middleware/loop_detection.py
+  classification: detail
+  feature_id: F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/invocation_scope.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/nudge_policy.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/protocol_validation.py
+  classification: detail
+  feature_id: F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/runtime_input.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/tool_error.py
+  classification: detail
+  feature_id: F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/tool_history.py
+  classification: feature
+  feature_ids:
+  - F-middleware-mounting
+- path: src/graph_skill_runtime/middleware/tracing.py
+  classification: detail
+  feature_id: F-middleware-mounting
+- path: src/graph_skill_runtime/models/__init__.py
+  classification: feature
+  feature_ids:
+  - F-llm-execution
+- path: src/graph_skill_runtime/models/reasoning_patch.py
   classification: detail
   feature_id: F-md-patch
-- path: src/graph_agent/patches/__init__.py
+- path: src/graph_skill_runtime/patches/__init__.py
   classification: feature
   feature_ids:
   - F-runtime-compatibility-patches
-- path: src/graph_agent/runtime/__init__.py
+- path: src/graph_skill_runtime/ports/__init__.py
   classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/runtime/state.py
-  classification: detail
-  feature_id: F-state-blackboard
-- path: src/graph_agent/runtime/state_mapper.py
-  classification: detail
-  feature_id: F-state-blackboard
-- path: src/graph_agent/settings.py
+  feature_id: F-runtime-application-service
+- path: src/graph_skill_runtime/ports/runtime.py
   classification: feature
   feature_ids:
-  - F-public-api-surface
-- path: src/graph_agent/skills/builtin/__init__.py
+  - F-runtime-application-service
+- path: src/graph_skill_runtime/runtime/__init__.py
   classification: detail
-  feature_id: F-public-api-surface
-- path: src/graph_agent/skills/builtin/md-patch/script/patch_tools.py
+  feature_id: F-state-blackboard
+- path: src/graph_skill_runtime/runtime/state.py
+  classification: detail
+  feature_id: F-state-blackboard
+- path: src/graph_skill_runtime/runtime/state_mapper.py
+  classification: detail
+  feature_id: F-state-blackboard
+- path: src/graph_skill_runtime/sdk.py
+  classification: feature
+  feature_ids:
+  - F-typed-runtime-facade
+- path: src/graph_skill_runtime/settings.py
+  classification: detail
+  feature_id: F-current-engine-adapter
+- path: src/graph_skill_runtime/skills/builtin/__init__.py
   classification: detail
   feature_id: F-md-patch
-- path: src/graph_agent/tools/__init__.py
+- path: src/graph_skill_runtime/skills/builtin/md-patch/script/patch_tools.py
+  classification: detail
+  feature_id: F-md-patch
+- path: src/graph_skill_runtime/tools/__init__.py
   classification: detail
   feature_id: F-tool-call-binding
-- path: src/graph_agent/tools/builtin/__init__.py
+- path: src/graph_skill_runtime/tools/builtin/__init__.py
   classification: detail
   feature_id: F-tool-call-binding
-- path: src/graph_agent/tools/builtin/clarification_tool.py
+- path: src/graph_skill_runtime/tools/builtin/clarification_tool.py
   classification: detail
   feature_id: F-clarification-flow
-- path: src/graph_agent/tools/builtin/parallel_map.py
+- path: src/graph_skill_runtime/tools/builtin/cognitive_tools.py
+  classification: feature
+  feature_ids:
+  - F-tool-call-binding
+- path: src/graph_skill_runtime/tools/builtin/parallel_map.py
   classification: feature
   feature_ids:
   - F-parallel-map-tools
-- path: src/graph_agent/tools/builtin/read_example.py
+- path: src/graph_skill_runtime/tools/builtin/read_example.py
   classification: feature
   feature_ids:
   - F-resource-reference-access
-- path: src/graph_agent/tools/builtin/read_file.py
+- path: src/graph_skill_runtime/tools/builtin/read_file.py
   classification: feature
   feature_ids:
   - F-tool-sandbox-isolation
-- path: src/graph_agent/tools/builtin/read_reference.py
+- path: src/graph_skill_runtime/tools/builtin/read_reference.py
   classification: feature
   feature_ids:
   - F-resource-reference-access
-- path: src/graph_agent/tools/dynamic_schema.py
+- path: src/graph_skill_runtime/tools/dynamic_schema.py
   classification: detail
   feature_id: F-tool-sandbox-permission
-- path: src/graph_agent/tools/md_to_json.py
+- path: src/graph_skill_runtime/tools/md_to_json.py
   classification: detail
   feature_id: F-md-patch
-- path: src/graph_agent/tools/providers.py
+- path: src/graph_skill_runtime/tools/md_value.py
   classification: detail
-  feature_id: F-tool-sandbox-isolation
-- path: src/graph_agent/tools/synthesize_speech.py
+  feature_id: F-md-patch
+- path: src/graph_skill_runtime/tracing/__init__.py
   classification: detail
-  feature_id: F-tool-sandbox-isolation
+  feature_id: F-callback-tracing
+- path: src/graph_skill_runtime/tracing/steps.py
+  classification: feature
+  feature_ids:
+  - F-callback-tracing

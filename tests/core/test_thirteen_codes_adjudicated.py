@@ -18,10 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.error_registry import ERROR_REGISTRY
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.skill_resolver_protocol import SkillResolutionError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.error_registry import ERROR_REGISTRY
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 

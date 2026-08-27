@@ -21,13 +21,13 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import ValidationError
 
-from graph_agent.callbacks.events import LLMCallEvent, LLMDeltaEvent, PromptCapturedEvent
-from graph_agent.core.llm_provider import (
+from graph_skill_runtime.callbacks.events import LLMCallEvent, LLMDeltaEvent, PromptCapturedEvent
+from graph_skill_runtime.core.llm_provider import (
     LLMProviderChatModel,
     LLMProviderChunk,
     LLMProviderRequest,
 )
-from graph_agent.tracing.steps import StepReporter
+from graph_skill_runtime.tracing.steps import StepReporter
 
 
 class _Recorder:
@@ -55,7 +55,7 @@ class _SlicedProvider:
 def _model(pieces: list[LLMProviderChunk], recorder: _Recorder) -> LLMProviderChatModel:
     return LLMProviderChatModel(
         provider=_SlicedProvider(pieces),
-        role="graph_agent",
+        role="graph_skill_runtime",
         phase_name="draft",
         event_callbacks=(recorder,),
     )
@@ -142,7 +142,7 @@ def test_an_abandoned_attempt_takes_its_deltas_back() -> None:
 
 def test_a_delta_is_never_written_to_the_trace_file(tmp_path: Any) -> None:
     """Deltas are droppable; a droppable frame in a permanent record is a lie."""
-    from graph_agent.callbacks.emit import _TraceJsonlSink
+    from graph_skill_runtime.callbacks.emit import _TraceJsonlSink
 
     sink = _TraceJsonlSink(tmp_path)
     sink.emit(LLMDeltaEvent(phase_name="draft", step_id="s1", channel="text", text="hi"))

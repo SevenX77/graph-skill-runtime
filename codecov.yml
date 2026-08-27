@@ -20,4 +20,4 @@ comment:
 flags:
   runtime:
     paths:
-      - src/graph_agent/
+      - src/graph_skill_runtime/

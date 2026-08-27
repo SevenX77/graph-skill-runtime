@@ -22,13 +22,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.callbacks.emit import _GatewayEventSink, active_subgraph_path
-from graph_agent.callbacks.events import (
+from graph_skill_runtime.callbacks.emit import _GatewayEventSink, active_subgraph_path
+from graph_skill_runtime.callbacks.events import (
     CallbackEvent,
     LLMRouteDecisionEvent,
     PhaseStartEvent,
 )
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 

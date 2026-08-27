@@ -16,10 +16,10 @@ from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from graph_agent.callbacks.events import AmbiguityLoggedEvent, WorkingMemoryUpdateEvent
-from graph_agent.core.io_manager import IOManager
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
+from graph_skill_runtime.callbacks.events import AmbiguityLoggedEvent, WorkingMemoryUpdateEvent
+from graph_skill_runtime.core.io_manager import IOManager
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
 
 
 class _EventSpy:

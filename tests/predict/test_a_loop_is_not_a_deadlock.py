@@ -30,8 +30,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import graph_agent
-from graph_agent.core.runner import MAX_PHASE_REVISITS
+from graph_skill_runtime.core.runner import MAX_PHASE_REVISITS, predict_skill
 
 _ITEM_COUNT = MAX_PHASE_REVISITS + 1
 
@@ -120,7 +119,7 @@ def test_a_loop_longer_than_the_revisit_limit_still_predicts(tmp_path: Path) -> 
     skill = _looping_skill(tmp_path / "skill")
     items = [f"item-{index}" for index in range(_ITEM_COUNT)]
 
-    result = graph_agent.predict_skill(skill, workspace_dir=tmp_path / "ws", items=items)
+    result = predict_skill(skill, workspace_dir=tmp_path / "ws", items=items)
 
     assert result.success, f"predict failed on a legal loop: {result.error}"
     visits = [phase.phase_name for phase in result.phases].count("collect")
@@ -140,6 +139,6 @@ def test_a_much_longer_loop_is_still_not_a_deadlock(tmp_path: Path) -> None:
     skill = _looping_skill(tmp_path / "skill")
     items = [f"item-{index}" for index in range(MAX_PHASE_REVISITS * 5)]
 
-    result = graph_agent.predict_skill(skill, workspace_dir=tmp_path / "ws", items=items)
+    result = predict_skill(skill, workspace_dir=tmp_path / "ws", items=items)
 
     assert result.success, f"predict failed on a long legal loop: {result.error}"

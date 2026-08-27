@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.run_context import RunContext
+from graph_skill_runtime.core.run_context import RunContext
 
 
 class TestRunContext:

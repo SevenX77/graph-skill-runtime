@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.runner import _run_v030_skill_dict
-from graph_agent.io.run_layout import runs_root
+from graph_skill_runtime.core.runner import _run_v030_skill_dict
+from graph_skill_runtime.io.run_layout import runs_root
 
 
 def _write(path: Path, text: str) -> None:

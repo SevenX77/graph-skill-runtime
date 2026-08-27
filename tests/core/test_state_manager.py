@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_agent.core.state import BusinessData, FrameworkState, StateManager, WorkflowState
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, StateManager, WorkflowState
 
 
 def _state(

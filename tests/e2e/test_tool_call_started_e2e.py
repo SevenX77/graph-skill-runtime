@@ -15,8 +15,8 @@ from typing import Any
 
 from langchain_core.messages import AIMessage
 
-from graph_agent.callbacks.events import ToolCallEvent, ToolCallStartedEvent
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.callbacks.events import ToolCallEvent, ToolCallStartedEvent
+from graph_skill_runtime.core.runner import run_skill
 
 
 class SpyCallback:

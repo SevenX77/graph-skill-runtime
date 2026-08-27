@@ -13,10 +13,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from graph_agent.callbacks.emit import _CompositeEventSink, _SubscriberSink
-from graph_agent.callbacks.events import EdgeStartEvent, PhaseStartEvent
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
+from graph_skill_runtime.callbacks.emit import _CompositeEventSink, _SubscriberSink
+from graph_skill_runtime.callbacks.events import EdgeStartEvent, PhaseStartEvent
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 

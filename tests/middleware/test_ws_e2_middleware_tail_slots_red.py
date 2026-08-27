@@ -9,17 +9,17 @@ import pytest
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 
-import graph_agent.core.graph_assembler as graph_assembler
-from graph_agent.callbacks.base import Callback
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.io_manager import IOManager
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.middleware import MVP0_MIDDLEWARE_ORDER_CONTRACT
-from graph_agent.middleware.factory import build_middleware_chain
-from graph_agent.middleware.loop_detection import LoopDetectionMiddleware
-from graph_agent.middleware.tool_error import ToolErrorHandlingMiddleware
-from graph_agent.middleware.tracing import TracingMiddleware
+import graph_skill_runtime.core.graph_assembler as graph_assembler
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.io_manager import IOManager
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.middleware import MVP0_MIDDLEWARE_ORDER_CONTRACT
+from graph_skill_runtime.middleware.factory import build_middleware_chain
+from graph_skill_runtime.middleware.loop_detection import LoopDetectionMiddleware
+from graph_skill_runtime.middleware.tool_error import ToolErrorHandlingMiddleware
+from graph_skill_runtime.middleware.tracing import TracingMiddleware
 
 
 class _RecordingCallback(Callback):
@@ -266,7 +266,7 @@ io:
       answer:
         type: string
 max_iterations: 1
-llm_role: graph_agent
+llm_role: graph_skill_runtime
 tools:
   - lookup
 ---

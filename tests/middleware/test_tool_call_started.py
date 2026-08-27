@@ -15,10 +15,10 @@ from typing import Any
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 
-from graph_agent.callbacks.base import Callback
-from graph_agent.callbacks.events import ToolCallEvent, ToolCallStartedEvent
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.middleware.tracing import TracingMiddleware
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.callbacks.events import ToolCallEvent, ToolCallStartedEvent
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.middleware.tracing import TracingMiddleware
 
 
 class _RecordingCallback(Callback):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.core._predict_internal.stub import _normalise_type
+from graph_skill_runtime.core._predict_internal.stub import _normalise_type
 
 
 @pytest.mark.parametrize(

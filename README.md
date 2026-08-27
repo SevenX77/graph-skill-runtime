@@ -1,112 +1,153 @@
 # Graph Skill Runtime
 
-Graph Skill Runtime is an independent Python repository for compiling and running document-driven graph skills. The repository is currently in **Phase 0**: it preserves and characterizes the extracted engine under its existing identity while the standalone v1 contract remains a drafted target.
+Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. Phase 1 is implemented in this repository: the distribution is `graph-skill-runtime` version `0.1.0a1`, the import is `graph_skill_runtime`, and the console command is `gskill`.
 
-## Current package and drafted target
+This is an alpha source release, not a PyPI release. The repository exists at [SevenX77/graph-skill-runtime](https://github.com/SevenX77/graph-skill-runtime); `main` is pull-request-only and has completed a green six-job CI run. The [release workflow](.github/workflows/release.yml) is prepared to verify a GitHub Release tag `v<pyproject version>`, build and inspect the wheel and source distribution, and publish through PyPI Trusted Publishing with OpenID Connect (OIDC). That workflow is release automation, not publication evidence: the PyPI project and trusted publisher still require owner configuration, and no package has been published.
 
-The two contract lines must not be mixed:
+## Current capability boundary
 
-| Surface | Current Phase 0 implementation | Drafted standalone target |
-| --- | --- | --- |
-| Python distribution | `graph-agent` 0.3.1 | `graph-skill-runtime` |
-| Python import | `graph_agent` | `graph_skill_runtime` |
-| Command line | Legacy `python -m graph_agent`; no console script | `gskill` |
-| Skill root | `GRAPH.md` | Agent Skills entry `SKILL.md` plus `graph.yaml` |
-| Agent phase file | `SKILL.md` | `AGENT.md` |
-| Nested graph layout | Root `subgraph/` hierarchy | Flat `graphs/<graph_id>/` registry |
-| Contract status | Implemented and characterized | `drafted`; not implemented or published |
+Phase 1 provides the typed runtime facade and configuration boundary:
 
-The repository name does not make the target package, import, command, or file format available. Until an explicit cutover replaces the current line, callers must use `graph-agent`, import `graph_agent`, and follow the current [`GRAPH.md` format contract](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md).
+- exactly 58 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
+- closed, frozen Pydantic request and result models with `schema_version` and `kind` discriminators;
+- immutable nested JSON collections after model construction;
+- a closed 38-value `RuntimeEvent.event_type` catalog kept exactly equal to every concrete internal `CallbackEvent` variant by contract test;
+- eight Python use-case functions: `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`;
+- the `gskill` CLI and eight same-named MCP tools as thin adapters over one `RuntimeApplication`;
+- explicit dependency composition through `create_application`, with no process-global application singleton;
+- deterministic configuration precedence and provenance-bearing immutable run requests;
+- create-once local request snapshots at `<state_root>/runs/<run_id>/request.json`;
+- the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded `LOGIC` skill.
 
-The project is pre-release and has no external compatibility commitment. A future cutover will replace the old contract in one coordinated change after implementation and migration verification; the runtime will not keep permanent dual readers, legacy aliases, or version-guessing branches.
+The current skill reader still accepts the FROZEN v0.3 format:
 
-## What the runtime owns
+```text
+my-skill/
+├── GRAPH.md
+└── phases/
+    └── <phase_id>/
+        └── LOGIC.md | SUBGRAPH.md | SKILL.md
+```
 
-The current engine compiles a user-provided skill directory into a typed graph and can execute, predict, checkpoint, resume, trace, and evaluate it. It owns:
+In this format, `SKILL.md` is the file for an agent phase. The replacement format with a root Agent Skills `SKILL.md`, `graph.yaml`, phase `AGENT.md`, and flat `graphs/<graph_id>/` registry is a Phase 2 drafted target. There is no dual reader.
 
-- aggregated compile diagnostics;
-- `LOGIC`, `AGENT`, and `SUBGRAPH` phase execution;
-- typed blackboard state, declared inputs and outputs, and iteration;
-- checkpoints and resume;
-- typed callback events, traces, artifacts, and structured errors;
-- prediction and golden-baseline evaluation;
-- local skill resolution and compiled artifacts.
-
-This repository is the runtime boundary. It does not own an HTTP API, Studio UI or filesystem behavior, Gateway credential and route truth, or a host application's global configuration. Host-specific integration belongs behind explicit adapters rather than inside the runtime domain.
+The default executor selection is `host-native`, but Phase 1 does not include a host-native handoff adapter. A default `run` therefore saves the resolved request snapshot and returns a failed `RunResult` with `GSKILL_EXECUTOR_UNAVAILABLE`. `resume` and `submit_agent_result` return structured `GSKILL_NOT_IMPLEMENTED` failures until Phase 3 supplies durable handoff and resume. Vendor CLI executors, MoirAI installation, and Gateway or Studio adapters are also later-phase work.
 
 ## User-owned graph skills
 
-A business graph skill (gSkill) is user-owned project content. The caller supplies its path explicitly; installing or importing the runtime does not discover, register, copy, or modify business skills.
+A business graph skill, or gSkill, is project content owned by its user. Every SDK, CLI, or MCP invocation receives the skill path explicitly. Installing or importing the runtime does not register, discover globally, copy, or mutate business gSkills.
 
-The wheel contains runtime code and may contain engine-owned implementation resources. Those resources are not user business skills. Neither the current `graph-agent` wheel nor the drafted future wheel is a registry or delivery channel for a user's gSkills.
+The wheel may contain runtime implementation resources. Those resources are not business gSkills and do not make the wheel a skill registry.
 
 ## Requirements and local installation
 
 - Python 3.11 or newer
 - [`uv`](https://docs.astral.sh/uv/)
 
-This is a single-package `uv` project. From the repository root, create or update the local environment with development dependencies:
+Create the development environment from the repository root:
 
 ```bash
 uv sync --extra dev
 ```
 
-For runtime dependencies only:
+Install only base runtime dependencies for this checkout:
 
 ```bash
 uv sync
 ```
 
-The target `graph-skill-runtime` distribution is not published. Do not install that name to use this checkout. The commands above install the current local `graph-agent` project into `.venv`.
+Provider clients are isolated in the optional `embedded` extra:
 
-## Use the current SDK
+```bash
+uv sync --extra embedded
+```
 
-Pass the skill root directory to the SDK. `workspace_dir` must be an absolute path for `run_skill`, `predict_skill`, and `resume_skill`.
+The `embedded` extra is required only for embedded provider-backed agent execution. It is not part of the base dependency set. An embedded `LOGIC`-only skill can run without a provider call.
+
+## Python SDK
+
+Construct the typed request that matches the use case. This example compiles and then runs a current-format `LOGIC` skill through the explicit embedded executor:
 
 ```python
 from pathlib import Path
 
-from graph_agent import compile_skill, run_skill
+from graph_skill_runtime import (
+    CompileRequest,
+    EmbeddedExecutorConfig,
+    RunInvocation,
+    RuntimeProfileOverlay,
+    compile,
+    run,
+)
 
 skill_root = Path("/absolute/path/to/my-skill").resolve()
-workspace_dir = (skill_root / ".workspace").resolve()
 
-compile_result = compile_skill(skill_root)
+compile_result = compile(CompileRequest(skill_root=str(skill_root)))
+if not compile_result.passed:
+    raise RuntimeError(compile_result.diagnostics)
 
-# This is sufficient only when the executed path has no AGENT phase.
-run_result = run_skill(
-    skill_root,
-    workspace_dir=workspace_dir,
-    user_name="Developer",
+run_result = run(
+    RunInvocation(
+        skill_root=str(skill_root),
+        runtime=RuntimeProfileOverlay(executor=EmbeddedExecutorConfig()),
+        inputs={"topic": "typed runtime"},
+    )
 )
 ```
 
-An executed `AGENT` phase requires model execution supplied explicitly by the host through the current `llm_provider` or `model_resolver` seam. The runtime does not infer a provider, credentials, role map, or model route from an implicit application configuration.
+Each SDK function accepts an optional `application=` argument for explicit adapter injection. Without it, the function calls `create_application()` and receives a new application service composed from the current engine and local snapshot store.
 
-The package currently exposes exactly 24 names through [`graph_agent.__all__`](src/graph_agent/__init__.py):
+## Configuration
 
-- execution and prediction: `run_skill`, `predict_skill`, `resume_skill`, `evaluate_golden_baseline`, `RunResult`, `PathDiff`, and `PhaseRecord`;
-- artifact execution: `compile_artifact`, `run_artifact`, and `predict_artifact`;
-- compilation and serialization: `compile_skill`, `CompileResult`, `SkillManifest`, and `serialize_skill`;
-- assembly and state: `assemble_graph`, `CompiledSkill`, `CompiledStateGraph`, and `BlackboardState`;
-- resolution: `LocalWorkspaceResolver`;
-- errors: `GraphAgentError`, `GraphCompileError`, `GraphExecutionError`, `ModelProviderError`, and `ResourceNotFoundError`.
+Runtime configuration resolves from highest to lowest precedence:
 
-Internal modules are not additional top-level SDK commitments.
+1. the current `RunInvocation` or equivalent CLI flags;
+2. project configuration at `<skill_root>/gskill.toml`;
+3. the operating-system user configuration;
+4. portable runtime or business defaults supplied by an integration;
+5. built-in defaults.
 
-## Current command-line entry
+Project configuration may define both a machine/runtime overlay and named, non-secret business presets:
 
-The package has no `[project.scripts]` entry. Its legacy argparse module can be inspected with:
+```toml
+schema_version = "gskill.config.v1"
 
-```bash
-uv run python -m graph_agent --help
+[runtime.executor]
+kind = "embedded"
+
+[presets.local.inputs]
+topic = "project default"
 ```
 
-This module entry is a legacy surface, not the drafted `gskill` command contract. Automation that needs the current stable boundary should use the exported Python API and pin the repository revision.
+User configuration may contain only the machine-level runtime overlay. `RuntimeProfile` owns executor, checkpoint store, state directory, permissions, required capabilities, and fallback executor declarations. `RunPreset` owns reusable non-secret business defaults. `RunInvocation` owns one call's overrides. Resolution produces a `RunRequest` containing absolute skill and state roots plus field-level provenance.
+
+Literal values under secret-shaped keys such as `api_key`, `access_token`, or `password` are rejected from persistent input contracts. Use `SecretReference` and `SecretBinding` instead. The runtime cannot infer whether an arbitrary business string is confidential, so callers remain responsible for classifying values that do not have a structurally secret-shaped key.
+
+## CLI and MCP
+
+The console command emits structured JSON:
+
+```bash
+uv run gskill compile /absolute/path/to/my-skill
+uv run gskill config resolve /absolute/path/to/my-skill --run-id example
+uv run gskill run /absolute/path/to/my-skill --executor embedded --inputs-json '{"topic":"typed runtime"}'
+uv run gskill inspect /absolute/path/to/my-skill
+uv run gskill golden /absolute/path/to/my-skill baseline-id --state-root /absolute/path/to/state
+```
+
+Start the MCP server over standard input/output with:
+
+```bash
+uv run gskill mcp
+```
+
+The MCP server exposes exactly `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`. These tools call the same application methods as the Python facade and CLI; they do not implement separate runtime rules.
+
+The CLI includes `resume` and `submit` command shapes so clients can bind the typed contracts now. Their durable behavior remains Phase 3 work and currently returns a structured not-implemented result.
 
 ## Development and verification
 
-Run the complete local gate set from the repository root:
+Run the required local gates from the repository root:
 
 ```bash
 uv run ruff check src tests scripts tools
@@ -117,21 +158,19 @@ uv build
 uv run pip-audit
 ```
 
-The Phase 0 local characterization result is 1,601 passed and 1 skipped. Ruff, strict mypy over 118 source files, and the contract-manifest validator are green. `uv build` produces `graph_agent-0.3.1` wheel and source distributions. `pip-audit` reports no known vulnerability in resolved third-party dependencies; it skips the local `graph-agent` project because that distribution has no PyPI entry.
-
-CI is configured for Python 3.11, 3.12, and 3.13 on Linux, with Windows and macOS smoke jobs, plus CodeQL, Scorecard, and Dependabot configuration. Phase 0 has not made its first remote push, so configured workflows and repository settings are not evidence that remote CI or branch protection has run successfully.
+`uv build` must produce both a wheel and a source distribution. A local package skip reported by `pip-audit` is not evidence that this repository's own source has been security-audited; the command audits resolved third-party distributions.
 
 ## Documentation map
 
-- [Current FROZEN skill-format contract](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md)
-- [Current engine MVP1 design](docs/mvp1/INDEX.md)
-- [Standalone design index and contract-line distinction](docs/design/README.md)
-- [Pre-extraction baseline](docs/design/baseline.md)
+- [Public Phase 1 API contract](docs/public-api-contract.md)
+- [Current FROZEN v0.3 skill-format contract](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md)
+- [Current extracted-engine MVP1 design](docs/mvp1/INDEX.md)
+- [Design authority and implementation-status map](docs/design/README.md)
 - [Drafted standalone v1 target](docs/design/v1-alignment.md)
+- [Historical pre-extraction baseline](docs/design/baseline.md)
+- [Feature compliance view generated from the feature manifest](docs/feature-compliance-checklist.md)
 - [Cross-platform policy](docs/CROSS_PLATFORM.md)
 - [Contributor and agent rules](AGENTS.md)
-
-The current implementation line is authoritative for behavior that exists today. The drafted target is authoritative only for the intended future design.
 
 ## License
 

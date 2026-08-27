@@ -8,11 +8,11 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentFatalError, SkillLoadError
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.runner import run_skill
-from graph_agent.core.schema_engine import SchemaEngine
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError, SkillLoadError
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.core.schema_engine import SchemaEngine
 
 
 def _write(path: Path, text: str) -> None:

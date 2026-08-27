@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
 
 
 def _write_minimal_graph(root: Path, action_body: str) -> None:

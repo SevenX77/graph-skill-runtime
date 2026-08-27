@@ -27,9 +27,9 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core import cache as cache_module
-from graph_agent.core.cache import load_from_cache, save_to_cache
-from graph_agent.core.compiler import compile_skill
+from graph_skill_runtime.core import cache as cache_module
+from graph_skill_runtime.core.cache import load_from_cache, save_to_cache
+from graph_skill_runtime.core.compiler import compile_skill
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"

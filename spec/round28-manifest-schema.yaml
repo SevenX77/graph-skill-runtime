@@ -181,6 +181,8 @@ $defs:
         type: object
         additionalProperties: false
         properties:
+          complete_inventory:
+            type: boolean
           include_globs:
             type: array
             items:
@@ -230,6 +232,13 @@ $defs:
                 required: [classification]
               then:
                 required: [feature_ids]
+            - if:
+                properties:
+                  classification:
+                    const: detail
+                required: [classification]
+              then:
+                required: [feature_id]
 
   contract_map:
     type: object
@@ -239,13 +248,6 @@ $defs:
       public_api_symbols:
         type: object
         minProperties: 1
-        required:
-          - AgentSkillDef
-          - GraphSkillDef
-          - IoInput
-          - PersonaSkillDef
-          - CompileIssue
-          - parse_skill_file
         patternProperties:
           "^[A-Za-z_][A-Za-z0-9_]*$":
             type: object

@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-import graph_agent
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core import runner as engine_runner
+from graph_skill_runtime.core.runner import run_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -66,9 +66,9 @@ io:
     )
 
 
-def _public_callable(name: str) -> Callable[..., Any]:
-    value = getattr(graph_agent, name, None)
-    assert callable(value), f"graph_agent.{name} must be a public callable"
+def _engine_callable(name: str) -> Callable[..., Any]:
+    value = getattr(engine_runner, name, None)
+    assert callable(value), f"engine runner {name} must remain characterized"
     return value
 
 
@@ -77,7 +77,7 @@ def _public_callable(name: str) -> Callable[..., Any]:
     ["run_skill", "predict_skill", "evaluate_golden_baseline"],
 )
 def test_public_engine_entrypoints_require_workspace_dir_argument(name: str) -> None:
-    entrypoint = _public_callable(name)
+    entrypoint = _engine_callable(name)
     parameter = inspect.signature(entrypoint).parameters.get("workspace_dir")
 
     assert parameter is not None, f"{name} must expose a workspace_dir parameter"

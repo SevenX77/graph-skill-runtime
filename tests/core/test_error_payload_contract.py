@@ -8,15 +8,15 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from graph_agent.core.exceptions import (
+from graph_skill_runtime.core.exceptions import (
     GraphAgentError,
     GraphAgentFatalError,
     SkillCompilationError,
     SkillLoadError,
 )
-from graph_agent.core.loader import SkillLoader
-from graph_agent.runtime.state_mapper import StateMapper
-from graph_agent.tools.builtin.read_reference import read_declared_reference
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.runtime.state_mapper import StateMapper
+from graph_skill_runtime.tools.builtin.read_reference import read_declared_reference
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ERROR_SPEC = (
@@ -30,12 +30,12 @@ ERROR_SPEC = (
 
 
 def _error_payload_model() -> Any:
-    exceptions = importlib.import_module("graph_agent.core.exceptions")
+    exceptions = importlib.import_module("graph_skill_runtime.core.exceptions")
     return exceptions.ErrorPayload
 
 
 def _error_registry() -> dict[str, Any]:
-    registry = importlib.import_module("graph_agent.core.error_registry")
+    registry = importlib.import_module("graph_skill_runtime.core.error_registry")
     return registry.ERROR_REGISTRY
 
 
@@ -102,8 +102,8 @@ def test_error_payload_rejects_unknown_code() -> None:
         ErrorPayload(code="[F-v3-not-in-spec]", message="unknown")
 
 
-def test_graph_agent_error_rejects_unknown_embedded_code() -> None:
-    with pytest.raises(ValueError, match="unknown graph_agent error code"):
+def test_graph_skill_runtime_error_rejects_unknown_embedded_code() -> None:
+    with pytest.raises(ValueError, match="unknown graph_skill_runtime error code"):
         GraphAgentFatalError("[F-v3-typo-not-registered] typo")
 
 
@@ -129,7 +129,7 @@ def test_error_registry_preserves_multi_stage_codes() -> None:
     assert registry["[F-v3-skill-id-ambiguous]"].stage == ("编译期", "装配期")
 
 
-def test_graph_agent_error_exposes_serializable_payload() -> None:
+def test_graph_skill_runtime_error_exposes_serializable_payload() -> None:
     ErrorPayload = _error_payload_model()
     payload = ErrorPayload(code="[F-v3-runtime-state-mapping-failed]", message="bad state")
     metadata = _error_registry()[payload.code]
@@ -144,7 +144,7 @@ def test_graph_agent_error_exposes_serializable_payload() -> None:
     assert dumped["doc_link"] == metadata.doc_link
 
 
-def test_concrete_graph_agent_error_subclass_exposes_payload() -> None:
+def test_concrete_graph_skill_runtime_error_subclass_exposes_payload() -> None:
     ErrorPayload = _error_payload_model()
     payload = ErrorPayload(code="[F-v3-tool-argument-invalid]", message="bad argument")
     metadata = _error_registry()[payload.code]
@@ -155,7 +155,7 @@ def test_concrete_graph_agent_error_subclass_exposes_payload() -> None:
     assert exc.payload.model_dump()["doc_link"] == metadata.doc_link
 
 
-def test_graph_agent_error_generated_payload_carries_context_details(tmp_path: Path) -> None:
+def test_graph_skill_runtime_error_generated_payload_carries_context_details(tmp_path: Path) -> None:
     exc = GraphAgentFatalError(
         "[F-v3-runtime-state-mapping-failed] bad state",
         context={"phase": "draft", "path": tmp_path / "state.json"},
@@ -168,7 +168,7 @@ def test_graph_agent_error_generated_payload_carries_context_details(tmp_path: P
     }
 
 
-def test_graph_agent_error_merges_explicit_payload_details_and_context(tmp_path: Path) -> None:
+def test_graph_skill_runtime_error_merges_explicit_payload_details_and_context(tmp_path: Path) -> None:
     ErrorPayload = _error_payload_model()
     payload = ErrorPayload(
         code="[F-v3-runtime-state-mapping-failed]",
@@ -225,7 +225,7 @@ def test_loader_failure_asserts_payload_code(tmp_path: Path, mock_skill_resolver
 
 
 def test_runtime_failure_asserts_payload_code() -> None:
-    from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+    from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
     with pytest.raises(GraphAgentFatalError) as exc_info:
         state = WorkflowState(data=BusinessData(), flow=FrameworkState(), messages=[])
         mapper = StateMapper(output_schema={"type": "object", "properties": {"text": {}}})
@@ -296,7 +296,7 @@ def test_error_payload_requires_nonempty_message() -> None:
 
 def test_engine_source_has_no_coarse_error_code_literals() -> None:
     coarse_codes = {f"[F-v3-{suffix}]" for suffix in ("route", "io", "graph", "actions", "purity")}
-    source_root = REPO_ROOT / "src" / "graph_agent"
+    source_root = REPO_ROOT / "src" / "graph_skill_runtime"
     occurrences: list[str] = []
     for path in source_root.rglob("*.py"):
         text = path.read_text(encoding="utf-8")

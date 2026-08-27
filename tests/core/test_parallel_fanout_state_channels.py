@@ -15,10 +15,10 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.loader import SkillLoadError
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.loader import SkillLoadError
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
 
 
 def _write(path: Path, content: str) -> None:

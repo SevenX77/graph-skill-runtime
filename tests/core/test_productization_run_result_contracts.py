@@ -22,7 +22,7 @@ def _fields(cls: type[Any]) -> set[str]:
 
 
 def test_run_result_snapshot_contract_is_readable_by_golden_headless() -> None:
-    contracts = importlib.import_module("graph_agent.core.result_contracts")
+    contracts = importlib.import_module("graph_skill_runtime.core.result_contracts")
 
     RunResultsRef = contracts.RunResultsRef
     NodeRunResult = contracts.NodeRunResult
@@ -82,7 +82,7 @@ def test_run_result_snapshot_contract_is_readable_by_golden_headless() -> None:
 
 
 def test_run_result_snapshot_contract_does_not_start_or_evaluate_runs() -> None:
-    contracts = importlib.import_module("graph_agent.core.result_contracts")
+    contracts = importlib.import_module("graph_skill_runtime.core.result_contracts")
 
     forbidden_callables = {
         "run",
@@ -108,7 +108,7 @@ def test_run_result_snapshot_contract_does_not_start_or_evaluate_runs() -> None:
 
 
 def test_missing_run_result_ref_has_explicit_golden_error_code() -> None:
-    contracts = importlib.import_module("graph_agent.core.result_contracts")
+    contracts = importlib.import_module("graph_skill_runtime.core.result_contracts")
 
     error = contracts.RunResultsNotFoundError("missing run result")
 

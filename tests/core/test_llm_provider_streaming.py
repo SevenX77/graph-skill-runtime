@@ -14,7 +14,7 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage
 
-from graph_agent.core.llm_provider import (
+from graph_skill_runtime.core.llm_provider import (
     LLMProvider,
     LLMProviderChatModel,
     LLMProviderChunk,

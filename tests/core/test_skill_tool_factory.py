@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core import runner
-from graph_agent.core.skill_tool_factory import (
+from graph_skill_runtime.core import runner
+from graph_skill_runtime.core.skill_tool_factory import (
     SubSkillSpec,
     _build_input_model,
     _resolve_skill_path,

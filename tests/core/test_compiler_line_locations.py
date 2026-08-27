@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.parser import locate_line_for_pydantic_loc, parse_markdown_parts
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.parser import locate_line_for_pydantic_loc, parse_markdown_parts
 
 
 def _write_minimal_logic_skill(

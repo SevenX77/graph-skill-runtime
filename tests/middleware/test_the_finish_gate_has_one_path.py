@@ -34,8 +34,8 @@ and ``::test_finish_without_schema_raises_phase_2_a1``.
 
 from __future__ import annotations
 
-import graph_agent.middleware.cognitive_flow as cognitive_flow
-from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
+import graph_skill_runtime.middleware.cognitive_flow as cognitive_flow
+from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
 
 #: Methods of the second pipeline, and the module-level helpers only it reached.
 RETIRED = (

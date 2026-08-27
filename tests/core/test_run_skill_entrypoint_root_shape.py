@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 def test_run_skill_single_markdown_file_returns_v030_root_error(

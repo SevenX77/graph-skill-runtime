@@ -20,12 +20,12 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from graph_agent.core.llm_provider import (
+from graph_skill_runtime.core.llm_provider import (
     FakeLLMProvider,
     LLMProviderChatModel,
     LLMProviderChunk,
 )
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 class Recorder:
@@ -137,7 +137,7 @@ def test_a_model_the_caller_brought_reports_its_calls_like_any_other() -> None:
     # ``run_skill(mock_llm=...)`` hands the engine a ready-made LangChain model.
     # It cannot report itself — the engine did not write it — so it enters
     # behind the provider Port and the one reporting model drives it.
-    from graph_agent.core.llm_provider import ChatModelProvider
+    from graph_skill_runtime.core.llm_provider import ChatModelProvider
 
     recorder = Recorder()
     model = LLMProviderChatModel(

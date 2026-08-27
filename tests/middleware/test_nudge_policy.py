@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from graph_agent.middleware.nudge_policy import (
+from graph_skill_runtime.middleware.nudge_policy import (
     MIN_FINISH_REASONING_LEN,
     PLANNING_NUDGE,
     SELFCHECK_NUDGE,

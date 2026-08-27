@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 def _write(path: Path, text: str) -> None:

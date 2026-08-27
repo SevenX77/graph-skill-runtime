@@ -16,8 +16,8 @@ is precisely the edit that would have made it disagree.
 
 from __future__ import annotations
 
-from graph_agent.core.io_manager import IOManager
-from graph_agent.middleware import (
+from graph_skill_runtime.core.io_manager import IOManager
+from graph_skill_runtime.middleware import (
     MVP0_MIDDLEWARE_ORDER_CONTRACT,
     CognitiveFlowMiddleware,
     CompactionMiddleware,
@@ -28,7 +28,7 @@ from graph_agent.middleware import (
     ToolErrorHandlingMiddleware,
     TracingMiddleware,
 )
-from graph_agent.middleware.factory import build_middleware_chain
+from graph_skill_runtime.middleware.factory import build_middleware_chain
 
 
 def test_the_chain_order_is_the_contract() -> None:

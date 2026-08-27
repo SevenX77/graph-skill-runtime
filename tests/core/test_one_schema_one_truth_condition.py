@@ -31,14 +31,14 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.schema_engine import (
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.schema_engine import (
     SchemaEngine,
     SchemaObject,
     _canonical_key,
     _schema_from_mapping,
 )
-from graph_agent.runtime.state_mapper import _validate_phase_updates_against_schema
+from graph_skill_runtime.runtime.state_mapper import _validate_phase_updates_against_schema
 
 
 def _model_for(json_schema: dict[str, Any]):

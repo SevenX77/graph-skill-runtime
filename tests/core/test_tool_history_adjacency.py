@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from graph_agent.middleware.tool_history import _repair_orphaned_tool_calls
+from graph_skill_runtime.middleware.tool_history import _repair_orphaned_tool_calls
 
 
 def _ai(call_id: str | None = None, content: str = "") -> AIMessage:

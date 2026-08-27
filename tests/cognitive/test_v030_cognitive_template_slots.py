@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_agent.cognitive.prompt import apply_v030_cognitive_template
+from graph_skill_runtime.cognitive.prompt import apply_v030_cognitive_template
 
 
 def _prompt() -> str:

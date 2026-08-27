@@ -6,10 +6,10 @@ from typing import Any
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import AIMessage
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.runner import run_skill
-from graph_agent.core.state import StateManager
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.core.state import StateManager
 
 
 class NoFinishChatModel:
@@ -285,7 +285,7 @@ def test_finish_task_success_must_pass_through_after_agent_exit_gate(
     mock_skill_resolver: object,
     monkeypatch: Any,
 ) -> None:
-    import graph_agent.middleware.factory as middleware_factory
+    import graph_skill_runtime.middleware.factory as middleware_factory
 
     original_build_middleware_chain = middleware_factory.build_middleware_chain
 
@@ -371,7 +371,7 @@ def test_exit_gate_iteration_budget_is_scoped_to_each_graph_invoke(
     # 2. 第二次调用：应当有 2 次模型调用预算
     import pytest
 
-    from graph_agent.core.exceptions import GraphAgentFatalError
+    from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
         graph.invoke(

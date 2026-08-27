@@ -23,8 +23,8 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-from graph_agent.core.adapter_contracts import RunArtifactRequest
-from graph_agent.core.artifacts import ArtifactRef
+from graph_skill_runtime.core.adapter_contracts import RunArtifactRequest
+from graph_skill_runtime.core.artifacts import ArtifactRef
 
 
 def _artifact_ref() -> ArtifactRef:
@@ -51,7 +51,7 @@ def _explode(_: RunArtifactRequest) -> dict[str, Any]:
 
 
 def test_an_engine_fault_is_not_reported_as_a_provider_failure() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
 
     result = runner.run_artifact(_request("idem-unclassified-1"), artifact_executor=_explode)
 
@@ -64,7 +64,7 @@ def test_an_engine_fault_is_not_reported_as_a_provider_failure() -> None:
 
 def test_an_unclassified_fault_keeps_what_actually_happened() -> None:
     """Relabelling is only half the fix — the payload has to say what went wrong."""
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
 
     result = runner.run_artifact(_request("idem-unclassified-2"), artifact_executor=_explode)
 
@@ -75,8 +75,8 @@ def test_an_unclassified_fault_keeps_what_actually_happened() -> None:
 
 def test_a_provider_failure_keeps_its_own_code() -> None:
     """The relabelling must not swallow codes the exception carries itself."""
-    runner = importlib.import_module("graph_agent.core.runner")
-    from graph_agent.core.llm_provider import LLMProviderError
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
+    from graph_skill_runtime.core.llm_provider import LLMProviderError
 
     def _provider_boom(_: RunArtifactRequest) -> dict[str, Any]:
         raise LLMProviderError(

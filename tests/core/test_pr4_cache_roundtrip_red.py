@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.loader import PhaseAttributeSpan
-from graph_agent.core.skill_resolver_protocol import SkillResolutionError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.loader import PhaseAttributeSpan
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
 
 class DictSkillResolver:
@@ -103,7 +103,7 @@ def test_pr4_cache_hit_preserves_subagents_tools_and_phase_tokens(
     _write_child_skill(child)
     resolver = DictSkillResolver({"demo.child": child})
 
-    monkeypatch.setattr("graph_agent.core.cache.get_cache_dir", lambda: tmp_path / "cache")
+    monkeypatch.setattr("graph_skill_runtime.core.cache.get_cache_dir", lambda: tmp_path / "cache")
 
     cold = compile_skill(parent, cache=True, skill_resolver=resolver)
     hit = compile_skill(parent, cache=True, skill_resolver=resolver)
