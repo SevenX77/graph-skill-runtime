@@ -5,6 +5,7 @@ import ast
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -12,18 +13,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPO_ROOT
-DEFAULT_SOURCE_INCLUDE_GLOBS = ("src/graph_agent/**/*.py",)
+DEFAULT_SOURCE_INCLUDE_GLOBS = ("src/graph_skill_runtime/**/*.py",)
 DEFAULT_SOURCE_EXCLUDE_GLOBS: tuple[str, ...] = ()
-VENDOR_ONLY_SYMBOLS = {
-    "AgentSkillDef",
-    "GraphSkillDef",
-    "IoInput",
-    "PersonaSkillDef",
-    "CompileIssue",
-    "parse_skill_file",
-}
-
-
 def _load_yaml(path: Path) -> Any:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
@@ -88,6 +79,18 @@ def _public_api_symbols() -> set[str]:
     }
 
 
+def _declared_public_api_symbols() -> set[str]:
+    tree = ast.parse((REPO_ROOT / "src/graph_skill_runtime/__init__.py").read_text(encoding="utf-8"))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+            value = ast.literal_eval(node.value)
+            if isinstance(value, list) and all(isinstance(symbol, str) for symbol in value):
+                return set(value)
+    raise ValueError("src/graph_skill_runtime/__init__.py must declare a literal string __all__ list")
+
+
 def _error_codes() -> set[str]:
     text = (REPO_ROOT / "docs/skill-spec/11-error-code-spec.md").read_text(encoding="utf-8")
     codes = set(re.findall(r"`(\[F-v3-[a-z0-9-]+\])`", text))
@@ -95,7 +98,7 @@ def _error_codes() -> set[str]:
 
 
 def _callback_events() -> set[str]:
-    tree = ast.parse((PACKAGE_ROOT / "src/graph_agent/callbacks/events.py").read_text(encoding="utf-8"))
+    tree = ast.parse((PACKAGE_ROOT / "src/graph_skill_runtime/callbacks/events.py").read_text(encoding="utf-8"))
     return {
         node.name
         for node in tree.body
@@ -105,7 +108,7 @@ def _callback_events() -> set[str]:
 
 def _runtime_compat_files() -> set[str]:
     files: set[str] = set()
-    patches_root = PACKAGE_ROOT / "src/graph_agent/patches"
+    patches_root = PACKAGE_ROOT / "src/graph_skill_runtime/patches"
     if patches_root.exists():
         files.update(path.relative_to(REPO_ROOT).as_posix() for path in patches_root.rglob("*.py"))
     return files
@@ -183,11 +186,22 @@ def _validate_features(features: list[dict[str, Any]], errors: list[str], *, ful
 
 
 def _validate_source_map(source_map: dict[str, Any], features: list[dict[str, Any]], errors: list[str]) -> None:
-    mapped = {entry.get("path") for entry in source_map.get("files", []) if isinstance(entry, dict)}
+    entries = [entry for entry in source_map.get("files", []) if isinstance(entry, dict)]
+    paths = [str(entry.get("path")) for entry in entries if isinstance(entry.get("path"), str)]
+    mapped = set(paths)
+    duplicates = sorted(path for path, count in Counter(paths).items() if count > 1)
+    if duplicates:
+        _fail(errors, "R28_SOURCE_FILE_DUPLICATE", "duplicate source files: " + ", ".join(duplicates[:5]))
     actual_src_files = _actual_src_files(source_map)
-    missing = sorted(actual_src_files - mapped)
-    if not features and missing and len(mapped) < len(actual_src_files):
-        _fail(errors, "R28_SOURCE_FILE_UNMAPPED", "missing source files: " + ", ".join(missing[:5]))
+    config = source_map.get("config")
+    complete_inventory = isinstance(config, dict) and config.get("complete_inventory") is True
+    if complete_inventory or not features:
+        missing = sorted(actual_src_files - mapped)
+        stale = sorted(mapped - actual_src_files)
+        if missing:
+            _fail(errors, "R28_SOURCE_FILE_UNMAPPED", "missing source files: " + ", ".join(missing[:5]))
+        if stale:
+            _fail(errors, "R28_SOURCE_FILE_STALE", "stale source files: " + ", ".join(stale[:5]))
 
     feature_core_paths: dict[str, set[str]] = {}
     for feature in features:
@@ -197,26 +211,52 @@ def _validate_source_map(source_map: dict[str, Any], features: list[dict[str, An
             if isinstance(entry, dict) and isinstance(entry.get("path"), str)
         }
 
-    for entry in source_map.get("files", []):
-        if not isinstance(entry, dict):
-            continue
+    owners_by_path: dict[str, set[str]] = {}
+    for entry in entries:
+        path = str(entry.get("path"))
         if entry.get("classification") == "debt" and not entry.get("exemption_id"):
-            _fail(errors, "R28_DEBT_EXEMPTION_REQUIRED", str(entry.get("path")))
+            _fail(errors, "R28_DEBT_EXEMPTION_REQUIRED", path)
         if entry.get("classification") == "feature":
-            path = entry.get("path")
-            for feature_id in entry.get("feature_ids", []):
+            feature_ids = {str(feature_id) for feature_id in entry.get("feature_ids", [])}
+            owners_by_path[path] = feature_ids
+            for feature_id in feature_ids:
+                if features and feature_id not in feature_core_paths:
+                    _fail(errors, "R28_SOURCE_OWNER_UNKNOWN", f"{path} names unknown feature {feature_id}")
                 if path not in feature_core_paths.get(feature_id, set()):
                     _fail(errors, "R28_FEATURE_FILE_NOT_IN_CORE_PATHS", f"{path} not in {feature_id}.core_paths")
+        elif entry.get("classification") == "detail":
+            feature_id = str(entry.get("feature_id"))
+            owners_by_path[path] = {feature_id}
+            if features and feature_id not in feature_core_paths:
+                _fail(errors, "R28_SOURCE_OWNER_UNKNOWN", f"{path} names unknown feature {feature_id}")
+
+    if features:
+        for feature_id, core_paths in feature_core_paths.items():
+            for path in sorted(core_paths):
+                if feature_id not in owners_by_path.get(path, set()):
+                    _fail(errors, "R28_FEATURE_CORE_PATH_UNOWNED", f"{feature_id}.core_paths contains unowned {path}")
 
 
 def _validate_contract_map(contract_map: dict[str, Any], errors: list[str]) -> None:
     symbols = set((contract_map.get("public_api_symbols") or {}).keys())
-    missing_public = sorted(_public_api_symbols() - symbols)
+    declared = _declared_public_api_symbols()
+    documented = _public_api_symbols()
+    missing_public = sorted(declared - symbols)
+    stale_public = sorted(symbols - declared)
+    undocumented = sorted(declared - documented)
+    stale_documentation = sorted(documented - declared)
     if missing_public:
         _fail(errors, "R28_PUBLIC_API_UNMAPPED", "missing public symbols: " + ", ".join(missing_public[:5]))
-    missing_vendor = sorted(VENDOR_ONLY_SYMBOLS - symbols)
-    if missing_vendor:
-        _fail(errors, "R28_VENDOR_ONLY_UNMAPPED", "missing vendor-only symbols: " + ", ".join(missing_vendor))
+    if stale_public:
+        _fail(errors, "R28_PUBLIC_API_MAP_STALE", "stale public symbols: " + ", ".join(stale_public[:5]))
+    if undocumented:
+        _fail(errors, "R28_PUBLIC_API_UNDOCUMENTED", "undocumented public symbols: " + ", ".join(undocumented[:5]))
+    if stale_documentation:
+        _fail(
+            errors,
+            "R28_PUBLIC_API_DOC_STALE",
+            "documented non-public symbols: " + ", ".join(stale_documentation[:5]),
+        )
 
 
 def _validate_contract_feature_ids(contract_map: dict[str, Any], feature_ids: set[str], errors: list[str]) -> None:

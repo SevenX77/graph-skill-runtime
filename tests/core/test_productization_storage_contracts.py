@@ -81,7 +81,7 @@ def _corrupt_store_bytes(store: Any, ref: Any, damaged: bytes) -> None:
 
 
 def test_storage_protocols_define_run_artifact_and_runtime_state_methods() -> None:
-    storage = importlib.import_module("graph_agent.core.storage_contracts")
+    storage = importlib.import_module("graph_skill_runtime.core.storage_contracts")
 
     RunArtifactStore = storage.RunArtifactStore
     RuntimeStateStore = storage.RuntimeStateStore
@@ -97,13 +97,13 @@ def test_storage_protocols_define_run_artifact_and_runtime_state_methods() -> No
 
 
 def test_run_artifact_store_does_not_expose_test_corruption_helper_in_production_class() -> None:
-    source = (ENGINE_ROOT / "src" / "graph_agent" / "core" / "storage_contracts.py").read_text(encoding="utf-8")
+    source = (ENGINE_ROOT / "src" / "graph_skill_runtime" / "core" / "storage_contracts.py").read_text(encoding="utf-8")
 
     assert "def corrupt_object_for_test" not in source
 
 
 def test_run_artifact_store_rejects_writes_after_seal_with_explicit_error_code() -> None:
-    storage = importlib.import_module("graph_agent.core.storage_contracts")
+    storage = importlib.import_module("graph_skill_runtime.core.storage_contracts")
 
     store = storage.InMemoryRunArtifactStore()
     store.begin_run("run-sealed", metadata={"source": "contract-test"})
@@ -120,7 +120,7 @@ def test_run_artifact_store_rejects_writes_after_seal_with_explicit_error_code()
 
 
 def test_sealed_run_cannot_be_reopened_by_begin_run() -> None:
-    storage = importlib.import_module("graph_agent.core.storage_contracts")
+    storage = importlib.import_module("graph_skill_runtime.core.storage_contracts")
 
     store = storage.InMemoryRunArtifactStore()
     store.begin_run("run-sealed-reopened", metadata={"attempt": 1})
@@ -136,7 +136,7 @@ def test_sealed_run_cannot_be_reopened_by_begin_run() -> None:
 
 
 def test_get_object_recomputes_hash_and_hard_fails_on_corrupt_bytes() -> None:
-    storage = importlib.import_module("graph_agent.core.storage_contracts")
+    storage = importlib.import_module("graph_skill_runtime.core.storage_contracts")
 
     store = storage.InMemoryRunArtifactStore()
     store.begin_run("run-hash", metadata={})
@@ -155,7 +155,7 @@ def test_get_object_recomputes_hash_and_hard_fails_on_corrupt_bytes() -> None:
 
 
 def test_lease_token_carries_monotonic_fencing_token() -> None:
-    storage = importlib.import_module("graph_agent.core.storage_contracts")
+    storage = importlib.import_module("graph_skill_runtime.core.storage_contracts")
 
     LeaseToken = storage.LeaseToken
     assert {
@@ -180,7 +180,7 @@ def test_lease_token_carries_monotonic_fencing_token() -> None:
 
 
 def test_released_lease_token_cannot_snapshot_again() -> None:
-    storage = importlib.import_module("graph_agent.core.storage_contracts")
+    storage = importlib.import_module("graph_skill_runtime.core.storage_contracts")
 
     state_store = storage.InMemoryRuntimeStateStore()
     lease = state_store.acquire_lease("run-release-fence", owner_id="worker-a", ttl_ms=1000)

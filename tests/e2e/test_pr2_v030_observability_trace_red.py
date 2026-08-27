@@ -7,15 +7,15 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage
 
-from graph_agent.callbacks.events import (
+from graph_skill_runtime.callbacks.events import (
     LLMCallEvent,
     PhaseEndEvent,
     PhaseStartEvent,
     ToolCallEvent,
 )
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.runner import _run_v030_skill_dict, run_skill
-from graph_agent.io.run_layout import runs_root
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.runner import _run_v030_skill_dict, run_skill
+from graph_skill_runtime.io.run_layout import runs_root
 
 
 class SpyCallback:

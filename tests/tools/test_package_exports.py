@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import graph_agent.tools as tools
+import graph_skill_runtime.tools as tools
 
 
 def test_tools_package_does_not_export_domain_specific_tools() -> None:

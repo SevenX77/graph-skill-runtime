@@ -6,7 +6,7 @@ from textwrap import dedent
 
 import pytest
 
-from graph_agent.core.purity import _violation_for_call, scan_python_purity
+from graph_skill_runtime.core.purity import _violation_for_call, scan_python_purity
 
 
 def _first_call(source: str) -> ast.Call:
@@ -84,7 +84,7 @@ def test_violation_for_call_current_non_violations(source: str, aliases: dict[st
     [
         (
             """
-            from graph_agent import run_skill
+            from graph_skill_runtime import run_skill
 
             def prepare(inputs):
                 run_skill("child.skill", workspace_dir="workspace")
@@ -94,7 +94,7 @@ def test_violation_for_call_current_non_violations(source: str, aliases: dict[st
         ),
         (
             """
-            from graph_agent.core.runner import run_skill as call_child
+            from graph_skill_runtime.core.runner import run_skill as call_child
 
             def prepare(inputs):
                 call_child("child.skill", workspace_dir="workspace")
@@ -256,7 +256,7 @@ def test_violation_for_call_current_non_violations(source: str, aliases: dict[st
             import importlib
 
             def prepare(inputs):
-                importlib.import_module("graph_agent.core.runner")
+                importlib.import_module("graph_skill_runtime.core.runner")
                 return {}
             """,
             ("importlib.import_module", "import"),

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_agent.cognitive.finish_task import FinishTaskInput, build_finish_task_tool
-from graph_agent.cognitive.md2json import Md2JsonResult
+from graph_skill_runtime.cognitive.finish_task import FinishTaskInput, build_finish_task_tool
+from graph_skill_runtime.cognitive.md2json import Md2JsonResult
 
 
 def _md2json_stub(markdown: str, output_schema: dict[str, Any] | None) -> Md2JsonResult:

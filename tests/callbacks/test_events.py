@@ -8,7 +8,7 @@ from pydantic import TypeAdapter, ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from graph_agent.callbacks.events import (  # noqa: E402
+from graph_skill_runtime.callbacks.events import (  # noqa: E402
     SCHEMA_VERSION,
     AgentLoopIterationEvent,
     ArtifactSavedEvent,

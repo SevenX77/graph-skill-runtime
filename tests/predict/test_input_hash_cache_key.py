@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 # Try to import input_hash. This will fail in Red Phase!
 try:
-    from graph_agent.core._predict_internal.hash import input_hash
+    from graph_skill_runtime.core._predict_internal.hash import input_hash
 except ImportError:
     input_hash = None  # type: ignore
 

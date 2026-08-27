@@ -9,7 +9,7 @@ Neither name appears in its phase's `LOGIC.md` `actions:` list, and neither is
 ever dispatched. The engine still called both "an action" and enforced the
 action signature on them.
 
-Cause (`src/graph_agent/core/loader.py`):
+Cause (`src/graph_skill_runtime/core/loader.py`):
 
 - `:1419-1429` `_load_action_dir` iterates `_module_functions(module)` and
   registers/validates EVERY module-level function found in the file.
@@ -50,9 +50,9 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 ENTRYPOINT_CODE = "[F-v3-logic-action-entrypoint-missing]"
 PURITY_CODE = "[F-v3-logic-action-purity-violation]"

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.parser import parse_markdown_parts
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.parser import parse_markdown_parts
 
 
 def _write(path: Path, text: str) -> None:

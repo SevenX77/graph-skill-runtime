@@ -24,9 +24,9 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.skill_resolver_protocol import SkillResolverProtocol
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolverProtocol
 
 _EMPTY_IO = """io:
   inputs:

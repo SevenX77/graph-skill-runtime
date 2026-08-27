@@ -8,15 +8,15 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-import graph_agent.callbacks.events as events
-from graph_agent.callbacks.base import Callback
-from graph_agent.callbacks.emit import _TraceJsonlSink
-from graph_agent.callbacks.events import CallbackEvent, LLMCallEvent, ToolCallEvent
+import graph_skill_runtime.callbacks.events as events
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.callbacks.emit import _TraceJsonlSink
+from graph_skill_runtime.callbacks.events import CallbackEvent, LLMCallEvent, ToolCallEvent
 
 
 def _event_class(name: str) -> type[Any]:
     cls = getattr(events, name, None)
-    assert cls is not None, f"{name} must be defined in graph_agent.callbacks.events"
+    assert cls is not None, f"{name} must be defined in graph_skill_runtime.callbacks.events"
     return cls
 
 
@@ -158,7 +158,7 @@ def test_default_callback_accepts_v4_trace_events_without_warning(caplog: pytest
         ),
     ]
 
-    with caplog.at_level(logging.WARNING, logger="graph_agent.callbacks.base"):
+    with caplog.at_level(logging.WARNING, logger="graph_skill_runtime.callbacks.base"):
         for event in v4_events:
             callback.on_event(event)
 

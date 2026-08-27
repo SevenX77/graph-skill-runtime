@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core._predict_internal.strategy import (
+from graph_skill_runtime.core._predict_internal.strategy import (
     BacktestStrategy,
     GoldenCaseStrategy,
     HeuristicStubStrategy,

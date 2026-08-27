@@ -6,11 +6,11 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.manifest import AgentNodeAST, SubgraphNodeAST
-from graph_agent.core.topology_projection import read_subgraph_path
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.manifest import AgentNodeAST, SubgraphNodeAST
+from graph_skill_runtime.core.topology_projection import read_subgraph_path
 
 
 class ExplodingResolver:

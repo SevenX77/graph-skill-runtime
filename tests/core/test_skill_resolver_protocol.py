@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.runner import run_skill
-from graph_agent.core.skill_resolver_protocol import (
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.core.skill_resolver_protocol import (
     SkillResolutionError,
     validate_skill_id,
 )

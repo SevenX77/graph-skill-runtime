@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core import runner as runner_module
-from graph_agent.core._predict_internal.strategy import HeuristicStubStrategy
-from graph_agent.io.run_layout import runs_root
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.core._predict_internal.strategy import HeuristicStubStrategy
+from graph_skill_runtime.io.run_layout import runs_root
 
 
 def _write_logic_skill(root: Path) -> Path:
@@ -93,7 +93,7 @@ def test_predict_result_shape_unchanged(
         return strategy
 
     monkeypatch.setattr(
-        "graph_agent.core._predict_internal.strategy.MockStrategy.from_param",
+        "graph_skill_runtime.core._predict_internal.strategy.MockStrategy.from_param",
         fake_strategy_from_param,
     )
 

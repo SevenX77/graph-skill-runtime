@@ -1,4 +1,4 @@
-"""Unit tests for graph_agent.io.storage.StorageManager.
+"""Unit tests for graph_skill_runtime.io.storage.StorageManager.
 
 Covered scenarios (match tasks.md Task 3.1):
 
@@ -19,10 +19,10 @@ from pathlib import Path
 import pytest
 
 # Allow running the tests without the package installed: add the in-tree
-# source root that holds ``graph_agent/``.
+# source root that holds ``graph_skill_runtime/``.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from graph_agent.io.storage import (  # noqa: E402
+from graph_skill_runtime.io.storage import (  # noqa: E402
     LegacyRunArtifactReadForbiddenError,
     StorageManager,
     sanitize_run_id,
@@ -167,7 +167,7 @@ class TestRetention:
             StorageManager(workspace, skill_id="s", run_id=ts).save_artifact("x.txt", payload)
 
         caplog.clear()
-        with caplog.at_level(logging.INFO, logger="graph_agent.io.storage"):
+        with caplog.at_level(logging.INFO, logger="graph_skill_runtime.io.storage"):
             # Trigger cleanup explicitly by constructing a new manager + get_output_dir.
             StorageManager(
                 workspace,

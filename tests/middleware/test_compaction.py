@@ -23,18 +23,18 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, RemoveMessage
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
-from graph_agent.callbacks.base import Callback
-from graph_agent.core.io_manager import IOManager
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.middleware import MVP0_MIDDLEWARE_ORDER_CONTRACT
-from graph_agent.middleware.compaction import (
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.core.io_manager import IOManager
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.middleware import MVP0_MIDDLEWARE_ORDER_CONTRACT
+from graph_skill_runtime.middleware.compaction import (
     COMPACTION_KEEP_MESSAGES,
     COMPACTION_TRIGGER_FRACTION,
     SUMMARIZATION_FALLBACK_MAX_INPUT_TOKENS,
     CompactionMiddleware,
     write_compaction_sidecar,
 )
-from graph_agent.middleware.factory import build_middleware_chain
+from graph_skill_runtime.middleware.factory import build_middleware_chain
 
 _SUMMARY_TEXT = "[[compaction-summary]]"
 

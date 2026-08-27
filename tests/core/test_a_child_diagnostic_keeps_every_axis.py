@@ -24,8 +24,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import CompileIssue, compile_skill
-from graph_agent.core.exceptions import GraphAgentError
+from graph_skill_runtime.core.compiler import CompileIssue, compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentError
 
 
 def _schema(properties: dict[str, object], required: list[str] | None = None) -> str:

@@ -11,8 +11,8 @@ from typing import Any
 
 import pytest
 
-import graph_agent
-from graph_agent.core.compiler import compile_skill
+from graph_skill_runtime.core import runner as engine_runner
+from graph_skill_runtime.core.compiler import compile_skill
 
 
 def _write(path: Path, payload: str) -> None:
@@ -24,9 +24,9 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     _write(path, json.dumps(payload, ensure_ascii=False, indent=2))
 
 
-def _public_callable(name: str) -> Callable[..., Any]:
-    value = getattr(graph_agent, name, None)
-    assert callable(value), f"graph_agent.{name} must be a public callable"
+def _engine_callable(name: str) -> Callable[..., Any]:
+    value = getattr(engine_runner, name, None)
+    assert callable(value), f"engine runner {name} must remain characterized"
     return value
 
 
@@ -126,7 +126,7 @@ def _golden_baseline(workspace_dir: Path, baseline_id: str, cases: list[dict[str
 
 
 def test_evaluate_golden_baseline_public_api_signature_is_locked() -> None:
-    evaluate = _public_callable("evaluate_golden_baseline")
+    evaluate = _engine_callable("evaluate_golden_baseline")
     signature = inspect.signature(evaluate)
 
     assert signature.parameters["workspace_dir"].kind is inspect.Parameter.KEYWORD_ONLY
@@ -142,7 +142,7 @@ def test_evaluate_golden_rejects_relative_workspace_dir(
 ) -> None:
     _logic_skill(tmp_path / "skill")
     _golden_baseline(tmp_path / "workspace", "baseline-a", [_case(case_id="case-a")])
-    evaluate = _public_callable("evaluate_golden_baseline")
+    evaluate = _engine_callable("evaluate_golden_baseline")
 
     with pytest.raises((TypeError, ValueError), match="workspace_dir"):
         evaluate(
@@ -163,7 +163,7 @@ def test_deterministic_logic_case_exact_match_writes_passed_report(
     _logic_skill(skill_root)
     _golden_baseline(workspace_dir, baseline_id, [_case(case_id="case-pass", topic="alpha")])
 
-    evaluate = _public_callable("evaluate_golden_baseline")
+    evaluate = _engine_callable("evaluate_golden_baseline")
     report = _as_report(
         evaluate(
             skill_root,
@@ -199,7 +199,7 @@ def test_golden_value_mismatch_returns_failed_case_with_field_diff(
         [_case(case_id="case-failed", topic="alpha", expected_output={"answer": "wrong"})],
     )
 
-    evaluate = _public_callable("evaluate_golden_baseline")
+    evaluate = _engine_callable("evaluate_golden_baseline")
     report = _as_report(
         evaluate(
             skill_root,
@@ -242,7 +242,7 @@ def test_required_output_missing_from_expected_marks_case_stale_not_compile_fata
     compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     assert compiled is not None
 
-    evaluate = _public_callable("evaluate_golden_baseline")
+    evaluate = _engine_callable("evaluate_golden_baseline")
     report = _as_report(
         evaluate(
             skill_root,
@@ -285,7 +285,7 @@ def test_golden_eval_uses_workspace_golden_not_skill_source_or_predict_latest(
     _golden_baseline(workspace_dir, baseline_id, [_case(case_id="case-layout")])
 
     assert not list(skill_root.rglob("golden.json"))
-    evaluate = _public_callable("evaluate_golden_baseline")
+    evaluate = _engine_callable("evaluate_golden_baseline")
     evaluate(
         skill_root,
         workspace_dir=workspace_dir,

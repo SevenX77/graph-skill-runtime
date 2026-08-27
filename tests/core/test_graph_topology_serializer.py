@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from graph_agent.core.graph_serializer import serialize_graph_topology
-from graph_agent.core.manifest import GraphPhaseRef, PhaseIOSchema
+from graph_skill_runtime.core.graph_serializer import serialize_graph_topology
+from graph_skill_runtime.core.manifest import GraphPhaseRef, PhaseIOSchema
 
 _IO = PhaseIOSchema(
     inputs={"type": "object", "properties": {}},

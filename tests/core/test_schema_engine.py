@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from graph_agent.core.schema_engine import (
+from graph_skill_runtime.core.schema_engine import (
     SchemaEngine,
     SchemaObject,
     SchemaParseError,
@@ -471,7 +471,7 @@ class TestEdgeCaseInputsT8:
         """``_parse_type_expr`` rejects an empty string — the public
         ``parse_from_md`` path raises ``missing a type declaration``
         before reaching this guard, so we exercise it directly."""
-        from graph_agent.core.schema_engine import _parse_type_expr
+        from graph_skill_runtime.core.schema_engine import _parse_type_expr
 
         with pytest.raises(SchemaParseError, match="Empty type"):
             _parse_type_expr("")

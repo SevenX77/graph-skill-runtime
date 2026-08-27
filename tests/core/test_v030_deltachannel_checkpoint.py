@@ -2,8 +2,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.channels.delta import DeltaChannel
 from langgraph.graph import END, START, StateGraph
 
-from graph_agent.core.checkpointer import checkpointer_context
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.core.checkpointer import checkpointer_context
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
 
 
 def test_workflow_state_messages_use_deltachannel() -> None:

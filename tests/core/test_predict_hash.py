@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.core._predict_internal.hash import prompt_hash, schema_hash
+from graph_skill_runtime.core._predict_internal.hash import prompt_hash, schema_hash
 
 
 def test_prompt_hash_normalizes_spaces_tabs_and_newlines() -> None:

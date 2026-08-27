@@ -7,17 +7,17 @@ from types import SimpleNamespace
 
 import pytest
 
-import graph_agent.core.graph_assembler as graph_assembler_module
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.graph_assembler import (
+import graph_skill_runtime.core.graph_assembler as graph_assembler_module
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.graph_assembler import (
     _build_subgraph_node,
     _invoke_subagent_once_t23,
     assemble_graph,
 )
-from graph_agent.core.loader import PhaseDocument
-from graph_agent.core.manifest import PhaseIOSchema, SubgraphNodeAST
-from graph_agent.runtime.state_mapper import PhaseWrapper, StateMapper
+from graph_skill_runtime.core.loader import PhaseDocument
+from graph_skill_runtime.core.manifest import PhaseIOSchema, SubgraphNodeAST
+from graph_skill_runtime.runtime.state_mapper import PhaseWrapper, StateMapper
 
 
 def _write(path: Path, text: str) -> None:
@@ -201,7 +201,7 @@ def test_subgraph_child_outputs_are_deterministic_across_child_phases(
 
 
 def test_subagent_child_without_phase_outputs_does_not_flat_diff_parent_data() -> None:
-    from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+    from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
     class FlatOnlyGraph:
         def invoke(self, state, config=None):
             del config
@@ -226,7 +226,7 @@ def test_subagent_child_without_phase_outputs_does_not_flat_diff_parent_data() -
 
 
 def test_subagent_child_flow_is_deep_copied_and_depth_increments() -> None:
-    from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+    from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
     captured_child_flow: FrameworkState | None = None
 
     class MutatingChildGraph:
@@ -268,7 +268,7 @@ def test_subgraph_child_flow_is_deep_copied_and_depth_increments(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+    from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
     class MutatingSubgraph:
         def invoke(self, state):
             assert state["flow"].subagent_depth == 2

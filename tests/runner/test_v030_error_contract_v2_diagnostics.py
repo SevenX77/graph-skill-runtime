@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 def test_run_skill_missing_graph_root_writes_error_diagnostics_snapshot(

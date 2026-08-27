@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core import runner
-from graph_agent.core.exceptions import LoaderError
+from graph_skill_runtime.core import runner
+from graph_skill_runtime.core.exceptions import LoaderError
 
 
 def _write_skill(tmp_path: Path) -> Path:
@@ -35,7 +35,7 @@ def test_main_dotenv_import_failure_raises_loader_error(
         return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr(builtins, "__import__", _blocked_import)
-    monkeypatch.setattr(sys, "argv", ["graph-agent", "--skill", str(skill_path)])
+    monkeypatch.setattr(sys, "argv", ["graph-skill-runtime", "--skill", str(skill_path)])
 
     with pytest.raises(LoaderError) as exc_info:
         runner.main()

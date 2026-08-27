@@ -37,9 +37,11 @@ EXPECTED_CONTRACT_HASHES = {
     # updated in the same PR).
     "docs/mvp0/public-api-contract.md": "68075217ba4c57feff2a5dce9b4d4e506d2a52095a4b2e891f0558baa60cd243",
     "docs/mvp0/feature-compliance-checklist.md": "77ea3efd4c6dfed5a09f496a82a1ba7ff3d2832ad1dc92ba9ac1f5cb759dc5c7",
-    # Re-pinned at standalone extraction: repository-relative examples changed
-    # from packages/graph-agent/... to src/... without changing the schema.
-    "spec/round28-manifest-schema.yaml": "e642706de673a00d2356b28e84f59b5df68a124547460cb50b322c31e5ffc2ad",
+    # Re-pinned at the typed-runtime hard cut: a canonical source map now
+    # declares complete_inventory and a mandatory owner for detail files, and
+    # the schema no longer requires six removed monorepo vendor-debt symbols in
+    # every public contract map.
+    "spec/round28-manifest-schema.yaml": "0546cded8c3ca35ea8bc7c66a73e5cd701a9c32ef54560439c4de35755bc7299",
 }
 
 

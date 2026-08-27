@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.manifest import AgentNodeAST, SubgraphNodeAST
-from graph_agent.core.validator_contract import VALIDATOR_ERROR_CODES, VALIDATOR_SIGNATURE
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.manifest import AgentNodeAST, SubgraphNodeAST
+from graph_skill_runtime.core.validator_contract import VALIDATOR_ERROR_CODES, VALIDATOR_SIGNATURE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -189,7 +189,7 @@ def test_γ0_2_subgraph_loader_accepts_validator_true(
 
 
 def test_γ0_3_middleware_order_contract_constant_exists() -> None:
-    from graph_agent import middleware
+    from graph_skill_runtime import middleware
 
     assert middleware.MVP0_MIDDLEWARE_ORDER_CONTRACT == (
         "Tracing",
@@ -216,11 +216,11 @@ def test_γ0_4_validator_signature_and_error_placeholders_are_public_constants()
 
 
 def test_γ0_5_source_contract_matches_public_constants() -> None:
-    manifest = (REPO_ROOT / "src/graph_agent/core/manifest.py").read_text(
+    manifest = (REPO_ROOT / "src/graph_skill_runtime/core/manifest.py").read_text(
         encoding="utf-8"
     )
     middleware_init = (
-        REPO_ROOT / "src/graph_agent/middleware/__init__.py"
+        REPO_ROOT / "src/graph_skill_runtime/middleware/__init__.py"
     ).read_text(encoding="utf-8")
 
     assert "class AgentNodeAST" in manifest

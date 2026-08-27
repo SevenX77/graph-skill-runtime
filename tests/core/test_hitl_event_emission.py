@@ -8,10 +8,10 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from graph_agent.callbacks.events import InterruptedEvent, ResumedEvent, RunEndedEvent
-from graph_agent.core.checkpointer import reset_checkpointer
-from graph_agent.core.runner import resume_skill, run_skill
-from graph_agent.core.state import BusinessData, FrameworkState
+from graph_skill_runtime.callbacks.events import InterruptedEvent, ResumedEvent, RunEndedEvent
+from graph_skill_runtime.core.checkpointer import reset_checkpointer
+from graph_skill_runtime.core.runner import resume_skill, run_skill
+from graph_skill_runtime.core.state import BusinessData, FrameworkState
 
 
 class _Resolver:
@@ -156,7 +156,7 @@ def test_hitl_pause_emits_interrupted_event_with_checkpoint_and_namespace(
 
 
 def test_hitl_interrupt_detection_ignores_stale_checkpoint_in_same_namespace() -> None:
-    from graph_agent.core import runner as runner_module
+    from graph_skill_runtime.core import runner as runner_module
 
     run_id = "hitl-stale-checkpoint"
     tool_call = {
@@ -206,7 +206,7 @@ def test_resume_skill_emits_resumed_event_before_continuing_from_checkpoint(
     tmp_path: Path,
     monkeypatch: Any,
 ) -> None:
-    from graph_agent.core import runner as runner_module
+    from graph_skill_runtime.core import runner as runner_module
 
     run_id = "hitl-resumed-event"
     checkpoint_id = "cp-hitl"

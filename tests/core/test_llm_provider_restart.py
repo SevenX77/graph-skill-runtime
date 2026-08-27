@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from graph_agent.core.llm_provider import (
+from graph_skill_runtime.core.llm_provider import (
     LLMProviderChatModel,
     LLMProviderChunk,
     LLMProviderRequest,
@@ -38,7 +38,7 @@ class _RestartingProvider:
 
 
 def _model(provider: object) -> LLMProviderChatModel:
-    return LLMProviderChatModel(provider=provider, role="graph_agent", phase_name="draft")
+    return LLMProviderChatModel(provider=provider, role="graph_skill_runtime", phase_name="draft")
 
 
 def test_a_restart_leaves_no_trace_of_the_attempt_it_replaced() -> None:

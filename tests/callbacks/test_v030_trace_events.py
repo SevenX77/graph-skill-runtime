@@ -6,15 +6,15 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
-from graph_agent.callbacks.base import Callback
-from graph_agent.callbacks.events import (
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.callbacks.events import (
     AmbiguityLoggedEvent,
     BuiltinSubagentEnterEvent,
     BuiltinSubagentExitEvent,
     BuiltinSubagentFallbackEvent,
     CallbackEvent,
 )
-from graph_agent.callbacks.tracing import TracingCallback
+from graph_skill_runtime.callbacks.tracing import TracingCallback
 
 
 def test_builtin_subagent_trace_events_round_trip_through_callback_union() -> None:
@@ -65,7 +65,7 @@ def test_default_callback_accepts_v030_typed_only_events_without_warning(caplog)
         ),
     ]
 
-    with caplog.at_level(logging.WARNING, logger="graph_agent.callbacks.base"):
+    with caplog.at_level(logging.WARNING, logger="graph_skill_runtime.callbacks.base"):
         for event in events:
             callback.on_event(event)
 

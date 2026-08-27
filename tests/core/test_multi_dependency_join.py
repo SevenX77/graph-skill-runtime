@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import graph_agent
+from graph_skill_runtime.core.runner import predict_skill
 
 _AGENT = """---
 llm_role: analyst
@@ -93,7 +93,7 @@ def test_join_waits_for_the_deeper_branch(tmp_path: Path) -> None:
     has written its output to the blackboard."""
     skill = _staggered_skill(tmp_path)
 
-    result = graph_agent.predict_skill(skill, workspace_dir=tmp_path / "ws", topic="mirrors")
+    result = predict_skill(skill, workspace_dir=tmp_path / "ws", topic="mirrors")
 
     assert result.success, f"predict failed: {result.error}"
     assert "verdict" in result.context, f"join never produced its output; context={result.context}"
@@ -105,7 +105,7 @@ def test_join_runs_exactly_once(tmp_path: Path) -> None:
     tokens at run time and silently overwrites the first result."""
     skill = _staggered_skill(tmp_path)
 
-    result = graph_agent.predict_skill(skill, workspace_dir=tmp_path / "ws", topic="mirrors")
+    result = predict_skill(skill, workspace_dir=tmp_path / "ws", topic="mirrors")
 
     assert result.success, f"predict failed: {result.error}"
     runs = [phase for phase in result.phases if phase.phase_name == "join"]

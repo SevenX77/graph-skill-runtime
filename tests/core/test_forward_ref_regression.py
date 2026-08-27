@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from graph_agent.core.module_sandbox import ModuleSandbox
+from graph_skill_runtime.core.module_sandbox import ModuleSandbox
 
 
 def test_module_sandbox_rebuilds_forward_ref_schema(tmp_path: Path) -> None:

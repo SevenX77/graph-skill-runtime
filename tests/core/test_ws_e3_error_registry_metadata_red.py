@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 
 import pytest
 
-from graph_agent.core.exceptions import ErrorPayload, GraphAgentError
-from graph_agent.core.result import RunResult
+from graph_skill_runtime.core.exceptions import ErrorPayload, GraphAgentError
+from graph_skill_runtime.core.result import RunResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ERROR_SPEC = (
@@ -46,7 +46,7 @@ CATALOG_ITEM_FIELDS = {
 
 
 def _registry_module() -> Any:
-    return importlib.import_module("graph_agent.core.error_registry")
+    return importlib.import_module("graph_skill_runtime.core.error_registry")
 
 
 def _spec_codes() -> set[str]:
@@ -80,7 +80,7 @@ def test_error_registry_metadata_exposes_p0_2_fields_for_every_existing_code() -
         assert metadata.stage
         assert metadata.doc_link
         assert isinstance(metadata.remediation, str) and metadata.remediation.strip()
-        assert metadata.doc_ref.startswith("graph-agent://errors/")
+        assert metadata.doc_ref.startswith("graph-skill-runtime://errors/")
         assert code.strip("[]") in metadata.doc_ref or code in metadata.doc_ref
         _assert_https_url(metadata.doc_url)
         assert isinstance(metadata.details_schema, dict)
@@ -126,7 +126,7 @@ def test_error_catalog_export_envelope_is_json_safe_versioned_and_stably_sorted(
         assert isinstance(item["stage"], list) and item["stage"]
         assert isinstance(item["domain"], str) and item["domain"]
         assert isinstance(item["remediation"], str) and item["remediation"].strip()
-        assert item["doc_ref"].startswith("graph-agent://errors/")
+        assert item["doc_ref"].startswith("graph-skill-runtime://errors/")
         _assert_https_url(item["doc_url"])
         assert item["status"] == "active"
         assert isinstance(item["details_schema"], dict)
@@ -144,7 +144,7 @@ def test_error_catalog_single_code_export_rejects_unknown_without_claiming_gatew
     assert CATALOG_ITEM_FIELDS <= set(item)
     assert item["code"] == "[F-v3-graph-phase-cycle]"
 
-    with pytest.raises(ValueError, match="unknown graph_agent error code"):
+    with pytest.raises(ValueError, match="unknown graph_skill_runtime error code"):
         export_error_metadata("[F-v3-not-in-spec]")
 
     exc = GraphAgentError(

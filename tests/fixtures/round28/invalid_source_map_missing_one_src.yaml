@@ -1,4 +1,9 @@
 files:
-  - path: src/graph_agent/__init__.py
+  - path: src/graph_skill_runtime/__init__.py
     classification: detail
     feature_ids: [F-api-stable-export]
+config:
+  complete_inventory: true
+  include_globs:
+  - src/graph_skill_runtime/**/*.py
+  exclude_globs: []

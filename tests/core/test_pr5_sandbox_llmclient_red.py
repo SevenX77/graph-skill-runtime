@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.module_sandbox import ModuleSandbox
+from graph_skill_runtime.core.module_sandbox import ModuleSandbox
 
 
 def test_module_sandbox_removes_sys_modules_for_importlib_resolved_spec_name_path(

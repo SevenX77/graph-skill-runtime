@@ -12,17 +12,17 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 
-from graph_agent.core import graph_assembler
-from graph_agent.core.checkpointer import checkpoint_serde
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import (
+from graph_skill_runtime.core import graph_assembler
+from graph_skill_runtime.core.checkpointer import checkpoint_serde
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import (
     NamespaceCheckpointer,
     _run_graph_loop_iterate,
     active_outer_ns,
     assemble_graph,
 )
-from graph_agent.core.manifest import IterateAccumulateSpec, IterateSpec
-from graph_agent.core.state import BusinessData, FrameworkState, StateManager, WorkflowState
+from graph_skill_runtime.core.manifest import IterateAccumulateSpec, IterateSpec
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, StateManager, WorkflowState
 
 
 def _write(path: Path, text: str) -> None:
@@ -117,7 +117,7 @@ io:
       answer:
         type: string
 max_iterations: 3
-llm_role: graph_agent
+llm_role: graph_skill_runtime
 ---
 <role>
 Checkpoint boundary verifier.

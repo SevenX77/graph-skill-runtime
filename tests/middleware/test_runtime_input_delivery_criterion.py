@@ -41,10 +41,10 @@ from typing import Any, cast
 from langchain.agents.middleware import ModelRequest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from graph_agent.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from graph_agent.core.runner import run_skill
-from graph_agent.core.state import BusinessData, FrameworkState
-from graph_agent.middleware.runtime_input import RuntimeInputMiddleware
+from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.core.state import BusinessData, FrameworkState
+from graph_skill_runtime.middleware.runtime_input import RuntimeInputMiddleware
 
 # The literal opening of the engine's own input block. Authored `{key}`
 # interpolation produces the value without this prefix, so counting on the

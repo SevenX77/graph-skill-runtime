@@ -34,8 +34,8 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
+from graph_skill_runtime.core.runner import run_skill
 
 from ._token_spend_invariant import CallRecorder, assert_totals_match_the_calls
 

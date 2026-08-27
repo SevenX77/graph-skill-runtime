@@ -30,9 +30,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from graph_agent.callbacks.emit import _TraceJsonlSink, elapsed_before
-from graph_agent.callbacks.events import PhaseStartEvent, RunEndedEvent
-from graph_agent.core.runner import resume_skill, runs_root
+from graph_skill_runtime.callbacks.emit import _TraceJsonlSink, elapsed_before
+from graph_skill_runtime.callbacks.events import PhaseStartEvent, RunEndedEvent
+from graph_skill_runtime.core.runner import resume_skill, runs_root
 
 
 def test_a_run_that_is_only_now_starting_opens_its_clock_at_zero(tmp_path: Path) -> None:

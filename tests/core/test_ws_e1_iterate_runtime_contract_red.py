@@ -9,9 +9,9 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentError
-from graph_agent.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentError
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 
 def _write(path: Path, text: str) -> None:

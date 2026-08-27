@@ -7,7 +7,7 @@ def test_engine_default_predict_resolver_uses_gateway_step4_contract() -> None:
     runner_source = (
         Path(__file__).resolve().parents[2]
         / "src"
-        / "graph_agent"
+        / "graph_skill_runtime"
         / "core"
         / "runner.py"
     )

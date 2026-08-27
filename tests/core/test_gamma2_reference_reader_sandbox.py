@@ -7,9 +7,9 @@ from typing import Any
 
 from langchain_core.messages import AIMessage
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.runtime.state import BlackboardState
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.runtime.state import BlackboardState
 
 
 class FakeToolChatModel:
@@ -152,7 +152,7 @@ def test_reference_reader_runtime_is_invoked_with_sandbox(
             return state
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         SpyReferenceReaderRuntime,
     )
     _base(

@@ -30,12 +30,12 @@ import pytest
 from pydantic import BaseModel
 from typing_extensions import is_typeddict
 
-from graph_agent.core.checkpointer import CHECKPOINT_STATE_TYPES
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.core.checkpointer import CHECKPOINT_STATE_TYPES
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
 
 _PROBE = Path(__file__).with_name("_engine_checkpoint_roundtrip_probe.py")
 
-_ENGINE_PACKAGE = "graph_agent."
+_ENGINE_PACKAGE = "graph_skill_runtime."
 
 _UNREGISTERED_WARNING = "Deserializing unregistered type"
 _BLOCKED_WARNING = "Blocked deserialization of"

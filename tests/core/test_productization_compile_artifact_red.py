@@ -67,7 +67,7 @@ io:
 
 
 def _compile_artifact(source_root: Path, *, skill_resolver: Any) -> Any:
-    artifacts = importlib.import_module("graph_agent.core.artifacts")
+    artifacts = importlib.import_module("graph_skill_runtime.core.artifacts")
     return artifacts.compile_artifact(source_root=source_root, skill_resolver=skill_resolver)
 
 
@@ -276,7 +276,7 @@ def test_compile_artifact_does_not_write_manifest_side_effects_into_source_root(
     assert source_map_path.is_file()
     assert skill_root not in manifest_path.parents
     assert skill_root not in source_map_path.parents
-    assert not (skill_root / ".graph_agent").exists()
+    assert not (skill_root / ".graph_skill_runtime").exists()
 
 
 def _file_uri_path(ref: str) -> Path:

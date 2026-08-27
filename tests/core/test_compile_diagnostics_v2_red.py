@@ -28,11 +28,11 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.error_registry import ERROR_REGISTRY, export_error_catalog
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.skill_resolver_protocol import SkillResolverProtocol
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.error_registry import ERROR_REGISTRY, export_error_catalog
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolverProtocol
 
 # --------------------------------------------------------------------------- #
 # Fixture builders (skill directory on disk, per design §6 "造样输入").          #
@@ -453,7 +453,7 @@ def test_allowed_roles_param_is_pure_set_no_gateway_import() -> None:
     annotation = str(sig.parameters["allowed_roles"].annotation)
     assert "set" in annotation and "str" in annotation, annotation
 
-    engine_pkg = Path(__file__).resolve().parents[2] / "src" / "graph_agent"
+    engine_pkg = Path(__file__).resolve().parents[2] / "src" / "graph_skill_runtime"
     offenders = [
         str(py)
         for py in engine_pkg.rglob("*.py")

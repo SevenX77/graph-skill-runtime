@@ -11,10 +11,10 @@ from typing import Any
 
 import pytest
 
-import graph_agent
-from graph_agent.core.checkpointer import get_checkpointer, reset_checkpointer
-from graph_agent.core.result import RunResult
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core import runner as engine_runner
+from graph_skill_runtime.core.checkpointer import get_checkpointer, reset_checkpointer
+from graph_skill_runtime.core.result import RunResult
+from graph_skill_runtime.core.runner import run_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -22,9 +22,9 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _public_callable(name: str) -> Callable[..., Any]:
-    value = getattr(graph_agent, name, None)
-    assert callable(value), f"graph_agent.{name} must be a public callable"
+def _engine_callable(name: str) -> Callable[..., Any]:
+    value = getattr(engine_runner, name, None)
+    assert callable(value), f"engine runner {name} must remain characterized"
     return value
 
 
@@ -213,7 +213,7 @@ def _checkpoint_id_with_b_without_c(run_id: str) -> str:
 
 
 def test_resume_skill_public_api_signature_is_locked() -> None:
-    resume_skill = _public_callable("resume_skill")
+    resume_skill = _engine_callable("resume_skill")
     signature = inspect.signature(resume_skill)
 
     assert signature.return_annotation in (RunResult, "RunResult")
@@ -236,7 +236,7 @@ def test_resume_rejects_relative_workspace_dir(
     mock_skill_resolver: object,
 ) -> None:
     _resume_logic_skill(tmp_path / "skill")
-    resume_skill = _public_callable("resume_skill")
+    resume_skill = _engine_callable("resume_skill")
 
     with pytest.raises((TypeError, ValueError), match="workspace_dir"):
         resume_skill(
@@ -259,7 +259,7 @@ def test_resume_from_checkpoint_applies_business_context_overrides_without_rerun
     _resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         initial = run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -306,7 +306,7 @@ def test_resume_events_include_resolved_checkpoint_id(
     _resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -356,7 +356,7 @@ def test_node_resume_from_abc_checkpoint_reruns_only_downstream_node(
     _abc_resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         initial = run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -404,7 +404,7 @@ def test_resume_from_phase_does_not_rerun_successful_upstream_phases(
     _resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         initial = run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -449,7 +449,7 @@ def test_node_resume_rejects_context_override_from_dirty_upstream_node(
     _abc_resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         initial = run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -499,7 +499,7 @@ def test_resume_context_overrides_reject_non_business_state_fields(
     _resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -533,7 +533,7 @@ def test_resume_selector_preserves_checkpoint_namespace_boundaries(
     _resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         run_skill(
             skill_root,
             workspace_dir=workspace_dir,
@@ -566,7 +566,7 @@ def test_resume_human_response_is_structured_and_plain_string_is_rejected(
     mock_skill_resolver: object,
 ) -> None:
     _resume_logic_skill(tmp_path / "skill")
-    resume_skill = _public_callable("resume_skill")
+    resume_skill = _engine_callable("resume_skill")
 
     with pytest.raises((TypeError, ValueError), match="human_response|content"):
         resume_skill(
@@ -599,7 +599,7 @@ def test_resume_human_response_without_pending_tool_call_is_rejected(
     _resume_logic_skill(skill_root)
     reset_checkpointer()
     try:
-        resume_skill = _public_callable("resume_skill")
+        resume_skill = _engine_callable("resume_skill")
         run_skill(
             skill_root,
             workspace_dir=workspace_dir,

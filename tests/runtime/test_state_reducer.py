@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.runtime.state import blackboard_data_merge
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.runtime.state import blackboard_data_merge
 
 
 def test_blackboard_data_merge_phase_outputs_disjoint_keys() -> None:

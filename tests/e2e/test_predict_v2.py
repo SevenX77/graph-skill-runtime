@@ -3,16 +3,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from graph_agent.callbacks.events import PhaseEndEvent, PhaseStartEvent
-from graph_agent.core._predict_internal.models import GoldenCase
-from graph_agent.core._predict_internal.strategy import (
+from graph_skill_runtime.callbacks.events import PhaseEndEvent, PhaseStartEvent
+from graph_skill_runtime.core._predict_internal.models import GoldenCase
+from graph_skill_runtime.core._predict_internal.strategy import (
     BacktestStrategy,
     GoldenCaseStrategy,
     HeuristicStubStrategy,
     MockStrategy,
     OverrideStrategy,
 )
-from graph_agent.core._predict_internal.tracing import (
+from graph_skill_runtime.core._predict_internal.tracing import (
     PredictMockSourceCache,
     PredictTracingCallback,
 )

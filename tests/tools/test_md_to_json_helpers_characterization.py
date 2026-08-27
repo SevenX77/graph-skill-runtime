@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from graph_agent.tools.md_to_json import _parse_block_data, _SourceLine
+from graph_skill_runtime.tools.md_to_json import _parse_block_data, _SourceLine
 
 
 def _lines(*texts: str) -> list[_SourceLine]:

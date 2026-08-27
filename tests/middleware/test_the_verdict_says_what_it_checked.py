@@ -24,9 +24,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_agent.core.io_manager import IODef, IOManager
-from graph_agent.core.schema_engine import SchemaEngine
-from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
+from graph_skill_runtime.core.io_manager import IODef, IOManager
+from graph_skill_runtime.core.schema_engine import SchemaEngine
+from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
 
 from .test_cognitive_flow import VALID_BUSINESS_MD, _handler, _request
 

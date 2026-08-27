@@ -13,9 +13,9 @@ from typing import Any
 import pytest
 from langchain_core.messages import ToolMessage
 
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.middleware.loop_detection import LoopDetectionMiddleware
-from graph_agent.middleware.protocol_validation import (
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.middleware.loop_detection import LoopDetectionMiddleware
+from graph_skill_runtime.middleware.protocol_validation import (
     ProtocolValidationError,
     ProtocolValidationMiddleware,
 )

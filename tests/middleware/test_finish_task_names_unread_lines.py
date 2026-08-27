@@ -25,10 +25,10 @@ from typing import Any
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
-from graph_agent.core.io_manager import IODef, IOManager
-from graph_agent.core.schema_engine import SchemaEngine
-from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
-from graph_agent.tools.md_to_json import parse_md
+from graph_skill_runtime.core.io_manager import IODef, IOManager
+from graph_skill_runtime.core.schema_engine import SchemaEngine
+from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
+from graph_skill_runtime.tools.md_to_json import parse_md
 
 from .test_cognitive_flow import _handler, _request
 

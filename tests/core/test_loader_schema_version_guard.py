@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import load_workflow_from_md
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import load_workflow_from_md
 
 
 def _write_skill(path: Path, schema_version_literal: str) -> None:

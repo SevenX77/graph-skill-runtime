@@ -33,10 +33,10 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import GraphAgentFatalError, SkillLoadError
-from graph_agent.core.loader import CompiledSkill, SkillLoader
-from graph_agent.core.manifest import AgentNodeAST, LogicNodeAST, SubgraphNodeAST
-from graph_agent.core.skill_resolver_protocol import SkillResolutionError
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError, SkillLoadError
+from graph_skill_runtime.core.loader import CompiledSkill, SkillLoader
+from graph_skill_runtime.core.manifest import AgentNodeAST, LogicNodeAST, SubgraphNodeAST
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
 FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "v030_e2e_pipeline"
 

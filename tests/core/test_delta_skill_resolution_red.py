@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from graph_agent.core import graph_assembler, loader
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.loader import CompiledSkill, PhaseDocument, SkillLoader
-from graph_agent.core.manifest import GraphManifest, SubagentSpec, SubgraphNodeAST
-from graph_agent.core.runner import run_skill
-from graph_agent.core.skill_resolver_protocol import SkillResolverProtocol
+from graph_skill_runtime.core import graph_assembler, loader
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.loader import CompiledSkill, PhaseDocument, SkillLoader
+from graph_skill_runtime.core.manifest import GraphManifest, SubagentSpec, SubgraphNodeAST
+from graph_skill_runtime.core.runner import run_skill
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolverProtocol
 
 
 class DictSkillResolver:

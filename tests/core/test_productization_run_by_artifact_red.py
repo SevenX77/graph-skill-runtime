@@ -8,12 +8,12 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.adapter_contracts import (
+from graph_skill_runtime.core.adapter_contracts import (
     PredictArtifactRequest,
     RunArtifactRequest,
     RunSession,
 )
-from graph_agent.core.artifacts import ArtifactRef, compile_artifact
+from graph_skill_runtime.core.artifacts import ArtifactRef, compile_artifact
 
 
 class HashingFakeRunArtifactStore:
@@ -28,7 +28,7 @@ class HashingFakeRunArtifactStore:
         return {"run_id": run_id, "metadata": metadata or {}}
 
     def put_batch(self, run_id: str, objects: dict[str, bytes]) -> dict[str, Any]:
-        from graph_agent.core.storage_contracts import ObjectRef
+        from graph_skill_runtime.core.storage_contracts import ObjectRef
 
         self.put_calls += 1
         refs: dict[str, ObjectRef] = {}
@@ -60,7 +60,7 @@ class EmptyRefsRunArtifactStore(HashingFakeRunArtifactStore):
 
 class WrongPathRefsRunArtifactStore(HashingFakeRunArtifactStore):
     def put_batch(self, run_id: str, objects: dict[str, bytes]) -> dict[str, Any]:
-        from graph_agent.core.storage_contracts import ObjectRef
+        from graph_skill_runtime.core.storage_contracts import ObjectRef
 
         self.put_calls += 1
         return {
@@ -325,7 +325,7 @@ class FailIfInvokedProvider:
 
 
 def test_run_artifact_accepts_artifact_ref_and_returns_run_session() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     request = RunArtifactRequest(
         artifact_ref=_artifact_ref(),
         inputs={"topic": "red"},
@@ -340,7 +340,7 @@ def test_run_artifact_accepts_artifact_ref_and_returns_run_session() -> None:
 
 
 def test_core_run_artifact_rejects_raw_skill_path() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
 
     assert hasattr(runner, "run_artifact"), "Engine must expose run_artifact before it can reject raw skill_path"
 
@@ -355,7 +355,7 @@ def test_core_run_artifact_rejects_raw_skill_path() -> None:
 
 
 def test_run_artifact_idempotency_key_executes_once() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     executor = CountingArtifactExecutor()
     request = RunArtifactRequest(
         artifact_ref=_artifact_ref(),
@@ -375,7 +375,7 @@ def test_run_artifact_without_executor_executes_compiled_graph(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     skill_root = tmp_path / "artifact-runtime-real-graph"
     _write_two_phase_logic_skill(skill_root)
     manifest = compile_artifact(source_root=skill_root, skill_resolver=mock_skill_resolver)
@@ -406,7 +406,7 @@ def test_run_artifact_replays_cached_file_result_through_run_artifact_store(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     idempotency_key = "idem-real-graph-run-store-after-file-cache"
     getattr(runner, "_RUN_CACHE", {}).pop(idempotency_key, None)
     skill_root = tmp_path / "artifact-runtime-real-graph"
@@ -447,7 +447,7 @@ def test_run_artifact_replays_cached_file_result_through_run_artifact_store(
 
 
 def test_run_artifact_store_metadata_records_dev_rebuild_audit() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     store = HashingFakeRunArtifactStore()
     artifact_ref = _artifact_ref()
     dev_rebuild = {
@@ -498,7 +498,7 @@ def test_predict_artifact_without_executor_executes_predict_graph_with_mock(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     skill_root = tmp_path / "artifact-runtime-real-graph"
     _write_two_phase_logic_skill(skill_root)
     manifest = compile_artifact(source_root=skill_root, skill_resolver=mock_skill_resolver)
@@ -531,7 +531,7 @@ def test_predict_artifact_agent_phase_never_invokes_live_llm_provider(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     skill_root = tmp_path / "artifact-runtime-predict-agent"
     _write_single_agent_skill(skill_root)
     manifest = compile_artifact(source_root=skill_root, skill_resolver=mock_skill_resolver)
@@ -569,7 +569,7 @@ def test_predict_artifact_agent_phase_accepts_complex_mock_payload(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     skill_root = tmp_path / "artifact-runtime-predict-complex-agent"
     _write_complex_agent_skill(skill_root)
     manifest = compile_artifact(source_root=skill_root, skill_resolver=mock_skill_resolver)
@@ -617,11 +617,11 @@ def test_predict_graph_resolves_engine_predict_model_before_live_provider(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    from graph_agent.core import graph_assembler
-    from graph_agent.core._predict_internal.interception import PredictGatewayChatModel
-    from graph_agent.core._predict_internal.strategy import MockStrategy
-    from graph_agent.core.compiler import compile_skill
-    from graph_agent.core.runner import SDKPredictContext
+    from graph_skill_runtime.core import graph_assembler
+    from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
+    from graph_skill_runtime.core._predict_internal.strategy import MockStrategy
+    from graph_skill_runtime.core.compiler import compile_skill
+    from graph_skill_runtime.core.runner import SDKPredictContext
 
     skill_root = tmp_path / "artifact-runtime-predict-agent"
     _write_single_agent_skill(skill_root)
@@ -664,11 +664,11 @@ def test_predict_graph_predict_context_overrides_explicit_chat_model(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    from graph_agent.core import graph_assembler
-    from graph_agent.core._predict_internal.interception import PredictGatewayChatModel
-    from graph_agent.core._predict_internal.strategy import MockStrategy
-    from graph_agent.core.compiler import compile_skill
-    from graph_agent.core.runner import SDKPredictContext
+    from graph_skill_runtime.core import graph_assembler
+    from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
+    from graph_skill_runtime.core._predict_internal.strategy import MockStrategy
+    from graph_skill_runtime.core.compiler import compile_skill
+    from graph_skill_runtime.core.runner import SDKPredictContext
 
     skill_root = tmp_path / "artifact-runtime-predict-explicit-chat-model"
     _write_single_agent_skill(skill_root)
@@ -710,7 +710,7 @@ def test_predict_artifact_replays_cached_file_result_through_run_artifact_store(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     idempotency_key = "idem-real-graph-predict-store-after-file-cache"
     getattr(runner, "_RUN_CACHE", {}).pop(idempotency_key, None)
     skill_root = tmp_path / "artifact-runtime-real-graph"
@@ -755,9 +755,9 @@ def test_predict_artifact_real_graph_persists_result_through_run_artifact_store(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    from graph_agent.core.storage_contracts import ObjectRef
+    from graph_skill_runtime.core.storage_contracts import ObjectRef
 
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     skill_root = tmp_path / "artifact-runtime-real-graph"
     _write_two_phase_logic_skill(skill_root)
     manifest = compile_artifact(source_root=skill_root, skill_resolver=mock_skill_resolver)
@@ -818,7 +818,7 @@ def test_predict_artifact_real_graph_persists_result_through_run_artifact_store(
 
 
 def test_run_artifact_store_result_rejects_missing_object_ref() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     request = RunArtifactRequest(
         artifact_ref=_artifact_ref(),
         inputs={"topic": "red"},
@@ -841,7 +841,7 @@ def test_run_artifact_store_result_rejects_missing_object_ref() -> None:
 
 
 def test_run_artifact_store_result_rejects_wrong_path_object_ref() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     request = RunArtifactRequest(
         artifact_ref=_artifact_ref(),
         inputs={"topic": "red"},

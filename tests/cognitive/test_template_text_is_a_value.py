@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.cognitive.prompt import (
+from graph_skill_runtime.cognitive.prompt import (
     V030_COGNITIVE_TEMPLATE_TEXT,
     apply_v030_cognitive_template,
 )

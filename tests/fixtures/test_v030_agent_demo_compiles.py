@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_agent.cognitive.prompt import apply_v030_cognitive_template
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.manifest import AgentNodeAST
+from graph_skill_runtime.cognitive.prompt import apply_v030_cognitive_template
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.manifest import AgentNodeAST
 
 FIXTURE = Path(__file__).parent / "v030_agent_demo"
 

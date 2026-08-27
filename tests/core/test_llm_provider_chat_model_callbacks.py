@@ -2,7 +2,7 @@
 reserved ``callbacks`` field.
 
 ``BaseChatModel`` already owns ``callbacks`` (list[BaseCallbackHandler] |
-BaseCallbackManager | None); shadowing it with a tuple of graph_agent Callback
+BaseCallbackManager | None); shadowing it with a tuple of graph_skill_runtime Callback
 objects makes every ``.invoke()`` crash inside LangChain's
 ``CallbackManager.configure`` (``'tuple' object has no attribute 'handlers'``)
 — first real LLM call of any run died this way. Engine callbacks ride their own
@@ -13,11 +13,11 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
-from graph_agent.core.llm_provider import FakeLLMProvider, LLMProviderChatModel
+from graph_skill_runtime.core.llm_provider import FakeLLMProvider, LLMProviderChatModel
 
 
 class _EngineCallback:
-    """Stand-in for graph_agent.callbacks.base.Callback — NOT a LangChain handler."""
+    """Stand-in for graph_skill_runtime.callbacks.base.Callback — NOT a LangChain handler."""
 
     def __init__(self) -> None:
         self.events: list[object] = []

@@ -10,10 +10,10 @@ from typing import Literal
 import pytest
 from pydantic import BaseModel, ConfigDict, Field
 
-import graph_agent.tools.md_to_json as md_to_json_module
-from graph_agent.core.exceptions import SkillLoadError, make_error_payload
-from graph_agent.core.result import WorkflowResult
-from graph_agent.tools.md_to_json import (
+import graph_skill_runtime.tools.md_to_json as md_to_json_module
+from graph_skill_runtime.core.exceptions import SkillLoadError, make_error_payload
+from graph_skill_runtime.core.result import WorkflowResult
+from graph_skill_runtime.tools.md_to_json import (
     BlockMeta,
     ParsedBlock,
     _type_to_constraint,
@@ -221,7 +221,7 @@ def test_md_to_json_patch_path_run_skill_failure_raises_skill_load_error(
 def test_md_patch_finalize_outputs_business_dicts_only() -> None:
     package_root = Path(__file__).resolve().parents[2]
     patch_tools_path = (
-        package_root / "src/graph_agent/skills/builtin/md-patch/script/patch_tools.py"
+        package_root / "src/graph_skill_runtime/skills/builtin/md-patch/script/patch_tools.py"
     )
     spec = importlib.util.spec_from_file_location("md_patch_tools_test", patch_tools_path)
     assert spec is not None

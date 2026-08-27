@@ -18,12 +18,12 @@ from typing import Any
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
-import graph_agent.core.graph_assembler as graph_assembler
-from graph_agent.core.checkpointer import checkpoint_serde
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
-from graph_agent.core.manifest import AgentNodeAST
+import graph_skill_runtime.core.graph_assembler as graph_assembler
+from graph_skill_runtime.core.checkpointer import checkpoint_serde
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
+from graph_skill_runtime.core.manifest import AgentNodeAST
 
 
 def _write(path: Path, text: str) -> None:
@@ -74,7 +74,7 @@ io:
       answer:
         type: string
 max_iterations: 2
-llm_role: graph_agent
+llm_role: graph_skill_runtime
 {access_block}---
 <role>
 Mount probe.

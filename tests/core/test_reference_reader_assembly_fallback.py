@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentFatalError, SkillLoadError, make_error_payload
-from graph_agent.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError, SkillLoadError, make_error_payload
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 
 class CapturePromptChatModel:
@@ -103,7 +103,7 @@ def test_reader_failure_warns_and_fallback_markdown_enters_knowledge_base(
             raise TimeoutError("reader timed out")
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         FailingReaderRuntime,
     )
     _agent_skill(tmp_path)
@@ -160,7 +160,7 @@ def test_reference_reader_path_invalid_fatal_propagates_from_assembly(
             )
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         PathInvalidReaderRuntime,
     )
     _agent_skill(tmp_path)
@@ -197,7 +197,7 @@ def test_reference_reader_runs_once_during_assembly_not_each_agent_turn(
             }
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         CountingReaderRuntime,
     )
     _agent_skill(tmp_path)
@@ -226,7 +226,7 @@ def test_reader_output_invalid_falls_back_without_blocking_agent(
             raise GraphAgentFatalError("[F-v3-reference-reader-output-invalid] missing markdown")
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         InvalidReaderRuntime,
     )
     _agent_skill(tmp_path)

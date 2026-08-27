@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.skill_resolver_protocol import SkillResolutionError
+from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
 
 def _local_workspace_resolver_class():
-    from graph_agent.core.local_workspace_resolver import LocalWorkspaceResolver
+    from graph_skill_runtime.core.local_workspace_resolver import LocalWorkspaceResolver
 
     return LocalWorkspaceResolver
 
@@ -75,7 +75,7 @@ def test_local_workspace_resolver_canonicalizes_search_paths(tmp_path: Path) -> 
 
 
 def test_default_local_resolver_canonicalizes_skill_entrypoint(tmp_path: Path) -> None:
-    from graph_agent.core.local_workspace_resolver import default_local_resolver_for_skill
+    from graph_skill_runtime.core.local_workspace_resolver import default_local_resolver_for_skill
 
     parent = _write_graph(tmp_path / "workspace" / "parent")
 

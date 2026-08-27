@@ -27,16 +27,6 @@ EXEMPTIONS_PATH = PACKAGE_ROOT / "tests/contract-exemptions.yaml"
 OLD_HASH_LOCK_PATH = PACKAGE_ROOT / "tests/test_skill_spec_hash_lock.py"
 CONTRACT_HASH_LOCK_PATH = PACKAGE_ROOT / "tests/test_contract_hash_lock.py"
 
-VENDOR_ONLY_SYMBOLS = {
-    "AgentSkillDef",
-    "GraphSkillDef",
-    "IoInput",
-    "PersonaSkillDef",
-    "CompileIssue",
-    "parse_skill_file",
-}
-
-
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -85,7 +75,7 @@ def _public_api_symbols() -> set[str]:
 
 
 def _src_python_files() -> set[str]:
-    return {path.relative_to(REPO_ROOT).as_posix() for path in (PACKAGE_ROOT / "src/graph_agent").rglob("*.py")}
+    return {path.relative_to(REPO_ROOT).as_posix() for path in (PACKAGE_ROOT / "src/graph_skill_runtime").rglob("*.py")}
 
 
 def _sha256(path: Path) -> str:
@@ -102,24 +92,18 @@ def test_a0_feature_boundary_schema_rejects_invalid_fixtures() -> None:
             _validate_manifest(_load_yaml(FIXTURES / fixture_name), "feature")
 
 
-def test_a1_vendor_only_symbols_are_required_in_contract_map_fixture() -> None:
+def test_a1_documented_public_symbols_must_be_mapped_without_legacy_debt() -> None:
     invalid_contract_map = _load_yaml(FIXTURES / "invalid_contract_map_missing_vendor_only.yaml")
-    with pytest.raises(ValidationError):
-        _validate_manifest(invalid_contract_map, "contract_map")
+    _validate_manifest(invalid_contract_map, "contract_map")
 
     result = _run_validator(FIXTURES / "invalid_contract_map_missing_vendor_only.yaml")
     assert result.returncode != 0
-    assert "R28_VENDOR_ONLY_UNMAPPED" in result.stderr
+    assert "R28_PUBLIC_API_UNMAPPED" in result.stderr
 
     features = _load_yaml(FEATURES_PATH)["features"]
-    compile_issue_features = [
-        feature
-        for feature in features
-        if "CompileIssue" in feature.get("public_api_symbols", [])
-    ]
-    assert len(compile_issue_features) == 1
-    assert compile_issue_features[0]["id"] == "F-skill-compilation-vendor-export"
-    assert compile_issue_features[0]["contract_status"] == "vendor-only"
+    feature_ids = {feature["id"] for feature in features}
+    assert "F-vendor-contract-debt" not in feature_ids
+    assert "F-skill-compilation-vendor-export" not in feature_ids
 
 
 def test_a2_non_functional_contract_schema_requires_evidence_and_other() -> None:
@@ -181,6 +165,22 @@ def test_task3_source_file_map_rejects_missing_src_file() -> None:
     result = _run_validator(FIXTURES / "invalid_source_map_missing_one_src.yaml")
     assert result.returncode != 0
     assert "R28_SOURCE_FILE_UNMAPPED" in result.stderr
+
+
+def test_canonical_manifests_match_schema_and_inventory_the_exact_source_tree() -> None:
+    feature_manifest = _load_yaml(FEATURES_PATH)
+    source_map = _load_yaml(SOURCE_MAP_PATH)
+    contract_map = _load_yaml(CONTRACT_MAP_PATH)
+
+    for feature in feature_manifest["features"]:
+        _validate_manifest(feature, "feature")
+    _validate_manifest(source_map, "source_file_map")
+    _validate_manifest(contract_map, "contract_map")
+
+    mapped_paths = [entry["path"] for entry in source_map["files"]]
+    assert source_map["config"]["complete_inventory"] is True
+    assert len(mapped_paths) == len(set(mapped_paths))
+    assert set(mapped_paths) == _src_python_files()
 
 
 def test_task4_contract_map_axes_require_feature_ids_and_consumer_kinds() -> None:
@@ -321,7 +321,7 @@ def test_cutover_discipline_quantifies_overlap() -> None:
 def test_runtime_compat_features_cover_all_patches() -> None:
     patch_like_files = sorted(
         path.relative_to(REPO_ROOT).as_posix()
-        for path in (PACKAGE_ROOT / "src/graph_agent").rglob("*.py")
+        for path in (PACKAGE_ROOT / "src/graph_skill_runtime").rglob("*.py")
         if "patch" in path.parts or "patch" in path.name or "compat" in path.name
     )
     assert patch_like_files, "fixture expectation: repo has patch/compat modules"

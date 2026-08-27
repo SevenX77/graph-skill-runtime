@@ -8,9 +8,9 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-import graph_agent
-from graph_agent.core.checkpointer import get_checkpointer, reset_checkpointer
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core import runner as engine_runner
+from graph_skill_runtime.core.checkpointer import get_checkpointer, reset_checkpointer
+from graph_skill_runtime.core.runner import run_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -22,9 +22,9 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     _write(path, json.dumps(payload, ensure_ascii=False, indent=2))
 
 
-def _public_callable(name: str) -> Callable[..., Any]:
-    value = getattr(graph_agent, name, None)
-    assert callable(value), f"graph_agent.{name} must be a public callable"
+def _engine_callable(name: str) -> Callable[..., Any]:
+    value = getattr(engine_runner, name, None)
+    assert callable(value), f"engine runner {name} must remain characterized"
     return value
 
 
@@ -160,8 +160,8 @@ def test_ws_e7_golden_report_and_resume_share_workspace_run_contract(
         assert initial.success is True
         checkpoint_id = _checkpoint_id_with_draft_without_final(run_id)
 
-        evaluate = _public_callable("evaluate_golden_baseline")
-        resume_skill = _public_callable("resume_skill")
+        evaluate = _engine_callable("evaluate_golden_baseline")
+        resume_skill = _engine_callable("resume_skill")
 
         report = evaluate(
             skill_root,

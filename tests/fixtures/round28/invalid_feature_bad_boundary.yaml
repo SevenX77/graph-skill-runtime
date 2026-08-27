@@ -2,11 +2,11 @@ id: F-bad-boundary
 description: Invalid boundary enum.
 feature_boundary:
   kind: directory-name
-  evidence: graph_agent.core
+  evidence: graph_skill_runtime.core
 sources:
   - public-api
 core_paths:
-  - path: src/graph_agent/core/runner.py
+  - path: src/graph_skill_runtime/core/runner.py
 error_codes_primary: []
 error_codes_secondary: []
 events_primary: []

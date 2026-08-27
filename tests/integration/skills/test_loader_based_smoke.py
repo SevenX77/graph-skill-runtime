@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.loader import CompiledSkill, SkillLoader
-from graph_agent.core.manifest import AgentNodeAST, LogicNodeAST
+from graph_skill_runtime.core.loader import CompiledSkill, SkillLoader
+from graph_skill_runtime.core.manifest import AgentNodeAST, LogicNodeAST
 
 from ...conftest import MockSkillResolver
 from ._fixture_corpus import write_legacy_v21_corpus

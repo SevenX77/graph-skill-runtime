@@ -23,8 +23,8 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
-from graph_agent.core.checkpointer import checkpointer_context
-from graph_agent.core.state import WorkflowState
+from graph_skill_runtime.core.checkpointer import checkpointer_context
+from graph_skill_runtime.core.state import WorkflowState
 
 
 def _round_trip(saver: Any, thread_id: str) -> dict[str, Any]:

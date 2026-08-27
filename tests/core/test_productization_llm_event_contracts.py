@@ -39,14 +39,14 @@ def test_llm_provider_contract_import_does_not_pull_gateway_concrete_module(
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", guarded_import)
-    module = importlib.import_module("graph_agent.core.llm_provider")
+    module = importlib.import_module("graph_skill_runtime.core.llm_provider")
 
     assert callable(getattr(module.LLMProvider, "stream", None))
     assert blocked_imports == []
 
 
 def test_event_envelope_and_stream_cursor_expose_resume_and_gap_contract() -> None:
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
 
     EventEnvelope = event_contracts.EventEnvelope
     StreamCursor = event_contracts.StreamCursor
@@ -93,7 +93,7 @@ def test_event_envelope_and_stream_cursor_expose_resume_and_gap_contract() -> No
 
 
 def test_event_error_payload_is_structured_and_sanitized() -> None:
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
 
     TransportErrorPayload = event_contracts.TransportErrorPayload
     make_event_envelope = event_contracts.make_event_envelope
@@ -129,7 +129,7 @@ def test_event_error_payload_is_structured_and_sanitized() -> None:
 
 
 def test_response_envelope_has_schema_version_and_structured_error_payload() -> None:
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
 
     ResponseEnvelope = event_contracts.ResponseEnvelope
     TransportErrorPayload = event_contracts.TransportErrorPayload
@@ -169,7 +169,7 @@ def test_response_envelope_has_schema_version_and_structured_error_payload() -> 
 
 
 def test_response_envelope_rejects_unstructured_error_payload() -> None:
-    event_contracts = importlib.import_module("graph_agent.core.event_contracts")
+    event_contracts = importlib.import_module("graph_skill_runtime.core.event_contracts")
     ResponseEnvelope = event_contracts.ResponseEnvelope
 
     with pytest.raises((TypeError, ValueError)):

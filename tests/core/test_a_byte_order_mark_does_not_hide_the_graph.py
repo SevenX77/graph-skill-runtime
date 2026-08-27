@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.parser import parse_markdown_parts, parse_markdown_parts_best_effort
-from graph_agent.core.topology_projection import load_graph_topology_projection
+from graph_skill_runtime.core.parser import parse_markdown_parts, parse_markdown_parts_best_effort
+from graph_skill_runtime.core.topology_projection import load_graph_topology_projection
 
 GRAPH = """---
 name: bom-skill

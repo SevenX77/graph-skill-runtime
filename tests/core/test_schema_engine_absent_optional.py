@@ -10,7 +10,7 @@ skill exp-a-round1, model args carried no ``metadata`` key at all).
 
 from __future__ import annotations
 
-from graph_agent.core.schema_engine import (
+from graph_skill_runtime.core.schema_engine import (
     SchemaEngine,
     SchemaObject,
     _schema_from_mapping,

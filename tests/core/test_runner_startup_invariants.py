@@ -22,8 +22,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from graph_agent.bootstrap import Bootstrap
-from graph_agent.core import runner as runner_module
+from graph_skill_runtime.bootstrap import Bootstrap
+from graph_skill_runtime.core import runner as runner_module
 
 SRC_RUNNER = Path(runner_module.__file__)
 SRC_CORE_INIT = SRC_RUNNER.parent / "__init__.py"
@@ -101,8 +101,8 @@ class TestRunnerMainBootstrapWiring:
             return MagicMock(wall_time_sec=0.0, metrics={}, trace_path=None)
 
         with (
-            patch("graph_agent.bootstrap.Bootstrap", return_value=fake_bootstrap),
-            patch("graph_agent.core.runner.run_skill", _fake_run_skill),
+            patch("graph_skill_runtime.bootstrap.Bootstrap", return_value=fake_bootstrap),
+            patch("graph_skill_runtime.core.runner.run_skill", _fake_run_skill),
         ):
             runner_module.main()
 
@@ -142,8 +142,8 @@ class TestRunnerMainBootstrapWiring:
             return MagicMock(wall_time_sec=0.0, metrics={}, trace_path=None)
 
         with (
-            patch("graph_agent.bootstrap.Bootstrap", return_value=fake_bootstrap),
-            patch("graph_agent.core.runner.run_skill", _fake_run_skill),
+            patch("graph_skill_runtime.bootstrap.Bootstrap", return_value=fake_bootstrap),
+            patch("graph_skill_runtime.core.runner.run_skill", _fake_run_skill),
             patch("dotenv.load_dotenv", _fake_load_dotenv),
         ):
             runner_module.main()
@@ -171,8 +171,8 @@ class TestRunnerMainBootstrapWiring:
             return MagicMock(wall_time_sec=0.0, metrics={}, trace_path=None)
 
         with (
-            patch("graph_agent.bootstrap.Bootstrap", return_value=fake_bootstrap),
-            patch("graph_agent.core.runner.run_skill", _fake_run_skill),
+            patch("graph_skill_runtime.bootstrap.Bootstrap", return_value=fake_bootstrap),
+            patch("graph_skill_runtime.core.runner.run_skill", _fake_run_skill),
             patch("dotenv.load_dotenv", return_value=True),
         ):
             runner_module.main()
@@ -180,4 +180,4 @@ class TestRunnerMainBootstrapWiring:
         resolver = captured_kwargs.get("skill_resolver")
         assert resolver is not None
         assert type(resolver).__name__ == "LocalWorkspaceResolver"
-        assert type(resolver).__module__ == "graph_agent.core.local_workspace_resolver"
+        assert type(resolver).__module__ == "graph_skill_runtime.core.local_workspace_resolver"

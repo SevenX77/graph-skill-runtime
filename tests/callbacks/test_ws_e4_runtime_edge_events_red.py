@@ -5,15 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from graph_agent.callbacks.emit import _CompositeEventSink, _SubscriberSink, _TraceJsonlSink
-from graph_agent.callbacks.events import (
+from graph_skill_runtime.callbacks.emit import _CompositeEventSink, _SubscriberSink, _TraceJsonlSink
+from graph_skill_runtime.callbacks.events import (
     BlackboardReduceEvent,
     InputDispatchEvent,
     InputFileInjectedEvent,
 )
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
-from graph_agent.core.runner import run_skill
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.runner import run_skill
 
 from ..ws_e4_runtime_skills import (
     write_batch_iterate_skill,

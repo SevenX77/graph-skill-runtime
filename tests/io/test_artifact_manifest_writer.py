@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.io.artifact_manifest import write_manifest_artifacts
+from graph_skill_runtime.io.artifact_manifest import write_manifest_artifacts
 
 TS1 = "20260702_120000"
 TS2 = "20260702_130000"

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentError, SkillCompilationError, SkillLoadError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentError, SkillCompilationError, SkillLoadError
 
 
 def test_skill_compilation_error_formats_structured_context() -> None:

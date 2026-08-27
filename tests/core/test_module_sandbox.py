@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.module_sandbox import ModuleSandbox
+from graph_skill_runtime.core.module_sandbox import ModuleSandbox
 
 
 def test_import_class_from_search_path(tmp_path: Path) -> None:

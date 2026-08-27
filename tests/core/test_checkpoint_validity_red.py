@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-from graph_agent.core.compiler import compile_skill
+from graph_skill_runtime.core.compiler import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -124,7 +124,7 @@ def test_checkpoint_validity_is_node_scoped_not_global(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    from graph_agent.core.checkpoint_validity import checkpoint_validity_by_phase
+    from graph_skill_runtime.core.checkpoint_validity import checkpoint_validity_by_phase
 
     skill_root = tmp_path / "skill"
     _fanout_skill(skill_root)

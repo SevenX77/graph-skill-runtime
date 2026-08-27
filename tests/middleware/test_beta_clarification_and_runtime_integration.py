@@ -8,8 +8,8 @@ import inspect
 def test_ask_clarification_attended_path_keeps_interrupt_semantics() -> None:
     """Unit parity: attended clarification must keep interrupt behavior."""
 
-    from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
-    from graph_agent.tools.builtin.clarification_tool import ask_clarification_tool
+    from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
+    from graph_skill_runtime.tools.builtin.clarification_tool import ask_clarification_tool
 
     interrupts: list[dict[str, object]] = []
 
@@ -33,8 +33,8 @@ def test_ask_clarification_attended_path_keeps_interrupt_semantics() -> None:
 def test_ask_clarification_unattended_path_returns_conservative_auto_answer() -> None:
     """Unit parity: unattended clarification must keep conservative auto-answer behavior."""
 
-    from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
-    from graph_agent.tools.builtin.clarification_tool import ask_clarification_tool
+    from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
+    from graph_skill_runtime.tools.builtin.clarification_tool import ask_clarification_tool
 
     intercept = CognitiveFlowMiddleware.intercept_ask_clarification
     result = intercept(
@@ -52,7 +52,7 @@ def test_ask_clarification_unattended_path_returns_conservative_auto_answer() ->
 def test_non_cognitive_tools_pass_through_middleware_chain() -> None:
     """Unit parity: non finish_task / ask_clarification tools must pass through unchanged."""
 
-    from graph_agent.middleware.cognitive_flow import CognitiveFlowMiddleware
+    from graph_skill_runtime.middleware.cognitive_flow import CognitiveFlowMiddleware
 
     calls: list[tuple[str, dict[str, object]]] = []
 
@@ -79,8 +79,8 @@ def test_non_cognitive_tools_pass_through_middleware_chain() -> None:
 def test_agent_runtime_finish_task_flows_through_middleware_not_graph_assembler_decision() -> None:
     """Integration/e2e parity: Agent finish_task must not be decided inside graph_assembler."""
 
-    from graph_agent.core import graph_assembler
-    from graph_agent.middleware.factory import build_middleware_chain
+    from graph_skill_runtime.core import graph_assembler
+    from graph_skill_runtime.middleware.factory import build_middleware_chain
 
     agent_path_source = inspect.getsource(graph_assembler)
 

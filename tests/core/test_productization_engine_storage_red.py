@@ -6,17 +6,17 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.adapter_contracts import RunArtifactRequest
-from graph_agent.core.artifacts import ArtifactRef
-from graph_agent.core.runtime_state import StateLeaseRequiredError
-from graph_agent.core.storage_contracts import (
+from graph_skill_runtime.core.adapter_contracts import RunArtifactRequest
+from graph_skill_runtime.core.artifacts import ArtifactRef
+from graph_skill_runtime.core.runtime_state import StateLeaseRequiredError
+from graph_skill_runtime.core.storage_contracts import (
     InMemoryRunArtifactStore,
     InMemoryRuntimeStateStore,
     LeaseConflictError,
     LeaseFencingError,
     SealedRunWriteError,
 )
-from graph_agent.io.storage import LegacyRunArtifactReadForbiddenError, StorageManager
+from graph_skill_runtime.io.storage import LegacyRunArtifactReadForbiddenError, StorageManager
 
 
 class SpyRunArtifactStore(InMemoryRunArtifactStore):
@@ -49,7 +49,7 @@ def _request() -> RunArtifactRequest:
 
 
 def test_run_artifact_writes_outputs_through_run_artifact_store() -> None:
-    runner = importlib.import_module("graph_agent.core.runner")
+    runner = importlib.import_module("graph_skill_runtime.core.runner")
     store = SpyRunArtifactStore()
 
     session = runner.run_artifact(
@@ -133,7 +133,7 @@ def test_runtime_state_store_reports_lease_conflict_and_stale_fencing_codes() ->
 
 
 def test_checkpoint_snapshot_requires_runtime_state_store_lease() -> None:
-    runtime_state = importlib.import_module("graph_agent.core.runtime_state")
+    runtime_state = importlib.import_module("graph_skill_runtime.core.runtime_state")
     state_store = InMemoryRuntimeStateStore()
 
     with pytest.raises(StateLeaseRequiredError) as exc_info:
@@ -148,7 +148,7 @@ def test_checkpoint_snapshot_requires_runtime_state_store_lease() -> None:
 
 
 def test_resolve_checkpointer_keeps_different_sqlite_specs_isolated(tmp_path: Path) -> None:
-    checkpointer_module = importlib.import_module("graph_agent.core.checkpointer")
+    checkpointer_module = importlib.import_module("graph_skill_runtime.core.checkpointer")
     checkpointer_module.reset_checkpointer()
 
     first_db = tmp_path / "first" / "checkpoints.db"
@@ -164,7 +164,7 @@ def test_resolve_checkpointer_keeps_different_sqlite_specs_isolated(tmp_path: Pa
 
 
 def test_get_checkpointer_keeps_different_sqlite_db_paths_isolated(tmp_path: Path) -> None:
-    checkpointer_module = importlib.import_module("graph_agent.core.checkpointer")
+    checkpointer_module = importlib.import_module("graph_skill_runtime.core.checkpointer")
     checkpointer_module.reset_checkpointer()
 
     first_db = tmp_path / "first" / "checkpoints.db"

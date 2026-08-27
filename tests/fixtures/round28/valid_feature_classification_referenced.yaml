@@ -3,12 +3,12 @@ features:
   description: Run compiled graph skills and return stable workflow results to callers.
   feature_boundary:
     kind: public-method
-    evidence: graph_agent.run_skill
+    evidence: graph_skill_runtime.run_skill
   sources:
   - public-api
   - source-file-map
   core_paths:
-  - path: src/graph_agent/core/runner.py
+  - path: src/graph_skill_runtime/core/runner.py
   error_codes_primary:
   - '[F-v3-runtime-phase-failed]'
   error_codes_secondary: []
@@ -32,7 +32,7 @@ features:
   - run_skill
 source_file_map:
   files:
-  - path: src/graph_agent/core/runner.py
+  - path: src/graph_skill_runtime/core/runner.py
     classification: feature
     feature_ids:
     - F-runtime-execution

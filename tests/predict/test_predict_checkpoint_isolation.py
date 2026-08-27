@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core import runner as runner_module
-from graph_agent.io.run_layout import runs_root
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.io.run_layout import runs_root
 
 
 class _DumpData:
@@ -109,15 +109,15 @@ def test_predict_passes_checkpointer_spec_none(
         return resolved
 
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
     monkeypatch.setattr(
-        "graph_agent.core.checkpointer.resolve_checkpointer",
+        "graph_skill_runtime.core.checkpointer.resolve_checkpointer",
         fake_resolve_checkpointer,
     )
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.assemble_graph",
+        "graph_skill_runtime.core.graph_assembler.assemble_graph",
         lambda *_args, **_kwargs: _FakeAssembler(),
     )
 
@@ -137,7 +137,7 @@ def test_predict_does_not_pollute_real_run_checkpoint_db(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    from graph_agent.core.checkpointer import reset_checkpointer
+    from graph_skill_runtime.core.checkpointer import reset_checkpointer
 
     skill_root = _write_logic_skill(tmp_path / "skill")
     db_path = tmp_path / "checkpoints.sqlite"

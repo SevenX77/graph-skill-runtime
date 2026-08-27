@@ -28,8 +28,8 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.exceptions import GraphAgentError
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.exceptions import GraphAgentError
 
 _FIELD = "summary"
 _UPSTREAM = "draft"

@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from graph_agent.cognitive.prompt import (
+from graph_skill_runtime.cognitive.prompt import (
     apply_cognitive_template,
     apply_v030_cognitive_template,
     resolve_role_prefix_from_llm_role,

@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core import runner as runner_module
-from graph_agent.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 
 
 def _write_artifact_skill(root: Path, *, required_missing: bool = False) -> Path:

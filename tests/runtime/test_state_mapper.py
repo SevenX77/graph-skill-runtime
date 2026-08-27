@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.state import (
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.state import (
     BusinessData,
     FrameworkState,
     WorkflowState,
     merge_business_channel,
 )
-from graph_agent.runtime.state_mapper import (
+from graph_skill_runtime.runtime.state_mapper import (
     PhaseWrapper,
     ReaderSandboxState,
     StateMapper,
@@ -182,7 +182,7 @@ def test_an_absent_optional_object_skips_its_nested_required() -> None:
 def test_ensure_no_input_write_stub_is_deleted() -> None:
     """The no-op ensure_no_input_write stub (documented code debt) must be gone,
     not silently exported as if it protected anything."""
-    import graph_agent.runtime.state_mapper as state_mapper_module
+    import graph_skill_runtime.runtime.state_mapper as state_mapper_module
 
     assert not hasattr(state_mapper_module, "ensure_no_input_write")
     assert "ensure_no_input_write" not in state_mapper_module.__all__

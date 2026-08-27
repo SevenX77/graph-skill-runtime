@@ -7,7 +7,7 @@ set names exactly the one HITL tool the engine mounts.
 
 from __future__ import annotations
 
-from graph_agent.core.runner import _HITL_TOOL_NAMES
+from graph_skill_runtime.core.runner import _HITL_TOOL_NAMES
 
 
 def test_hitl_tool_names_contains_only_tools_defined_in_src() -> None:

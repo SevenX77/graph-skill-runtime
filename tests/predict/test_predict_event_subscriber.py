@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core import runner as runner_module
-from graph_agent.core.adapter_contracts import PredictArtifactRequest
-from graph_agent.core.artifacts import ArtifactRef
-from graph_agent.core.result import RunResult
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.core.adapter_contracts import PredictArtifactRequest
+from graph_skill_runtime.core.artifacts import ArtifactRef
+from graph_skill_runtime.core.result import RunResult
 
 
 def test_sdk_predict_artifact_threads_event_subscriber_to_predict_skill(

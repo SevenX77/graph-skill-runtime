@@ -22,7 +22,9 @@ if str(SRC_ROOT) not in sys.path:
 from langchain_core.messages import AIMessage  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from graph_agent import LocalWorkspaceResolver, assemble_graph, compile_skill  # noqa: E402
+from graph_skill_runtime.core.compiler import compile_skill  # noqa: E402
+from graph_skill_runtime.core.graph_assembler import assemble_graph  # noqa: E402
+from graph_skill_runtime.core.local_workspace_resolver import LocalWorkspaceResolver  # noqa: E402
 
 _VOLATILE_FLOW_FIELDS = {
     "phase_execution_ids",

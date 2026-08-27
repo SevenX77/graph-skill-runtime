@@ -5,14 +5,14 @@ from typing import Any
 
 import pytest
 
-from graph_agent.callbacks.base import Callback
-from graph_agent.callbacks.events import (
+from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.callbacks.events import (
     BuiltinSubagentEnterEvent,
     BuiltinSubagentExitEvent,
     BuiltinSubagentFallbackEvent,
 )
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.loader import load_workflow_from_md
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.loader import load_workflow_from_md
 
 
 class CollectorCallback(Callback):
@@ -99,7 +99,7 @@ def test_e2_reference_reader_success_emits_enter_then_exit_from_loader_callbacks
             return {"markdown": "## refined\n\nshort refined knowledge"}
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         SuccessfulReaderRuntime,
     )
     _agent_skill(tmp_path)
@@ -156,7 +156,7 @@ def test_e2_e3_reference_reader_fallback_emits_slim_payload_for_each_reason(
             return {"unexpected": "shape"}  # invalid_output
 
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.ReferenceReaderRuntime",
+        "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         FailingReaderRuntime,
     )
     _agent_skill(tmp_path)

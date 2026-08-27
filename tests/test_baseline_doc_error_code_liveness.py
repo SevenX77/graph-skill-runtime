@@ -4,7 +4,7 @@ A `baseline.md` under `docs/mvp1/` has exactly one job: describe the
 CURRENT implementation state. So when such a doc cites an `[F-v3-*]` error code
 as something the engine raises, the engine source must actually contain an
 emission site for it. A code that exists only in
-`src/graph_agent/core/error_registry.py` is registry
+`src/graph_skill_runtime/core/error_registry.py` is registry
 metadata, not a live gate, and a baseline doc must say so explicitly.
 
 Observable defect this test reproduces (状态 before the fix)
@@ -24,7 +24,7 @@ Both statements are false. The gate was deleted on 2026-06-20 by commit
 `cad7dbc0` ("feat(engine): relax subgraph io.outputs 1:1 compile gate
 (n2-iopanel#30)"), whose diff removes the `parent_outputs != child_outputs`
 comparison and its `_fatal(...)` call from `_validate_subgraph_io_contracts` in
-`src/graph_agent/core/loader.py`. That commit's message
+`src/graph_skill_runtime/core/loader.py`. That commit's message
 states the retention rule this test encodes:
 
     The error code is retained in the registry (no longer emitted) to preserve
@@ -59,7 +59,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ENGINE_SRC_ROOT = REPO_ROOT / "src" / "graph_agent"
+ENGINE_SRC_ROOT = REPO_ROOT / "src" / "graph_skill_runtime"
 ERROR_REGISTRY_PATH = ENGINE_SRC_ROOT / "core" / "error_registry.py"
 BASELINE_DOCS_ROOT = REPO_ROOT / "docs" / "mvp1"
 
@@ -136,7 +136,7 @@ def test_only_baseline_docs_are_scanned(tmp_path: Path) -> None:
 
 
 def test_registry_module_alone_does_not_make_a_code_live(tmp_path: Path) -> None:
-    engine_src = tmp_path / "graph_agent"
+    engine_src = tmp_path / "graph_skill_runtime"
     (engine_src / "core").mkdir(parents=True)
     registry_path = engine_src / "core" / "error_registry.py"
     registry_path.write_text("REGISTRY = {'[F-v3-dead-code]': ..., '[F-v3-live-code]': ...}\n", encoding="utf-8")

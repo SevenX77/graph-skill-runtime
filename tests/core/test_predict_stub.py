@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_agent.core._predict_internal.stub import generate_heuristic_stub
+from graph_skill_runtime.core._predict_internal.stub import generate_heuristic_stub
 
 
 def test_generate_basic_json_schema_field_types() -> None:

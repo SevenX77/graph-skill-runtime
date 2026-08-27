@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from graph_agent.core.manifest import GraphManifest
-from graph_agent.core.parser import parse_markdown_parts
-from graph_agent.core.serialize import serialize_skill
+from graph_skill_runtime.core.manifest import GraphManifest
+from graph_skill_runtime.core.parser import parse_markdown_parts
+from graph_skill_runtime.core.serialize import serialize_skill
 
 
 def _manifest() -> GraphManifest:

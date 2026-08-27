@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_agent.core._predict_internal.exporter import assemble_phase_record
+from graph_skill_runtime.core._predict_internal.exporter import assemble_phase_record
 
 
 def test_assemble_phase_record_outputs_business_fields_only() -> None:

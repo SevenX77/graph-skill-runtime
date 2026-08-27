@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core import runner as runner_module
-from graph_agent.io.run_layout import PREDICTS_DIRNAME, RUNS_DIRNAME, predicts_root, runs_root
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.io.run_layout import PREDICTS_DIRNAME, RUNS_DIRNAME, predicts_root, runs_root
 
 
 class _FakeGraph:
@@ -44,11 +44,11 @@ phases: []
 @pytest.fixture(autouse=True)
 def _stub_graph(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
     monkeypatch.setattr(
-        "graph_agent.core.graph_assembler.assemble_graph",
+        "graph_skill_runtime.core.graph_assembler.assemble_graph",
         lambda *_args, **_kwargs: _FakeAssembler(),
     )
 

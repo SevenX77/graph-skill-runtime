@@ -5,10 +5,10 @@ from typing import Any
 
 import pytest
 
-from graph_agent.core.exceptions import GraphAgentFatalError
-from graph_agent.core.graph_assembler import _invoke_subagent_once_t23, _SubagentRuntime
-from graph_agent.core.state import BusinessData, FrameworkState, WorkflowState
-from graph_agent.runtime.state_mapper import PhaseWrapper, StateMapper
+from graph_skill_runtime.core.exceptions import GraphAgentFatalError
+from graph_skill_runtime.core.graph_assembler import _invoke_subagent_once_t23, _SubagentRuntime
+from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
+from graph_skill_runtime.runtime.state_mapper import PhaseWrapper, StateMapper
 
 
 class _Subagent:
@@ -106,9 +106,9 @@ def test_gamma2_phase_wrapper_rejects_writes_to_read_only_inputs() -> None:
 def test_gamma2_grep_guard_rejects_flat_state_and_parent_merge_residue() -> None:
     root = Path(__file__).resolve().parents[2]
     forbidden = {
-        "src/graph_agent/middleware/cognitive_flow.py": 'response_state["data"] = {phase_name',
-        "src/graph_agent/core/graph_assembler.py": "child_data = {**before_data, **input_data}",
-        "src/graph_agent/core/graph_assembler.py::before_data": '"data": before_data',
+        "src/graph_skill_runtime/middleware/cognitive_flow.py": 'response_state["data"] = {phase_name',
+        "src/graph_skill_runtime/core/graph_assembler.py": "child_data = {**before_data, **input_data}",
+        "src/graph_skill_runtime/core/graph_assembler.py::before_data": '"data": before_data',
     }
 
     failures: list[str] = []

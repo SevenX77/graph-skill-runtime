@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
 
 
 def _write(path: Path, text: str) -> None:

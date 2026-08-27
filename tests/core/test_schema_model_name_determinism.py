@@ -13,10 +13,10 @@ import os
 import subprocess
 import sys
 
-from graph_agent.core.schema_engine import SchemaObject, _model_name_for_schema
+from graph_skill_runtime.core.schema_engine import SchemaObject, _model_name_for_schema
 
 _PROBE = """
-from graph_agent.core.schema_engine import SchemaObject, _model_name_for_schema
+from graph_skill_runtime.core.schema_engine import SchemaObject, _model_name_for_schema
 
 schema = SchemaObject(
     fields=(

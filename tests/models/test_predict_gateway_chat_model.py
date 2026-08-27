@@ -9,9 +9,9 @@ from typing import Literal
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
-from graph_agent.core._predict_internal.interception import PredictGatewayChatModel
-from graph_agent.core._predict_internal.strategy import BaseMockStrategy
-from graph_agent.tools.md_to_json import parse_md
+from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
+from graph_skill_runtime.core._predict_internal.strategy import BaseMockStrategy
+from graph_skill_runtime.tools.md_to_json import parse_md
 
 MockedSource = Literal["golden_case", "copilot", "heuristic_stub", "manual"]
 

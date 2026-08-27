@@ -7,9 +7,9 @@ from textwrap import dedent
 
 import pytest
 
-from graph_agent.core.error_registry import ERROR_REGISTRY, ErrorCodeMetadata
-from graph_agent.core.exceptions import SkillLoadError
-from graph_agent.core.loader import SkillLoader
+from graph_skill_runtime.core.error_registry import ERROR_REGISTRY, ErrorCodeMetadata
+from graph_skill_runtime.core.exceptions import SkillLoadError
+from graph_skill_runtime.core.loader import SkillLoader
 
 PURITY_CODE = "[F-v3-logic-action-purity-violation]"
 
@@ -84,7 +84,7 @@ def _assert_compile_purity_fatal(
     [
         (
             """
-            from graph_agent import run_skill
+            from graph_skill_runtime import run_skill
 
             def prepare(inputs):
                 run_skill("child.skill", workspace_dir="workspace")
@@ -163,7 +163,7 @@ def _assert_compile_purity_fatal(
             import importlib
 
             def prepare(inputs):
-                runner = importlib.import_module("graph_agent.core.runner")
+                runner = importlib.import_module("graph_skill_runtime.core.runner")
                 runner.run_skill("child.skill", workspace_dir="workspace")
                 return {}
             """,

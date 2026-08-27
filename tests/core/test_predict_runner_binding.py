@@ -4,8 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from graph_agent.core import runner as runner_module
-from graph_agent.io.run_layout import runs_root
+from graph_skill_runtime.core import runner as runner_module
+from graph_skill_runtime.io.run_layout import runs_root
 
 
 class RecordingGraph:
@@ -52,7 +52,7 @@ def test_run_skill_dict_omitted_mock_llm_passes_no_chat_model(
     model_resolvers: list[object] = []
 
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: object(),
     )
 
@@ -61,7 +61,7 @@ def test_run_skill_dict_omitted_mock_llm_passes_no_chat_model(
         model_resolvers.append(model_resolver)
         return RecordingAssembler()
 
-    monkeypatch.setattr("graph_agent.core.graph_assembler.assemble_graph", fake_assemble_graph)
+    monkeypatch.setattr("graph_skill_runtime.core.graph_assembler.assemble_graph", fake_assemble_graph)
 
     runner_module._run_skill_dict(
         skill_root,
@@ -88,7 +88,7 @@ def test_run_skill_dict_explicit_mock_none_is_passed_as_chat_model(
     model_resolvers: list[object] = []
 
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: object(),
     )
 
@@ -97,7 +97,7 @@ def test_run_skill_dict_explicit_mock_none_is_passed_as_chat_model(
         model_resolvers.append(model_resolver)
         return RecordingAssembler()
 
-    monkeypatch.setattr("graph_agent.core.graph_assembler.assemble_graph", fake_assemble_graph)
+    monkeypatch.setattr("graph_skill_runtime.core.graph_assembler.assemble_graph", fake_assemble_graph)
 
     runner_module._run_skill_dict(
         skill_root,
@@ -123,7 +123,7 @@ def test_run_skill_dict_uses_model_resolver_when_mock_llm_omitted(
     model_resolvers: list[object] = []
 
     monkeypatch.setattr(
-        "graph_agent.core.compiler.compile_skill",
+        "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: object(),
     )
 
@@ -132,7 +132,7 @@ def test_run_skill_dict_uses_model_resolver_when_mock_llm_omitted(
         model_resolvers.append(model_resolver)
         return RecordingAssembler()
 
-    monkeypatch.setattr("graph_agent.core.graph_assembler.assemble_graph", fake_assemble_graph)
+    monkeypatch.setattr("graph_skill_runtime.core.graph_assembler.assemble_graph", fake_assemble_graph)
 
     runner_module._run_skill_dict(
         skill_root,

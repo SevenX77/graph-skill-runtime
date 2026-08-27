@@ -13,9 +13,9 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from graph_agent.cognitive.md2json import _coerce_value
-from graph_agent.core.schema_engine import _parse_output_example_to_schema
-from graph_agent.tools.md_to_json import diagnose, parse_md
+from graph_skill_runtime.cognitive.md2json import _coerce_value
+from graph_skill_runtime.core.schema_engine import _parse_output_example_to_schema
+from graph_skill_runtime.tools.md_to_json import diagnose, parse_md
 
 
 class DimensionList(BaseModel):

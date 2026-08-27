@@ -1,60 +1,76 @@
 # Graph Skill Runtime Project Rules
 
-This file is the canonical project rule entry for contributors and coding agents working in this repository. Read it before planning or changing code, tests, specifications, CI, dependencies, or authoritative documentation.
+This file is the canonical project-rule entry for contributors and coding agents working in this repository. Read it before planning or changing code, tests, specifications, CI, dependencies, or authoritative documentation.
 
-## 1. Contract status and sources of truth
+## 1. Current implementation and sources of truth
 
-Phase 0 has two deliberately separate contract lines.
+The repository is on the Phase 1 implementation line.
 
-### Current implementation line
+- The distribution is `graph-skill-runtime` version `0.1.0a1`.
+- The Python import is `graph_skill_runtime`.
+- The console command is `gskill`.
+- The top-level typed contract contains exactly the symbols in [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py); [`docs/public-api-contract.md`](docs/public-api-contract.md) documents that executable set.
+- SDK, CLI, and MCP calls converge on [`RuntimeApplication`](src/graph_skill_runtime/application/service.py). [`create_application`](src/graph_skill_runtime/composition.py) is the explicit composition root; there is no global application singleton.
+- [`spec/features.yaml`](spec/features.yaml), [`spec/source_file_map.yaml`](spec/source_file_map.yaml), and [`spec/contract_map.yaml`](spec/contract_map.yaml) own feature, source, event, error-code, and public-contract traceability.
 
-The code that exists today is the `graph-agent` 0.3.1 distribution, imported as `graph_agent`. Its skill root is `GRAPH.md`; phase files are `LOGIC.md`, `SUBGRAPH.md`, or `SKILL.md` according to phase type.
+The current skill-file contract is still v0.3. A skill root contains `GRAPH.md`; a phase contains `LOGIC.md`, `SUBGRAPH.md`, or, for an agent phase, `SKILL.md`. [`docs/skill-spec/00-FORMAT-GROUND-TRUTH.md`](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md) is the FROZEN current format source of truth. [`docs/mvp1/INDEX.md`](docs/mvp1/INDEX.md) routes the extracted engine's current design contracts.
 
-The current line has these authoritative sources:
+[`docs/design/v1-alignment.md`](docs/design/v1-alignment.md) remains `drafted` because the complete v1 design is not implemented. Its Section 2 naming and the Phase 1 typed facade, configuration, and SDK/CLI/MCP boundary are implemented. Its root `SKILL.md` plus `graph.yaml`, phase `AGENT.md`, flat graph registry, durable host-native handoff, vendor CLI executors, MoirAI installer, and Gateway/Studio integrations remain later-phase targets. [`docs/design/README.md`](docs/design/README.md) routes current facts versus drafted targets. [`docs/design/baseline.md`](docs/design/baseline.md) is historical pre-extraction evidence, not a current path map.
 
-- [`pyproject.toml`](pyproject.toml) owns the installed distribution identity, Python requirement, dependencies, and build configuration.
-- [`src/graph_agent`](src/graph_agent) owns executable runtime behavior and the `graph_agent` import.
-- [`docs/skill-spec/00-FORMAT-GROUND-TRUTH.md`](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md) is the FROZEN current file-format source of truth.
-- [`docs/mvp1/INDEX.md`](docs/mvp1/INDEX.md) routes current engine design and module contracts.
-- [`spec`](spec) and its validator own feature-to-source, test, event, and error-code traceability.
-
-### Drafted target line
-
-[`docs/design/README.md`](docs/design/README.md) routes the standalone design. [`docs/design/v1-alignment.md`](docs/design/v1-alignment.md) owns the drafted target names and contracts: `graph-skill-runtime`, `graph_skill_runtime`, `gskill`, and the root `SKILL.md` plus `graph.yaml` format. [`docs/design/baseline.md`](docs/design/baseline.md) records the pre-extraction source baseline used to derive that target.
-
-The design directory is not the current runtime or format source of truth. A drafted target must never be described in code, tests, release metadata, or user documentation as an implemented feature.
-
-### Explicit cutover
-
-This project is pre-release and has no external compatibility commitment. A contract change replaces the old design once its implementation, converter or regeneration path, tests, cross-platform evidence, contract maps, examples, and documentation are ready together. The cutover must name the new current source of truth and delete the displaced reader and contract in the same change.
-
-Do not add permanent compatibility shims, dual-format readers, legacy aliases, deprecated fields, or version-sniffing branches. Before cutover, preserve the current FROZEN contract. After cutover, preserve only the newly declared current contract.
+The project is not published on PyPI. [`.github/workflows/release.yml`](.github/workflows/release.yml) defines separate build and publish jobs for a published GitHub Release whose tag equals `v<pyproject version>`; it validates the built wheel and uses PyPI Trusted Publishing through OpenID Connect (OIDC). The workflow is only prepared automation. The owner must configure the PyPI project and trusted publisher before the first release, and repository metadata, workflow presence, or a successful local build does not prove registry publication.
 
 ## 2. Runtime boundary
 
-This repository is a pure Python runtime and SDK. It compiles and executes user-provided graph skills. It owns compilation, typed dataflow, execution and prediction, checkpoints and resume, events and traces, artifacts, golden evaluation, resolution, and structured runtime errors.
+This repository is a Python runtime and SDK. It owns compilation, typed dataflow, prediction and execution, request snapshots, checkpoint-domain contracts, events and traces, artifacts, inspection, golden evaluation, local skill resolution, and structured runtime errors.
 
-It does not own Studio UI or native filesystem behavior, Studio HTTP routes, Gateway credential or route truth, or a host application's global state. The core package must not import Studio or Gateway modules. Host-, provider-, storage-, process-, operating-system-, and network-specific behavior belongs behind narrow ports and adapters.
+The application boundary is organized as follows:
 
-A business gSkill is a user-owned asset. A runtime wheel may contain runtime implementation resources, but it must not bundle, register, discover globally, copy, or mutate user business skills. The caller supplies the business skill path explicitly.
+- [`domain/models.py`](src/graph_skill_runtime/domain/models.py) owns closed, frozen, versioned public data contracts;
+- [`application/config.py`](src/graph_skill_runtime/application/config.py) owns configuration precedence and provenance;
+- [`application/service.py`](src/graph_skill_runtime/application/service.py) owns use-case ordering;
+- [`ports/runtime.py`](src/graph_skill_runtime/ports/runtime.py) owns provider-neutral protocols;
+- [`adapters`](src/graph_skill_runtime/adapters) owns engine, local persistence, CLI, and MCP translation;
+- [`sdk.py`](src/graph_skill_runtime/sdk.py) is the thin Python facade.
+
+Core and application code must not import Studio or Gateway modules. Studio UI, native filesystem behavior, HTTP routes, Gateway credential and route truth, host session state, vendor processes, operating-system integration, and network behavior belong behind explicit adapters or integrations.
+
+A business gSkill is a user-owned asset. A runtime wheel may contain runtime implementation resources, but it must not bundle, register, discover globally, copy, or mutate user business skills. Callers provide the skill path explicitly.
 
 Keep pure computation separate from I/O and state mutation. Important state and side effects have one owner. Validate external inputs at the boundary, make invalid states unrepresentable where practical, and return complete structured diagnostics rather than hiding bad state with fallback behavior.
 
-## 3. Repository workflow
+## 3. Phase 1 execution semantics
 
-The intended repository workflow is branch to pull request to `main`:
+Configuration precedence is fixed, from highest to lowest: invocation, project `<skill_root>/gskill.toml`, operating-system user config, portable defaults, and built-in defaults. User config contains only a machine `RuntimeProfile`; named `RunPreset` values come only from project or explicitly supplied portable defaults. `RuntimeProfile` contains executor, checkpoint store, state directory, permissions, capabilities, and fallback declarations. Business inputs and run controls belong to `RunPreset`, `RunInvocation`, and the resolved `RunRequest`.
 
-1. Refresh `main` and create one task branch from it.
-2. Keep one coherent concern in the branch and pull request.
-3. Run all required local gates.
-4. Open a pull request to `main`; do not directly push ordinary changes to `main`.
-5. Merge only after required checks pass, normally as a squash merge.
+Resolved requests contain absolute skill and state roots plus field-level provenance. Public Pydantic contracts are closed and frozen, and nested JSON dicts and lists remain immutable after construction. Literal values under structurally secret-shaped keys are rejected; secret values are represented only through `SecretReference` and `SecretBinding`. A runtime cannot infer whether every arbitrary business string is secret, so callers must classify values that do not have secret-shaped keys.
 
-This is a project policy and a target repository rule. The initial Phase 0 repository has not yet supplied evidence that GitHub branch protection or remote CI has run. Do not claim that `main` is technically protected until the GitHub settings and an actual pull-request run have been verified. Establishing initial remote protection is an owner-controlled bootstrap action, not general authorization for direct pushes.
+The default executor is `host-native`. Phase 1 has no host-native handoff implementation, so `run` must first persist the request snapshot and then return `GSKILL_EXECUTOR_UNAVAILABLE`. The local snapshot owner writes `<state_root>/runs/<run_id>/request.json` with create-if-absent semantics: identical content is idempotent and different content must never overwrite the existing run id.
 
-Do not commit, push, open a pull request, merge, or change repository settings unless the user or task owner explicitly requests that external state change.
+The extracted engine runs only when the resolved primary executor is explicitly `embedded`. Provider clients remain isolated in the optional `embedded` dependency extra. The current adapter has verified a real current-format `LOGIC` skill compile/run path. Do not describe agent-provider execution as generally complete from that logic-only evidence.
 
-## 4. Python and dependency workflow
+Typed `resume` and `submit_agent_result` request/result contracts exist, but durable handoff is Phase 3. Their current implementation returns `GSKILL_NOT_IMPLEMENTED`. Fallback executor declarations are preserved in the snapshot; Phase 1 does not silently select them. Host-native, vendor CLI, MoirAI, Gateway, and Studio adapters must not be described as implemented until their own causal tests exist.
+
+## 4. Contract cutovers
+
+This project is pre-release and has no external compatibility commitment. A contract change replaces the previous design once implementation, regeneration or conversion, tests, cross-platform evidence, contract maps, examples, and documentation are ready together.
+
+Do not add permanent compatibility shims, dual-format readers, legacy aliases, deprecated fields, or version-sniffing branches. Phase 2 will replace the current v0.3 reader with the root `SKILL.md` plus `graph.yaml` format in one explicit cutover. Until then, preserve the FROZEN v0.3 format and do not write the Phase 2 layout as a current capability.
+
+The historical files under [`docs/mvp0`](docs/mvp0) are a frozen archive. Do not update them to describe current behavior. Update the active root documents and manifests instead.
+
+## 5. Repository workflow
+
+`main` is protected and pull-request-only. The repository has completed a green six-job CI run on `main`; ordinary work still follows branch to pull request to squash merge:
+
+1. refresh `main` and create one task branch from it;
+2. keep one coherent concern in the branch and pull request;
+3. run all required local gates;
+4. open a pull request to `main`; do not push ordinary changes directly to `main`;
+5. merge only after required checks pass.
+
+Do not commit, push, open a pull request, merge, tag, create or publish a GitHub Release, publish a distribution, configure the PyPI trusted publisher, or change repository settings unless the user or task owner explicitly requests that external state change.
+
+## 6. Python and dependency workflow
 
 This repository is one `uv` package, not a workspace. Run commands from the repository root.
 
@@ -64,9 +80,9 @@ uv sync --extra dev
 
 Change dependency declarations in `pyproject.toml`, then let `uv` update `uv.lock`. Never hand-edit the lockfile. Do not use monorepo commands such as `uv sync --all-packages`.
 
-New dependencies require a current need and a clear owner. Runtime core must not acquire Studio, Gateway, web-server, UI, or provider-specific dependencies merely to simplify an adapter. Optional dependencies still require an explicit boundary and tests proving the core import remains independent.
+Provider client packages belong in the `embedded` extra, not base runtime dependencies. New dependencies require a current need and a clear owner. Runtime core must not acquire Studio, Gateway, web-server, UI, host, or provider-specific dependencies merely to simplify an adapter.
 
-## 5. Required local gates
+## 7. Required local gates
 
 Before proposing a change, run all gates from the repository root:
 
@@ -79,36 +95,30 @@ uv build
 uv run pip-audit
 ```
 
-The manifest validator is a separate required gate; a green pytest run does not replace it. Build success must produce both the wheel and source distribution. `pip-audit` checks resolved third-party distributions; the local `graph-agent` project is skipped when no matching PyPI project exists, and that skip must not be reported as an audit of this repository's own source.
+The manifest validator is a separate required gate; a green pytest run does not replace it. Build success must produce both the wheel and source distribution. `pip-audit` checks resolved third-party distributions. Because this project is not published on PyPI, a local-project skip must not be reported as a security audit of this repository's own source.
 
-CI configuration currently defines Linux quality gates, tests on Python 3.11/3.12/3.13, and Python 3.12 smoke tests on Windows and macOS. Configuration is not execution evidence. Record actual results before claiming a platform or remote gate is green.
+CI configuration and a past green run do not prove a new change is green. Record the new run's results before claiming that change passed a platform or remote gate.
 
-## 6. Test and contract ownership
+## 8. Tests and traceability ownership
 
-Executable behavior belongs to the nearest coherent source module; regression evidence belongs to the corresponding test area. A root-cause fix adds or updates a test that fails for the cause, not only an end-to-end symptom. Add an integration test when the changed contract crosses a real module or process boundary.
+Executable behavior belongs to the nearest coherent source module; regression evidence belongs to the corresponding test area. A root-cause fix adds or updates a test that fails for the cause, not only an end-to-end symptom. Add an integration test when a changed contract crosses a real module or process boundary.
 
-Tests are evidence, not an alternate product specification. Do not weaken, skip, or delete a test merely to make a change pass. When an intentional current-contract change invalidates a test, update the owning current specification, source, contract manifests, and tests together.
+Tests are evidence, not an alternate product specification. Do not weaken, skip, or delete a test merely to make a change pass. When an intentional current-contract change invalidates a test, update the owning current specification, source, contract manifests, generated compliance view, and tests together.
 
-The files under `spec/` are the traceability source of truth. Every callback event class and every registered error code needs exactly one primary owning feature, and source/test references must resolve. Update the manifests when ownership changes; do not satisfy the validator with invented or unrelated references.
+The files under `spec/` are the traceability source of truth. Every callback event class and every registered error code needs exactly one primary owning feature. Public API headings must match `graph_skill_runtime.__all__` and the contract map. Source and test references must resolve. Do not satisfy the validator with invented, stale, or unrelated references.
 
-Drafted target tests must be clearly scoped to implementation work. Their existence does not authorize changing current `GRAPH.md` behavior before the explicit cutover.
+[`docs/feature-compliance-checklist.md`](docs/feature-compliance-checklist.md) is the FROZEN generated view of `spec/features.yaml`; change the manifest first, then regenerate the view in manifest order. Do not manually create a parallel feature inventory.
 
-## 7. Cross-platform and text rules
+## 9. Cross-platform and text rules
 
 [`docs/CROSS_PLATFORM.md`](docs/CROSS_PLATFORM.md) is the authoritative Windows, macOS, and Linux policy for this runtime.
 
-Repository text is UTF-8 with LF line endings. Human-authored inputs enter through `graph_agent.core.authored_text.read_authored_text`, which uses `utf-8-sig` to remove one leading UTF-8 byte-order mark. Runtime-owned text uses explicit `encoding="utf-8"`. Text subprocesses use explicit UTF-8 decoding and replacement behavior. Use `pathlib`, avoid case-only paths, and give Windows and POSIX implementations the same observable timeout, locking, replacement, and failure semantics.
+Repository text is UTF-8 with LF line endings. Human-authored inputs enter through [`read_authored_text`](src/graph_skill_runtime/core/authored_text.py), which accepts a leading UTF-8 byte-order mark through `utf-8-sig`. Runtime-owned text uses explicit `encoding="utf-8"`. Text subprocesses use explicit UTF-8 decoding and replacement behavior. Use `pathlib`, avoid case-only paths, and give Windows and POSIX implementations the same observable timeout, locking, replacement, and failure semantics.
 
-## 8. Safe editing
+## 10. Safe editing and documentation
 
 Inspect `git status` before editing and preserve changes you do not own. Use `apply_patch` for targeted source and documentation edits. Formatting tools may perform mechanical rewrites when their scope is known. Do not use destructive Git commands, broad recursive deletion, or checkout/reset operations to erase a dirty tree.
 
-Resolve exact paths before moving or deleting files. Never target a repository root, home directory, unresolved environment variable, or broad glob with a destructive command. Prefer recoverable operations and report material deletions.
+Resolve exact paths before moving or deleting files. Never target a repository root, home directory, unresolved environment variable, or broad glob with a destructive command. Keep generated output, caches, coverage data, `.venv`, `dist/`, credentials, machine-local paths, and user business skills out of source edits.
 
-Keep generated output out of source edits. Do not manually edit build artifacts, caches, coverage output, `.venv`, or `dist/`. Do not add secrets, credentials, machine-local paths, or user business skills to the repository.
-
-## 9. Documentation rules
-
-Authoritative documentation must be self-contained. State the goal, terms, observable facts, constraints, and acceptance evidence in the document; do not rely on chat history or temporary context. Define the supported behavior positively before listing prohibited misuse.
-
-Separate facts, drafted targets, recommendations, and unresolved questions. Use stable relative links to the owning source instead of copying parallel versions of a contract. If the implementation and documentation disagree, first identify which contract line owns the subject; do not rewrite a current source of truth to match a future draft or present historical evidence as a current capability.
+Authoritative documentation must be self-contained. State goals, terms, observable facts, constraints, and acceptance evidence in the document; do not depend on chat history. Define supported behavior positively before listing prohibited misuse. Separate current facts, drafted targets, recommendations, and unresolved questions. Link to the owning source instead of copying parallel versions of a contract.

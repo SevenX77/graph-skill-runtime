@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_agent.callbacks.events import ToolCallEvent, ToolCallStartedEvent
-from graph_agent.tracing import StepReporter
+from graph_skill_runtime.callbacks.events import ToolCallEvent, ToolCallStartedEvent
+from graph_skill_runtime.tracing import StepReporter
 
 
 class _Recorder:

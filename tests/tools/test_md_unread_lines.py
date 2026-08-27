@@ -27,7 +27,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from graph_agent.tools.md_to_json import parse_md
+from graph_skill_runtime.tools.md_to_json import parse_md
 
 
 class Segmented(BaseModel):

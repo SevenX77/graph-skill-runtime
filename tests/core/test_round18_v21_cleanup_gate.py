@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from graph_agent.core.compiler import compile_skill
-from graph_agent.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GRAPH_AGENT_ROOT = REPO_ROOT
+GRAPH_SKILL_RUNTIME_ROOT = REPO_ROOT
 SCAN_ROOTS = (
-    GRAPH_AGENT_ROOT / "src",
-    GRAPH_AGENT_ROOT / "tests",
+    GRAPH_SKILL_RUNTIME_ROOT / "src",
+    GRAPH_SKILL_RUNTIME_ROOT / "tests",
 )
 
 TEXT_SUFFIXES = {
@@ -207,29 +207,29 @@ def test_round18_semantic_grep_gate_has_no_real_legacy_usage() -> None:
 
 def test_round18_cognitive_modules_remain_importable() -> None:
     for module_name in (
-        "graph_agent.cognitive.finish_task",
-        "graph_agent.cognitive.md2json",
-        "graph_agent.cognitive.md_patch",
+        "graph_skill_runtime.cognitive.finish_task",
+        "graph_skill_runtime.cognitive.md2json",
+        "graph_skill_runtime.cognitive.md_patch",
     ):
         importlib.import_module(module_name)
 
 
 def test_round18_dead_modules_are_removed() -> None:
     dead_paths = [
-        GRAPH_AGENT_ROOT / "src" / "graph_agent" / "codemod",
-        GRAPH_AGENT_ROOT / "src" / "graph_agent" / "io" / "context_resolver.py",
-        GRAPH_AGENT_ROOT / "tests" / "core" / "test_v21_codemod.py",
+        GRAPH_SKILL_RUNTIME_ROOT / "src" / "graph_skill_runtime" / "codemod",
+        GRAPH_SKILL_RUNTIME_ROOT / "src" / "graph_skill_runtime" / "io" / "context_resolver.py",
+        GRAPH_SKILL_RUNTIME_ROOT / "tests" / "core" / "test_v21_codemod.py",
         *(
-            GRAPH_AGENT_ROOT
+            GRAPH_SKILL_RUNTIME_ROOT
             / "src"
-            / "graph_agent"
+            / "graph_skill_runtime"
             / "core"
             / "validators"
             / f"{module}.py"
             for module in REMOVED_VALIDATORS
         ),
         *(
-            GRAPH_AGENT_ROOT / "tests" / "core" / "validators" / test_name
+            GRAPH_SKILL_RUNTIME_ROOT / "tests" / "core" / "validators" / test_name
             for test_name in REMOVED_VALIDATOR_TESTS
         ),
     ]
@@ -238,7 +238,7 @@ def test_round18_dead_modules_are_removed() -> None:
 
 
 def test_round18_collect_ignore_glob_does_not_hide_broken_tests() -> None:
-    conftest_path = GRAPH_AGENT_ROOT / "tests" / "conftest.py"
+    conftest_path = GRAPH_SKILL_RUNTIME_ROOT / "tests" / "conftest.py"
     spec = importlib.util.spec_from_file_location("round18_conftest_probe", conftest_path)
     assert spec is not None
     assert spec.loader is not None
@@ -251,7 +251,7 @@ def test_round18_collect_ignore_glob_does_not_hide_broken_tests() -> None:
 def test_round18_v030_compile_and_runtime_path_still_work(tmp_path: Path) -> None:
     resolver = EmptyResolver()
 
-    fixture = GRAPH_AGENT_ROOT / "tests" / "fixtures" / "v030_e2e_pipeline"
+    fixture = GRAPH_SKILL_RUNTIME_ROOT / "tests" / "fixtures" / "v030_e2e_pipeline"
     compiled_fixture = compile_skill(fixture, skill_resolver=FixtureResolver(fixture), cache=False)
     assert compiled_fixture.manifest.schema_version == "v0.3.0"
 

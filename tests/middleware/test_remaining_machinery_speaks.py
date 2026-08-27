@@ -13,10 +13,10 @@ from langchain.agents.middleware import ModelRequest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 
-from graph_agent.core.state import BusinessData, FrameworkState
-from graph_agent.middleware.runtime_input import RuntimeInputMiddleware
-from graph_agent.middleware.tool_error import ToolErrorHandlingMiddleware
-from graph_agent.middleware.tool_history import ToolHistoryIntegrityMiddleware
+from graph_skill_runtime.core.state import BusinessData, FrameworkState
+from graph_skill_runtime.middleware.runtime_input import RuntimeInputMiddleware
+from graph_skill_runtime.middleware.tool_error import ToolErrorHandlingMiddleware
+from graph_skill_runtime.middleware.tool_history import ToolHistoryIntegrityMiddleware
 
 
 class Recorder:
