@@ -770,6 +770,57 @@ class ResumedEvent(_EventBase):
     ns: str | None = None
 
 
+class AgentRequiredEvent(_EventBase):
+    """A durable AgentTask is now waiting for a host-native child session."""
+
+    event_type: Literal["agent_required"] = "agent_required"
+    handoff_event_id: str
+    run_id: str
+    task_id: str
+    graph_id: str
+    phase_name: str
+    checkpoint_ref: str
+
+
+class AgentCompletedEvent(_EventBase):
+    """The host returned a completed AgentResult and it was accepted."""
+
+    event_type: Literal["agent_completed"] = "agent_completed"
+    handoff_event_id: str
+    run_id: str
+    task_id: str
+    phase_name: str
+    executor_id: str
+    provenance: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentFailedEvent(_EventBase):
+    """The host returned terminal failure or cancellation evidence."""
+
+    event_type: Literal["agent_failed"] = "agent_failed"
+    handoff_event_id: str
+    run_id: str
+    task_id: str
+    phase_name: str
+    executor_id: str
+    status: Literal["failed", "cancelled"]
+    error_code: str
+    error_message: str
+
+
+class AgentResultRejectedEvent(_EventBase):
+    """A submitted AgentResult failed identity or output-contract validation."""
+
+    event_type: Literal["agent_result_rejected"] = "agent_result_rejected"
+    handoff_event_id: str
+    run_id: str
+    submitted_task_id: str
+    expected_task_id: str | None = None
+    phase_name: str | None = None
+    checkpoint_ref: str
+    reason: str
+
+
 CallbackEvent = Annotated[
     PhaseStartEvent
     | PredictChainStartEvent
@@ -803,6 +854,10 @@ CallbackEvent = Annotated[
     | ParallelMapGroupEndedEvent
     | InterruptedEvent
     | ResumedEvent
+    | AgentRequiredEvent
+    | AgentCompletedEvent
+    | AgentFailedEvent
+    | AgentResultRejectedEvent
     | AgentLoopIterationEvent
     | EdgeStartEvent
     | EdgeEndEvent
@@ -851,6 +906,10 @@ __all__ = [
     "ParallelMapGroupEndedEvent",
     "InterruptedEvent",
     "ResumedEvent",
+    "AgentRequiredEvent",
+    "AgentCompletedEvent",
+    "AgentFailedEvent",
+    "AgentResultRejectedEvent",
     "AgentLoopIterationEvent",
     "BlackboardReduceEvent",
     "InputDispatchEvent",

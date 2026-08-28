@@ -11,8 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, m
 JsonObject: TypeAlias = dict[str, JsonValue]
 Identifier: TypeAlias = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")]
 CallbackEventType: TypeAlias = Literal[
+    "agent_completed",
     "agent_exit_decision",
+    "agent_failed",
     "agent_loop_iteration",
+    "agent_required",
+    "agent_result_rejected",
     "ambiguity_logged",
     "artifact_saved",
     "blackboard_reduce",
@@ -553,6 +557,9 @@ class AgentResult(ContractModel):
             raise ValueError("a completed AgentResult requires output")
         if self.status != "completed" and self.error is None:
             raise ValueError("a non-completed AgentResult requires error")
+        if self.output is not None:
+            _assert_no_inline_secrets(self.output, path="agent_result.output")
+        _assert_no_inline_secrets(self.provenance, path="agent_result.provenance")
         return self
 
 

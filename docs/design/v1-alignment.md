@@ -10,7 +10,7 @@ updated: 2026-08-27
 
 # Graph Skill Runtime v1 目标设计
 
-本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1 与 Phase 2 portable 文件格式已经实现；Phase 3 至 Phase 6 的 durable host-native handoff、vendor executor、installer 和产品 adapter 尚未实现，因此不能把完整 v1 当作当前能力。
+本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1、Phase 2 portable 文件格式，以及 Phase 3 中 root DAG 串行可定位 Agent wait point 的 durable host-native handoff 已经实现；Phase 3b 的 host-native 扩展和 Phase 4 至 Phase 6 的 vendor executor、installer 与跨平台发布验收尚未实现，因此不能把完整 v1 当作当前能力。Gateway 与 Studio plugin 不属于本轮 release 交付；本文只保留其未来 Port/Adapter 所有权边界。
 
 ## 0. Implementation status（2026-08-27）
 
@@ -19,12 +19,14 @@ updated: 2026-08-27
 | Phase 0：仓库提取与现状冻结 | **已实现** | 独立 GitHub repository 已建立；旧实现与 v0.3 格式已完成提取和 characterization；历史证据保留在 [`baseline.md`](./baseline.md) 与 `docs/mvp0/` |
 | Section 2：产品命名 | **已实现于源码与仓库** | distribution/import/command 是 `graph-skill-runtime` / `graph_skill_runtime` / `gskill`，当前版本 `0.1.0a1`；release workflow 已准备 build、wheel validation 与 OIDC Trusted Publishing，但 PyPI project/publisher 尚未配置，也没有实际发布 |
 | Section 3 与 Section 8 的 Phase 1 子集：typed facade、配置、SDK/CLI/MCP 边界 | **已实现** | 顶层 58-symbol contract、closed/frozen/versioned models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication`、八个 SDK 用例与八个同名 MCP tools 已落地 |
-| Current engine bridge | **已实现于当前范围** | `CurrentEngineAdapter` 已用真实 portable `LOGIC` skill 验证 compile/run；只有显式 `embedded` 才进入 engine，provider clients 位于 optional `embedded` extra |
+| Current engine bridge | **已实现于当前范围** | `CurrentEngineAdapter` 已用真实 portable `LOGIC` skill 验证显式 embedded compile/run，并把 bounded host-native run/resume/submit 接入同一 core；provider clients 仍只位于 optional `embedded` extra |
 | Section 4 至 Section 5：portable 格式与 flat graph registry | **Phase 2 已实现** | Production compile/run/SDK/CLI/MCP 只接受显式 root `SKILL.md` + `graph.yaml` bundle；内部 agent phase 使用 `AGENT.md`；graph registry 为单层 `graphs/<graph_id>/`；legacy v0.3 读取只存在于显式 converter 边界 |
-| Section 6 至 Section 7：host-native durable handoff | **Phase 3 drafted；未实现** | `host-native` 是配置默认值，但当前 `run` 先保存 request snapshot，再返回 `GSKILL_EXECUTOR_UNAVAILABLE`；`resume` / `submit_agent_result` 返回 `GSKILL_NOT_IMPLEMENTED` |
-| Vendor CLI executors、MoirAI installer、Gateway/Studio adapters | **Phase 4 至 Phase 6 drafted；未实现** | CLI executor 只有 typed config；未实现 vendor process adapter、宿主资产安装或产品集成 |
+| Section 6 至 Section 7：host-native durable handoff | **Phase 3 当前范围已实现** | 支持 root DAG 内串行可定位的 Agent wait point：图 checkpoint 与 `AgentTask` 先后持久化后返回 `agent_required`；SDK/MCP/CLI submit 校验结果并继续同一 run；跨进程、非法输出纠正、精确重试、checkpoint-to-task 与 graph-commit-to-response 两个 crash window 均有因果测试 |
+| Phase 3b：host-native 扩展 | **drafted；未实现** | registry subgraph、graph/phase iterate、不可比较并行 wait point、普通 human/breakpoint typed resume，以及宿主 dispatched/started acknowledgment 与 capability negotiation 尚未完成 |
+| Vendor CLI executors、MoirAI installer、跨平台 package/release acceptance | **Phase 4 至 Phase 6 drafted；未实现** | CLI executor 只有 typed config；未实现 vendor process adapter、宿主资产安装或三平台发布验收 |
+| Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
-当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；凡未被上表标为已实现的内容都不得写成当前能力。
+当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；凡未被上表标为已实现的内容都不得写成当前能力。Phase 3 manifest 当前列出 12 条 host-native targeted tests；Ruff、覆盖 135 个 source files 的 strict mypy、contract manifest validator 与包含这 12 条证据的本地完整 pytest suite 均已通过，完整 suite 结果为 `1604 passed / 1 skipped in 83.88s`。本次还完成了一次真实 Codex native clean-context subagent 人工闭环。远程 Ubuntu/Windows/macOS 门禁不在这组已核验证据内。
 
 ## 1. 目标、术语与不可变约束
 
@@ -80,9 +82,9 @@ PyPI、`pip` 和 `uv` 是 Python 软件的分发与安装方式；SDK 是调用�
 | application | `compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden` 用例 | domain Port 与强类型请求/结果 |
 | ports | `AgentExecutor`、checkpoint store、artifact store、event sink、skill source 等稳定协议 | 只包含宿主无关类型 |
 | adapters | 本地文件、host-native、vendor CLI、embedded、MCP、console、Python facade | 依赖 ports；可以依赖具体平台或厂商 |
-| integrations | MoirAI、Gateway plugin、Studio plugin、宿主安装 renderer | 通过 SDK/CLI/MCP 契约调用 application，不进入 core |
+| integrations | MoirAI 与宿主安装 renderer | 通过 SDK/CLI/MCP 契约调用 application，不进入 core |
 
-核心包不提供 HTTP API，也不持有 Studio 文件扫描、Gateway credential truth 或某个宿主的全局配置。新仓可以包含多个 optional distribution extra，但每个 extra 都必须通过同一 Port 接入。
+核心包不提供 HTTP API，也不持有 Studio 文件扫描、Gateway credential truth 或某个宿主的全局配置。Gateway 与 Studio plugin 不属于本轮 release；未来外部集成只能通过公开 SDK/CLI/MCP 与显式 Port/Adapter 边界接入，不能把产品状态或依赖放进 core。本轮 optional distribution extra 只服务已经列入阶段计划且通过验收的能力。
 
 ### 3.2 强类型 facade
 
@@ -112,7 +114,7 @@ Python SDK、`gskill` CLI 与 `gskill` MCP server 均是薄 adapter：
 
 **Phase 1 实现说明**：上述 domain/application/ports/adapters 分层、五十八个顶层 typed symbols、八个 Python use-case functions、`gskill` CLI 与八个同名 MCP tools 已实现，并共享同一个 `RuntimeApplication`。所有公共 Pydantic contracts 都是 closed、frozen、带 `schema_version` 与 `kind` 的对象，构造后的嵌套 JSON collection 也不可变。`create_application` 是显式 composition root，每次调用构造独立 application，不持有全局 singleton。
 
-这一实现状态不表示所有目标用例已经具备完整执行语义。Phase 1 的 `resume` 与 `submit_agent_result` 只提供 typed boundary 并返回结构化 `GSKILL_NOT_IMPLEMENTED`；`RuntimeEvent.event_type` 已收紧为封闭的三十八值 Literal，并由 contract test 保证与当前全部 concrete `CallbackEvent` discriminator 精确相等，但完整 host-native lifecycle emission 仍属于 Phase 3。公共预测结果当前统一使用 `RunResult(mode="predict")`；是否另立 `PredictResult` 仍属于完整 v1 设计收敛事项，不能凭本文的目标清单虚构一个当前 export。
+这一实现状态不表示所有目标用例已经具备完整执行语义。Phase 3 已让 `submit_agent_result` 在受支持的 host-native wait point 上完成 durable state transition；`resume(checkpoint_ref)` 只读取当前 durable wait 或 terminal response，普通 human/breakpoint typed resume 仍返回结构化 `GSKILL_NOT_IMPLEMENTED`。`RuntimeEvent.event_type` 已收紧为封闭的四十二值 Literal，并由 contract test 保证与当前全部 concrete `CallbackEvent` discriminator 精确相等。当前有因果发出的 handoff lifecycle 只有 `agent_required`、`agent_completed`、`agent_failed` 与 `agent_result_rejected`；`agent_dispatched`、`agent_started` 需要未来宿主 acknowledgment 契约，当前既不在 closed Literal 中，也不得声称已发出。公共预测结果当前统一使用 `RunResult(mode="predict")`；是否另立 `PredictResult` 仍属于完整 v1 设计收敛事项，不能凭本文的目标清单虚构一个当前 export。
 
 ## 4. Portable gSkill 格式
 
@@ -207,40 +209,44 @@ trace 和诊断使用稳定地址 `<graph_id>/<phase_id>`。编译器必须在�
 
 核心不再拥有唯一的自制 ReAct agent。ReAct 是让模型在“思考—调用工具—观察结果”循环中完成任务的一种 agent 策略；它可以是一个 adapter 的实现，不能定义整个 runtime。
 
-目标 `AgentExecutor` 是窄 Port。它消费版本化 `AgentTask`，产生 `AgentResult` 或 durable `AgentRequired`：
+目标 `AgentExecutor` 是窄 Port。直接 executor 消费版本化 `AgentTask` 并产生 `AgentResult`；cooperative host-native adapter 则把同一 task 投影为 durable `AgentRequired`，等待外部提交：
 
 | 对象 | 必须表达的事实 |
 | --- | --- |
 | `AgentTask` | schema version、task/run id、`graph_id/phase_id`、已渲染指令、typed input、output schema、允许工具/路径/网络策略、deadline 与 capability requirements |
-| `AgentRequired` | task reference、checkpoint reference、允许的提交入口、所需 executor capability；它表示任务已持久化等待宿主，不表示 agent 已启动 |
+| `AgentRequired` | 完整 `AgentTask`、opaque checkpoint reference 与允许的 wire 提交入口；所需能力在 task 内；它表示任务已持久化等待宿主，不表示 agent 已启动 |
 | `AgentResult` | schema version、task id、terminal status、typed output 或结构化 failure、executor identity 与可复核 provenance |
 | lifecycle events | `agent_required`、`agent_dispatched`、`agent_started`、`agent_completed`、`agent_failed`、`agent_result_rejected`；每个事件只能在有相应可观察证据时发出 |
 
-runtime 收到结果后先验证 task identity、状态转换和 output schema，再把结果写入 blackboard 并继续 graph。错误 task、重复提交、过期 checkpoint 或 schema 不匹配必须 fail fast。
+runtime 收到结果后先验证 task identity、状态转换和 output schema；completed 结果写入 blackboard 并继续 graph，failed/cancelled 结果不执行该 Agent phase，而是幂等地产生 terminal failed response 并发出 `agent_failed`。错误 task、过期 checkpoint 或 schema 不匹配必须 fail fast。当前实现对完整 immutable `AgentResult` 做 canonical hash：完全相同的重复提交返回第一次提交因果产生的同一 `RunResult`，不同结果冲突，schema 非法结果不消费 task。`FrameworkState.agent_result_hashes` 记录 graph owner 已接收的 hash，用来跨越 graph checkpoint SQLite 与 handoff SQLite 无法共享事务的 result-commit crash window。
+
+当前闭集只增加并实际发出已有证据的 `agent_required`、`agent_completed`、`agent_failed` 与 `agent_result_rejected`，因此 `RuntimeEvent.event_type` 从 38 值变为 42 值。每条 handoff trace event 带确定性 `handoff_event_id`，本地 append 做 best-effort 去重；trace JSONL 与 handoff SQLite 是不同 owner，consumer 必须按 causal at-least-once evidence 处理并用该 id 去重，event 不能充当跨 owner commit proof，也不存在全局 exactly-once delivery 承诺。目标表中的 `agent_dispatched` 与 `agent_started` 仍待宿主 acknowledgment：runtime 仅仅返回 task 不能证明宿主已经派发或启动 agent。
 
 ### 6.2 Adapter 1：`host-native`，v1 默认
 
 `host-native` 是协作式 adapter：它让当前交互宿主自己的 root agent 创建原生、干净上下文的 subagent，而不是让 runtime 外部进程假装进入当前 session。
 
-**Phase 1 实现说明**：`host-native` 已成为 `RuntimeProfile` 的默认 executor discriminator，但 adapter 尚未实现。当前 `run` 会先把 resolved `RunRequest` 写到 `<state_root>/runs/<run_id>/request.json`，再返回 `GSKILL_EXECUTOR_UNAVAILABLE`；它不会产生假的 `AgentRequired`，也不会静默切到 `embedded` 或 `cli`。
+**Phase 3 当前实现**：`host-native` 是 `RuntimeProfile` 的默认 executor。没有 Agent phase 的纯 logic graph 在该 profile 下直接完成。存在 Agent phase 时，当前只接受 root DAG 内可按依赖关系串行定位的 wait point，并要求 `SqliteCheckpointStoreConfig`。registry subgraph 内 Agent、包含 Agent 的 graph-level iterate、Agent phase iterate，以及 Agent 与其他 phase 不可比较的并行分支都会在执行前以 `GSKILL_INVALID_REQUEST` 失败，不会落入 embedded 模型路径。
 
 一次 AGENT phase 的完整时序是：
 
-1. runtime 在 phase 执行前持久化业务 checkpoint 与 `AgentTask`；
-2. runtime 返回结构化 `agent_required`，同时提供 MCP `submit_agent_result` 和 CLI `gskill submit` / `gskill resume` 提交路径；
-3. 当前宿主 root agent 按业务 `SKILL.md` 的协议，用宿主原生 tool 或 instruction 创建 clean-context subagent；
-4. 宿主把 `AgentTask` 交给该 subagent，并把完成结果提交回 runtime；
-5. runtime 校验 `AgentResult` output schema，提交 checkpoint transition，然后继续图。
+1. `RuntimeApplication.run` 解析并以 create-if-absent 语义保存 immutable `RunRequest`；
+2. engine 运行到 root Agent phase 之前，由 LangGraph SQLite checkpoint store 持久化等待状态；
+3. host-native adapter 从该 pause 构造并在独立的 `<state_root>/agent-handoffs.sqlite3` 中持久化 `AgentTask`；
+4. runtime 返回结构化 `agent_required`。公开 `checkpoint_ref` 固定为 `gskill-handoff-v1:<task-id>`，不泄漏 LangGraph checkpoint id 或 namespace；
+5. 当前宿主 root agent 按业务 `SKILL.md` 的协议，用宿主原生 tool 或 instruction 创建新的 clean-context subagent，并把 `AgentTask` 交给它；
+6. 宿主通过 Python SDK `submit_agent_result`、同名 MCP tool 或 CLI `gskill submit` 提交 `AgentResult`；
+7. runtime 从 immutable request snapshot 恢复调用上下文，先确认 handoff record 仍拥有完全相同的 request，再校验 task/run identity 与 output JSON Schema，把 external phase completion 写入同一 graph state，并继续同一 run。若后续还有受支持的串行 Agent phase，则再次返回新的 durable `agent_required`。
 
-持久化必须发生在 `agent_required` 对外可见之前，因此宿主崩溃或会话结束后仍能恢复。公开契约是 durable dispatch/result，不是 LangGraph interrupt object。
+两层持久化都发生在 `agent_required` 对外可见之前，因此宿主崩溃或会话结束后仍能由另一进程提交。若进程在 LangGraph 已提交 Agent breakpoint、handoff row 尚未写入时退出，下一次相同 `run` 通过 `recover_paused_skill` 只读现有 checkpoint，重建 public task，而不调用 graph node 或重放已经完成的 prefix。公开契约是 durable dispatch/result，不是 LangGraph interrupt object。`resume(checkpoint_ref)` 只读取 handoff owner 当前保存的 wait 或 terminal response；它不提交 Agent output，也不推进图。普通 human/breakpoint typed resume 仍待 Phase 3b。
 
-若当前宿主没有 native subagent 能力，`host-native` 必须在运行边界明确失败；只有 `RuntimeProfile` 显式允许 `cli` 或 `embedded` executor 时才能选择替代路径，不能静默降级。
+若当前宿主没有 native subagent 能力，宿主必须明确报告不能执行，不能伪造 task completion。当前 runtime 能把 `required_capabilities` 放入 task，但尚无宿主 acknowledgment 来证明 capability、`agent_dispatched` 或 `agent_started`；该协商属于 Phase 3b。无论宿主能力如何，runtime 都不静默选择 fallback executor。显式选择 `embedded` 才进入 embedded，显式选择 `cli` 当前则返回 `GSKILL_EXECUTOR_UNAVAILABLE`。
 
 ### 6.3 Adapter 2：`cli`，第二阶段直接执行
 
 `cli` adapter 从 runtime 启动厂商 headless CLI。每次启动是一个新的、vendor-native 顶层 session，虽然上下文干净，但不是当前交互会话里的 child thread。
 
-**当前状态**：Phase 1 只实现了 `CliExecutorConfig` 的 typed declaration，没有启动、探测或解析任何 vendor CLI。以下命令形状继续只是 Phase 4 调研输入。
+**当前状态**：只实现了 `CliExecutorConfig` 的 typed declaration，没有启动、探测或解析任何 vendor CLI。以下命令形状继续只是 Phase 4 调研输入。
 
 实现期需要探测的候选命令形状如下。它们是调研示例，不是可硬编码的稳定契约：
 
@@ -272,7 +278,11 @@ Claude、Codex、Copilot、Gemini、Cursor 与 OpenCode 都提供原生 subagent
 
 ## 7. Checkpoint、interrupt 与 agent supervisor
 
-checkpoint 保存业务图的 durable state：已完成 phase、blackboard、待处理 `AgentTask`、恢复位置和提交幂等信息。ah 或 Prime Agent 这类系统管理 agent session、进程、provider、角色拓扑与 crash recovery。两者解决不同问题，不是二选一。
+checkpoint 保存业务图的 durable state：已完成 phase、blackboard、恢复位置和已经应用的外部结果 hash；handoff store 保存待处理 `AgentTask` 与对外提交响应。ah 或 Prime Agent 这类系统管理 agent session、进程、provider、角色拓扑与 crash recovery。两者解决不同问题，不是二选一。
+
+当前 Phase 3 把两个事实 owner 明确分开。`<state_root>/<SqliteCheckpointStoreConfig.filename>` 由 LangGraph 拥有 graph checkpoint；`<state_root>/agent-handoffs.sqlite3` 拥有跨进程 `AgentTask`、完整 `AgentResult` hash 与对外 `RunResult`。因此要分别收口两个无法共享事务的 crash window：其一，graph pause 已提交而 task row 未写入时，`recover_paused_skill` 从现有 Agent breakpoint 重建 task，不重放 graph prefix；其二，result 已写入 graph 而 handoff response 未提交时，`FrameworkState.agent_result_hashes[task_id]` 作为 crash marker，让完全相同的 submission 从最新 graph state 恢复并缓存 response，而不同 hash 被拒绝。handoff store 用 SQLite `BEGIN IMMEDIATE` 串行化提交，两条恢复路径都不会再次执行 Agent phase。
+
+这项机制借用两个成熟方案的已公开取舍。[SQLite `BEGIN IMMEDIATE`](https://www.sqlite.org/lang_transaction.html) 在 transaction 开始时就申请 write transaction，因此本地 handoff owner 用单写者顺序裁决并发 submission；它没有被扩展成跨两个数据库的伪原子事务。[Stripe idempotent requests](https://docs.stripe.com/api/idempotent_requests) 保存首次执行结果供同 key 重试，并在同一 identity 携带不同参数时拒绝复用；本实现对应地缓存同一完整 `AgentResult` hash 的 `RunResult`，并拒绝同 task 的不同 hash。Stripe 的时间窗清理不适合直接照搬：当前 runtime 尚未拥有明确的 handoff retention lifecycle，所以 Phase 3 不做基于时间的自动 pruning，避免 task 在宿主离线期间失去唯一 durable owner。
 
 内部实现可以继续用 LangGraph checkpoint。只有人工介入和 cooperative host adapter 需要 interrupt-like pause；普通 CLI executor 可以在一次 application call 内等待子进程完成。无论内部如何实现，SDK/CLI/MCP 只暴露 versioned pause/dispatch/result，不暴露 `interrupt()`、Command 或内部 checkpoint object。
 
@@ -298,7 +308,7 @@ checkpoint 保存业务图的 durable state：已完成 phase、blackboard、待
 
 `RuntimeProfile` 只承载 executor、checkpoint store、state directory、capability 与权限/失败策略等运行环境选择。`RunPreset` 承载需要跨多次运行复用的**非秘密业务运行默认值**，例如 input/binding defaults、breakpoints、node overrides、compare candidates 和 artifact requests。二者是 `gskill.toml` 中两个独立的强类型 schema；不能为了少一个文件把业务输入、artifact 定义或 UI 扫描状态塞进 `RuntimeProfile`。
 
-调用者可以选择一个具名 preset，再只覆盖本次变化的值，不需要每次重新配置整套运行。resolver 合并上述来源后输出两个 normalized、强类型对象：resolved `RuntimeProfile` snapshot，以及包含实际 inputs/bindings/overrides/artifact requests 的 immutable `RunRequest`。两者记录每个值的来源层；Phase 1 的 `run` 与 `predict` 会把 `RunRequest` 以 create-if-absent 语义持久化。后续 resume 从该快照恢复而不重新读取变化后的 profile 或 preset，仍是 Phase 3 要完成的 durable behavior。
+调用者可以选择一个具名 preset，再只覆盖本次变化的值，不需要每次重新配置整套运行。resolver 合并上述来源后输出两个 normalized、强类型对象：resolved `RuntimeProfile` snapshot，以及包含实际 inputs/bindings/overrides/artifact requests 的 immutable `RunRequest`。两者记录每个值的来源层；`run` 与 `predict` 会把 `RunRequest` 以 create-if-absent 语义持久化。Phase 3 的 host-native `resume(checkpoint_ref)` 与 `submit_agent_result` 已从该快照恢复，不重新读取变化后的 profile 或 preset；普通 human/breakpoint typed resume 仍待 Phase 3b。
 
 秘密只来自宿主 secret store、环境变量或操作系统 keychain，绝不把 secret value 写入业务 gSkill、`gskill.toml`、run snapshot 或安装 manifest。配置和 snapshot 可以保存 `SecretReference` / `SecretBinding`，不能保存 secret value。Phase 1 对 structurally secret-shaped literal key 做边界拒绝；runtime 无法从任意业务字符串本身可靠推断它是否是秘密，调用者仍须正确分类其他字段。
 
@@ -312,7 +322,7 @@ checkpoint 保存业务图的 durable state：已完成 phase、blackboard、待
 
 默认 state directory 是业务 skill 根的 `.gskill/`。`--state-dir` 或 profile 可显式覆盖。runtime 必须在边界解析并验证绝对路径，不允许内部模块各自从 CWD 推导目录。run snapshot、checkpoint、trace 与 artifact manifest 都引用同一 resolved state root，但各自仍有独立 owner 和保留策略。
 
-Phase 1 的 `LocalRunSnapshotStore` 已实现 `<state_root>/runs/<run_id>/request.json`：第一次写入采用 create-if-absent，同一内容重复保存幂等，不同内容不得覆盖相同 run id。该 request snapshot 事实不能替代 Phase 3 尚未实现的 checkpoint/result submission state machine。
+`LocalRunSnapshotStore` 在 `<state_root>/runs/<run_id>/request.json` 保存 immutable request：第一次写入采用 create-if-absent，同一内容重复保存幂等，不同内容不得覆盖相同 run id。Phase 3 host-native submission 以它恢复调用请求；graph checkpoint 由配置的 LangGraph SQLite 文件拥有，handoff protocol 由固定的 `agent-handoffs.sqlite3` 拥有，三者不能互相替代。
 
 ## 9. 从 `studio.runtime_config.v2` 拆分
 
@@ -321,7 +331,7 @@ Phase 1 的 `LocalRunSnapshotStore` 已实现 `<state_root>/runs/<run_id>/reques
 1. **Portable declarations**：`SKILL.md`、`graph.yaml`、phase 文件，以及 `graph.yaml` 中具名 artifact declarations；随业务 skill 提交。
 2. **Reusable configuration**：project `gskill.toml` 同时容纳彼此独立的强类型 `RuntimeProfile` overlay 与可选 named `RunPreset`；user config 只提供机器/用户级 `RuntimeProfile` 默认值。`RunPreset` 保存可复用、非秘密的运行默认值，不保存 artifact definition。
 3. **RunRequest**：由显式 invocation、选中的 preset、profile 与声明默认值合并出的本次 immutable snapshot；包含实际 inputs/bindings、breakpoints、artifact requests、node overrides 与 compare candidates。
-4. **StudioAdapterState**：Studio 文件 mirror、扫描和 UI 编辑投影；只属于 Studio adapter。
+4. **Future StudioAdapterState**：Studio 文件 mirror、扫描和 UI 编辑投影；只属于未来外部 Studio adapter，不是本轮 release 交付物。
 
 Artifact declaration 和 artifact request 是两个不同对象。根 `graph.yaml` 以稳定 `artifact_id` 声明 `stem`、`fields`、`mode`、`format`，回答“这个 skill 能产出什么、怎样物化”；`RunPreset` 或 `RunRequest.artifact_requests` 只引用 `artifact_id`，回答“这次要产出哪些”。v1 默认只允许 request 指定输出 destination；若未来确需覆盖其他属性，必须由 declaration 中的强类型 override schema 明确开放，不能让 request 任意改写 `fields`、`mode` 或 `format`。
 
@@ -330,12 +340,12 @@ Artifact declaration 和 artifact request 是两个不同对象。根 `graph.yam
 | 当前字段 | 新 owner | 转换规则 |
 | --- | --- | --- |
 | `schema_version` | converter 输入判别；各新对象各自有版本 | 不复制成统一 runtime config version |
-| `inputs.import_root` | `StudioAdapterState.import_root` | 只用于 Studio 导入扫描，不进入 runtime core |
-| `inputs.manifest.root` / `.phases` | `StudioAdapterState.input_manifest` | 保留文件 mirror/scan 事实，不作为运行输入 |
+| `inputs.import_root` | future `StudioAdapterState.import_root` | 只用于 Studio 导入扫描，不进入 runtime core |
+| `inputs.manifest.root` / `.phases` | future `StudioAdapterState.input_manifest` | 保留文件 mirror/scan 事实，不作为运行输入 |
 | `inputs.active.root` | named `RunPreset.inputs` → resolved `RunRequest.inputs` | 非秘密、可复用值进入 converter 生成的 project preset；本次覆盖合并后进入 immutable request。秘密或机器临时值不得持久化，converter 必须报告并要求运行时显式提供 |
 | `inputs.active.phases` | named `RunPreset.bindings` → resolved `RunRequest.bindings` | 按 `<graph_id>/<phase_id>/<field>` 规范化；同样先保留长期默认，再在每次运行形成最终快照 |
-| `inputs.removed.root` / `.phases` | `StudioAdapterState.removed` | UI 差异状态，不进入 runtime |
-| `inputs.conflicts.root` / `.phases` | `StudioAdapterState.conflicts` | Studio 在提交 RunRequest 前解决；未解决则边界拒绝 |
+| `inputs.removed.root` / `.phases` | future `StudioAdapterState.removed` | UI 差异状态，不进入 runtime |
+| `inputs.conflicts.root` / `.phases` | future `StudioAdapterState.conflicts` | 未来 Studio adapter 在提交 RunRequest 前解决；未解决则边界拒绝 |
 | `llm.node_params.nodes` | named `RunPreset.node_overrides` → resolved `RunRequest.node_overrides` | 可复用、非秘密覆盖可进 preset；显式本次覆盖优先，最终值只接受公开 schema |
 | `llm.compare_candidates.nodes` | named `RunPreset.compare_candidates` → resolved `RunRequest.compare_candidates` | 经常复用的非秘密候选集可进 preset；一次性候选只进 invocation，二者都在本次 snapshot 固化 |
 | `llm.custom_params.nodes` | named `RunPreset.node_overrides.custom_params` → resolved `RunRequest` | 按 executor capability/schema 校验；秘密值禁止进入 preset 与 snapshot |
@@ -374,8 +384,8 @@ canonical assets 只维护一份。每个 host renderer 将其投影为相应的
 | Tool family | 目标 owner | 原因 |
 | --- | --- | --- |
 | compile、predict、run、resume/submit、trace、artifacts、golden、inspect、portable skill reads | portable runtime MCP | 只依赖业务 skill 与 runtime application service |
-| LLM credential、role、route、endpoint registry 与 provider probe | optional Gateway plugin | Gateway 是配置真相 owner；秘密与 route 不属于 portable skill |
-| create/fork/publish、Studio UI file writing、workspace mirror | Studio plugin | 需要 Studio native-fs、router 与产品工作流 |
+| LLM credential、role、route、endpoint registry 与 provider probe | future external Gateway adapter | Gateway 是配置真相 owner；秘密与 route 不属于 portable skill。本轮不交付该 adapter |
+| create/fork/publish、Studio UI file writing、workspace mirror | future external Studio adapter | 需要 Studio native-fs、router 与产品工作流。本轮不交付该 adapter |
 | web fetch/search | 当前宿主能力 | 网络权限、登录和安全策略由宿主拥有，runtime 不重复内置 |
 
 同一用例的 MCP、CLI 与 SDK 入口必须调用同一 application service。MoirAI prompt 或 renderer 不允许直接调用 runtime 内部模块，也不允许复制 compile/run 判断。
@@ -406,7 +416,7 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ## 13. 分阶段迁移
 
-每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1 与 Phase 2 已实现；当前独立 package 与 portable gSkill v1 格式是运行事实。Phase 3 之后的退出判据未通过前，不能靠未实现 adapter 或文档声明掩盖缺口。Phase 2 的远程 Ubuntu/Windows/macOS CI 结果在本次变更合并前尚未发生，因此当前证据只支持“实现已完成并在 Windows 本地门禁通过”，不支持“三平台远程 CI 已通过”。
+每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1、Phase 2 与下述受限 Phase 3 已实现；当前独立 package、portable gSkill v1 格式和 bounded host-native protocol 是运行事实。Phase 3b 之后的退出判据未通过前，不能靠未实现 adapter 或文档声明掩盖缺口。当前 12 条 feature-targeted tests 与自动核验基线的精确范围见下述 Phase 3 验收证据；包含最后两条回归测试的本地完整 suite 已以 `1604 passed / 1 skipped in 83.88s` 通过。远程 Ubuntu/Windows/macOS 门禁不在本次已核验结果中，因此不得声称已通过。
 
 ### Phase 0：契约冻结与 characterization
 
@@ -440,13 +450,32 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ### Phase 3：完成 `host-native` cooperative adapter
 
-**当前状态（2026-08-27）**：未实现，保持 drafted。默认 executor declaration 已是 `host-native`，但运行只会保存 request snapshot 后返回 `GSKILL_EXECUTOR_UNAVAILABLE`；typed resume/submit 返回 `GSKILL_NOT_IMPLEMENTED`。
+**当前状态（2026-08-27）**：当前受限范围已实现。默认 executor 是 `host-native`；纯 logic graph 直接完成，root DAG 内串行可定位的 Agent phase 返回 durable `agent_required`，提交结果后继续同一 run。
 
-**工作**：实现 durable `agent_required`、MCP/CLI submit、output validation、幂等 resume 和至少一个真实宿主闭环；把 `host-native` 设为 v1 默认。
+**已落实工作**：
 
-**退出判据**：checkpoint 先于 dispatch 可见；宿主崩溃后可从另一个会话提交并继续；无 native subagent 时准确 fail fast；结果不依赖 LangGraph interrupt public type。
+- LangGraph SQLite checkpoint 先于 `AgentTask` 持久化，二者又都先于 `agent_required` 可见；
+- `AgentTask` 完整携带 run/task id、root graph/phase address、host-neutral instructions、typed inputs、output JSON Schema、allowed tools/paths/network、deadline 与 required capabilities；
+- Python SDK、MCP `submit_agent_result` 与 CLI `gskill submit` 到达同一 application service；CLI 把 `agent_required` 当作成功的两步协议状态并返回 exit code 0；
+- immutable request 被篡改、output schema 或 identity 非法时 submission 被拒绝；schema 非法不消费 task；完整结果的精确重复提交返回缓存的同一 `RunResult`，不同结果冲突；
+- failed/cancelled terminal result 不执行 Agent phase，而是幂等地返回 terminal failure 并发出 `agent_failed`；
+- checkpoint-to-task window 由只读 `recover_paused_skill` 重建 public task，graph-commit-to-response window 由 `agent_result_hashes` 恢复；SQLite `BEGIN IMMEDIATE` 串行提交；另一进程可以加载 immutable request snapshot、提交并继续原 run；
+- 公开 checkpoint reference 是 `gskill-handoff-v1:<task-id>`，不暴露 LangGraph checkpoint id、namespace、interrupt 或 `Command`；
+- 当前 trace 有证据地发出 `agent_required`、`agent_completed`、`agent_failed` 与 `agent_result_rejected`。
 
-**失败出口**：该宿主标为 unsupported，不静默切 executor；compile/predict 仍可发布为预览，但不得宣称默认 run 完成。
+**验收证据**：`tests/application/test_host_native_handoff.py` 的 12 条 manifest-targeted tests 覆盖跨进程闭环、多个串行 Agent phase 每次只暴露一个 durable task、非法输出纠正、cancelled terminal failure、篡改 request snapshot 拒绝、graph-commit/handoff-response crash window 与 graph-pause/handoff-row crash window，并另有 durable SQLite、parallel fail-fast、secret-shaped durable result rejection、CLI 两步协议与 MCP 同源提交证据。Ruff green，strict mypy 覆盖 135 个 source files green，manifest validator green，包含全部 12 条 Phase 3 targeted evidence 的本地完整 pytest suite 为 `1604 passed / 1 skipped in 83.88s`。一次人工实测由 `gskill run` 产生 `task_id=c5533e58-abf1-5cfb-ae19-e5f4751e974d`，Codex native clean-context subagent 执行后由 `gskill submit` 让同一 `run_id=real-host-closure` 完成，`executor_id=codex-native-subagent`。这是一条本次人工实测记录，不把机器本地临时 state 路径冒充长期 CI 证据。
+
+**失败出口**：不支持的 graph shape 或非 SQLite Agent handoff 返回结构化 `GSKILL_INVALID_REQUEST`，不执行 Agent phase，也不静默切 executor。宿主没有 native subagent 时必须明确报告无法执行，不能伪造结果。
+
+### Phase 3b：扩展 host-native address 与宿主 acknowledgment
+
+**当前状态（2026-08-27）**：未实现，保持 drafted。
+
+**工作**：为 registry subgraph、graph-level iterate、Agent phase iterate 与不可比较并行分支定义可唯一定位且可重复恢复的 wait-point address；把普通 human/breakpoint resume 接入 standalone typed facade；定义宿主 acknowledgment 与 capability negotiation，使 runtime 只有在宿主确实派发或启动后才能发出 `agent_dispatched` / `agent_started`。
+
+**退出判据**：每种新增地址形状都有跨进程、重复提交和 crash-window 因果测试；human/breakpoint response 与 AgentResult 走彼此不混淆的 typed transition；capability 不满足在派发前明确失败；lifecycle 事件只由宿主回执证明。
+
+**失败出口**：继续保留 Phase 3 的 fail-fast 支持矩阵；不得用 embedded 回退、隐式路径猜测或无证据 lifecycle event 假装覆盖新增形状。
 
 ### Phase 4：直接 vendor CLI adapters
 
@@ -460,7 +489,7 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ### Phase 5：MoirAI canonical assets、installer 与 portable MCP
 
-**当前状态（2026-08-27）**：未实现，保持 drafted。Phase 1 MCP 只暴露八个 runtime use-case tools，不包含 installer。
+**当前状态（2026-08-27）**：未实现，保持 drafted。当前 MCP 暴露八个 runtime use-case tools，不包含 installer。
 
 **工作**：以 integration id `moirai` 整理一份 canonical roles/skills/KB，完成六宿主 renderer、显式 `gskill integrations install moirai`、dry-run、manifest/uninstall 与 portable runtime MCP tool set。
 
@@ -468,15 +497,15 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 **失败出口**：MoirAI extra 不发布或缩小已验证 target 列表；core runtime release 不依赖它。
 
-### Phase 6：Gateway/Studio optional plugins 与 cutover
+### Phase 6：跨平台 packaging 与 release acceptance
 
-**当前状态（2026-08-27）**：未实现，保持 drafted。当前 repository 没有 Gateway 或 Studio adapter。
+**当前状态（2026-08-27）**：未实现，保持 drafted。本地完整 suite 已通过，但没有远程 Ubuntu/Windows/macOS 门禁结果，因此尚不构成三平台 release acceptance。release workflow 已准备，但 PyPI project 与 trusted publisher 尚未配置，也没有实际发布。
 
-**工作**：将 credential/role/route 管理留在 Gateway plugin，将 authoring/publish/UI file writing 留在 Studio plugin；更新 Studio adapter 使用当前 typed SDK 与 portable format，重钉 Studio 的 contract maps、文档、fixtures 与发布流水线。
+**工作**：在 clean Python 3.11+ 环境构建并检查 wheel 与 source distribution，在 Ubuntu、Windows、macOS 运行同一权威测试、strict type、contract manifest、安装和 CLI/MCP smoke；核验路径、编码、文件锁、SQLite reopen 与 host-native 两步协议。发布前由 owner 配置 PyPI Trusted Publishing，并让 GitHub Release tag、package version、构建产物和 publish job 保持同一因果链。
 
-**退出判据**：Studio 真机旅程、三平台包、Gateway/Studio owner 边界和数据破坏恢复验证通过；Studio 的所有活动引用已从旧格式重钉；旧 Studio package/reader/phase `SKILL.md` 在同一 integration cutover 中删除；Studio 只消费已经是当前权威的 portable contract。
+**退出判据**：完整 suite 与三平台矩阵在候选提交上通过；从构建产物而非 source tree 安装后，`graph_skill_runtime`、`gskill`、八个 MCP tools、portable compile/run 和受支持的 handoff/reopen 路径可用；wheel 不包含用户业务 gSkill；release tag 与版本检查阻止错误产物进入 publish job。只有真实 registry publish 才能声称 PyPI 已发布。
 
-**失败出口**：不切 Studio production path，也不宣称 Gateway/Studio integration 已完成；standalone portable runtime 与其当前 contract 保持不变，修复 adapter 后重新执行 integration rehearsal。不得让两个 Studio runtime 同时接受写入或成为并行真相源。
+**失败出口**：不发布候选版本，也不以较少平台的本地结果冒充完整矩阵；修复 package、adapter 或平台差异后，从同一候选提交重新执行验收。Gateway/Studio plugins 不进入该阶段，不得为满足发布验收而把产品专用依赖或状态移入 runtime。
 
 ## 14. v1 总体验收
 
@@ -490,7 +519,7 @@ v1 只有同时满足以下条件才可标记完成：
 6. checkpoint、trace、artifact 与 immutable run snapshot 可由因果证据关联到同一 run；重复 result 提交不会重复执行。
 7. config 五层优先级、RuntimeProfile/RunPreset 职责分离、持久非秘密默认值、immutable RunRequest、secret exclusion 与 state-dir 绝对路径在三平台通过测试。
 8. `gskill integrations install moirai` 的 dry-run、conflict、manifest、idempotency 与 safe uninstall 通过；wheel 携带的 canonical assets 在显式安装前不投影到宿主，安装资产也不包含用户业务 gSkill。
-9. runtime、Gateway plugin、Studio plugin 与 host web capability 的工具 owner 无交叉真相；MoirAI 仍是 optional integration。
+9. wheel/sdist、clean install、CLI/MCP smoke、SQLite reopen 与受支持 handoff 在 Ubuntu、Windows、macOS 的同一候选提交上通过；Gateway/Studio plugins 不是本轮验收依赖，未来只能消费公开 Port/Adapter 边界。
 10. Production runtime 只有 portable reader；旧 v0.3 契约保持 `superseded`，legacy parser 只服务显式 converter。当前 portable 规范处于 `audited-ready`；只有 owner 盖章并建立 SHA-256 哈希锁后才可标记 `FROZEN`。
 
 ## 15. 尚待实证的裁决
@@ -505,7 +534,9 @@ v1 只有同时满足以下条件才可标记完成：
 
 | 日期 | 修订 | 依据与边界 |
 | --- | --- | --- |
-| 2026-08-27 | 将 Phase 2 portable gSkill reader、flat registry、artifact-by-id 与显式 Studio converter 标为当前已实现；把 v0.3 降为 converter/历史证据 | 当前 compiler/loader/converter、portable fixtures 与 Windows 本地门禁；远程 Ubuntu/Windows/macOS CI 尚未发生，Phase 3+ 仍未实现 |
+| 2026-08-27 | 将 Phase 6 裁决为跨平台 packaging/release acceptance；Gateway/Studio plugins 移出本轮 release，只保留未来 Port/Adapter owner 边界 | 本轮后续交付顺序固定为 vendor CLI、MoirAI、三平台发布验收；当前无 Gateway/Studio adapter，也不得把产品 plugin 当作 v1 release gate |
+| 2026-08-27 | 将 root DAG 串行可定位 wait point 的 durable host-native handoff 标为 Phase 3 当前能力，并把 richer address、普通 typed resume 与 host acknowledgment 留在 Phase 3b | `agent_handoffs.py`、`host_native.py`、`host_native_runtime.py`、`result_mapping.py`、`recover_paused_skill`、external phase completion 与 `agent_result_hashes`；12 条 feature-targeted tests 覆盖跨进程/纠错/cancelled failure/两个 crash window/CLI/MCP，Ruff、135-source strict mypy、manifest validator 与完整 suite `1604 passed / 1 skipped in 83.88s` 通过，并有一次 Codex native clean-context 人工闭环。远程三平台门禁未列为已通过 |
+| 2026-08-27 | 将 Phase 2 portable gSkill reader、flat registry、artifact-by-id 与显式 Studio converter 标为当前已实现；把 v0.3 降为 converter/历史证据 | 当前 compiler/loader/converter、portable fixtures 与 Windows 本地门禁；该行只记录 Phase 2 cutover，当时的 Phase 3 判断已由本表上一条修订取代 |
 | 2026-08-27 | 初次增加 implementation-status，把 Section 2 源码命名与 Section 3 typed facade/config/SDK-CLI-MCP boundary 标为 Phase 1 已实现 | `pyproject.toml`、`src/graph_skill_runtime/__init__.py`、`domain/models.py`、`application/`、`ports/`、`adapters/`、composition root 与 Phase 1 contract tests；当时的后续阶段判断已由本表第一条 cutover 修订取代，仍未宣称 PyPI 发布 |
-| 2026-08-27 | 将配置来源展开为 invocation > project > user > portable > built-in，并澄清 project/portable preset owner、secret reference 与 create-once request snapshot | 当前 `ConfigResolver`、`LocalRunSnapshotStore` 与 immutable contract tests；durable resume 仍留在 Phase 3 |
+| 2026-08-27 | 将配置来源展开为 invocation > project > user > portable > built-in，并澄清 project/portable preset owner、secret reference 与 create-once request snapshot | `ConfigResolver`、`LocalRunSnapshotStore` 与 immutable contract tests；该行当时留下的 durable handoff 缺口已由本表第一条 Phase 3 修订收口 |
 | 2026-08-27 | 记录 release workflow 已准备 tag/version check、distribution build、wheel validation 与 OIDC Trusted Publishing | `.github/workflows/release.yml`；PyPI project/trusted publisher 尚未由 owner 配置，也没有实际发布 |

@@ -24,6 +24,7 @@ from graph_skill_runtime.domain.models import (
     RunRequest,
     RunResult,
     RuntimeEvent,
+    SubmitAgentResultRequest,
 )
 
 
@@ -79,7 +80,13 @@ class RuntimeEngine(Protocol):
 
     def run(self, request: RunRequest) -> RunResult: ...
 
-    def resume(self, request: ResumeRequest) -> RunResult: ...
+    def resume(self, request: ResumeRequest, run_request: RunRequest) -> RunResult: ...
+
+    def submit_agent_result(
+        self,
+        request: SubmitAgentResultRequest,
+        run_request: RunRequest,
+    ) -> RunResult: ...
 
     def evaluate_golden(self, request: GoldenEvaluationRequest) -> GoldenEvaluationResult: ...
 

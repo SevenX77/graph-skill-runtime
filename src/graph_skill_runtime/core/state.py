@@ -212,6 +212,12 @@ class FrameworkState(BaseModel):
     #: on the edge events exists to remove (decision 2026-08-15, D3). A
     #: single-execution phase writes a list of one, with no special case.
     phase_execution_ids: dict[str, list[str]] = Field(default_factory=dict)
+    #: Durable proof that an externally executed Agent phase result has already
+    #: been applied to this graph state.  The value is the canonical hash of
+    #: the submitted AgentResult.  It lets a retry distinguish "the handoff
+    #: store did not commit" from "the graph never received the result" after
+    #: a process crash between those two independent SQLite transactions.
+    agent_result_hashes: dict[str, str] = Field(default_factory=dict)
     critic_metrics: dict[str, Any] = Field(default_factory=dict)
     subagent_validation_retries: dict[str, int] = Field(default_factory=dict)
     # 工作记忆
@@ -237,6 +243,7 @@ class FrameworkState(BaseModel):
 # now counted on the run's event sink instead of in this channel.
 _FLOW_DICT_MERGE_FIELDS = (
     "phase_execution_ids",
+    "agent_result_hashes",
     "critic_metrics",
     "subagent_validation_retries",
     "working_memory",

@@ -14,6 +14,7 @@ from graph_skill_runtime.callbacks.events import LLMCallSettingsEvent, LLMRouteD
 from graph_skill_runtime.io.run_layout import TRACE_FILENAME
 
 logger = logging.getLogger(__name__)
+_APPEND_EVENT_LOCK = RLock()
 
 
 class _TraceJsonlSink:
@@ -45,6 +46,42 @@ class _TraceJsonlSink:
         payload = event.model_dump(mode="json") if hasattr(event, "model_dump") else event
         with self._lock, self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+
+
+def append_run_event(trace_dir: str | Path, event: Any) -> Path:
+    """Append one causally evidenced adapter event to an existing run trace."""
+
+    sink = _TraceJsonlSink(trace_dir)
+    sink.emit(event)
+    return sink.path
+
+
+def append_run_event_once(
+    trace_dir: str | Path,
+    event: Any,
+    *,
+    event_id: str,
+) -> Path:
+    """Append a deterministic handoff event once within the current process."""
+
+    sink = _TraceJsonlSink(trace_dir)
+    try:
+        with _APPEND_EVENT_LOCK:
+            if sink.path.exists():
+                for line in sink.path.read_text(encoding="utf-8").splitlines():
+                    try:
+                        payload = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if (
+                        isinstance(payload, dict)
+                        and payload.get("handoff_event_id") == event_id
+                    ):
+                        return sink.path
+            sink.emit(event)
+    except Exception:  # noqa: BLE001
+        logger.exception("failed to append durable handoff event %s", event_id)
+    return sink.path
 
 
 class _RunSpendLedger:

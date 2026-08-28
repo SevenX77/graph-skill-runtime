@@ -1,4 +1,5 @@
 ---
+role: compliance-view
 status: FROZEN
 source: spec/features.yaml
 ---
@@ -6,7 +7,7 @@ source: spec/features.yaml
 
 # Feature Compliance Checklist
 
-This FROZEN view follows the feature source of truth in manifest order. Each item records the feature description, review boundary, source anchors, every core implementation path, primary contract counts, and the first targeted pytest node id.
+This FROZEN view follows the feature source of truth in manifest order. Each item records the feature description, review boundary, source anchors, every core implementation path, primary contract counts, and its canonical first targeted pytest node id. A feature may additionally enumerate its complete targeted-test set when exact evidence coverage is part of the feature contract.
 
 ## Manifest Features
 
@@ -40,7 +41,7 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 - **Sources**: `public-api`, `source-file-map`
 - **Core paths**: `src/graph_skill_runtime/application/service.py`, `src/graph_skill_runtime/composition.py`, `src/graph_skill_runtime/ports/runtime.py`
 - **Primary contracts**: 0 error codes, 0 events
-- `[Covered By: tests/application/test_transport_parity.py::test_default_host_native_run_fails_explicitly_and_keeps_request_snapshot]`
+- `[Covered By: tests/application/test_transport_parity.py::test_default_host_native_run_delegates_to_engine_and_keeps_request_snapshot]`
 
 ### F-runtime-cli-adapter: Project the application service through the gskill console command using structured JSON results.
 
@@ -62,9 +63,30 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 
 - **Boundary**: lifecycle-behavior - CurrentEngineAdapter contract tests
 - **Sources**: `public-api`, `source-file-map`
-- **Core paths**: `src/graph_skill_runtime/adapters/engine.py`
+- **Core paths**: `src/graph_skill_runtime/adapters/engine.py`, `src/graph_skill_runtime/adapters/result_mapping.py`
 - **Primary contracts**: 0 error codes, 0 events
 - `[Covered By: tests/application/test_current_engine_adapter.py::test_current_engine_adapter_compiles_and_runs_an_explicit_embedded_logic_skill]`
+
+### F-host-native-agent-handoff: Persist a root Agent phase task before exposing it, validate a host-native result, and resume the same graph run exactly once across process boundaries.
+
+- **Boundary**: lifecycle-behavior - durable AgentTask and AgentResult integration tests
+- **Sources**: `public-api`, `source-file-map`
+- **Core paths**: `src/graph_skill_runtime/adapters/agent_handoffs.py`, `src/graph_skill_runtime/adapters/host_native.py`, `src/graph_skill_runtime/adapters/host_native_runtime.py`, `src/graph_skill_runtime/adapters/engine.py`
+- **Primary contracts**: 0 error codes, 4 events
+- **Targeted tests**:
+  - `tests/application/test_host_native_handoff.py::test_host_native_task_survives_process_boundary_and_resumes_same_run`
+  - `tests/application/test_host_native_handoff.py::test_sequential_agent_phases_create_one_durable_task_at_a_time`
+  - `tests/application/test_host_native_handoff.py::test_invalid_agent_output_does_not_consume_the_task`
+  - `tests/application/test_host_native_handoff.py::test_cancelled_agent_result_fails_the_run_without_executing_the_phase`
+  - `tests/application/test_host_native_handoff.py::test_agent_result_rejects_a_checkpoint_for_a_tampered_run_snapshot`
+  - `tests/application/test_host_native_handoff.py::test_retry_recovers_when_graph_committed_before_handoff_response`
+  - `tests/application/test_host_native_handoff.py::test_run_recovers_when_graph_paused_before_handoff_row_was_written`
+  - `tests/application/test_host_native_handoff.py::test_host_native_agent_requires_a_durable_checkpoint_store`
+  - `tests/application/test_host_native_handoff.py::test_parallel_agent_wait_point_fails_instead_of_falling_back_to_embedded`
+  - `tests/application/test_host_native_handoff.py::test_agent_result_cannot_persist_secret_shaped_output_or_provenance`
+  - `tests/application/test_host_native_handoff.py::test_cli_treats_agent_required_as_a_successful_two_step_protocol`
+  - `tests/application/test_host_native_handoff.py::test_mcp_projects_the_same_host_native_submit_protocol`
+- `[Covered By: tests/application/test_host_native_handoff.py::test_host_native_task_survives_process_boundary_and_resumes_same_run]`
 
 ### F-md-frontmatter-parsing: Parse markdown frontmatter and body into stable skill metadata and diagnostics.
 

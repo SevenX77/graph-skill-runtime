@@ -54,7 +54,7 @@ from graph_skill_runtime.core.exceptions import (
 )
 from graph_skill_runtime.core.graph_assembler import assemble_graph, read_runtime_input_binding_value
 from graph_skill_runtime.core.llm_provider import LLMProvider, LLMProviderError
-from graph_skill_runtime.core.loader import DECLARED_OUTPUT_TARGETS
+from graph_skill_runtime.core.loader import DECLARED_OUTPUT_TARGETS, CompiledSkill
 from graph_skill_runtime.core.local_workspace_resolver import (
     LocalWorkspaceResolver,
     default_local_resolver_for_skill,
@@ -159,6 +159,21 @@ class _HitLInterruptCheckpoint:
     question: str | None = None
     clarification_type: str | None = None
     options: list[str] | None = None
+
+
+@dataclass(frozen=True)
+class ExternalPhaseCompletion:
+    """One host-executed phase result to apply before continuing a graph.
+
+    This is an internal engine seam, not a public transport contract.  Public
+    callers submit an ``AgentResult`` and the host-native adapter turns it into
+    this already-validated completion.
+    """
+
+    task_id: str
+    phase_id: str
+    result_hash: str
+    output: dict[str, Any]
 
 
 #: How many times one phase may run inside a SINGLE iteration before predict
@@ -462,6 +477,8 @@ def run_skill(
     model_resolver: Any | None = None,
     llm_provider: LLMProvider | None = None,
     runtime_config: dict[str, Any] | None = None,
+    checkpointer_spec: Any = "auto",
+    pause_before: frozenset[str] = frozenset(),
     **inputs: Any,
 ) -> RunResult:
     """Execute a portable gSkill and return a typed workflow result."""
@@ -515,6 +532,8 @@ def run_skill(
             model_resolver=model_resolver,
             llm_provider=llm_provider,
             runtime_config=runtime_config,
+            checkpointer_spec=checkpointer_spec,
+            pause_before=pause_before,
             spend=spend,
             **inputs,
         )
@@ -546,8 +565,13 @@ def run_skill(
 
     finished_at = datetime.now(UTC)
     wall_time = float(raw.get("wall_time_sec", round(time.monotonic() - started_monotonic, 3)))
+    paused_at = (
+        PausedRunPoint.model_validate(raw["paused_at"])
+        if raw.get("paused_at") is not None
+        else None
+    )
     workflow_result = WorkflowResult(
-        success=True,
+        success=paused_at is None,
         run_id=run_id,
         skill_id=skill_id,
         context=dict(raw.get("context", {})),
@@ -557,9 +581,67 @@ def run_skill(
         started_at=started_at,
         finished_at=finished_at,
         wall_time_sec=wall_time,
+        paused_at=paused_at,
     )
     _write_workflow_result_artifacts(run_dir, workflow_result)
     return workflow_result
+
+
+def recover_paused_skill(
+    compiled: CompiledSkill,
+    *,
+    workspace_dir: Path,
+    run_id: str,
+    checkpointer: Any,
+    pause_before: frozenset[str],
+) -> RunResult | None:
+    """Recover an existing durable breakpoint without invoking graph nodes.
+
+    A process can stop after LangGraph commits the breakpoint but before the
+    adapter persists its public AgentTask. Retrying ``run_skill`` with initial
+    input would replay the already-completed prefix. This read-only recovery
+    seam reconstructs the paused result directly from the checkpoint instead.
+    """
+
+    resolver = default_local_resolver_for_skill(compiled.skill_root)
+    graph = assemble_graph(
+        compiled,
+        skill_resolver=resolver,
+        checkpointer=checkpointer,
+        pause_before=pause_before,
+    ).graph
+    thread_config = {"configurable": {"thread_id": run_id}}
+    state = graph.get_state(thread_config)
+    state_config = cast(dict[str, Any], getattr(state, "config", None) or {})
+    configurable = dict(state_config.get("configurable") or {})
+    if not configurable.get("checkpoint_id"):
+        return None
+    pending = tuple(getattr(state, "next", ()) or ())
+    if len(pending) != 1 or str(pending[0]) not in pause_before:
+        pending_text = ", ".join(str(item) for item in pending) or "<none>"
+        raise ValueError(
+            "existing graph checkpoint is not a recoverable Agent wait; "
+            f"pending phases: {pending_text}"
+        )
+    paused_at = PausedRunPoint(
+        phase_name=str(pending[0]),
+        reason="breakpoint",
+        checkpoint_id=configurable.get("checkpoint_id"),
+        checkpoint_ns=configurable.get("checkpoint_ns"),
+    )
+    now = datetime.now(UTC)
+    trace_path = runs_root(_validate_workspace_dir(workspace_dir)) / run_id / TRACE_FILENAME
+    values = dict(getattr(state, "values", {}) or {})
+    return RunResult(
+        success=False,
+        run_id=run_id,
+        skill_id=compiled.skill_root.name,
+        context=_business_context_from_graph_result(values),
+        trace_path=trace_path if trace_path.exists() else None,
+        started_at=now,
+        finished_at=now,
+        paused_at=paused_at,
+    )
 
 
 def resume_skill(
@@ -581,6 +663,7 @@ def resume_skill(
     event_subscriber: Callable[[CallbackEvent], None] | None = None,
     runtime_config: dict[str, Any] | None = None,
     pause_before: frozenset[str] = frozenset(),
+    external_phase_completion: ExternalPhaseCompletion | None = None,
 ) -> RunResult:
     """Resume a previously interrupted skill run from a checkpoint."""
     workspace_root = _validate_workspace_dir(workspace_dir)
@@ -589,6 +672,13 @@ def resume_skill(
     _validate_resume_node_selector(from_phase, "from_phase")
     _validate_resume_node_selector(resume_from_node_id, "resume_from_node_id")
     _validate_resume_node_selector(resume_to_node_id, "resume_to_node_id")
+    if external_phase_completion is not None and (
+        context_overrides is not None or human_response is not None
+    ):
+        raise _ResumeInputError(
+            "an external phase completion cannot be combined with context overrides "
+            "or a human response"
+        )
 
     requested_path = Path(skill_path)
     requested_root = requested_path
@@ -684,6 +774,24 @@ def resume_skill(
             resume_from_node_id=resume_from_node_id or from_phase,
         )
         invoke_config = _apply_resume_human_response(graph, invoke_config, human_response)
+        pause_after_external_completion: PausedRunPoint | None = None
+        if external_phase_completion is not None:
+            invoke_config = _apply_external_phase_completion(
+                graph,
+                invoke_config,
+                external_phase_completion,
+                run_id=run_id,
+            )
+            candidate_pause = _breakpoint_pause_point(
+                graph,
+                invoke_config,
+                checkpointer=active_checkpointer,
+            )
+            if (
+                candidate_pause is not None
+                and candidate_pause.phase_name in pause_before
+            ):
+                pause_after_external_completion = candidate_pause
         resumed_from_phase = (
             from_phase
             or resume_from_node_id
@@ -701,7 +809,11 @@ def resume_skill(
                 ns=selected_checkpoint_ns,
             ),
         )
-        result = graph.invoke(None, config=invoke_config)
+        if pause_after_external_completion is None:
+            result = graph.invoke(None, config=invoke_config)
+        else:
+            latest_state = graph.get_state({"configurable": {"thread_id": run_id}})
+            result = dict(getattr(latest_state, "values", {}) or {})
 
     except Exception as exc:
         if isinstance(exc, _ResumeInputError):
@@ -735,7 +847,7 @@ def resume_skill(
 
     # A resume can land on the next breakpoint just as a first run can, and this
     # path used to walk straight into the successful-run finalizer either way.
-    paused_at = (
+    paused_at = pause_after_external_completion or (
         _breakpoint_pause_point(graph, invoke_config, checkpointer=active_checkpointer)
         if pause_before
         else None
@@ -844,6 +956,8 @@ def _run_skill_dict(
     model_resolver: Any | None = None,
     llm_provider: LLMProvider | None = None,
     runtime_config: dict[str, Any] | None = None,
+    checkpointer_spec: Any = "auto",
+    pause_before: frozenset[str] = frozenset(),
     spend: _RunSpendLedger | None = None,
     **inputs: Any,
 ) -> dict[str, Any]:
@@ -896,7 +1010,9 @@ def _run_skill_dict(
             skill_resolver=resolver,
             model_resolver=model_resolver,
             llm_provider=llm_provider,
+            checkpointer_spec=checkpointer_spec,
             runtime_config=runtime_config,
+            pause_before=pause_before,
             unattended=unattended,
             **inputs,
         )
@@ -1740,6 +1856,86 @@ def _apply_resume_context_overrides(
         as_node = resume_from_node_id or _override_source_node(compiled, set(context_overrides.keys()))
 
     return cast(dict[str, Any], graph.update_state(invoke_config, {"data": updated_data}, as_node=as_node))
+
+
+def _apply_external_phase_completion(
+    graph: Any,
+    invoke_config: dict[str, Any],
+    completion: ExternalPhaseCompletion,
+    *,
+    run_id: str,
+) -> dict[str, Any]:
+    """Apply one host result once, then return the checkpoint to continue.
+
+    The handoff database and LangGraph checkpoint database cannot share an
+    atomic transaction. A process can therefore die after this update is
+    durable but before the handoff row records its response. The hash marker
+    in ``FrameworkState`` is the recovery fact: an exact retry continues from
+    the latest state, while a conflicting retry is rejected.
+    """
+
+    latest_state = graph.get_state({"configurable": {"thread_id": run_id}})
+    latest_config = cast(dict[str, Any], getattr(latest_state, "config", None) or {})
+    if not latest_config:
+        raise _ResumeInputError(f"run {run_id!r} has no durable graph checkpoint")
+
+    flow = latest_state.values.get("flow")
+    if hasattr(flow, "agent_result_hashes"):
+        markers = dict(flow.agent_result_hashes)
+    elif isinstance(flow, dict):
+        raw_markers = flow.get("agent_result_hashes")
+        markers = dict(raw_markers) if isinstance(raw_markers, dict) else {}
+    else:
+        markers = {}
+
+    applied_hash = markers.get(completion.task_id)
+    if applied_hash is not None:
+        if applied_hash != completion.result_hash:
+            raise _ResumeInputError(
+                f"task {completion.task_id!r} already has a different durable result"
+            )
+        return latest_config
+
+    expected_checkpoint_id = _checkpoint_id_from_config(invoke_config)
+    latest_checkpoint_id = _checkpoint_id_from_config(latest_config)
+    expected_checkpoint_ns = _checkpoint_ns_from_config(invoke_config)
+    latest_checkpoint_ns = _checkpoint_ns_from_config(latest_config)
+    if (
+        expected_checkpoint_id != latest_checkpoint_id
+        or expected_checkpoint_ns != latest_checkpoint_ns
+    ):
+        raise _ResumeInputError(
+            "the run advanced beyond the checkpoint that owns this AgentTask "
+            "without recording its result"
+        )
+
+    pending = tuple(getattr(latest_state, "next", ()) or ())
+    if pending != (completion.phase_id,):
+        pending_text = ", ".join(str(item) for item in pending) or "<none>"
+        raise _ResumeInputError(
+            f"task phase {completion.phase_id!r} is not the sole pending phase; "
+            f"pending phases: {pending_text}"
+        )
+    if "phase_outputs" in completion.output:
+        raise _ResumeInputError("AgentResult output cannot use reserved field 'phase_outputs'")
+
+    data_delta = dict(completion.output)
+    data_delta["phase_outputs"] = {completion.phase_id: dict(completion.output)}
+    state_delta = {
+        "data": data_delta,
+        "flow": {
+            "phase_execution_ids": {
+                completion.phase_id: [f"host-agent:{completion.task_id}"]
+            },
+            "agent_result_hashes": {
+                completion.task_id: completion.result_hash,
+            },
+        },
+    }
+    return cast(
+        dict[str, Any],
+        graph.update_state(latest_config, state_delta, as_node=completion.phase_id),
+    )
 
 
 def _pending_tool_calls(state_messages: list[Any]) -> list[dict[str, Any]]:

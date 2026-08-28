@@ -251,8 +251,12 @@ features:
   - '[F-v3-agent-validator-failed]'
   error_codes_secondary: []
   events_primary:
+  - AgentCompletedEvent
   - AgentExitDecisionEvent
+  - AgentFailedEvent
   - AgentLoopIterationEvent
+  - AgentRequiredEvent
+  - AgentResultRejectedEvent
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:

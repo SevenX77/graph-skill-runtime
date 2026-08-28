@@ -122,4 +122,4 @@ checkpoint 当前保存的是业务图执行事实；Studio/copilot 进程与 ag
 
 ## 8. 基线结论
 
-从该固定截面证据可得出的结论是：独立化主要不是重新发明图执行器，而是收紧公共契约、拆开配置生命周期、建立可替换 executor、定义 portable skill 入口，并把 Studio/MoirAI 集成按 owner 重组。在当时，`graph-agent` 0.3.1、v0.3 格式与 Studio adapter 仍是运行事实；这句话不描述当前 checkout。当前源码已完成 Phase 1 typed facade 和 Phase 2 portable format，但仍未发布 PyPI，Phase 3+ executor/installer/integration 也未完成。
+从该固定截面证据可得出的结论是：独立化主要不是重新发明图执行器，而是收紧公共契约、拆开配置生命周期、建立可替换 executor、定义 portable skill 入口，并把 Studio/MoirAI 集成按 owner 重组。在当时，`graph-agent` 0.3.1、v0.3 格式与 Studio adapter 仍是运行事实；这句话不描述当前 checkout。当前源码已完成 Phase 1 typed facade、Phase 2 portable format，以及 Phase 3 中受限于 root DAG 串行可定位 wait point 的 durable host-native handoff；PyPI 发布、Phase 3b host-native 扩展、Phase 4 vendor CLI、Phase 5 installer 与 Phase 6 产品集成仍未完成。

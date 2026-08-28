@@ -89,7 +89,7 @@ def _write_model(model: BaseModel) -> None:
 
 def _exit_code(model: BaseModel) -> int:
     status = getattr(model, "status", None)
-    if status in {"failed", "agent_required"}:
+    if status == "failed":
         return 2
     passed = getattr(model, "passed", None)
     if passed is False:
