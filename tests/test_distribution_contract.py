@@ -246,6 +246,39 @@ def test_import_and_version_probe_do_not_write_host_configuration(tmp_path: Path
     assert not any(config.rglob("*"))
 
 
+def test_cli_process_emits_utf8_json_even_under_a_legacy_console_code_page(
+    tmp_path: Path,
+) -> None:
+    environment = os.environ.copy()
+    environment["PYTHONUTF8"] = "0"
+    environment["PYTHONIOENCODING"] = "cp936"
+    expected = "全局安装"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "graph_skill_runtime",
+            "config",
+            "resolve",
+            str(tmp_path),
+            "--run-id",
+            "utf8-contract",
+            "--inputs-json",
+            json.dumps({"name": expected}, ensure_ascii=False),
+        ],
+        cwd=tmp_path,
+        env=environment,
+        text=False,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
+    payload = json.loads(result.stdout.decode("utf-8", errors="strict"))
+    assert payload["request"]["inputs"]["name"] == expected
+
+
 def test_release_workflow_separates_build_from_oidc_publish() -> None:
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")

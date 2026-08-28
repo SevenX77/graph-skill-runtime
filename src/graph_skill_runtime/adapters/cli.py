@@ -111,6 +111,15 @@ def _write_model(model: BaseModel) -> None:
     sys.stdout.write(model.model_dump_json(indent=2) + "\n")
 
 
+def _configure_standard_streams_as_utf8() -> None:
+    """Keep the JSON transport encoding stable across host console code pages."""
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="strict")
+
+
 def _exit_code(model: BaseModel) -> int:
     status = getattr(model, "status", None)
     if status in {"failed", "conflict"}:
@@ -370,6 +379,7 @@ def main(
     application: RuntimeApplication | None = None,
     integration_installer: IntegrationInstaller | None = None,
 ) -> int:
+    _configure_standard_streams_as_utf8()
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "integrations":

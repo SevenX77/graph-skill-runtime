@@ -12,6 +12,7 @@ from graph_skill_runtime.domain.models import (
     CompileRequest,
     EmbeddedExecutorConfig,
     GoldenEvaluationRequest,
+    InspectRequest,
     RunInvocation,
     RuntimeProfileOverlay,
 )
@@ -123,6 +124,24 @@ def test_current_engine_adapter_returns_structured_compile_diagnostics(tmp_path:
     assert result.status == "failed"
     assert result.diagnostics
     assert all(diagnostic.severity == "fatal" for diagnostic in result.diagnostics)
+
+
+def test_current_engine_inspect_does_not_write_the_compile_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    skill_root = tmp_path / "inspect-only"
+    cache_root = tmp_path / "compile-cache"
+    _logic_skill(skill_root)
+    monkeypatch.setattr(
+        "graph_skill_runtime.core.cache.get_cache_dir",
+        lambda: cache_root,
+    )
+
+    result = CurrentEngineAdapter().inspect(InspectRequest(skill_root=str(skill_root)))
+
+    assert result.skill_id == "inspect-only"
+    assert not cache_root.exists()
 
 
 @pytest.mark.parametrize("failed,stale", [(1, 0), (0, 1)])

@@ -294,7 +294,7 @@ class CurrentEngineAdapter:
 
     def inspect(self, request: InspectRequest) -> InspectResult:
         try:
-            compiled: CompiledSkill = compile_skill(request.skill_root)
+            compiled: CompiledSkill = compile_skill(request.skill_root, cache=False)
         except Exception as exc:
             failed = _compile_failure(exc)
             return InspectResult(diagnostics=failed.diagnostics)
