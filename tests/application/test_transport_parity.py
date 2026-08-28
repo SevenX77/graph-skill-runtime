@@ -128,8 +128,10 @@ def test_default_host_native_run_delegates_to_engine_and_keeps_request_snapshot(
 
 def test_mcp_exposes_the_same_eight_application_use_cases(tmp_path: Path) -> None:
     application, _, _ = _application(tmp_path)
-    names = {tool.name for tool in asyncio.run(create_server(application).list_tools())}
-    assert names == {
+    tools = {
+        tool.name: tool for tool in asyncio.run(create_server(application).list_tools())
+    }
+    assert set(tools) == {
         "compile",
         "evaluate_golden",
         "inspect",
@@ -139,6 +141,53 @@ def test_mcp_exposes_the_same_eight_application_use_cases(tmp_path: Path) -> Non
         "run",
         "submit_agent_result",
     }
+    expected_annotations = {
+        "compile": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+        "resolve_run": {"readOnlyHint": True, "openWorldHint": False},
+        "predict": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+        "run": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "resume": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "submit_agent_result": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+        "inspect": {"readOnlyHint": True, "openWorldHint": False},
+        "evaluate_golden": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    }
+    actual_annotations = {
+        name: tool.annotations.model_dump(by_alias=True, exclude_none=True)
+        if tool.annotations is not None
+        else None
+        for name, tool in tools.items()
+    }
+    assert actual_annotations == expected_annotations
 
 
 @pytest.mark.parametrize("executor_args", [[], ["--executor", "embedded"]])

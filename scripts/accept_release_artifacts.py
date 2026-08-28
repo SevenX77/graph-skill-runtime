@@ -44,6 +44,46 @@ _EXPECTED_MCP_TOOLS: Final = {
     "run",
     "submit_agent_result",
 }
+_EXPECTED_MCP_ANNOTATIONS: Final = {
+    "compile": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    "resolve_run": {"readOnlyHint": True, "openWorldHint": False},
+    "predict": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    "run": {
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+    "resume": {
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+    "submit_agent_result": {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    "inspect": {"readOnlyHint": True, "openWorldHint": False},
+    "evaluate_golden": {
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+}
 _WHEEL_BASE_MEMBERS: Final = {
     "graph_skill_runtime/__init__.py",
     "graph_skill_runtime/migration/atomic_publish.py",
@@ -538,6 +578,35 @@ def _run_checked(
     return result
 
 
+def _run_checked_bytes(
+    argv: Sequence[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str],
+    timeout: float = _COMMAND_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[bytes]:
+    try:
+        result = subprocess.run(
+            list(argv),
+            cwd=cwd,
+            env=dict(env),
+            text=False,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"command could not complete: {argv[0]}: {exc}") from exc
+    if result.returncode != 0:
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        raise ValueError(
+            f"command failed ({result.returncode}): {list(argv)!r}\n"
+            f"stdout:\n{stdout}\nstderr:\n{stderr}"
+        )
+    return result
+
+
 def _controlled_environment(*, home: Path, config: Path, cache: Path) -> dict[str, str]:
     environment = os.environ.copy()
     for name in (
@@ -662,6 +731,38 @@ def _cli_json(
     return _load_json_bytes(result.stdout.encode("utf-8"), source=f"gskill {' '.join(arguments)}")
 
 
+def _assert_cli_utf8_transport(
+    gskill: Path,
+    *,
+    skill_root: Path,
+    cwd: Path,
+    env: Mapping[str, str],
+) -> None:
+    legacy_environment = dict(env)
+    legacy_environment["PYTHONUTF8"] = "0"
+    legacy_environment["PYTHONIOENCODING"] = "cp936"
+    expected = "全局安装"
+    result = _run_checked_bytes(
+        [
+            str(gskill),
+            "config",
+            "resolve",
+            str(skill_root),
+            "--run-id",
+            "utf8-transport",
+            "--inputs-json",
+            json.dumps({"name": expected}, ensure_ascii=False),
+        ],
+        cwd=cwd,
+        env=legacy_environment,
+    )
+    payload = _load_json_bytes(result.stdout, source="gskill UTF-8 transport probe")
+    request = cast(JsonObject, payload.get("request"))
+    inputs = cast(JsonObject, request.get("inputs"))
+    if inputs.get("name") != expected:
+        raise ValueError("installed console did not preserve UTF-8 JSON text")
+
+
 def _assert_completed(payload: JsonObject, *, mode: str) -> None:
     if payload.get("status") != "completed" or payload.get("mode") != mode:
         raise ValueError(f"expected completed {mode} result, got {payload}")
@@ -713,6 +814,14 @@ async def _mcp_smoke(
                 names = tuple(sorted(tool.name for tool in tools.tools))
                 if set(names) != _EXPECTED_MCP_TOOLS:
                     raise ValueError(f"installed MCP tool inventory differs: {names}")
+                annotations = {
+                    tool.name: tool.annotations.model_dump(by_alias=True, exclude_none=True)
+                    if tool.annotations is not None
+                    else None
+                    for tool in tools.tools
+                }
+                if annotations != _EXPECTED_MCP_ANNOTATIONS:
+                    raise ValueError(f"installed MCP tool annotations differ: {annotations}")
                 result = await session.call_tool(
                     "compile",
                     {
@@ -731,6 +840,28 @@ async def _mcp_smoke(
                     structured = getattr(result, "structured_content", None)
                 if not isinstance(structured, dict) or structured.get("status") != "passed":
                     raise ValueError(f"installed MCP compile payload differs: {structured}")
+                inspected = await session.call_tool(
+                    "inspect",
+                    {
+                        "request": {
+                            "schema_version": "gskill.inspect-request.v1",
+                            "kind": "inspect_request",
+                            "skill_root": str(skill_root),
+                            "include_call_graph": True,
+                        }
+                    },
+                )
+                if getattr(inspected, "isError", False):
+                    raise ValueError(f"installed MCP inspect returned an error: {inspected}")
+                inspected_content = getattr(inspected, "structuredContent", None)
+                if inspected_content is None:
+                    inspected_content = getattr(inspected, "structured_content", None)
+                if not isinstance(inspected_content, dict) or inspected_content.get(
+                    "skill_id"
+                ) != "hello-world":
+                    raise ValueError(
+                        f"installed MCP inspect payload differs: {inspected_content}"
+                    )
     return names
 
 
@@ -783,6 +914,12 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     version_result = _run_checked([str(gskill), "--version"], cwd=work_root, env=environment)
     if version_result.stdout.strip() != f"gskill {expected_version}":
         raise ValueError(f"installed console version differs: {version_result.stdout!r}")
+    _assert_cli_utf8_transport(
+        gskill,
+        skill_root=logic_skill,
+        cwd=work_root,
+        env=environment,
+    )
     detections = _cli_json(gskill, ["integrations", "detect"], cwd=work_root, env=environment)
     detection_targets = {
         item.get("target")
