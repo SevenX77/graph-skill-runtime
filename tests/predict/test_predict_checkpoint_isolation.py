@@ -30,10 +30,18 @@ class _FakeAssembler:
 
 def _write_logic_skill(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "GRAPH.md").write_text(
+    (root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
-name: checkpoint_isolation
+name: skill
+description: Exercise predict checkpoint isolation.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise predict checkpoint isolation.
 io:
   inputs:
     type: object
@@ -45,9 +53,9 @@ io:
       text:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
@@ -56,6 +64,7 @@ phases:
     actions_dir.mkdir(parents=True)
     (phase_dir / "LOGIC.md").write_text(
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -156,7 +165,7 @@ def test_predict_does_not_pollute_real_run_checkpoint_db(
         assert predict_result.source == "predict"
         assert _checkpoint_rows_for_thread(db_path, thread_id) == 0
 
-        raw_run = runner_module._run_v030_skill_dict(
+        raw_run = runner_module._run_portable_skill_dict(
             skill_root,
             workspace_dir=tmp_path / "workspace-run",
             run_root=runs_root(tmp_path / "workspace-run"),

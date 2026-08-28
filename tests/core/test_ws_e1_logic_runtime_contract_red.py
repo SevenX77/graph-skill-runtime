@@ -25,12 +25,13 @@ def _schema_yaml(properties: dict[str, Any]) -> str:
 
 
 def _logic_skill(
-    root: Path,
+    parent: Path,
     *,
     input_properties: dict[str, Any],
     output_properties: dict[str, Any],
     actions: dict[str, str],
-) -> None:
+) -> Path:
+    root = parent / "logic-runtime-contract"
     action_names = list(actions)
     graph_input_yaml = _schema_yaml(input_properties)
     graph_output_yaml = _schema_yaml(output_properties)
@@ -38,24 +39,33 @@ def _logic_skill(
     action_body = "\n".join(f"<action>{name}</action>" for name in action_names)
 
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: ws-e1-step3-logic-runtime-red
+        root / "SKILL.md",
+        """---
+name: logic-runtime-contract
+description: Exercise pure-return logic runtime behavior.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise pure-return logic runtime behavior.
 io:
   inputs:
     {graph_input_yaml}
   outputs:
     {graph_output_yaml}
 phases:
-  - score
----
-<phase depends_on="input" output>score</phase>
+  - id: score
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "score" / "LOGIC.md",
         f"""---
+name: score
 io:
   inputs:
     {graph_input_yaml}
@@ -73,6 +83,7 @@ validator: false
             root / "phases" / "score" / "actions" / f"{name}.py",
             dedent(body).lstrip(),
         )
+    return root
 
 
 def _invoke(root: Path, mock_skill_resolver: object, data: dict[str, Any]) -> dict[str, Any]:
@@ -91,7 +102,7 @@ def _business_data(result: dict[str, Any]) -> dict[str, Any]:
 def test_logic_action_receives_plain_dict_inputs_and_writes_only_returned_output(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -103,7 +114,7 @@ def test_logic_action_receives_plain_dict_inputs_and_writes_only_returned_output
         },
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"inputs": {"text": "hello"}})
+    result = _invoke(root, mock_skill_resolver, {"inputs": {"text": "hello"}})
 
     assert _business_data(result)["report"] == "dict:hello"
     assert result["data"]["phase_outputs"]["score"] == {"report": "dict:hello"}
@@ -112,7 +123,7 @@ def test_logic_action_receives_plain_dict_inputs_and_writes_only_returned_output
 def test_logic_action_sees_only_declared_phase_inputs(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"public": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -125,7 +136,7 @@ def test_logic_action_sees_only_declared_phase_inputs(
     )
 
     result = _invoke(
-        tmp_path,
+        root,
         mock_skill_resolver,
         {
             "inputs": {"public": "visible", "root_secret": "hidden"},
@@ -139,7 +150,7 @@ def test_logic_action_sees_only_declared_phase_inputs(
 def test_logic_action_chain_reads_previous_returned_outputs_as_input_increment(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={
@@ -158,7 +169,7 @@ def test_logic_action_chain_reads_previous_returned_outputs_as_input_increment(
         },
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"inputs": {"text": " hello "}})
+    result = _invoke(root, mock_skill_resolver, {"inputs": {"text": " hello "}})
 
     assert _business_data(result)["report"] == "HELLO"
     assert result["data"]["phase_outputs"]["score"] == {"report": "HELLO"}
@@ -207,7 +218,7 @@ def test_action_inputs_mutation_is_compile_fatal(
     case_name: str,
     mutation_body: str,
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -215,7 +226,7 @@ def test_action_inputs_mutation_is_compile_fatal(
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert case_name in str(exc_info.value)
     assert exc_info.value.payload.code == "[F-v3-logic-action-purity-violation]"
@@ -227,7 +238,7 @@ def test_logic_action_context_or_ctx_parameter_is_compile_fatal(
     mock_skill_resolver: object,
     param_name: str,
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -240,7 +251,7 @@ def test_logic_action_context_or_ctx_parameter_is_compile_fatal(
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-logic-action-entrypoint-missing]"
     assert "inputs" in str(exc_info.value)
@@ -250,7 +261,7 @@ def test_compile_importing_actions_does_not_write_pycache_under_skill_source(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -262,7 +273,7 @@ def test_compile_importing_actions_does_not_write_pycache_under_skill_source(
         },
     )
 
-    compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert list(tmp_path.rglob("__pycache__")) == []
 
@@ -270,7 +281,7 @@ def test_compile_importing_actions_does_not_write_pycache_under_skill_source(
 def test_undeclared_return_key_still_uses_logic_output_field_error(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -283,7 +294,7 @@ def test_undeclared_return_key_still_uses_logic_output_field_error(
     )
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
-        _invoke(tmp_path, mock_skill_resolver, {"inputs": {"text": "hello"}})
+        _invoke(root, mock_skill_resolver, {"inputs": {"text": "hello"}})
 
     assert exc_info.value.payload.code == "[F-v3-logic-output-field-undeclared]"
     assert "missing" in str(exc_info.value)
@@ -292,7 +303,7 @@ def test_undeclared_return_key_still_uses_logic_output_field_error(
 def test_non_dict_return_still_uses_logic_action_return_invalid_error(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         input_properties={"text": {"type": "string"}},
         output_properties={"report": {"type": "string"}},
@@ -305,6 +316,6 @@ def test_non_dict_return_still_uses_logic_action_return_invalid_error(
     )
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
-        _invoke(tmp_path, mock_skill_resolver, {"inputs": {"text": "hello"}})
+        _invoke(root, mock_skill_resolver, {"inputs": {"text": "hello"}})
 
     assert exc_info.value.payload.code == "[F-v3-logic-action-return-invalid]"

@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from graph_skill_runtime.core.compiler import compile_skill
-from graph_skill_runtime.core.loader import PhaseAttributeSpan
 from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
 
@@ -25,10 +24,18 @@ def _write(path: Path, text: str) -> None:
 
 def _write_graph(root: Path, *, name: str, phase: str = "main") -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
 name: {name}
+description: Exercise cache round-trip fidelity.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise cache round-trip fidelity.
 io:
   inputs:
     type: object
@@ -39,9 +46,9 @@ io:
     type: object
     properties: {{}}
 phases:
-  - {phase}
----
-<phase depends_on="input" output>{phase}</phase>
+  - id: {phase}
+    depends_on: [input]
+    output: true
 """,
     )
 
@@ -49,8 +56,9 @@ phases:
 def _write_child_skill(root: Path) -> None:
     _write_graph(root, name="child-cache-roundtrip", phase="child")
     _write(
-        root / "phases" / "child" / "SKILL.md",
+        root / "phases" / "child" / "AGENT.md",
         """---
+name: child
 io:
   inputs:
     type: object
@@ -71,11 +79,12 @@ io:
 def _write_parent_skill(root: Path) -> None:
     _write_graph(root, name="parent-cache-roundtrip", phase="main")
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 subagents:
   - name: child_expert
-    target_skill: demo.child
+    target_skill: demo-child
     description: Resolve child by skill id.
 io:
   inputs:
@@ -97,11 +106,11 @@ def test_pr4_cache_hit_preserves_subagents_tools_and_phase_tokens(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    parent = tmp_path / "parent"
-    child = tmp_path / "child"
+    parent = tmp_path / "parent-cache-roundtrip"
+    child = tmp_path / "child-cache-roundtrip"
     _write_parent_skill(parent)
     _write_child_skill(child)
-    resolver = DictSkillResolver({"demo.child": child})
+    resolver = DictSkillResolver({"demo-child": child})
 
     monkeypatch.setattr("graph_skill_runtime.core.cache.get_cache_dir", lambda: tmp_path / "cache")
 
@@ -114,5 +123,7 @@ def test_pr4_cache_hit_preserves_subagents_tools_and_phase_tokens(
     tool_names = {tool.name for tool in hit.tools.for_phase("main")}
     assert "call_subagent_child_expert" in tool_names
 
+    assert hit.phase_tokens == cold.phase_tokens
     token = hit.phase_tokens["main"]
-    assert isinstance(token.attr_spans["depends_on"], PhaseAttributeSpan)
+    assert token.attrs == {"depends_on": "input", "output": "true"}
+    assert token.line_start > 0

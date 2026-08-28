@@ -103,11 +103,16 @@ def test_a_resume_reports_the_run_s_clock_even_when_it_dies(
             wall_time_seconds=61.5,
         )
     )
-    not_a_v030_skill = tmp_path / "not_a_v030_skill"
-    not_a_v030_skill.mkdir()
+    invalid_portable_skill = tmp_path / "invalid-portable-skill"
+    invalid_portable_skill.mkdir()
+    (invalid_portable_skill / "SKILL.md").write_text(
+        "---\nname: invalid-portable-skill\ndescription: Invalid compile fixture.\n---\n",
+        encoding="utf-8",
+    )
+    (invalid_portable_skill / "graph.yaml").write_text("not: a portable graph\n", encoding="utf-8")
 
     result = resume_skill(
-        not_a_v030_skill,
+        invalid_portable_skill,
         workspace_dir=workspace_dir,
         run_id="run-that-already-ran",
         skill_resolver=mock_skill_resolver,

@@ -3,8 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def write_legacy_v21_corpus(root: Path) -> Path:
-    """Write the minimal legacy corpus the loader smoke tests exercise."""
+def write_portable_corpus(root: Path) -> Path:
+    """Write the minimal current-format corpus used by loader smoke tests."""
+
     skills_root = root / "skills"
     _write_event_extraction(skills_root / "event-extraction")
     _write_batch_analysis(skills_root / "batch-analysis")
@@ -42,8 +43,19 @@ def _write_text_segmentation(root: Path) -> None:
     _write_agent(root, "review", "segmentation_result")
 
 
-def _write_global_synthesis(root: Path) -> None:
-    _write_graph(root, "global-synthesis", ["global_analysis", "scene_assembly", "retroactive", "export"])
+def _write_global_synthesis(
+    root: Path,
+    *,
+    graph_id: str = "root",
+    skill_entry: bool = True,
+) -> None:
+    _write_graph(
+        root,
+        "global-synthesis",
+        ["global_analysis", "scene_assembly", "retroactive", "export"],
+        graph_id=graph_id,
+        skill_entry=skill_entry,
+    )
     _write_agent(root, "global_analysis", "climax_ranking")
     _write_logic(root, "scene_assembly", "build_scene_stream")
     _write_agent(root, "retroactive", "retroactive_notes")
@@ -51,25 +63,55 @@ def _write_global_synthesis(root: Path) -> None:
 
 
 def _write_story_deconstruction(root: Path) -> None:
-    _write_graph(root, "story-deconstruction", ["segmentation", "event_extraction", "batch_loop", "global_synthesis"])
+    _write_graph(
+        root,
+        "story-deconstruction",
+        ["segmentation", "event_extraction", "batch_loop", "global_synthesis"],
+    )
     _write_logic(root, "segmentation", "segment_all_chapters")
     _write_logic(root, "event_extraction", "extract_all_events")
     _write_logic(root, "batch_loop", "run_batch_loop")
-    _write_subgraph(root, "global_synthesis", "subskills/global-synthesis")
-    _write_global_synthesis(root / "subskills" / "global-synthesis")
+    _write_subgraph(root, "global_synthesis", "global-synthesis")
+    _write_global_synthesis(
+        root / "graphs" / "global-synthesis",
+        graph_id="global-synthesis",
+        skill_entry=False,
+    )
 
 
-def _write_graph(root: Path, name: str, phases: list[str]) -> None:
-    phase_list = ", ".join(phases)
-    phase_body = "\n".join(
-        f'<phase depends_on="{_phase_dependency(index, phases)}"{_output_flag(index, phases)}>{phase}</phase>'
+def _write_graph(
+    root: Path,
+    name: str,
+    phases: list[str],
+    *,
+    graph_id: str = "root",
+    skill_entry: bool = True,
+) -> None:
+    if skill_entry:
+        _write(
+            root / "SKILL.md",
+            f"""---
+name: {name}
+description: Portable integration fixture for {name}.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+        )
+    phase_entries = "\n".join(
+        "\n".join(
+            (
+                f"  - id: {phase}",
+                f"    depends_on: [{_phase_dependency(index, phases)}]",
+                f"    output: {str(index == len(phases) - 1).lower()}",
+            )
+        )
         for index, phase in enumerate(phases)
     )
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {graph_id}
+description: Portable integration graph for {name}.
 io:
   inputs:
     type: object
@@ -77,9 +119,8 @@ io:
   outputs:
     type: object
     properties: {{}}
-phases: [{phase_list}]
----
-{phase_body}
+phases:
+{phase_entries}
 """,
     )
 
@@ -90,16 +131,11 @@ def _phase_dependency(index: int, phases: list[str]) -> str:
     return phases[index - 1]
 
 
-def _output_flag(index: int, phases: list[str]) -> str:
-    if index == len(phases) - 1:
-        return " output"
-    return ""
-
-
 def _write_logic(root: Path, phase: str, action_name: str) -> None:
     _write(
         root / "phases" / phase / "LOGIC.md",
         f"""---
+name: {phase}
 actions:
   - {action_name}
 io:
@@ -123,8 +159,9 @@ io:
 
 def _write_agent(root: Path, phase: str, output_property: str) -> None:
     _write(
-        root / "phases" / phase / "SKILL.md",
+        root / "phases" / phase / "AGENT.md",
         f"""---
+name: {phase}
 llm_role: analyst
 io:
   inputs:
@@ -149,12 +186,12 @@ Call finish_task with the requested output.
     )
 
 
-def _write_subgraph(root: Path, phase: str, relative_path: str) -> None:
+def _write_subgraph(root: Path, phase: str, graph_id: str) -> None:
     _write(
         root / "phases" / phase / "SUBGRAPH.md",
         f"""---
 name: {phase}
-path: {relative_path}
+graph: {graph_id}
 io:
   inputs:
     type: object
@@ -169,4 +206,4 @@ io:
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")

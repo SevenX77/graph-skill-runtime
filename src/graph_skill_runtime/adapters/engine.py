@@ -12,6 +12,7 @@ from graph_skill_runtime.core.compiler import CompileResult as CoreCompileResult
 from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentError
 from graph_skill_runtime.core.loader import CompiledSkill
+from graph_skill_runtime.core.manifest import AgentNodeAST, SubgraphNodeAST
 from graph_skill_runtime.core.result import RunResult as CoreRunResult
 from graph_skill_runtime.domain.models import (
     CompileDiagnostic,
@@ -158,6 +159,62 @@ def _run_result(
     )
 
 
+def _skill_id(compiled: CompiledSkill) -> str:
+    if compiled.skill_manifest is not None:
+        return compiled.skill_manifest.name
+    return compiled.skill_root.name
+
+
+def _invalid_artifact_request(request: RunRequest, compiled: CompiledSkill) -> RunResult | None:
+    requested_ids = [item.artifact_id for item in request.artifact_requests]
+    if len(requested_ids) != len(set(requested_ids)):
+        return RunResult(
+            status="failed",
+            run_id=request.run_id,
+            mode="run",
+            request=request,
+            error=RuntimeErrorPayload(
+                code=RuntimeErrorCode.INVALID_REQUEST,
+                message="artifact_requests must not repeat an artifact_id",
+            ),
+        )
+    declared_ids = {item.artifact_id for item in compiled.manifest.artifacts}
+    unknown = sorted(set(requested_ids) - declared_ids)
+    if not unknown:
+        return None
+    return RunResult(
+        status="failed",
+        run_id=request.run_id,
+        mode="run",
+        request=request,
+        error=RuntimeErrorPayload(
+            code=RuntimeErrorCode.INVALID_REQUEST,
+            message="artifact request references undeclared artifact ids: " + ", ".join(unknown),
+            details={"unknown_artifact_ids": cast(JsonValue, unknown)},
+        ),
+    )
+
+
+def _compiled_for_run(request: RunRequest) -> CompiledSkill | RunResult:
+    try:
+        compiled: CompiledSkill = compile_skill(request.profile.skill_root)
+    except Exception as exc:
+        failed = _compile_failure(exc)
+        return RunResult(
+            status="failed",
+            run_id=request.run_id,
+            mode="run",
+            request=request,
+            error=RuntimeErrorPayload(
+                code=RuntimeErrorCode.COMPILE_FAILED,
+                message="portable gSkill compilation failed",
+            ),
+            diagnostics=failed.diagnostics,
+        )
+    invalid = _invalid_artifact_request(request, compiled)
+    return invalid or compiled
+
+
 class CurrentEngineAdapter:
     """Keep the characterized engine behind the new stable application Port."""
 
@@ -174,13 +231,16 @@ class CurrentEngineAdapter:
         )
         return CompileResult(
             status="passed",
-            skill_id=compiled.manifest.name,
+            skill_id=_skill_id(compiled),
             diagnostics=diagnostics,
         )
 
     def predict(self, request: RunRequest) -> RunResult:
         from graph_skill_runtime.core.runner import predict_skill
 
+        checked = _compiled_for_run(request)
+        if isinstance(checked, RunResult):
+            return checked.model_copy(update={"mode": "predict"})
         predict_call = cast(_PredictCallable, predict_skill)
         result = predict_call(
             request.profile.skill_root,
@@ -193,6 +253,9 @@ class CurrentEngineAdapter:
     def run(self, request: RunRequest) -> RunResult:
         from graph_skill_runtime.core.runner import run_skill
 
+        checked = _compiled_for_run(request)
+        if isinstance(checked, RunResult):
+            return checked
         run_call = cast(_RunCallable, run_skill)
         result = run_call(
             request.profile.skill_root,
@@ -253,4 +316,15 @@ class CurrentEngineAdapter:
         except Exception as exc:
             failed = _compile_failure(exc)
             return InspectResult(diagnostics=failed.diagnostics)
-        return InspectResult(skill_id=compiled.manifest.name, graphs=(compiled.manifest.name,))
+        call_edges: set[tuple[str, str]] = set()
+        for graph_id, graph in compiled.graph_registry.items():
+            for node in graph.nodes:
+                if isinstance(node.ast, SubgraphNodeAST):
+                    call_edges.add((graph_id, node.ast.graph))
+                elif isinstance(node.ast, AgentNodeAST):
+                    call_edges.update((graph_id, item.graph) for item in node.ast.subgraphs)
+        return InspectResult(
+            skill_id=_skill_id(compiled),
+            graphs=tuple(sorted(compiled.graph_registry)),
+            call_edges=tuple(sorted(call_edges)) if request.include_call_graph else (),
+        )

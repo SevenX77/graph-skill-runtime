@@ -11,7 +11,7 @@ def test_run_skill_missing_graph_root_writes_error_diagnostics_snapshot(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    skill_dir = tmp_path / "not_v030_skill"
+    skill_dir = tmp_path / "invalid-portable-skill"
     skill_dir.mkdir()
     workspace_dir = tmp_path / "workspace"
 

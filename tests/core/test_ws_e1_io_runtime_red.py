@@ -11,7 +11,7 @@ import pytest
 
 from graph_skill_runtime.callbacks.events import InputFileInjectedEvent
 from graph_skill_runtime.core.result import RunResult
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 RAW_BUSINESS_MD = "## main\n- answer: raw ok\n\n<!-- preserve-me -->\n\n- note: keep spacing"
 

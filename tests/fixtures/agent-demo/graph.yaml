@@ -1,0 +1,22 @@
+schema_version: gskill.graph.v1
+graph_id: root
+description: Segment a chapter with an agent phase.
+io:
+  inputs:
+    type: object
+    required: [chapter_content]
+    properties:
+      chapter_content:
+        type: string
+  outputs:
+    type: object
+    required: [segments]
+    properties:
+      segments:
+        type: array
+        items:
+          type: object
+phases:
+  - id: segment
+    depends_on: [input]
+    output: true

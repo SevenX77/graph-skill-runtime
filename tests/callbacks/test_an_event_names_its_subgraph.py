@@ -28,7 +28,7 @@ from graph_skill_runtime.callbacks.events import (
     LLMRouteDecisionEvent,
     PhaseStartEvent,
 )
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 

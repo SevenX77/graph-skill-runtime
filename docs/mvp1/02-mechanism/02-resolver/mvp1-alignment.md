@@ -1,11 +1,13 @@
 ---
 module: 02-mechanism/02-resolver
 doc: mvp1-alignment
-status: audited-ready（**U1 单元锁定 2026-06-05**;子图 path 解析（相对 skill root 优先，绝对也须落在边界内）+ DI 协议形状(契约)已定、删 registry;默认实现 LocalWorkspaceResolver 函数体归 kiro;文件未 FROZEN）
+status: superseded（Phase 2 flat graph registry 已取代本文的 path-only resolver alignment）
 aligns_with: ../../00-architecture-overview.md（§3 机制层 B·编译）
 ---
 
 # 02-resolver — 机制 B · 子图引用解析(path · DI 接缝)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 `SUBGRAPH.md.graph`、`AGENT.md.subgraphs[].graph` 与 flat registry contract 见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前实现见 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py) 与 [`local_workspace_resolver.py`](../../../../src/graph_skill_runtime/core/local_workspace_resolver.py)。后文保留为 path-only、无 registry 的 pre-cutover 设计证据；后文现在时不再描述当前 runtime。
 
 > **Tier**: 机制层 B · 编译期 | **Owns**: 把子图引用的 **path**（相对 skill root 或绝对）解析成子图本地 root + skill-root 边界校验(**无 registry**)+ 定义 `SkillResolverProtocol` DI 接缝**形状**(契约,非 kiro) | **现状**: ⏳ | **Related**: `01-compile`(用它递归解析 SUBGRAPH)· `01-contract/02-skill-syntax`(path 语法)· `05-run-inner/07-subagent`(运行期子代理,另一回事)
 

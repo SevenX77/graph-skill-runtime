@@ -50,24 +50,33 @@ def _logic_skill(root: Path, *, required_outputs: list[str] | None = None) -> No
     if required_outputs and "confidence" in required_outputs:
         outputs["confidence"] = {"type": "number"}
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e7-golden-eval-red
+name: {root.name}
+description: Exercise deterministic golden evaluation behavior.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise deterministic golden evaluation behavior.
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}
   outputs:
     {_schema(outputs, required=required_outputs or ["answer"])}
 phases:
-  - score
----
-<phase depends_on="input" output>score</phase>
+  - id: score
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "score" / "LOGIC.md",
         f"""---
+name: score
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}

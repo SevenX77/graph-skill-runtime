@@ -1,11 +1,13 @@
 ---
 module: 01-contract/01-physical-layout
 doc: mvp1-alignment
-status: audited-ready（mvp1 自写=唯一真理；子图 subgraph/ 默认落点 + golden→workspace；.workspace 户型字段正文已迁入 §2.2）
+status: superseded（Phase 2 portable layout 与 flat registry 已取代本文的递归 v0.3 目标）
 aligns_with: ../../00-architecture-overview.md（§2 契约层 A）
 ---
 
 # 01-physical-layout — 契约 A · 物理布局(整个磁盘文件结构)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前目录、root/registry graph 与 runtime-state 边界见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前 loader 见 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py)。后文保留的是递归 `subgraph/`、root `GRAPH.md` 与 phase `SKILL.md` 的 pre-cutover 设计证据；后文现在时不再描述当前 runtime。
 
 > **Tier**: 契约层 A(声明式) | **Owns**: 磁盘上**所有文件放哪** = skill 源码树 + `.workspace` 运行时树 | **现状**: 子图 subgraph/ + golden→workspace + workspace 户型字段已写清 | **Related**: `skill-syntax`(文件里写什么)· `02-mechanism/02-resolver`(子图 path 解析)· `compile-rules`(校验)· `06-golden-eval` · `invalidation`
 

@@ -24,7 +24,7 @@ features:
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:
-  - tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_v030_root_error
+  - tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_portable_root_error
   public_api_symbols:
   - PhaseEndEvent
   - PhaseStartEvent

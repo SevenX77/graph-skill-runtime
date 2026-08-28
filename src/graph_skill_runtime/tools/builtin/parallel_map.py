@@ -9,9 +9,8 @@ default max_concurrent=3".
 
 Behaviour:
 
-* A fresh harness is loaded via :func:`load_workflow_from_md` for each
-  sub-run, so we never race on the cached-harness instance that
-  ``run_skill`` uses for serial callers.
+* Each item starts an independent ``run_skill`` call with its own run id;
+  compiled source may use the normal immutable compile cache.
 * Every sub-run receives a unique ``sub_run_id`` plus a shared
   ``group_key`` via ``runtime_inputs``. The chat model reads
   these two keys off the context and stamps every ``prompt_captured``
@@ -55,8 +54,8 @@ def parallel_map(
     """Run ``skill_path`` once per item in ``item_list`` under a thread pool.
 
     Args:
-        skill_path: Path to the child SKILL.md. Must already have IO
-            declarations matching ``item_as``.
+        skill_path: Path to the child portable gSkill root. Its graph input
+            declaration must contain ``item_as``.
         item_list: The items to fan out over. An empty list returns ``[]``.
         item_as: Name of the runtime input the child skill expects — the
             current item's value is forwarded as ``{item_as: item}``.

@@ -1,12 +1,15 @@
 ---
 doc: _impl-backlog
-status: living（活工单表;2026-06-06 起把各模块"impl 归 kiro"的 Gap 工单化,持续维护、随派单更新,不进入 FROZEN 流水线）
+status: superseded（旧 Graph Agent MVP1 工单已被 standalone Phase 1/2 实现与当前计划取代）
+updated: 2026-08-27
 owns: engine mvp1 实施任务清单(分层 + 依赖 + 落点),codex/kiro 执行入口
 audience: 架构师(派单)+ codex(执行);待 daemon 恢复
 related: INDEX.md（设计单元台账）· 各模块 mvp1-alignment.md §8（impl-target 来源）· _api-handshake-audit.md（studio 协同）
 ---
 
 # Engine MVP1 实施 Backlog(工单化)
+
+> **已被 standalone runtime 计划取代（2026-08-27）**：本文保留旧 `packages/graph-agent` 工单、路径和决策的历史证据，不再是活动 backlog。当前实现与 owner 导航见 [`INDEX.md`](./INDEX.md)，完整 v1 尚未实现的 Phase 3+ 工作见 [`design/v1-alignment.md`](../design/v1-alignment.md)。后文所有“当前”“现在就能路由”和 `skill-spec/00` 指针都描述 pre-cutover 状态，不得作为本 checkout 的当前事实。
 
 > 设计文档内容已齐(12/12 模块 A 达标);本文把各模块 `§8 impl 归 kiro` 的 Gap 拆成**可派 codex 的任务**,按**依赖分层**排。CCB daemon 恢复后从 Tier 0 起派单。
 > **不在此锁文档**:codex 跑通骨架前不扩大 audited-ready 哈希锁(防"设计未验证就锁死→改一行测试就挂"的返工摩擦;且 engine 文档现无并发改动、防漂收益≈0)。

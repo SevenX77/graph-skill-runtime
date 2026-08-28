@@ -74,13 +74,13 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 - **Primary contracts**: 0 error codes, 0 events
 - `[Covered By: tests/core/test_parse_skill_file.py::test_parse_markdown_parts_returns_frontmatter_body_and_line_meta]`
 
-### F-graph-skill-loading: Load GRAPH skills from disk, validate topology, and build the phase registry.
+### F-graph-skill-loading: Load portable gSkill bundles from disk, validate topology, and build the phase registry.
 
 - **Boundary**: lifecycle-behavior - GRAPH skill spec
 - **Sources**: `public-api`, `source-file-map`
 - **Core paths**: `src/graph_skill_runtime/core/loader.py`, `src/graph_skill_runtime/core/manifest.py`
 - **Primary contracts**: 22 error codes, 0 events
-- `[Covered By: tests/core/test_round14_skill_compilation_cutover.py::test_valid_v030_graph_uses_frontmatter_phase_registry_and_body_phase_dag]`
+- `[Covered By: tests/core/test_round14_skill_compilation_cutover.py::test_valid_portable_graph_uses_graph_yaml_as_the_only_phase_registry]`
 
 ### F-iterate-runtime: Compile and execute MVP1 iterate batch/loop contracts for node-level and graph-level loops.
 
@@ -112,7 +112,7 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 - **Sources**: `public-api`, `source-file-map`
 - **Core paths**: `src/graph_skill_runtime/core/graph_assembler.py`, `src/graph_skill_runtime/core/loader.py`
 - **Primary contracts**: 16 error codes, 1 events
-- `[Covered By: tests/fixtures/test_v030_agent_demo_compiles.py::test_v030_agent_demo_fixture_compiles_and_renders_template]`
+- `[Covered By: tests/fixtures/test_portable_agent_demo_compiles.py::test_portable_agent_demo_compiles_and_renders_template]`
 
 ### F-mention-resolution: Resolve @-mentions against tools, references, examples, subagents, and subgraphs before runtime.
 
@@ -152,7 +152,7 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 - **Sources**: `public-api`, `source-file-map`
 - **Core paths**: `src/graph_skill_runtime/cognitive/context_facade.py`, `src/graph_skill_runtime/core/edge_transition.py`, `src/graph_skill_runtime/core/result_contracts.py`
 - **Primary contracts**: 1 error codes, 12 events
-- `[Covered By: tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_v030_root_error]`
+- `[Covered By: tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_portable_root_error]`
 
 ### F-state-blackboard: Map parent, child, and blackboard state without leaking unrelated execution state.
 
@@ -214,7 +214,7 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 
 - **Boundary**: lifecycle-behavior - tool binding runtime
 - **Sources**: `public-api`, `source-file-map`
-- **Core paths**: `src/graph_skill_runtime/core/skill_tool_factory.py`, `src/graph_skill_runtime/tools/builtin/cognitive_tools.py`
+- **Core paths**: `src/graph_skill_runtime/tools/builtin/cognitive_tools.py`
 - **Primary contracts**: 1 error codes, 3 events
 - `[Covered By: tests/models/test_predict_gateway_chat_model.py::test_bind_tools_preserves_predict_gateway_and_mock_strategy]`
 
@@ -288,7 +288,7 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 - **Sources**: `public-api`, `source-file-map`
 - **Core paths**: `src/graph_skill_runtime/core/graph_assembler.py`, `src/graph_skill_runtime/core/topology_projection.py`
 - **Primary contracts**: 0 error codes, 0 events
-- `[Covered By: tests/core/test_round14_skill_compilation_cutover.py::test_graph_serializer_fresh_render_does_not_synthesize_graph_boundaries]`
+- `[Covered By: tests/core/test_round14_skill_compilation_cutover.py::test_graph_serializer_fresh_render_emits_only_portable_yaml]`
 
 ### F-runtime-compatibility-patches: Apply runtime compatibility patches and compatibility hooks exactly through the central bootstrap path.
 
@@ -326,6 +326,22 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 
 - **Boundary**: lifecycle-behavior - IO storage helpers
 - **Sources**: `skill-spec`, `source-file-map`
-- **Core paths**: `src/graph_skill_runtime/examples/hello_world/script/greet.py`, `src/graph_skill_runtime/core/artifacts.py`, `src/graph_skill_runtime/core/storage_contracts.py`, `src/graph_skill_runtime/io/artifact_manifest.py`, `src/graph_skill_runtime/io/manager.py`, `src/graph_skill_runtime/io/run_layout.py`
+- **Core paths**: `src/graph_skill_runtime/core/artifacts.py`, `src/graph_skill_runtime/core/storage_contracts.py`, `src/graph_skill_runtime/io/artifact_manifest.py`, `src/graph_skill_runtime/io/manager.py`, `src/graph_skill_runtime/io/run_layout.py`
 - **Primary contracts**: 0 error codes, 1 events
 - `[Covered By: tests/io/test_storage.py::TestStorageManagerBasics::test_save_artifact_writes_str_bytes_and_json]`
+
+### F-portable-gskill-v1: Compile one root Agent Skill entry, graph.yaml topology, flat graph registry, internal phase documents, and root artifact declarations as one portable business gSkill bundle.
+
+- **Boundary**: lifecycle-behavior - portable gSkill v1 bundle contract
+- **Sources**: `skill-spec`, `source-file-map`
+- **Core paths**: `src/graph_skill_runtime/core/loader.py`, `src/graph_skill_runtime/core/manifest.py`
+- **Primary contracts**: 10 error codes, 0 events
+- `[Covered By: tests/core/test_portable_gskill_v1.py::test_missing_root_entry_and_graph_are_reported_in_one_compile]`
+
+### F-studio-skill-migration: Convert one legacy Studio v0.3 skill into the portable v1 layout through an explicit, deterministic, no-overwrite CLI operation.
+
+- **Boundary**: externally-observable-behavior - portable gSkill v1 migration contract
+- **Sources**: `skill-spec`, `source-file-map`
+- **Core paths**: `src/graph_skill_runtime/adapters/cli.py`, `src/graph_skill_runtime/migration/studio_v030.py`
+- **Primary contracts**: 0 error codes, 0 events
+- `[Covered By: tests/migration/test_studio_v030.py::test_converter_renames_internal_agent_entry_and_emits_one_root_skill]`

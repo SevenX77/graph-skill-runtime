@@ -31,12 +31,17 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _skill(root: Path, *, context_access: list[str] | None = None) -> None:
+def _skill(root: Path, *, context_access: list[str] | None = None) -> Path:
+    root = root / "cognitive-tools-mount-probe"
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: cognitive-tools-mount-probe
+        root / "SKILL.md",
+        "---\nname: cognitive-tools-mount-probe\ndescription: Cognitive tool mounting fixture.\n---\n",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: cognitive-tools-mount-probe
+description: Cognitive tool mounting fixture.
 io:
   inputs:
     type: object
@@ -49,9 +54,9 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     access_block = (
@@ -60,8 +65,9 @@ phases:
         else ""
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 io:
   inputs:
     type: object
@@ -84,6 +90,7 @@ Produce the declared output.
 </goal>
 """,
     )
+    return root
 
 
 class _ChatModel:
@@ -119,7 +126,7 @@ def _mounted_tool_names(
     *,
     context_access: list[str] | None = None,
 ) -> set[str]:
-    _skill(tmp_path, context_access=context_access)
+    root = _skill(tmp_path, context_access=context_access)
     captured: dict[str, Any] = {}
 
     class _Agent:
@@ -133,7 +140,7 @@ def _mounted_tool_names(
 
     monkeypatch.setattr(graph_assembler, "create_agent", fake_create_agent, raising=False)
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     graph = graph_assembler.assemble_graph(
         compiled,
         model_resolver=_Resolver(_ChatModel()),
@@ -197,9 +204,9 @@ def test_context_access_both_mounts_both_tools(
 def test_loader_carries_context_access_into_agent_ast(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _skill(tmp_path, context_access=["working_memory", "artifact"])
+    root = _skill(tmp_path, context_access=["working_memory", "artifact"])
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     agent_asts = [doc.ast for doc in compiled.nodes if isinstance(doc.ast, AgentNodeAST)]
     assert len(agent_asts) == 1
@@ -209,9 +216,9 @@ def test_loader_carries_context_access_into_agent_ast(
 def test_loader_defaults_context_access_to_empty(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _skill(tmp_path)
+    root = _skill(tmp_path)
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     agent_asts = [doc.ast for doc in compiled.nodes if isinstance(doc.ast, AgentNodeAST)]
     assert agent_asts[0].context_access == []
@@ -220,10 +227,10 @@ def test_loader_defaults_context_access_to_empty(
 def test_loader_rejects_unknown_context_access_value(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _skill(tmp_path, context_access=["everything"])
+    root = _skill(tmp_path, context_access=["everything"])
 
     with pytest.raises(SkillLoadError) as exc_info:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     payload = exc_info.value.payload
     assert payload is not None

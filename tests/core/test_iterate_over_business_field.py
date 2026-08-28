@@ -36,7 +36,8 @@ def _schema_yaml(properties: dict[str, Any], *, required: list[str] | None = Non
     return json.dumps(schema, ensure_ascii=False, indent=4).replace("\n", "\n    ")
 
 
-def _batch_skill(root: Path, *, over: str) -> None:
+def _batch_skill(parent: Path, *, over: str) -> Path:
+    root = parent / "iterate-over-bare-field"
     graph_inputs = _schema_yaml(
         {"chapters": {"type": "array", "items": {"type": "object"}}},
         required=["chapters"],
@@ -46,24 +47,33 @@ def _batch_skill(root: Path, *, over: str) -> None:
     phase_outputs = _schema_yaml({"summaries": {"type": "array"}})
 
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
+        root / "SKILL.md",
+        """---
 name: iterate-over-bare-field
+description: Exercise batch iteration over a root business input.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise batch iteration over a root business input.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - worker
----
-<phase depends_on="input" output>worker</phase>
+  - id: worker
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "worker" / "LOGIC.md",
         f"""---
+name: worker
 actions: [worker]
 validator: false
 io:
@@ -88,6 +98,7 @@ iterate:
             """
         ).lstrip(),
     )
+    return root
 
 
 def test_node_batch_iterate_over_bare_business_field_resolves_root_input(
@@ -95,9 +106,9 @@ def test_node_batch_iterate_over_bare_business_field_resolves_root_input(
 ) -> None:
     """``over: chapters`` (the documented product syntax) resolves the root
     input list on the blackboard and runs every item."""
-    _batch_skill(tmp_path, over="chapters")
+    skill_root = _batch_skill(tmp_path, over="chapters")
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph
     result = graph.invoke(
         {
@@ -119,10 +130,10 @@ def test_compile_rejects_iterate_over_with_no_dataflow_source(
     """An ``over`` naming a field with no root-input / upstream source is a
     compile-time defect ([F-v3-iterate-over-not-list] compile phase), not a
     predict/run crash discovered later."""
-    _batch_skill(tmp_path, over="chapter_event_timeline")
+    skill_root = _batch_skill(tmp_path, over="chapter_event_timeline")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
 
     issues = list(getattr(exc_info.value.compile_result, "issues", []) or [])
     codes = {str(getattr(issue, "rule_id", getattr(issue, "code", ""))) for issue in issues}

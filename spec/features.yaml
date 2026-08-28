@@ -156,11 +156,11 @@ features:
   targeted_tests:
   - tests/core/test_parse_skill_file.py::test_parse_markdown_parts_returns_frontmatter_body_and_line_meta
 - id: F-graph-skill-loading
-  description: Load GRAPH skills from disk, validate topology, and build the phase
-    registry.
+  description: Load portable gSkill bundles from disk, validate topology, and build
+    the phase registry.
   feature_boundary:
     kind: lifecycle-behavior
-    evidence: GRAPH skill spec
+    evidence: portable gSkill v1 contract
   sources:
   - public-api
   - source-file-map
@@ -195,13 +195,12 @@ features:
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:
-  - tests/core/test_round14_skill_compilation_cutover.py::test_valid_v030_graph_uses_frontmatter_phase_registry_and_body_phase_dag
+  - tests/core/test_round14_skill_compilation_cutover.py::test_valid_portable_graph_uses_graph_yaml_as_the_only_phase_registry
   public_api_symbols:
   - CompiledSkill
   - GraphManifest
   - GraphPhaseRef
   - SkillLoader
-  - SkillManifest
 - id: F-iterate-runtime
   description: Compile and execute MVP1 iterate batch/loop contracts for node-level
     and graph-level loops.
@@ -325,7 +324,7 @@ features:
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:
-  - tests/fixtures/test_v030_agent_demo_compiles.py::test_v030_agent_demo_fixture_compiles_and_renders_template
+  - tests/fixtures/test_portable_agent_demo_compiles.py::test_portable_agent_demo_compiles_and_renders_template
   public_api_symbols:
   - AgentNodeAST
 - id: F-mention-resolution
@@ -461,7 +460,7 @@ features:
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:
-  - tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_v030_root_error
+  - tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_portable_root_error
   public_api_symbols:
   - PhaseEndEvent
   - PhaseStartEvent
@@ -666,7 +665,6 @@ features:
   - public-api
   - source-file-map
   core_paths:
-  - path: src/graph_skill_runtime/core/skill_tool_factory.py
   - path: src/graph_skill_runtime/tools/builtin/cognitive_tools.py
   error_codes_primary:
   - '[F-v3-tool-argument-invalid]'
@@ -878,7 +876,6 @@ features:
   - tests/callbacks/test_serialize.py::TestPrimitives::test_passthrough
   public_api_symbols:
   - serialize_graph
-  - serialize_skill
   - to_jsonable_dict
 - id: F-graph-assembly
   description: Assemble phase nodes into executable graphs while preserving graph
@@ -898,7 +895,7 @@ features:
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:
-  - tests/core/test_round14_skill_compilation_cutover.py::test_graph_serializer_fresh_render_does_not_synthesize_graph_boundaries
+  - tests/core/test_round14_skill_compilation_cutover.py::test_graph_serializer_fresh_render_emits_only_portable_yaml
   public_api_symbols:
   - CompiledStateGraph
   - assemble_graph
@@ -1000,7 +997,6 @@ features:
   - skill-spec
   - source-file-map
   core_paths:
-  - path: src/graph_skill_runtime/examples/hello_world/script/greet.py
   - path: src/graph_skill_runtime/core/artifacts.py
   - path: src/graph_skill_runtime/core/storage_contracts.py
   - path: src/graph_skill_runtime/io/artifact_manifest.py
@@ -1014,3 +1010,53 @@ features:
   non_functional_contracts: []
   targeted_tests:
   - tests/io/test_storage.py::TestStorageManagerBasics::test_save_artifact_writes_str_bytes_and_json
+- id: F-portable-gskill-v1
+  description: Compile one root Agent Skill entry, graph.yaml topology, flat graph
+    registry, internal phase documents, and root artifact declarations as one
+    portable business gSkill bundle.
+  feature_boundary:
+    kind: lifecycle-behavior
+    evidence: portable gSkill v1 bundle contract
+  sources:
+  - skill-spec
+  - source-file-map
+  core_paths:
+  - path: src/graph_skill_runtime/core/loader.py
+  - path: src/graph_skill_runtime/core/manifest.py
+  error_codes_primary:
+  - '[F-v3-artifact-declaration-invalid]'
+  - '[F-v3-graph-call-cycle]'
+  - '[F-v3-graph-id-directory-mismatch]'
+  - '[F-v3-graph-id-duplicate]'
+  - '[F-v3-graph-reference-unknown]'
+  - '[F-v3-graph-registry-invalid]'
+  - '[F-v3-skill-entry-missing]'
+  - '[F-v3-skill-entry-nested]'
+  - '[F-v3-skill-metadata-invalid]'
+  - '[F-v3-skill-name-directory-mismatch]'
+  error_codes_secondary: []
+  events_primary: []
+  events_secondary: []
+  non_functional_contracts: []
+  targeted_tests:
+  - tests/core/test_portable_gskill_v1.py::test_missing_root_entry_and_graph_are_reported_in_one_compile
+- id: F-studio-skill-migration
+  description: Convert one legacy Studio v0.3 skill into the portable v1 layout
+    through an explicit, deterministic, no-overwrite CLI operation.
+  feature_boundary:
+    kind: externally-observable-behavior
+    evidence: portable gSkill v1 migration contract
+  sources:
+  - skill-spec
+  - source-file-map
+  core_paths:
+  - path: src/graph_skill_runtime/adapters/cli.py
+  - path: src/graph_skill_runtime/migration/atomic_publish.py
+  - path: src/graph_skill_runtime/migration/studio_v030.py
+  error_codes_primary: []
+  error_codes_secondary: []
+  events_primary: []
+  events_secondary: []
+  non_functional_contracts: []
+  targeted_tests:
+  - tests/migration/test_studio_v030.py::test_converter_renames_internal_agent_entry_and_emits_one_root_skill

@@ -1,10 +1,8 @@
 ---
 status: retired
-updated: 2026-06-28
+updated: 2026-08-27
 ---
 
 # Mention Syntax Spec Retired
 
-本页不再承载 mention 模板或字段规范。
-
-唯一真相源见 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md#8-mention-与资源引用)。
+本页是 v0.3 mention 规则的退役导航，不承载当前规范。当前 mention registry 与可见域见 [`01-PORTABLE-GSKILL-V1.md` §5.2、§6](./01-PORTABLE-GSKILL-V1.md#52-agentmd)。

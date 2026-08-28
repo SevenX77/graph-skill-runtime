@@ -1,10 +1,8 @@
 ---
 status: retired
-updated: 2026-06-28
+updated: 2026-08-27
 ---
 
-# SKILL.md Spec Retired
+# Agent Phase Spec Retired
 
-本页不再承载 Agent `SKILL.md` 模板或字段规范。
-
-唯一真相源见 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md#5-skillmd)。
+本页是 v0.3 agent-phase `SKILL.md` 的退役导航，不承载当前模板。Portable bundle 只有根 [`SKILL.md` Agent Skills 入口](./01-PORTABLE-GSKILL-V1.md#3-根-skillmdagent-skills-入口)；内部 agent phase 使用 [`AGENT.md`](./01-PORTABLE-GSKILL-V1.md#52-agentmd)。

@@ -23,6 +23,19 @@ def _fail(errors: list[str], code: str, detail: str) -> None:
     errors.append(f"{code}: {detail}")
 
 
+def _skill_spec_section_exists(section: object) -> bool:
+    path_text, separator, heading = str(section).partition("#")
+    target = REPO_ROOT / path_text
+    if not separator or not heading or not target.is_file():
+        return False
+    headings = {
+        match.group(1).strip()
+        for line in target.read_text(encoding="utf-8").splitlines()
+        if (match := re.fullmatch(r"#{1,6}\s+(.+?)\s*", line)) is not None
+    }
+    return heading in headings
+
+
 def _features(data: Any) -> list[dict[str, Any]]:
     if isinstance(data, dict) and isinstance(data.get("features"), list):
         return [feature for feature in data["features"] if isinstance(feature, dict)]
@@ -146,9 +159,7 @@ def _validate_features(features: list[dict[str, Any]], errors: list[str], *, ful
             event_owners[event] = feature_id
 
         for section in feature.get("skill_spec_sections", []):
-            path_text, _, anchor = str(section).partition("#")
-            target = REPO_ROOT / path_text
-            if not anchor or not target.exists():
+            if not _skill_spec_section_exists(section):
                 _fail(errors, "R28_SKILL_SPEC_ANCHOR_MISSING", section)
 
     if full_manifest:
@@ -257,6 +268,9 @@ def _validate_contract_map(contract_map: dict[str, Any], errors: list[str]) -> N
             "R28_PUBLIC_API_DOC_STALE",
             "documented non-public symbols: " + ", ".join(stale_documentation[:5]),
         )
+    for section in (contract_map.get("skill_spec_sections") or {}):
+        if not _skill_spec_section_exists(section):
+            _fail(errors, "R28_SKILL_SPEC_ANCHOR_MISSING", section)
 
 
 def _validate_contract_feature_ids(contract_map: dict[str, Any], feature_ids: set[str], errors: list[str]) -> None:

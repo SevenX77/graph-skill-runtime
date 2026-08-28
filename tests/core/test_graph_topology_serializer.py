@@ -1,110 +1,108 @@
 from __future__ import annotations
 
-from graph_skill_runtime.core.graph_serializer import serialize_graph_topology
-from graph_skill_runtime.core.manifest import GraphPhaseRef, PhaseIOSchema
+import pytest
+import yaml
+
+from graph_skill_runtime.core.graph_serializer import (
+    GraphTopologySerializationError,
+    serialize_graph_topology,
+)
+from graph_skill_runtime.core.manifest import ArtifactDeclaration, GraphPhaseRef, PhaseIOSchema
 
 _IO = PhaseIOSchema(
     inputs={"type": "object", "properties": {}},
-    outputs={"type": "object", "properties": {}},
+    outputs={"type": "object", "properties": {"report": {"type": "string"}}},
 )
 
 
-def _ref(phase_id: str, depends_on: list[str], *, output: bool = False) -> GraphPhaseRef:
-    return GraphPhaseRef(id=phase_id, src=f"phases/{phase_id}", depends_on=depends_on, output=output)
+def _phase(phase_id: str, depends_on: list[str], *, output: bool = False) -> GraphPhaseRef:
+    return GraphPhaseRef(id=phase_id, depends_on=tuple(depends_on), output=output)
 
 
-def test_linear_chain_emits_real_depends_on_and_single_output() -> None:
-    md = serialize_graph_topology(
-        name="linear",
-        description=None,
-        io=_IO,
-        phases=[_ref("a", ["input"]), _ref("b", ["a"]), _ref("c", ["b"])],
-    )
-    assert '<phase depends_on="input">a</phase>' in md
-    assert '<phase depends_on="a">b</phase>' in md
-    assert '<phase depends_on="b">c</phase>' in md
-    assert " output>" not in md
-
-
-def test_diamond_fan_in_preserves_multiple_depends_on() -> None:
-    # The regression the old linear stub corrupted: d depends on BOTH b and c.
-    md = serialize_graph_topology(
-        name="diamond",
-        description=None,
-        io=_IO,
-        phases=[_ref("a", ["input"]), _ref("b", ["a"]), _ref("c", ["a"]), _ref("d", ["b", "c"])],
-    )
-    assert '<phase depends_on="b, c">d</phase>' in md
-    # b and c are NOT linearised into a chain; both depend only on a.
-    assert '<phase depends_on="a">b</phase>' in md
-    assert '<phase depends_on="a">c</phase>' in md
-    assert " output>" not in md
-
-
-def test_multiple_leaves_each_marked_output() -> None:
-    md = serialize_graph_topology(
-        name="multi-out",
-        description=None,
-        io=_IO,
-        phases=[_ref("a", ["input"]), _ref("b", ["a"]), _ref("c", ["a"])],
-    )
-    assert '<phase depends_on="a">b</phase>' in md
-    assert '<phase depends_on="a">c</phase>' in md
-    assert " output>" not in md
-
-
-def test_explicit_output_marker_is_preserved() -> None:
-    md = serialize_graph_topology(
-        name="explicit-out",
-        description=None,
-        io=_IO,
-        phases=[_ref("a", ["input"]), _ref("b", ["a"], output=True)],
-    )
-    assert '<phase depends_on="input">a</phase>' in md
-    assert '<phase depends_on="a" output>b</phase>' in md
-
-
-def test_disconnected_phase_renders_bare_phase_tag() -> None:
-    # A freshly-added phase has depends_on=[]; it must land in GRAPH.md as a
-    # plain canvas node, without inventing depends_on="input" or output.
-    md = serialize_graph_topology(
-        name="with-new",
-        description=None,
-        io=_IO,
-        phases=[_ref("step1", ["input"]), _ref("logic", [])],
-    )
-    assert "  - logic" in md  # appears in the phases: frontmatter list
-    assert '<phase>logic</phase>' in md
-
-
-def test_self_dependency_is_serialized_for_compile_to_diagnose() -> None:
-    md = serialize_graph_topology(
-        name="draft-invalid",
-        description=None,
-        io=_IO,
-        phases=[_ref("loop", ["loop"])],
+def _serialize(phases: list[GraphPhaseRef]) -> dict[str, object]:
+    return yaml.safe_load(
+        serialize_graph_topology(
+            graph_id="test-graph",
+            description="Typed topology fixture.",
+            io=_IO,
+            phases=phases,
+        )
     )
 
-    assert '<phase depends_on="loop">loop</phase>' in md
 
-
-def test_cycle_is_serialized_for_compile_to_diagnose() -> None:
-    md = serialize_graph_topology(
-        name="draft-cycle",
-        description=None,
-        io=_IO,
-        phases=[_ref("a", ["b"]), _ref("b", ["a"])],
+def test_linear_chain_emits_explicit_dependencies_and_output() -> None:
+    document = _serialize(
+        [_phase("a", ["input"]), _phase("b", ["a"]), _phase("c", ["b"], output=True)]
     )
 
-    assert '<phase depends_on="b">a</phase>' in md
-    assert '<phase depends_on="a">b</phase>' in md
+    assert document["schema_version"] == "gskill.graph.v1"
+    assert document["phases"] == [
+        {"id": "a", "depends_on": ["input"], "output": False},
+        {"id": "b", "depends_on": ["a"], "output": False},
+        {"id": "c", "depends_on": ["b"], "output": True},
+    ]
 
 
-def test_description_is_emitted_when_present() -> None:
-    md = serialize_graph_topology(
-        name="n",
-        description="hello world",
-        io=_IO,
-        phases=[_ref("only", [])],
+def test_diamond_fan_in_and_multiple_outputs_remain_explicit() -> None:
+    document = _serialize(
+        [
+            _phase("a", ["input"]),
+            _phase("b", ["a"], output=True),
+            _phase("c", ["a"], output=True),
+            _phase("d", ["b", "c"], output=True),
+        ]
     )
-    assert "description: hello world" in md
+
+    rows = {row["id"]: row for row in document["phases"]}
+    assert rows["b"]["depends_on"] == ["a"]
+    assert rows["c"]["depends_on"] == ["a"]
+    assert rows["d"]["depends_on"] == ["b", "c"]
+    assert {phase_id for phase_id, row in rows.items() if row["output"]} == {"b", "c", "d"}
+
+
+def test_topology_without_an_output_cannot_be_serialized() -> None:
+    with pytest.raises(GraphTopologySerializationError):
+        _serialize([_phase("a", ["input"])])
+
+
+def test_phase_without_a_dependency_cannot_be_represented() -> None:
+    with pytest.raises(ValueError):
+        _phase("a", [], output=True)
+
+
+def test_cycle_can_be_serialized_for_bundle_compile_to_diagnose() -> None:
+    document = _serialize(
+        [_phase("a", ["b"], output=True), _phase("b", ["a"], output=True)]
+    )
+    assert document["phases"] == [
+        {"id": "a", "depends_on": ["b"], "output": True},
+        {"id": "b", "depends_on": ["a"], "output": True},
+    ]
+
+
+def test_root_artifact_declaration_is_serialized_as_typed_data() -> None:
+    rendered = serialize_graph_topology(
+        graph_id="artifact-graph",
+        description="Artifact graph.",
+        io=_IO,
+        phases=[_phase("done", ["input"], output=True)],
+        artifacts=[
+            ArtifactDeclaration(
+                artifact_id="report",
+                stem="report",
+                fields=("report",),
+                mode="single",
+                format="md",
+            )
+        ],
+    )
+
+    assert yaml.safe_load(rendered)["artifacts"] == [
+        {
+            "artifact_id": "report",
+            "stem": "report",
+            "fields": ["report"],
+            "mode": "single",
+            "format": "md",
+        }
+    ]

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from graph_skill_runtime.core.runner import _run_v030_skill_dict
+from graph_skill_runtime.core.runner import _run_portable_skill_dict
 from graph_skill_runtime.io.run_layout import runs_root
 
 
@@ -16,21 +16,30 @@ def _write(path: Path, text: str) -> None:
 
 
 def _write_logic_skill(root: Path, phases: list[tuple[str, list[str]]]) -> None:
-    phase_yaml = "\n".join(f"  - {phase_id}" for phase_id, _ in phases)
     depended_on = {dep for _, deps in phases for dep in deps}
-    phase_body = "\n".join(
-        '<phase depends_on="{deps}"{output}>{phase_id}</phase>'.format(
-            deps=", ".join(deps) if deps else "input",
-            output=" output" if phase_id not in depended_on else "",
-            phase_id=phase_id,
+    phase_yaml = "\n".join(
+        "\n".join(
+            (
+                f"  - id: {phase_id}",
+                f"    depends_on: [{', '.join(deps) if deps else 'input'}]",
+                f"    output: {str(phase_id not in depended_on).lower()}",
+            )
         )
         for phase_id, deps in phases
     )
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: trace-auto-attach
+        root / "SKILL.md",
+        """---
+name: skill
+description: Exercise automatic trace attachment.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise automatic trace attachment.
 io:
   inputs:
     type: object
@@ -49,8 +58,6 @@ io:
         type: string
 phases:
 {phase_yaml}
----
-{phase_body}
 """,
     )
     for phase_id, _ in phases:
@@ -58,6 +65,7 @@ phases:
         _write(
             root / "phases" / phase_id / "LOGIC.md",
             f"""---
+name: {phase_id}
 io:
   inputs:
     type: object
@@ -70,6 +78,7 @@ io:
     type: object
     properties:
 {outputs_props}
+actions: [{phase_id}]
 ---
 <action>{phase_id}</action>
 """,
@@ -96,7 +105,7 @@ def _run_without_subscriber(
     *,
     run_id: str,
 ) -> Path:
-    result = _run_v030_skill_dict(
+    result = _run_portable_skill_dict(
         skill_root,
         thread_id=run_id,
         skill_resolver=mock_skill_resolver,
@@ -124,11 +133,11 @@ def _make_draft_phase_crash(skill_root: Path) -> None:
     )
 
 
-def test_v030_skill_dict_writes_trace_jsonl_when_no_subscriber(
+def test_portable_skill_dict_writes_trace_jsonl_when_no_subscriber(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    """V0.3 _run_v030_skill_dict() should auto-write trace.jsonl without subscribers."""
+    """V0.3 _run_portable_skill_dict() should auto-write trace.jsonl without subscribers."""
     skill_root = tmp_path / "skill"
     trace_dir = tmp_path / "trace-output"
     run_id = "trace-auto-no-subscriber"
@@ -144,7 +153,7 @@ def test_v030_skill_dict_writes_trace_jsonl_when_no_subscriber(
     assert events[-1]["status"] == "completed"
 
 
-def test_v030_skill_dict_trace_records_phase_events(
+def test_portable_skill_dict_trace_records_phase_events(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
@@ -177,7 +186,7 @@ def test_v030_skill_dict_trace_records_phase_events(
     ]
 
 
-def test_v030_skill_dict_trace_includes_phase_io(
+def test_portable_skill_dict_trace_includes_phase_io(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
@@ -203,7 +212,7 @@ def test_v030_skill_dict_trace_includes_phase_io(
     assert phase_end["context"]["phase_outputs"]["draft"] == {"answer": "draft:observability"}
 
 
-def test_v030_skill_dict_writes_trace_when_phase_crashes(
+def test_portable_skill_dict_writes_trace_when_phase_crashes(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
@@ -215,7 +224,7 @@ def test_v030_skill_dict_writes_trace_when_phase_crashes(
     _make_draft_phase_crash(skill_root)
 
     with pytest.raises(Exception, match="intentional trace crash"):
-        _run_v030_skill_dict(
+        _run_portable_skill_dict(
             skill_root,
             thread_id=run_id,
             skill_resolver=mock_skill_resolver,

@@ -25,5 +25,5 @@ legacy_marker: true
         encoding="utf-8",
     )
 
-    with pytest.raises(SkillLoadError, match="expects a skill root directory"):
+    with pytest.raises(SkillLoadError, match="expects a portable gSkill root directory"):
         compile_skill(skill_file, cache=False, skill_resolver=mock_skill_resolver)

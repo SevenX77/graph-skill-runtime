@@ -1,12 +1,8 @@
 ---
 status: retired
-updated: 2026-06-28
+updated: 2026-08-27
 ---
 
 # Resource Mechanisms Spec Retired
 
-本页不再承载 reference/example 文件格式模板。
-
-唯一真相源见 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md#8-mention-与资源引用)。
-
-运行机制属于 MVP1 mechanism 层，见 `docs/engine/mvp1/02-mechanism/03-assemble/` 与 `docs/engine/mvp1/02-mechanism/05-run-inner/04-tools/`。
+本页是 v0.3 resource 规则的退役导航，不承载当前模板。当前 reference/example path、skill-root resource 和 tool scope 契约见 [`01-PORTABLE-GSKILL-V1.md` §6](./01-PORTABLE-GSKILL-V1.md#6-flat-graph-registry调用图与资源)；运行实现以当前源码为准。

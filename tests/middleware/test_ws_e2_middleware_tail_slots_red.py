@@ -11,7 +11,6 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 
 import graph_skill_runtime.core.graph_assembler as graph_assembler
 from graph_skill_runtime.callbacks.base import Callback
-from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 from graph_skill_runtime.core.io_manager import IOManager
 from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
@@ -20,6 +19,7 @@ from graph_skill_runtime.middleware.factory import build_middleware_chain
 from graph_skill_runtime.middleware.loop_detection import LoopDetectionMiddleware
 from graph_skill_runtime.middleware.tool_error import ToolErrorHandlingMiddleware
 from graph_skill_runtime.middleware.tracing import TracingMiddleware
+from tests.legacy_fixture_adapter import compile_skill
 
 
 class _RecordingCallback(Callback):

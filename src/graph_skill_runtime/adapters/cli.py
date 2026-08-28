@@ -31,6 +31,7 @@ from graph_skill_runtime.domain.models import (
     RuntimeProfileOverlay,
     SubmitAgentResultRequest,
 )
+from graph_skill_runtime.migration import MigrationFailure
 
 _JSON_OBJECT_ADAPTER = TypeAdapter(JsonObject)
 
@@ -157,6 +158,16 @@ def build_parser() -> argparse.ArgumentParser:
     golden_parser.add_argument("baseline_id")
     golden_parser.add_argument("--state-root", required=True)
 
+    migrate_parser = commands.add_parser("migrate", help="Run an explicit one-shot format converter")
+    migrate_commands = migrate_parser.add_subparsers(dest="migrate_command", required=True)
+    studio_parser = migrate_commands.add_parser(
+        "studio-skill", help="Convert a frozen Studio v0.3 skill to portable v1"
+    )
+    studio_parser.add_argument("source")
+    studio_parser.add_argument("destination")
+    studio_parser.add_argument("--runtime-config")
+    studio_parser.add_argument("--preset-id", default="migrated")
+
     commands.add_parser("mcp", help="Serve gskill tools over MCP stdio")
     return parser
 
@@ -228,8 +239,26 @@ def main(
 
         create_server(active_application).run("stdio")
         return 0
+    if args.command == "migrate" and args.migrate_command == "studio-skill":
+        from graph_skill_runtime.migration import migrate_studio_skill
+
+        try:
+            migration = migrate_studio_skill(
+                args.source,
+                args.destination,
+                runtime_config=args.runtime_config,
+                preset_id=args.preset_id,
+            )
+        except MigrationFailure as exc:
+            _write_model(exc.report)
+            return 2
+        _write_model(migration)
+        return 0
     try:
         result = _dispatch(args, active_application)
+    except MigrationFailure as exc:
+        _write_model(exc.report)
+        return 2
     except ConfigurationError as exc:
         _write_model(exc.payload)
         return 2

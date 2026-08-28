@@ -1,4 +1,4 @@
-"""Runtime schema smoke tests for the V2.1 text-segmentation skill."""
+"""Runtime schema smoke tests for the text-segmentation skill."""
 
 from __future__ import annotations
 

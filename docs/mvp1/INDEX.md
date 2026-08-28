@@ -5,13 +5,36 @@ status: living
 updated: 2026-08-27
 ---
 
-# Graph Agent MVP1 文档索引
+# Graph Skill Runtime MVP1 文档索引
 
-本文是 engine MVP1 文档入口。历史迁移目录 `docs/engine/mvp1/_migration-src/` 已在 2026-06-28 删除；已迁内容以正式模块文档为准，需要历史记录时看 git 历史。
+本文是提取后 engine 的 MVP1 导航和 cutover 状态索引。当前运行事实由 standalone runtime 的 portable contract 与当前源码拥有；被 Phase 2 反转的 v0.3 模块文档保留为 pre-cutover 证据，不再作为当前契约。历史迁移目录 `docs/engine/mvp1/_migration-src/` 已在 2026-06-28 删除，需要更早记录时查看 git 历史。
 
-本文只索引**当前 engine MVP1 契约**。将 engine 提炼为独立 Python runtime/PyPI 包的未来目标另见 [Graph Skill Runtime 文档索引](../graph-skill-runtime/README.md)。该目标目前为 `drafted`，尚未替代本目录或当前 FROZEN skill format。
+## 1. Phase 2 后的当前所有权
 
-## 1. 三层结构
+| 事实 | 当前 owner | 边界 |
+| --- | --- | --- |
+| Portable 目录、`SKILL.md`、`graph.yaml`、phase schema、flat registry、artifact declaration/request、bundle compile 与 converter | [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md) | `audited-ready` 当前 contract；不复制第二套模板 |
+| Error code、level、stage、正向定义、原因、修复与 owning spec | [`skill-spec/11-error-code-spec.md`](../skill-spec/11-error-code-spec.md) | `living` 唯一 catalog，与 `ERROR_REGISTRY` 双射 |
+| Parser、loader、bundle inventory、compile 聚合与 flat graph call resolution | [`parser.py`](../../src/graph_skill_runtime/core/parser.py)、[`loader.py`](../../src/graph_skill_runtime/core/loader.py)、[`compiler.py`](../../src/graph_skill_runtime/core/compiler.py) | 当前可执行行为；格式与错误语义仍分别回到 `01` 与 `11` |
+| Graph/phase typed manifest 与本地 resolver | [`manifest.py`](../../src/graph_skill_runtime/core/manifest.py)、[`local_workspace_resolver.py`](../../src/graph_skill_runtime/core/local_workspace_resolver.py) | 当前可执行结构与解析；内部 graph id 由 portable flat registry 拥有 |
+| Typed SDK/CLI/MCP facade | [Public API contract](../public-api-contract.md) 与 [`graph_skill_runtime.__all__`](../../src/graph_skill_runtime/__init__.py) | 58-symbol Phase 1 facade 保持不变 |
+
+Production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取 portable contract。Legacy v0.3 parser 只在显式 `gskill migrate studio-skill` converter 中可达；[`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 是 `superseded` converter 输入与历史证据。
+
+## 2. Phase 2 已取代的模块文档
+
+下列文档的正文保留 v0.3 pre-cutover 描述，状态统一为 `superseded`。其中的现在时、路径、owner 和“唯一真相源”陈述都不是当前 runtime 事实：
+
+| 模块 | Superseded 文档 |
+| --- | --- |
+| Physical layout | [`baseline`](./01-contract/01-physical-layout/baseline.md)、[`alignment`](./01-contract/01-physical-layout/mvp1-alignment.md) |
+| Skill syntax | [`baseline`](./01-contract/02-skill-syntax/baseline.md)、[`alignment`](./01-contract/02-skill-syntax/mvp1-alignment.md) |
+| Compile rules | [`baseline`](./01-contract/03-compile-rules/baseline.md)、[`alignment`](./01-contract/03-compile-rules/mvp1-alignment.md) |
+| Invalidation baseline | [`baseline`](./01-contract/05-invalidation/baseline.md) |
+| Compile mechanism | [`baseline`](./02-mechanism/01-compile/baseline.md)、[`alignment`](./02-mechanism/01-compile/mvp1-alignment.md) |
+| Resolver mechanism | [`baseline`](./02-mechanism/02-resolver/baseline.md)、[`alignment`](./02-mechanism/02-resolver/mvp1-alignment.md) |
+
+## 3. 历史三层结构与未反转模块导航
 
 | Layer | Scope | Directory |
 | --- | --- | --- |
@@ -19,22 +42,22 @@ updated: 2026-08-27
 | B. Mechanism | compile / resolve / assemble / run outer / run inner / seam / runtime | `02-mechanism/` |
 | C. API Contract | engine 与 Studio 的操作边界 | `03-api-contract/` |
 
-## 2. Contract Modules
+## 4. Contract Modules
+
+| Module | Purpose | Phase 2 status |
+| --- | --- | --- |
+| `01-contract/01-physical-layout` | 文件树、`.workspace`、运行产物位置 | superseded；当前格式见 portable `01` |
+| `01-contract/02-skill-syntax` | skill 语法在 MVP1 中的职责边界 | superseded；当前格式见 portable `01` |
+| `01-contract/03-compile-rules` | 编译/装配/运行生命周期规则与错误诊断 | superseded；当前 compile 规则见 portable `01`，错误目录见 `11` |
+| `01-contract/04-data-contracts` | WorkflowState / result / error payload 等数据形状 | 未在本次 format cutover 中退役；消费前仍须核对当前 public models |
+| `01-contract/05-invalidation` | source change 到 golden/checkpoint/cache 的失效模型 | baseline superseded；其余内容须在消费前核对当前源码 |
+
+## 5. Mechanism Modules
 
 | Module | Purpose |
 | --- | --- |
-| `01-contract/01-physical-layout` | 文件树、`.workspace`、运行产物位置 |
-| `01-contract/02-skill-syntax` | skill 语法在 MVP1 中的职责边界；格式模板唯一真相源见 `../skill-spec/00-FORMAT-GROUND-TRUTH.md` |
-| `01-contract/03-compile-rules` | 编译/装配/运行生命周期规则与错误码 |
-| `01-contract/04-data-contracts` | WorkflowState / result / error payload 等数据形状 |
-| `01-contract/05-invalidation` | source change 到 golden/checkpoint/cache 的失效模型 |
-
-## 3. Mechanism Modules
-
-| Module | Purpose |
-| --- | --- |
-| `02-mechanism/01-compile` | loader/parser/validator/cache/purity scanner |
-| `02-mechanism/02-resolver` | subgraph path resolver |
+| `02-mechanism/01-compile` | loader/parser/validator/cache/purity scanner；旧文 superseded，当前实现见本页 §1 |
+| `02-mechanism/02-resolver` | 旧 path resolver 文档 superseded；当前 flat registry 解析见 portable `01` 与本页 §1 |
 | `02-mechanism/03-assemble` | AST 到 runnable graph / prompt assembly |
 | `02-mechanism/04-run-outer/01-graph-exec` | graph-level execution, StateMapper, LOGIC/SUBGRAPH dispatch |
 | `02-mechanism/04-run-outer/02-iterate` | batch/loop/graph-level iterate runtime |
@@ -51,15 +74,17 @@ updated: 2026-08-27
 | `02-mechanism/06-seam/02-observability` | typed events, traces, metrics |
 | `02-mechanism/07-runtime` | public SDK runtime entrypoints |
 
-## 4. API Contract
+## 6. API Contract
 
 | Module | Purpose |
 | --- | --- |
 | `03-api-contract` | compile/run/predict/resume/golden API signatures, event protocol, Studio HTTP contract |
 
-## 5. Current SSOT Notes
+## 7. Current SSOT Notes
 
-- Skill file templates: [`docs/engine/skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md).
-- MVP1 syntax alignment links to the skill-spec template and must not duplicate YAML examples.
+- Current skill format and bundle compile: [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md).
+- Current error catalog: [`skill-spec/11-error-code-spec.md`](../skill-spec/11-error-code-spec.md).
+- Superseded v0.3 converter input: [`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md).
+- MVP1 historical syntax and mechanism documents must not duplicate or override portable `01`.
 - `_migration-src` is no longer part of the live doc set.
-- Future extraction target: [`docs/engine/graph-skill-runtime/v1-alignment.md`](../graph-skill-runtime/v1-alignment.md). It remains drafted until implementation, migration verification, and reference cutover are complete.
+- Complete v1 design: [`design/v1-alignment.md`](../design/v1-alignment.md). It remains `drafted` because Phase 3 through Phase 6 are not implemented, even though Phase 2 is current.

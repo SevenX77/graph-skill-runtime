@@ -1,4 +1,4 @@
-"""Smoke tests for the legacy text-segmentation corpus layout."""
+"""Smoke tests for the portable text-segmentation corpus layout."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from graph_skill_runtime.core.loader import CompiledSkill, SkillLoader
 from graph_skill_runtime.core.manifest import AgentNodeAST, LogicNodeAST
 
 from ....conftest import MockSkillResolver
-from .._fixture_corpus import write_legacy_v21_corpus
+from .._fixture_corpus import write_portable_corpus
 
 
 def _compile_text_segmentation(tmp_path: Path) -> tuple[CompiledSkill, Path]:
-    corpus_root = write_legacy_v21_corpus(tmp_path)
+    corpus_root = write_portable_corpus(tmp_path)
     skill_root = corpus_root / "skills" / "text-segmentation"
     compiled = SkillLoader(validate_context_writes=False).compile_skill(
         skill_root,
@@ -21,10 +21,10 @@ def _compile_text_segmentation(tmp_path: Path) -> tuple[CompiledSkill, Path]:
     return compiled, skill_root
 
 
-def test_text_segmentation_compiles_from_legacy_v21_root(tmp_path: Path) -> None:
+def test_text_segmentation_compiles_from_portable_root(tmp_path: Path) -> None:
     compiled, _skill_root = _compile_text_segmentation(tmp_path)
 
-    assert list(compiled.manifest.phases) == ["setup", "segment", "review"]
+    assert [phase.id for phase in compiled.manifest.phases] == ["setup", "segment", "review"]
     assert {node.phase_name for node in compiled.nodes} == {"setup", "segment", "review"}
 
 

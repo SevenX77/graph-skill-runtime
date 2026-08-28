@@ -12,6 +12,7 @@ import pytest
 from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentError
 from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.migration import MigrationFailure, migrate_studio_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -39,7 +40,7 @@ def _invoke(root: Path, mock_skill_resolver: object, inputs: dict[str, Any]) -> 
     return graph.invoke({"data": {"inputs": inputs}, "flow": {}, "messages": [], "run_id": "r1"})
 
 
-def _logic_skill(
+def _legacy_logic_skill(
     root: Path,
     *,
     graph_inputs: dict[str, Any],
@@ -95,10 +96,77 @@ validator: false
     )
 
 
-def test_legacy_batch_field_remains_supported_while_iterate_becomes_primary(
-    tmp_path: Path, mock_skill_resolver: object
+def _logic_skill(
+    parent: Path,
+    *,
+    graph_inputs: dict[str, Any],
+    graph_outputs: dict[str, Any],
+    phase_inputs: dict[str, Any],
+    phase_outputs: dict[str, Any],
+    action_body: str,
+    phase_iterate: str | None = None,
+    graph_iterate: str | None = None,
+    graph_required: list[str] | None = None,
+    phase_required: list[str] | None = None,
+) -> Path:
+    root = parent / "iterate-runtime-contract"
+    graph_input_yaml = _schema_yaml(graph_inputs, required=graph_required)
+    graph_output_yaml = _schema_yaml(graph_outputs)
+    phase_input_yaml = _schema_yaml(phase_inputs, required=phase_required)
+    phase_output_yaml = _schema_yaml(phase_outputs)
+    graph_iterate_block = f"{graph_iterate.rstrip()}\n" if graph_iterate else ""
+    phase_iterate_block = f"{phase_iterate.rstrip()}\n" if phase_iterate else ""
+
+    _write(
+        root / "SKILL.md",
+        """---
+name: iterate-runtime-contract
+description: Exercise declarative iterate runtime behavior.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise declarative iterate runtime behavior.
+io:
+  inputs:
+    {graph_input_yaml}
+  outputs:
+    {graph_output_yaml}
+phases:
+  - id: worker
+    depends_on: [input]
+    output: true
+{graph_iterate_block}""",
+    )
+    _write(
+        root / "phases" / "worker" / "LOGIC.md",
+        f"""---
+name: worker
+io:
+  inputs:
+    {phase_input_yaml}
+  outputs:
+    {phase_output_yaml}
+actions: [worker]
+validator: false
+{phase_iterate_block}---
+<action>worker</action>
+""",
+    )
+    _write(
+        root / "phases" / "worker" / "actions" / "worker.py",
+        dedent(action_body).lstrip(),
+    )
+    return root
+
+
+def test_legacy_batch_field_requires_explicit_author_rewrite_before_migration(
+    tmp_path: Path,
 ) -> None:
-    _logic_skill(
+    _legacy_logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array", "items": {"type": "string"}}},
         graph_outputs={
@@ -125,15 +193,31 @@ batch:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": ["a", "b", "c"]})
+    source_snapshot = {
+        path.relative_to(tmp_path).as_posix(): path.read_bytes()
+        for path in sorted(path for path in tmp_path.rglob("*") if path.is_file())
+    }
+    destination = tmp_path.parent / "portable-batch-rejected"
 
-    assert _business_data(result)["seen"] == ["a", "b", "c"]
+    with pytest.raises(MigrationFailure) as exc_info:
+        migrate_studio_skill(tmp_path, destination)
+
+    report = exc_info.value.report
+    assert report.status == "failed"
+    assert report.diagnostics[0].code == "GSKILL_MIGRATION_UNKNOWN_FIELD"
+    assert "batch" in report.diagnostics[0].message
+    assert "iterate" in report.diagnostics[0].message
+    assert not destination.exists()
+    assert source_snapshot == {
+        path.relative_to(tmp_path).as_posix(): path.read_bytes()
+        for path in sorted(path for path in tmp_path.rglob("*") if path.is_file())
+    }
 
 
 def test_node_batch_iterate_one_based_closed_range_runs_selected_items_and_aggregates_outputs(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array", "items": {"type": "string"}}},
         graph_outputs={"seen": {"type": "array", "items": {"type": "string"}}},
@@ -153,7 +237,7 @@ iterate:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": ["a", "b", "c", "d"]})
+    result = _invoke(root, mock_skill_resolver, {"items": ["a", "b", "c", "d"]})
 
     assert _business_data(result)["seen"] == ["b", "c"]
     assert _business_data(result)["phase_outputs"]["worker"] == {"seen": ["b", "c"]}
@@ -216,7 +300,7 @@ def test_node_loop_iterate_accumulates_serially_with_declared_merge_mode(
     action_body: str,
     expected: Any,
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array"}},
         graph_outputs={"collected": {}},
@@ -237,7 +321,7 @@ iterate:
         action_body=action_body,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": items})
+    result = _invoke(root, mock_skill_resolver, {"items": items})
 
     assert _business_data(result)["collected"] == expected
     assert _business_data(result)["phase_outputs"]["worker"] == {"collected": expected}
@@ -246,7 +330,7 @@ iterate:
 def test_node_loop_iterate_next_iteration_reads_previous_accumulator_value(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array"}},
         graph_outputs={"collected": {"type": "array"}},
@@ -272,7 +356,7 @@ iterate:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": ["a", "b", "c"]})
+    result = _invoke(root, mock_skill_resolver, {"items": ["a", "b", "c"]})
 
     assert _business_data(result)["collected"] == ["a", "b", "c"]
     assert _business_data(result)["phase_outputs"]["worker"] == {"collected": ["a", "b", "c"]}
@@ -300,7 +384,7 @@ def test_loop_iterate_requires_item_and_accumulator_in_phase_inputs(
     phase_required: list[str],
     missing_name: str,
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array", "items": {"type": "string"}}},
         graph_outputs={"collected": {"type": "array"}},
@@ -325,7 +409,7 @@ iterate:
     )
 
     with pytest.raises(GraphAgentError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-iterate-accumulate-fields-missing]"
     assert missing_name in str(exc_info.value)
@@ -334,7 +418,7 @@ iterate:
 def test_iterate_over_must_resolve_to_list_at_runtime(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"title": {"type": "string"}},
         graph_outputs={"seen": {"type": "array"}},
@@ -353,7 +437,7 @@ iterate:
     )
 
     with pytest.raises(GraphAgentError) as exc_info:
-        _invoke(tmp_path, mock_skill_resolver, {"title": "not-a-list"})
+        _invoke(root, mock_skill_resolver, {"title": "not-a-list"})
 
     assert exc_info.value.payload.code == "[F-v3-iterate-over-not-list]"
     assert "'title'" in str(exc_info.value)
@@ -362,7 +446,7 @@ iterate:
 def test_node_batch_iterate_empty_list_returns_empty_aggregate_without_calling_action(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array", "items": {"type": "string"}}},
         graph_outputs={"seen": {"type": "array", "items": {"type": "string"}}},
@@ -380,7 +464,7 @@ iterate:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": []})
+    result = _invoke(root, mock_skill_resolver, {"items": []})
 
     assert _business_data(result)["seen"] == []
     assert _business_data(result)["phase_outputs"]["worker"] == {"seen": []}
@@ -389,7 +473,7 @@ iterate:
 def test_node_loop_iterate_empty_list_returns_accumulate_init_without_calling_action(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array", "items": {"type": "string"}}},
         graph_outputs={"collected": {"type": "array", "items": {"type": "string"}}},
@@ -413,7 +497,7 @@ iterate:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": []})
+    result = _invoke(root, mock_skill_resolver, {"items": []})
 
     assert _business_data(result)["collected"] == ["seed"]
     assert _business_data(result)["phase_outputs"]["worker"] == {"collected": ["seed"]}
@@ -422,7 +506,7 @@ iterate:
 def test_graph_level_batch_iterate_runs_the_whole_dag_inside_one_graph_invoke(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={"items": {"type": "array", "items": {"type": "integer"}}},
         graph_outputs={"doubled": {"type": "array", "items": {"type": "integer"}}},
@@ -441,7 +525,7 @@ iterate:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"items": [1, 2, 3]})
+    result = _invoke(root, mock_skill_resolver, {"items": [1, 2, 3]})
 
     assert _business_data(result)["doubled"] == [2, 4, 6]
     assert _business_data(result)["phase_outputs"]["worker"] == {"doubled": [2, 4, 6]}
@@ -450,7 +534,7 @@ iterate:
 def test_graph_level_loop_iterate_is_one_thread_loop_body_not_test_side_reinvoke(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         graph_inputs={
             "rounds": {"type": "array", "items": {"type": "integer"}},
@@ -479,7 +563,7 @@ iterate:
         """,
     )
 
-    result = _invoke(tmp_path, mock_skill_resolver, {"rounds": [1, 2, 3]})
+    result = _invoke(root, mock_skill_resolver, {"rounds": [1, 2, 3]})
 
     assert _business_data(result)["count"] == 6
     assert _business_data(result)["phase_outputs"]["worker"] == {"count": 6}

@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 
-from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
+from tests.legacy_fixture_adapter import compile_skill
 
 
 class DictSkillResolver:

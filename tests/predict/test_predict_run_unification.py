@@ -36,12 +36,20 @@ class _FakeAssembler:
         self.graph = _FakeGraph(payload)
 
 
-def _write_empty_v030_skill(root: Path) -> Path:
+def _write_empty_portable_skill(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "GRAPH.md").write_text(
+    (root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
-name: test
+name: skill
+description: Minimal boundary fixture for predict/run unification.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Minimal boundary fixture for predict/run unification.
 io:
   inputs:
     type: object
@@ -50,7 +58,6 @@ io:
     type: object
     properties: {}
 phases: []
----
 """,
         encoding="utf-8",
     )
@@ -68,15 +75,15 @@ def _compiled_with_outputs(output_schema: dict[str, Any]) -> SimpleNamespace:
     )
 
 
-def test_predict_reuses_run_v030_skill_dict_single_path(
+def test_predict_reuses_run_portable_skill_dict_single_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    skill_root = _write_empty_v030_skill(tmp_path / "skill")
+    skill_root = _write_empty_portable_skill(tmp_path / "skill")
     calls: list[dict[str, Any]] = []
 
-    def fake_run_v030_skill_dict(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    def fake_run_portable_skill_dict(*args: Any, **kwargs: Any) -> dict[str, Any]:
         calls.append({"args": args, "kwargs": kwargs})
         callbacks = kwargs.get("callbacks") or []
         for callback in callbacks:
@@ -102,7 +109,7 @@ def test_predict_reuses_run_v030_skill_dict_single_path(
         "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
-    monkeypatch.setattr(runner_module, "_run_v030_skill_dict", fake_run_v030_skill_dict)
+    monkeypatch.setattr(runner_module, "_run_portable_skill_dict", fake_run_portable_skill_dict)
 
     result = runner_module.predict_skill(
         skill_root,
@@ -122,7 +129,7 @@ def test_predict_context_threaded_to_assemble_graph(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    skill_root = _write_empty_v030_skill(tmp_path / "skill")
+    skill_root = _write_empty_portable_skill(tmp_path / "skill")
     received_predict_contexts: list[Any] = []
 
     monkeypatch.setattr(
@@ -136,13 +143,13 @@ def test_predict_context_threaded_to_assemble_graph(
 
     monkeypatch.setattr("graph_skill_runtime.core.graph_assembler.assemble_graph", fake_assemble_graph)
 
-    runner_module._run_v030_skill_dict(
+    runner_module._run_portable_skill_dict(
         skill_root,
         workspace_dir=tmp_path / "workspace-run",
         run_root=runs_root(tmp_path / "workspace-run"),
         skill_resolver=mock_skill_resolver,
     )
-    runner_module._run_v030_skill_dict(
+    runner_module._run_portable_skill_dict(
         skill_root,
         workspace_dir=tmp_path / "workspace-predict",
         run_root=predicts_root(tmp_path / "workspace-predict"),
@@ -159,7 +166,7 @@ def test_predict_root_output_schema_validated_like_run(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    skill_root = _write_empty_v030_skill(tmp_path / "skill")
+    skill_root = _write_empty_portable_skill(tmp_path / "skill")
     output_schema = {
         "type": "object",
         "required": ["text"],
@@ -176,7 +183,7 @@ def test_predict_root_output_schema_validated_like_run(
     )
 
     with pytest.raises(GraphAgentFatalError) as run_exc:
-        runner_module._run_v030_skill_dict(
+        runner_module._run_portable_skill_dict(
             skill_root,
             workspace_dir=tmp_path / "workspace-run",
             run_root=runs_root(tmp_path / "workspace-run"),
@@ -201,14 +208,14 @@ def test_predict_wrapper_still_returns_path_diff_and_deadlock(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    skill_root = _write_empty_v030_skill(tmp_path / "skill")
+    skill_root = _write_empty_portable_skill(tmp_path / "skill")
 
     def fake_strategy_from_param(_param: Any) -> HeuristicStubStrategy:
         strategy = HeuristicStubStrategy()
         strategy.expected_path = ["draft", "review"]  # type: ignore[attr-defined]
         return strategy
 
-    def fake_run_v030_skill_dict(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+    def fake_run_portable_skill_dict(*_args: Any, **kwargs: Any) -> dict[str, Any]:
         callbacks = kwargs.get("callbacks") or []
         for callback in callbacks:
             callback.on_event(PhaseStartEvent(phase_name="draft", phase_execution_id="exec-1", context={}))
@@ -237,7 +244,7 @@ def test_predict_wrapper_still_returns_path_diff_and_deadlock(
         "graph_skill_runtime.core.compiler.compile_skill",
         lambda *_args, **_kwargs: SimpleNamespace(nodes=[], raw={}),
     )
-    monkeypatch.setattr(runner_module, "_run_v030_skill_dict", fake_run_v030_skill_dict)
+    monkeypatch.setattr(runner_module, "_run_portable_skill_dict", fake_run_portable_skill_dict)
 
     result = runner_module.predict_skill(
         skill_root,
@@ -251,7 +258,7 @@ def test_predict_wrapper_still_returns_path_diff_and_deadlock(
     assert result.path_diff.missing == ["review"]
     assert result.success is False
 
-    def fake_deadlocking_run_v030_skill_dict(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+    def fake_deadlocking_run_portable_skill_dict(*_args: Any, **kwargs: Any) -> dict[str, Any]:
         callbacks = kwargs.get("callbacks") or []
         for callback in callbacks:
             for _ in range(11):
@@ -273,7 +280,7 @@ def test_predict_wrapper_still_returns_path_diff_and_deadlock(
             "wall_time_sec": 0.01,
         }
 
-    monkeypatch.setattr(runner_module, "_run_v030_skill_dict", fake_deadlocking_run_v030_skill_dict)
+    monkeypatch.setattr(runner_module, "_run_portable_skill_dict", fake_deadlocking_run_portable_skill_dict)
 
     with pytest.raises(runner_module.PredictDeadlockError):
         runner_module.predict_skill(

@@ -7,9 +7,9 @@ from typing import Any
 
 from langchain_core.messages import AIMessage
 
-from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
 from graph_skill_runtime.runtime.state import BlackboardState
+from tests.legacy_fixture_adapter import compile_skill
 
 
 class FakeToolChatModel:
@@ -189,7 +189,7 @@ def test_reference_reader_runtime_is_invoked_with_sandbox(
         {
             "data": {
                 "inputs": {
-                    "skill_id": "gamma2-reference",
+                    "skill_id": compiled.skill_manifest.name,
                     "phase_id": "main",
                     "references": [
                         {

@@ -13,6 +13,21 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _root(parent: Path) -> Path:
+    return parent / "strict-compile"
+
+
+def _skill_entry(root: Path) -> None:
+    _write(
+        root / "SKILL.md",
+        """---
+name: strict-compile
+description: Exercise strict portable compile boundaries.
+---
+""",
+    )
+
+
 def _graph(
     root: Path,
     *,
@@ -20,11 +35,12 @@ def _graph(
     output_field: str = "answer",
     phase: str = "main",
 ) -> None:
+    _skill_entry(root)
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: strict-compile
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise strict portable compile boundaries.
 io:
   inputs:
     type: object
@@ -39,9 +55,9 @@ io:
         type: string
     required: [{output_field}]
 phases:
-  - {phase}
----
-<phase depends_on="input" output>{phase}</phase>
+  - id: {phase}
+    depends_on: [input]
+    output: true
 """,
     )
 
@@ -67,8 +83,9 @@ def _agent(
         else ""
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 io:
   inputs:
     type: object
@@ -102,10 +119,12 @@ def _assert_code(exc_info: pytest.ExceptionInfo[SkillLoadError], code: str) -> N
 
 
 def test_phase_config_is_compile_fatal(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
+    root = _root(tmp_path)
+    _graph(root)
     _write(
-        tmp_path / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 phase_config:
   io:
     inputs:
@@ -131,7 +150,7 @@ Produce the declared output.
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-agent-schema-unknown-field]")
     assert exc_info.value.payload.field_path == "phase_config"
@@ -140,11 +159,13 @@ Produce the declared output.
 def test_required_io_must_be_declared_in_properties(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
+    root = _root(tmp_path)
+    _skill_entry(root)
     _write(
-        tmp_path / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: strict-compile
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise strict portable compile boundaries.
 io:
   inputs:
     type: object
@@ -159,15 +180,15 @@ io:
         type: string
     required: [answer]
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
-    _agent(tmp_path)
+    _agent(root)
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-graph-io-schema-invalid]")
 
@@ -175,11 +196,12 @@ phases:
 def test_phase_required_input_without_source_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path, input_field="topic", output_field="answer")
-    _agent(tmp_path, input_field="missing", output_field="answer")
+    root = _root(tmp_path)
+    _graph(root, input_field="topic", output_field="answer")
+    _agent(root, input_field="missing", output_field="answer")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-graph-dataflow-source-missing]")
 
@@ -187,10 +209,12 @@ def test_phase_required_input_without_source_is_compile_fatal(
 def test_phase_declared_input_without_source_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path, input_field="topic", output_field="answer")
+    root = _root(tmp_path)
+    _graph(root, input_field="topic", output_field="answer")
     _write(
-        tmp_path / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -221,7 +245,7 @@ Produce the declared output.
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-graph-dataflow-source-missing]")
     issues = exc_info.value.compile_result.issues  # type: ignore[attr-defined]
@@ -234,11 +258,12 @@ Produce the declared output.
 def test_required_root_output_must_be_available_at_output_phase(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path, input_field="topic", output_field="answer")
-    _agent(tmp_path, input_field="topic", output_field="summary")
+    root = _root(tmp_path)
+    _graph(root, input_field="topic", output_field="answer")
+    _agent(root, input_field="topic", output_field="summary")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-graph-dataflow-source-missing]")
 
@@ -246,11 +271,12 @@ def test_required_root_output_must_be_available_at_output_phase(
 def test_unknown_declared_agent_tool_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path, tool="missing_tool")
+    root = _root(tmp_path)
+    _graph(root)
+    _agent(root, tool="missing_tool")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-agent-tool-unknown]")
 
@@ -258,11 +284,12 @@ def test_unknown_declared_agent_tool_is_compile_fatal(
 def test_reference_path_must_resolve_to_readable_file(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path, reference_path="refs/missing.md")
+    root = _root(tmp_path)
+    _graph(root)
+    _agent(root, reference_path="refs/missing.md")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-resource-reference-path-invalid]")
 
@@ -270,11 +297,12 @@ def test_reference_path_must_resolve_to_readable_file(
 def test_example_path_must_resolve_to_readable_file(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path, example_path="examples/missing.md")
+    root = _root(tmp_path)
+    _graph(root)
+    _agent(root, example_path="examples/missing.md")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-resource-example-path-invalid]")
 
@@ -285,11 +313,12 @@ def test_declared_resource_paths_must_be_portable_relative_paths(
     mock_skill_resolver: object,
     bad_path: str,
 ) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path, reference_path=bad_path)
+    root = _root(tmp_path)
+    _graph(root)
+    _agent(root, reference_path=bad_path)
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-resource-reference-path-invalid]")
 
@@ -297,10 +326,12 @@ def test_declared_resource_paths_must_be_portable_relative_paths(
 def test_logic_action_inputs_mutation_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path, output_field="normalized")
+    root = _root(tmp_path)
+    _graph(root, output_field="normalized")
     _write(
-        tmp_path / "phases" / "main" / "LOGIC.md",
+        root / "phases" / "main" / "LOGIC.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -320,12 +351,12 @@ actions: [normalize]
 """,
     )
     _write(
-        tmp_path / "phases" / "main" / "actions" / "normalize.py",
+        root / "phases" / "main" / "actions" / "normalize.py",
         "def normalize(inputs):\n    inputs['normalized'] = 'bad'\n    return {}\n",
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-logic-action-purity-violation]")
 
@@ -333,10 +364,12 @@ actions: [normalize]
 def test_logic_action_context_signature_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path, output_field="normalized")
+    root = _root(tmp_path)
+    _graph(root, output_field="normalized")
     _write(
-        tmp_path / "phases" / "main" / "LOGIC.md",
+        root / "phases" / "main" / "LOGIC.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -356,12 +389,12 @@ actions: [normalize]
 """,
     )
     _write(
-        tmp_path / "phases" / "main" / "actions" / "normalize.py",
+        root / "phases" / "main" / "actions" / "normalize.py",
         "def normalize(context):\n    return {'normalized': 'bad'}\n",
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     _assert_code(exc_info, "[F-v3-logic-action-entrypoint-missing]")
 
@@ -369,11 +402,13 @@ actions: [normalize]
 def test_compile_does_not_write_pycache_into_skill_actions(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path, output_field="normalized")
-    actions_dir = tmp_path / "phases" / "main" / "actions"
+    root = _root(tmp_path)
+    _graph(root, output_field="normalized")
+    actions_dir = root / "phases" / "main" / "actions"
     _write(
-        tmp_path / "phases" / "main" / "LOGIC.md",
+        root / "phases" / "main" / "LOGIC.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -397,17 +432,19 @@ actions: [normalize]
         "def normalize(inputs):\n    return {'normalized': inputs['topic']}\n",
     )
 
-    _compile(tmp_path, mock_skill_resolver)
+    _compile(root, mock_skill_resolver)
 
     assert not (actions_dir / "__pycache__").exists()
 
 
 def test_nested_json_schema_remains_legal(tmp_path: Path, mock_skill_resolver: object) -> None:
+    root = _root(tmp_path)
+    _skill_entry(root)
     _write(
-        tmp_path / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: strict-compile
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise strict portable compile boundaries.
 io:
   inputs:
     type: object
@@ -432,11 +469,11 @@ io:
         required: [value]
     required: [answer]
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
-    _agent(tmp_path, input_field="records", output_field="answer")
+    _agent(root, input_field="records", output_field="answer")
 
-    _compile(tmp_path, mock_skill_resolver)
+    _compile(root, mock_skill_resolver)

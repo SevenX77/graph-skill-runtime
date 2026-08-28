@@ -1,9 +1,7 @@
-"""A defect found inside a child skill reaches the parent with every axis intact.
+"""A defect found inside a called registry graph keeps every diagnostic axis.
 
-A subgraph phase compiles its child skill, and when that child fails, the parent
-catches the error and re-raises the child's diagnostics as its own. That seam
-rebuilt each diagnostic field by field, so an axis nobody remembered to list
-there simply did not exist any more once the parent reported it.
+Bundle compile validates every graph and reports registry-graph failures against
+the business skill root. That seam must retain every structured diagnostic axis.
 
 `conflicting_phase` is the one that proved it. It was added so the sequential-
 overwrite rule could name the OTHER phase structurally instead of only inside
@@ -11,9 +9,8 @@ its English sentence (ledger K3), and it worked — at the top level. One subgra
 deep the field arrived `None`, and the canvas was back to reading the sentence.
 
 `source_path` is the axis that must be REBUILT rather than carried: it is
-relative to whichever root stated it, so the child's own relative path has to be
-re-rooted before the parent renders it against its own root. That distinction —
-one axis re-derived, all others carried — is what these tests pin.
+relative to the business skill root, even when the failing graph lives in the
+flat registry. That distinction is what these tests pin.
 """
 
 from __future__ import annotations
@@ -44,12 +41,12 @@ def _logic_phase(root: Path, name: str) -> None:
     _write(
         root / "phases" / name / "LOGIC.md",
         f"""---
+name: {name}
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}
   outputs:
     {_schema({"summary": {"type": "string"}})}
-actions: [{name}]
 validator: false
 ---
 <action>{name}</action>
@@ -64,68 +61,73 @@ validator: false
 def _conflict_skill(root: Path, name: str) -> None:
     """Two chained phases declaring the same output: the sequential-overwrite rule."""
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {name}
+description: Sequential overwrite fixture.
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}
   outputs:
     {_schema({"summary": {"type": "string"}})}
 phases:
-  - draft
-  - revise
----
-<phase depends_on="input">draft</phase>
-<phase depends_on="draft" output>revise</phase>
+  - id: draft
+    depends_on: [input]
+    output: false
+  - id: revise
+    depends_on: [draft]
+    output: true
 """,
     )
     _logic_phase(root, "draft")
     _logic_phase(root, "revise")
 
 
-def _wrapper_skill(root: Path, name: str, child_dir: str, phase_name: str) -> None:
-    """A skill whose single phase is a subgraph pointing at `subgraph/<child_dir>`."""
+def _wrapper_skill(root: Path, name: str, child_graph: str, phase_name: str) -> None:
+    """A graph whose single phase calls one flat registry graph id."""
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {name}
+description: Registry graph wrapper.
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}
   outputs:
     {_schema({"summary": {"type": "string"}})}
 phases:
-  - {phase_name}
----
-<phase depends_on="input" output>{phase_name}</phase>
+  - id: {phase_name}
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / phase_name / "SUBGRAPH.md",
         f"""---
 name: {phase_name}
-path: subgraph/{child_dir}
+graph: {child_graph}
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}
   outputs:
     {_schema({"summary": {"type": "string"}})}
 ---
-<subgraph>{phase_name}</subgraph>
 """,
     )
 
 
 @pytest.fixture
 def nested_conflict_root(tmp_path: Path) -> Path:
-    """parent → subgraph/mid → subgraph/leaf, the conflict in the deepest child."""
-    _wrapper_skill(tmp_path, "k6_parent", "mid", "mid_stage")
-    _wrapper_skill(tmp_path / "subgraph" / "mid", "k6_mid", "leaf", "leaf_stage")
-    _conflict_skill(tmp_path / "subgraph" / "mid" / "subgraph" / "leaf", "k6_leaf")
-    return tmp_path
+    """root → graphs/mid → graphs/leaf, with the conflict in the last graph."""
+    root = tmp_path / "diagnostic-skill"
+    _write(
+        root / "SKILL.md",
+        "---\nname: diagnostic-skill\ndescription: Nested graph diagnostic fixture.\n---\n",
+    )
+    _wrapper_skill(root, "root", "mid", "mid_stage")
+    _wrapper_skill(root / "graphs" / "mid", "mid", "leaf", "leaf_stage")
+    _conflict_skill(root / "graphs" / "leaf", "leaf")
+    return root
 
 
 def _issues(root: Path) -> list[CompileIssue]:
@@ -137,12 +139,13 @@ def _issues(root: Path) -> list[CompileIssue]:
 
 
 def _overwrite_issue(root: Path) -> CompileIssue:
+    issues = _issues(root)
     matches = [
         issue
-        for issue in _issues(root)
+        for issue in issues
         if issue.rule_id == "[F-v3-sequential-overwrite-unauthorized]"
     ]
-    assert len(matches) == 1, f"expected exactly one overwrite issue, got {matches}"
+    assert len(matches) == 1, f"expected exactly one overwrite issue, got {issues}"
     return matches[0]
 
 
@@ -165,7 +168,7 @@ def test_the_rebuilt_axis_is_the_one_that_names_the_root(nested_conflict_root: P
     # against the parent's.
     issue = _overwrite_issue(nested_conflict_root)
 
-    assert issue.source_path == "subgraph/mid/subgraph/leaf/phases/revise/LOGIC.md"
+    assert issue.source_path == "graphs/leaf/phases/revise/LOGIC.md"
 
 
 def test_every_issue_axis_is_accounted_for_at_the_child_seam() -> None:

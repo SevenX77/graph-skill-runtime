@@ -69,7 +69,6 @@ from graph_skill_runtime.core.loader import CompiledSkill, CompiledSubagent, Pha
 from graph_skill_runtime.core.local_workspace_resolver import default_local_resolver_for_compiled
 from graph_skill_runtime.core.manifest import (
     AgentNodeAST,
-    BatchSpec,
     GraphManifest,
     IterateSpec,
     LogicNodeAST,
@@ -223,7 +222,7 @@ def assemble_graph(
     _loading_stack: tuple[str, ...] = (),
     _compilation_cache: dict[str, CompiledSkill] | None = None,
 ) -> CompiledStateGraph:
-    """Assemble a V2.1 CompiledSkill into a compiled LangGraph."""
+    """Assemble one portable compiled graph into a LangGraph runtime."""
 
     resolver = skill_resolver or default_local_resolver_for_compiled(compiled)
     if _compilation_cache is None:
@@ -359,6 +358,7 @@ def _build_phase_node(
             _build_subgraph_node(
                 phase_doc,
                 ast,
+                compiled,
                 chat_model,
                 max_patch_attempts,
                 skill_resolver,
@@ -912,24 +912,6 @@ def _build_iterate_wrapped_phase(
     return _build_loop_iterate_phase(phase_id, node, iterate, output_schema, callbacks=callbacks)
 
 
-def _build_legacy_batch_wrapped_phase(
-    phase_id: str,
-    node: Any,
-    batch: BatchSpec,
-    output_schema: dict[str, Any] | None,
-) -> Any:
-    return _build_batch_iterate_phase(
-        phase_id,
-        node,
-        over=batch.iterator,
-        item_var=batch.item_var,
-        concurrency=batch.concurrency,
-        range_spec=None,
-        output_schema=output_schema,
-        include_batch_outputs=True,
-    )
-
-
 def _build_batch_iterate_phase(
     phase_id: str,
     node: Any,
@@ -1325,13 +1307,6 @@ def _wrap_phase_runtime_node(
             output_schema,
             callbacks=callbacks,
         )
-    if getattr(phase_ast, "batch", None) is not None:
-        return _build_legacy_batch_wrapped_phase(
-            phase_id,
-            wrapped,
-            phase_ast.batch,
-            output_schema,
-        )
     return wrapped
 
 
@@ -1725,6 +1700,7 @@ def _build_logic_node(
 def _build_subgraph_node(
     phase_doc: PhaseDocument,
     phase_ast: SubgraphNodeAST,
+    compiled: CompiledSkill,
     chat_model: Any,
     max_patch_attempts: int,
     skill_resolver: SkillResolverProtocol,
@@ -1739,15 +1715,17 @@ def _build_subgraph_node(
 ) -> Any:
     if _compilation_cache is None:
         _compilation_cache = {}
-    sub_root = _resolve_subgraph_path_root_for_assembly(phase_doc.path, phase_ast.path)
-    sub_root_key = str(Path(sub_root).resolve())
-    sub_compiled = _compilation_cache.get(sub_root_key)
+    sub_compiled = compiled.graph_registry.get(phase_ast.graph)
     if sub_compiled is None:
-        sub_compiled = SkillLoader(validate_context_writes=False).compile_skill(
-            sub_root,
-            skill_resolver=skill_resolver,
-            _loading_stack=_loading_stack,
-            _compilation_cache=_compilation_cache,
+        detail = f"{phase_doc.path}:1 graph registry does not contain {phase_ast.graph!r}"
+        raise GraphAgentFatalError(
+            detail,
+            payload=make_error_payload(
+                "[F-v3-graph-reference-unknown]",
+                detail,
+                field_path="graph",
+                source_path=phase_doc.path,
+            ),
         )
     sub_assembled = assemble_graph(
         sub_compiled,
@@ -1792,47 +1770,6 @@ def _build_subgraph_node(
         }
 
     return _subgraph_node
-
-
-def _resolve_subgraph_path_root_for_assembly(source_path: Path, value: str) -> Path:
-    parent_root = source_path.parent.parent.parent.resolve()
-    candidate = Path(value)
-    # Mirror the compile-time resolver (loader._resolve_subgraph_path_root): a
-    # relative path resolves against the skill root derived from this
-    # SUBGRAPH.md's location, an absolute path is taken as-is. Resolving against
-    # the *current* root (not a path baked at authoring time) is what lets a
-    # compiled skill survive relocation — e.g. Studio copying it into an
-    # ephemeral run dir — instead of failing with "must be absolute" / "escapes
-    # skill root".
-    if candidate.is_absolute():
-        resolved = candidate.resolve()
-    else:
-        resolved = (parent_root / candidate).resolve()
-    try:
-        resolved.relative_to(parent_root)
-    except ValueError as exc:
-        _subgraph_path_fatal(
-            source_path,
-            f"subgraph path {value!r} escapes skill root {parent_root}",
-        )
-        raise AssertionError("unreachable") from exc
-    if not resolved.is_dir():
-        _subgraph_path_fatal(source_path, f"subgraph path {value!r} is not a directory")
-    if not (resolved / "GRAPH.md").is_file():
-        _subgraph_path_fatal(source_path, f"subgraph path {value!r} has no GRAPH.md")
-    return resolved
-
-
-def _subgraph_path_fatal(source_path: Path, message: str) -> NoReturn:
-    detail = f"{source_path}:1 {message}"
-    raise GraphAgentFatalError(
-        detail,
-        payload=make_error_payload(
-            "[F-v3-subgraph-target-skill-invalid]",
-            detail,
-            source_path=source_path,
-        ),
-    )
 
 active_outer_ns: contextvars.ContextVar[str] = contextvars.ContextVar("active_outer_ns", default="")
 
@@ -2731,7 +2668,7 @@ def _skill_root(compiled: CompiledSkill) -> Path:
     root = compiled.raw.get("__skill_root__")
     if isinstance(root, (str, Path)):
         return Path(root)
-    # phases/<id>/SKILL.md — three levels up from any phase document.
+    # phases/<id>/<phase-file> — three levels up from any phase document.
     for document in compiled.nodes:
         return document.path.parents[2]
     return Path(".")
@@ -2757,10 +2694,10 @@ def _build_reference_reader_markdown(
 ) -> str:
     if not phase_ast.references:
         return ""
-    root = _skill_root_for_phase_path(phase_doc.path)
+    root = compiled.skill_root
     references = [item.model_dump() for item in phase_ast.references]
     runtime = ReferenceReaderRuntime(
-        skill_id=compiled.manifest.name,
+        skill_id=(compiled.skill_manifest.name if compiled.skill_manifest is not None else compiled.manifest.graph_id),
         phase_id=phase_id,
         root=root,
         references=references,
@@ -2906,7 +2843,7 @@ def _agent_resource_tools(
     phase_ast: AgentNodeAST,
     compiled: CompiledSkill,
 ) -> list[Any]:
-    root = _skill_root_for_phase_path(phase_doc.path)
+    root = compiled.skill_root
     references = {item.id: item for item in phase_ast.references}
     examples = {item.id: item for item in phase_ast.examples}
 
@@ -3270,7 +3207,7 @@ def _is_terminal_phase(
     compiled: CompiledSkill | None = None,
 ) -> bool:
     if compiled is None:
-        return phase_id in manifest.phases
+        return phase_id in {phase.id for phase in manifest.phases}
     return phase_id in _terminal_phase_ids(manifest, compiled)
 
 
@@ -3278,7 +3215,7 @@ def _terminal_phase_ids(
     manifest: GraphManifest, compiled: CompiledSkill | None = None
 ) -> list[str]:
     if compiled is None:
-        return list(manifest.phases)
+        return [phase.id for phase in manifest.phases]
     topology = _graph_topology(compiled)
     outputs = [
         str(row["name"])
@@ -3304,7 +3241,7 @@ def _graph_topology(compiled: CompiledSkill) -> dict[str, list[str]]:
                 topology[name] = [dep for dep in deps if isinstance(dep, str)]
         if topology:
             return topology
-    return {phase: ["input"] for phase in compiled.manifest.phases}
+    return {phase.id: ["input"] for phase in compiled.manifest.phases}
 
 
 def _is_critic_tool_name(name: str) -> bool:

@@ -1,4 +1,4 @@
-"""Line-location helpers for V2.1 YAML frontmatter."""
+"""Line-location guarantees for portable graph and phase documents."""
 
 from __future__ import annotations
 
@@ -12,6 +12,28 @@ from graph_skill_runtime.core.exceptions import SkillLoadError
 from graph_skill_runtime.core.loader import SkillLoader
 from graph_skill_runtime.core.parser import locate_line_for_pydantic_loc, parse_markdown_parts
 
+_EMPTY_IO = """io:
+  inputs:
+    type: object
+    properties: {}
+  outputs:
+    type: object
+    properties: {}"""
+
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _root(tmp_path: Path) -> Path:
+    root = tmp_path / "line-location-skill"
+    _write(
+        root / "SKILL.md",
+        "---\nname: line-location-skill\ndescription: Line location fixture.\n---\n",
+    )
+    return root
+
 
 def _write_minimal_logic_skill(
     root: Path,
@@ -19,654 +41,395 @@ def _write_minimal_logic_skill(
     graph_extra: str = "",
     logic_extra: str = "",
 ) -> None:
-    (root / "phases" / "prepare" / "actions").mkdir(parents=True)
-    graph_extra_block = f"{graph_extra}\n" if graph_extra else ""
-    logic_extra_block = f"{logic_extra}\n" if logic_extra else ""
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
-name: compiler-line-location-test
-{graph_extra_block}io:
+    graph_extra_row = f"{graph_extra}\n" if graph_extra else ""
+    logic_extra_row = f"{logic_extra}\n" if logic_extra else ""
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Line location graph.
+{graph_extra_row}io:
   inputs:
     type: object
     properties: {{}}
   outputs:
     type: object
+    required: [answer]
     properties:
-      answer:
-        type: string
+      answer: {{type: string}}
 phases:
-  - prepare
----
-<phase depends_on="input" output>prepare</phase>
+  - id: prepare
+    depends_on: [input]
+    output: true
 """,
-        encoding="utf-8",
     )
-    (root / "phases" / "prepare" / "LOGIC.md").write_text(
+    _write(
+        root / "phases" / "prepare" / "LOGIC.md",
         f"""---
-{logic_extra_block}io:
+name: prepare
+{logic_extra_row}io:
   inputs:
     type: object
     properties: {{}}
   outputs:
     type: object
+    required: [answer]
     properties:
-      answer:
-        type: string
+      answer: {{type: string}}
 ---
 <action>prepare</action>
 """,
-        encoding="utf-8",
     )
-    (root / "phases" / "prepare" / "actions" / "prepare.py").write_text(
+    _write(
+        root / "phases" / "prepare" / "actions" / "prepare.py",
         "def prepare(inputs):\n    return {'answer': 'ok'}\n",
-        encoding="utf-8",
     )
 
 
-def test_loader_validation_error_mentions_graph_md(tmp_path: Path, mock_skill_resolver: object) -> None:
-    (tmp_path / "phases" / "hello").mkdir(parents=True)
-    (tmp_path / "GRAPH.md").write_text(
-        """---
-schema_version: "v0.3.0"
-name: ""
-io:
-  inputs:
-    type: object
-    properties: {}
-  outputs:
-    type: object
-    properties: {}
+def _write_agent_graph(
+    root: Path,
+    *,
+    phases: list[tuple[str, tuple[str, ...], bool]],
+    bodies: dict[str, str] | None = None,
+) -> dict[str, Path]:
+    phase_rows: list[str] = []
+    for phase_id, dependencies, output in phases:
+        phase_rows.append(
+            f"  - id: {phase_id}\n"
+            f"    depends_on: [{', '.join(dependencies)}]\n"
+            f"    output: {str(output).lower()}"
+        )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Agent line location graph.
+{_EMPTY_IO}
 phases:
-  - hello
----
-<phase depends_on="input" output>hello</phase>
+{chr(10).join(phase_rows)}
 """,
-        encoding="utf-8",
     )
-    (tmp_path / "phases" / "hello" / "SKILL.md").write_text(
-        """---
-io:
-  inputs:
-    type: object
-    properties: {}
-  outputs:
-    type: object
-    properties: {}
+    paths: dict[str, Path] = {}
+    for phase_id, _, _ in phases:
+        path = root / "phases" / phase_id / "AGENT.md"
+        _write(
+            path,
+            f"""---
+name: {phase_id}
+llm_role: analyst
+{_EMPTY_IO}
 ---
-<role>Hello</role>
-<goal>Done.</goal>
-""",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert "GRAPH.md" in str(excinfo.value)
-    # engine-compile-diagnostics-v2 §5.1: empty graph name now surfaces the revived
-    # specific code instead of the generic collapsed "manifest validation failed" wrap.
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-graph-name-invalid]"
+{(bodies or {}).get(phase_id, "<role>R</role>" + chr(10) + "<goal>G</goal>" + chr(10))}""",
+        )
+        paths[phase_id] = path
+    return paths
 
 
-def test_graph_frontmatter_validation_payload_uses_relative_source_and_field_path(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    _write_minimal_logic_skill(tmp_path, graph_extra="unexpected_root: true")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    payload = excinfo.value.payload
-    assert payload is not None
-    assert payload.code == "[F-v3-graph-schema-unknown-field]"
-    assert payload.source_path == "GRAPH.md"
-    assert payload.field_path == "unexpected_root"
-    assert getattr(excinfo.value, "source_path", None) == "GRAPH.md"
-    assert getattr(excinfo.value, "field_path", None) == "unexpected_root"
+def _compile_error(root: Path) -> SkillLoadError:
+    with pytest.raises(SkillLoadError) as caught:
+        SkillLoader().compile_skill(root)
+    return caught.value
 
 
-def test_frontmatter_parse_error_payload_uses_relative_source_path(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    _write_minimal_logic_skill(tmp_path)
-    (tmp_path / "GRAPH.md").write_text(
-        """---
-schema_version: "v0.3.0"
-name: [unterminated
----
-<phase depends_on="input" output>prepare</phase>
-""",
-        encoding="utf-8",
+def _issues(exc: SkillLoadError) -> list[object]:
+    return list(exc.compile_result.issues)
+
+
+def _issue(exc: SkillLoadError, code: str, source_path: str | None = None) -> object:
+    matches = [
+        issue
+        for issue in _issues(exc)
+        if issue.rule_id == code
+        and (source_path is None or issue.source_path == source_path)
+    ]
+    assert matches, [(issue.rule_id, issue.source_path, issue.line) for issue in _issues(exc)]
+    return matches[0]
+
+
+def _line(path: Path, needle: str) -> int:
+    return next(
+        index
+        for index, row in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if needle in row
     )
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
 
-    payload = excinfo.value.payload
-    assert payload is not None
-    assert payload.code == "[F-v3-graph-schema-unknown-field]"
-    assert payload.source_path == "GRAPH.md"
-    assert payload.field_path is None
-
-
-def test_phase_frontmatter_validation_payload_uses_relative_source_and_field_path(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    _write_minimal_logic_skill(tmp_path, logic_extra='validator: "yes"')
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    payload = excinfo.value.payload
-    assert payload is not None
-    assert payload.code == "[F-v3-logic-validator-type-invalid]"
-    assert payload.source_path == "phases/prepare/LOGIC.md"
-    assert payload.field_path == "validator"
-    assert getattr(excinfo.value, "source_path", None) == "phases/prepare/LOGIC.md"
-    assert getattr(excinfo.value, "field_path", None) == "validator"
-
-
-def test_public_compile_error_payload_round_trips_location_axes(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    _write_minimal_logic_skill(tmp_path, graph_extra="unexpected_root: true")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
-
-    assert excinfo.value.payload is not None
-    dumped = excinfo.value.payload.model_dump(mode="json")
-    assert dumped["source_path"] == "GRAPH.md"
-    assert dumped["field_path"] == "unexpected_root"
-    wire_payload = getattr(excinfo.value, "error_payload", None)
-    assert wire_payload is not None
-    assert wire_payload["source_path"] == "GRAPH.md"
-    assert wire_payload["field_path"] == "unexpected_root"
-
-
-def test_locate_line_returns_one_indexed_line(tmp_path: Path, mock_skill_resolver: object) -> None:
-    graph = tmp_path / "GRAPH.md"
+def test_graph_validation_error_names_graph_yaml(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_minimal_logic_skill(root)
+    graph = root / "graph.yaml"
     graph.write_text(
-        "---\n"  # line 1
-        'schema_version: "2.1"\n'  # line 2
-        "name: hello\n"  # line 3
-        "phases:\n"  # line 4
-        "  - id: phase_a\n"  # line 5
-        "    src: phases/phase_a\n"  # line 6
-        "    depends_on: []\n"  # line 7
-        "---\n",
+        graph.read_text(encoding="utf-8").replace("graph_id: root", "graph_id: INVALID_ID"),
         encoding="utf-8",
+        newline="\n",
     )
-    frontmatter, _, _ = parse_markdown_parts(graph)
 
-    assert locate_line_for_pydantic_loc(frontmatter, ("name",)) == 3
-    assert locate_line_for_pydantic_loc(frontmatter, ("phases", 0, "src")) == 6
+    exc = _compile_error(root)
+    issue = _issue(exc, "[F-v3-graph-name-invalid]")
+
+    assert "graph.yaml" in str(exc)
+    assert issue.source_path == "graph.yaml"
+    assert issue.field_path == "graph_id"
+    assert issue.line == _line(graph, "graph_id:")
+
+
+def test_graph_field_error_has_relative_source_and_field_path(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_minimal_logic_skill(root, graph_extra="unexpected_root: true")
+
+    exc = _compile_error(root)
+    issue = _issue(exc, "[F-v3-graph-schema-unknown-field]")
+
+    assert issue.source_path == "graph.yaml"
+    assert issue.field_path == "unexpected_root"
+    assert exc.payload is not None
+    assert exc.payload.source_path == "graph.yaml"
+    assert exc.payload.field_path == "unexpected_root"
+
+
+def test_graph_yaml_parse_error_has_relative_source_path(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_minimal_logic_skill(root)
+    _write(root / "graph.yaml", "schema_version: [unterminated\n")
+
+    exc = _compile_error(root)
+    issue = _issue(exc, "[F-v3-graph-schema-unknown-field]")
+
+    assert issue.source_path == "graph.yaml"
+    assert issue.field_path is None
+
+
+def test_phase_field_error_has_relative_source_and_field_path(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_minimal_logic_skill(root, logic_extra='validator: "yes"')
+
+    exc = _compile_error(root)
+    issue = _issue(exc, "[F-v3-logic-validator-type-invalid]")
+
+    assert issue.source_path == "phases/prepare/LOGIC.md"
+    assert issue.field_path == "validator"
+
+
+def test_public_error_payload_round_trips_location_axes(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_minimal_logic_skill(root, graph_extra="unexpected_root: true")
+
+    with pytest.raises(SkillLoadError) as caught:
+        compile_skill(root, cache=False)
+
+    payload = caught.value.payload
+    assert payload is not None
+    dumped = payload.model_dump(mode="json")
+    assert dumped["source_path"] == "graph.yaml"
+    assert dumped["field_path"] == "unexpected_root"
+    assert caught.value.error_payload["source_path"] == "graph.yaml"
+    assert caught.value.error_payload["field_path"] == "unexpected_root"
+
+
+def test_locate_line_returns_one_indexed_line(tmp_path: Path) -> None:
+    phase = tmp_path / "AGENT.md"
+    _write(
+        phase,
+        "---\n"
+        "name: hello\n"
+        "subgraphs:\n"
+        "  - name: phase_a\n"
+        "    graph: graph-a\n"
+        "---\n",
+    )
+    frontmatter, _, _ = parse_markdown_parts(phase)
+
+    assert locate_line_for_pydantic_loc(frontmatter, ("name",)) == 2
+    assert locate_line_for_pydantic_loc(frontmatter, ("subgraphs", 0, "graph")) == 5
 
 
 def test_locate_line_returns_none_for_plain_dict() -> None:
-    plain = {"name": "x", "phases": [{"id": "p"}]}
-
-    assert locate_line_for_pydantic_loc(plain, ("name",)) is None
+    assert locate_line_for_pydantic_loc({"name": "x"}, ("name",)) is None
 
 
-# --------------------------------------------------------------------------- #
-# Body-tag line attribution: role / goal / action errors must carry the        #
-# FILE-absolute line of the offending tag (or the body start when the tag is   #
-# entirely absent), never the hardcoded line 1 that lands on the frontmatter   #
-# ``---``. The editor marks the whole file (frontmatter included), and Studio  #
-# forwards the engine line verbatim, so the axis must match frontmatter errors #
-# (file-absolute), not the body-relative ``_xml_line`` output.                 #
-# --------------------------------------------------------------------------- #
-
-# Fixed agent SKILL.md frontmatter: closing ``---`` on file line 10, so the
-# body begins at file line 11. Keep this in lockstep with the line asserts.
-_AGENT_SKILL_FRONTMATTER = """---
-llm_role: analyst
-io:
-  inputs:
-    type: object
-    properties: {}
-  outputs:
-    type: object
-    properties: {}
----
-"""
-_AGENT_BODY_START_LINE = 11
-
-
-def _write_agent_skill(root: Path, *, body: str, phase: str = "act") -> Path:
-    (root / "phases" / phase).mkdir(parents=True)
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
-name: agent-line-location-test
-io:
-  inputs:
-    type: object
-    properties: {{}}
-  outputs:
-    type: object
-    properties: {{}}
-phases:
-  - {phase}
----
-<phase depends_on="input" output>{phase}</phase>
-""",
-        encoding="utf-8",
-    )
-    skill = root / "phases" / phase / "SKILL.md"
-    skill.write_text(_AGENT_SKILL_FRONTMATTER + body, encoding="utf-8")
-    return skill
-
-
-def _error_line(exc: SkillLoadError, filename: str) -> int:
-    match = re.search(rf"{re.escape(filename)}:(\d+)", str(exc))
-    assert match is not None, f"no {filename}:<line> marker in: {exc}"
-    return int(match.group(1))
-
-
-def test_empty_role_tag_points_to_tag_line_not_one(
-    tmp_path: Path, mock_skill_resolver: object
+@pytest.mark.parametrize(
+    ("body", "code", "needle"),
+    [
+        ("<goal>Done.</goal>\n<role></role>\n", "[F-v3-agent-role-missing]", "<role>"),
+        ("<role>R</role>\n<goal></goal>\n", "[F-v3-agent-goal-missing]", "<goal>"),
+        (
+            "<role>R</role>\n<goal>G</goal>\n<bogus>x</bogus>\n",
+            "[F-v3-agent-body-tag-unknown]",
+            "<bogus>",
+        ),
+    ],
+)
+def test_agent_body_error_points_to_the_authored_tag_line(
+    tmp_path: Path,
+    body: str,
+    code: str,
+    needle: str,
 ) -> None:
-    # <goal> on file line 11, empty <role> on file line 12.
-    _write_agent_skill(tmp_path, body="<goal>Done.</goal>\n<role></role>\n")
+    root = _root(tmp_path)
+    phase = _write_agent_graph(
+        root,
+        phases=[("act", ("input",), True)],
+        bodies={"act": body},
+    )["act"]
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    issue = _issue(_compile_error(root), code)
 
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-agent-role-missing]"
-    assert _error_line(excinfo.value, "SKILL.md") == 12
+    assert issue.source_path == "phases/act/AGENT.md"
+    assert issue.line == _line(phase, needle)
 
 
-def test_missing_role_points_to_body_start_not_one(
-    tmp_path: Path, mock_skill_resolver: object
+@pytest.mark.parametrize(
+    ("body", "code", "remaining_tag"),
+    [
+        ("<goal>Done.</goal>\n", "[F-v3-agent-role-missing]", "<goal>"),
+        ("<role>R</role>\n", "[F-v3-agent-goal-missing]", "<role>"),
+    ],
+)
+def test_missing_agent_block_points_to_body_start(
+    tmp_path: Path,
+    body: str,
+    code: str,
+    remaining_tag: str,
 ) -> None:
-    _write_agent_skill(tmp_path, body="<goal>Done.</goal>\n")
+    root = _root(tmp_path)
+    phase = _write_agent_graph(
+        root,
+        phases=[("act", ("input",), True)],
+        bodies={"act": body},
+    )["act"]
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    issue = _issue(_compile_error(root), code)
 
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-agent-role-missing]"
-    assert _error_line(excinfo.value, "SKILL.md") == _AGENT_BODY_START_LINE
-
-
-def test_empty_goal_tag_points_to_tag_line_not_one(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # <role> on file line 11, empty <goal> on file line 12.
-    _write_agent_skill(tmp_path, body="<role>R</role>\n<goal></goal>\n")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-agent-goal-missing]"
-    assert _error_line(excinfo.value, "SKILL.md") == 12
+    assert issue.line == _line(phase, remaining_tag)
 
 
-def test_missing_goal_points_to_body_start_not_one(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    _write_agent_skill(tmp_path, body="<role>R</role>\n")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-agent-goal-missing]"
-    assert _error_line(excinfo.value, "SKILL.md") == _AGENT_BODY_START_LINE
-
-
-def test_empty_action_tag_flagged_even_beside_filled_sibling(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # Consistent with the agent's strict role/goal check: an empty <action></action>
-    # is itself a diagnostic even when another action is filled. The LOGIC.md body's
-    # filled action is file line 12, the empty one file line 13.
-    _write_minimal_logic_skill(tmp_path)
-    logic = tmp_path / "phases" / "prepare" / "LOGIC.md"
+def test_empty_action_points_to_its_tag_line(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_minimal_logic_skill(root)
+    logic = root / "phases" / "prepare" / "LOGIC.md"
     logic.write_text(
         logic.read_text(encoding="utf-8").replace(
             "<action>prepare</action>",
             "<action>prepare</action>\n<action></action>",
         ),
         encoding="utf-8",
+        newline="\n",
     )
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    issue = _issue(_compile_error(root), "[F-v3-logic-actions-empty]")
 
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-logic-actions-empty]"
-    assert _error_line(excinfo.value, "LOGIC.md") == 13
+    assert issue.line == _line(logic, "<action></action>")
 
 
-def test_unknown_body_tag_points_to_tag_file_line(
-    tmp_path: Path, mock_skill_resolver: object
+def test_forbidden_topology_tag_points_to_its_agent_file_line(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    phase = _write_agent_graph(
+        root,
+        phases=[("act", ("input",), True)],
+        bodies={"act": "<role>R</role>\n<goal>G</goal>\n<edge>x</edge>\n"},
+    )["act"]
+
+    exc = _compile_error(root)
+
+    assert "forbidden" in str(exc)
+    assert exc.payload is not None
+    assert exc.payload.source_path == "phases/act/AGENT.md"
+    assert re.search(rf"{re.escape(str(phase))}:\d+", str(exc))
+    assert _issues(exc)[0].line == _line(phase, "<edge>")
+
+
+@pytest.mark.parametrize(
+    ("phases", "code", "phase_id"),
+    [
+        ([("solo", ("solo",), True)], "[F-v3-graph-phase-cycle]", "solo"),
+        ([("solo", ("ghost",), True)], "[F-v3-graph-depends-unknown]", "solo"),
+        (
+            [("a", ("b",), False), ("b", ("a",), True)],
+            "[F-v3-graph-phase-cycle]",
+            "a",
+        ),
+    ],
+)
+def test_topology_error_points_to_a_phase_entry_line(
+    tmp_path: Path,
+    phases: list[tuple[str, tuple[str, ...], bool]],
+    code: str,
+    phase_id: str,
 ) -> None:
-    # Sibling of role/goal: the unknown-tag diagnostic must share the file-absolute
-    # axis too. role L11, goal L12, unknown <bogus> on file line 13.
-    _write_agent_skill(
-        tmp_path, body="<role>R</role>\n<goal>G</goal>\n<bogus>x</bogus>\n"
+    root = _root(tmp_path)
+    _write_agent_graph(root, phases=phases)
+    graph = root / "graph.yaml"
+
+    issue = _issue(_compile_error(root), code)
+
+    assert issue.source_path == "graph.yaml"
+    if len(phases) == 1:
+        assert issue.line == _line(graph, f"- id: {phase_id}")
+    else:
+        phase_lines = {_line(graph, f"- id: {item[0]}") for item in phases}
+        assert issue.line in phase_lines
+
+
+def test_missing_role_and_goal_are_reported_together(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_agent_graph(
+        root,
+        phases=[("act", ("input",), True)],
+        bodies={"act": "Plain prose.\n"},
     )
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    codes = {issue.rule_id for issue in _issues(_compile_error(root))}
 
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-agent-body-tag-unknown]"
-    assert _error_line(excinfo.value, "SKILL.md") == 13
-
-
-def test_forbidden_topology_tag_in_body_points_to_file_line(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # scan_forbidden_topology_tags (parser) was the last body diagnostic still on
-    # the body-relative axis. role L11, goal L12, forbidden <edge> on file line 13.
-    _write_agent_skill(
-        tmp_path, body="<role>R</role>\n<goal>G</goal>\n<edge>x</edge>\n"
-    )
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert "forbidden" in str(excinfo.value)
-    assert _error_line(excinfo.value, "SKILL.md") == 13
-
-
-def _write_graph_with_solo_phase(root: Path, *, depends_on: str) -> None:
-    # GRAPH.md frontmatter closes on file line 13 → the body <phase> is on file line 14.
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
-name: graph-diag-line-test
-io:
-  inputs:
-    type: object
-    properties: {{}}
-  outputs:
-    type: object
-    properties: {{}}
-phases:
-  - solo
----
-<phase depends_on="{depends_on}">solo</phase>
-""",
-        encoding="utf-8",
-    )
-    (root / "phases" / "solo").mkdir(parents=True)
-    (root / "phases" / "solo" / "SKILL.md").write_text(
-        _AGENT_SKILL_FRONTMATTER + "<role>R</role>\n<goal>G</goal>\n", encoding="utf-8"
-    )
-
-
-def test_graph_phase_cycle_points_to_phase_tag_file_line(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # Regression for the auditor-found defect: the GRAPH.md <phase> diagnostics read
-    # token.line_start (body-relative) and landed on line 1. They must point at the
-    # <phase> tag's FILE line (14), like the sibling [F-v3-graph-phase-id-invalid].
-    _write_graph_with_solo_phase(tmp_path, depends_on="solo")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-graph-phase-cycle]"
-    assert _error_line(excinfo.value, "GRAPH.md") == 14
-
-
-def test_graph_depends_unknown_points_to_phase_tag_file_line(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    _write_graph_with_solo_phase(tmp_path, depends_on="input ghost")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-graph-depends-unknown]"
-    assert _error_line(excinfo.value, "GRAPH.md") == 14
-
-
-def _write_graph_with_multinode_cycle(root: Path) -> None:
-    # A real a->b->a cycle. GRAPH.md frontmatter closes on file line 14, so the two
-    # body <phase> tags are on file lines 15 (a) and 16 (b).
-    (root / "GRAPH.md").write_text(
-        """---
-schema_version: "v0.3.0"
-name: graph-cycle-line-test
-io:
-  inputs:
-    type: object
-    properties: {}
-  outputs:
-    type: object
-    properties: {}
-phases:
-  - a
-  - b
----
-<phase depends_on="b">a</phase>
-<phase depends_on="a" output>b</phase>
-""",
-        encoding="utf-8",
-    )
-    for phase in ("a", "b"):
-        (root / "phases" / phase).mkdir(parents=True)
-        (root / "phases" / phase / "SKILL.md").write_text(
-            _AGENT_SKILL_FRONTMATTER + "<role>R</role>\n<goal>G</goal>\n", encoding="utf-8"
-        )
-
-
-def test_graph_multinode_cycle_points_to_phase_tag_file_line(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # The multi-node cycle in _validate_acyclic_graph hardcoded line 1 (the only
-    # <phase> diagnostic still on the wrong axis). It must point at an offending
-    # <phase> tag's FILE line (15 or 16 here), like every sibling <phase> diagnostic.
-    _write_graph_with_multinode_cycle(tmp_path)
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    assert excinfo.value.payload is not None
-    assert excinfo.value.payload.code == "[F-v3-graph-phase-cycle]"
-    assert "cycle detected" in str(excinfo.value)
-    assert _error_line(excinfo.value, "GRAPH.md") in {15, 16}
-
-
-# --------------------------------------------------------------------------- #
-# Collect-all (P2): compile/lint is static analysis, not a run — one pass must  #
-# surface EVERY independent diagnostic, not abort at the first. The engine      #
-# carries the full set on ``exc.compile_result.issues`` (the seam Studio's      #
-# compile drawer already projects); the primary ``payload`` stays the first     #
-# diagnostic for the single-error (realtime-lint) consumers.                    #
-# --------------------------------------------------------------------------- #
-
-
-def _all_codes(exc: SkillLoadError) -> set[str]:
-    compile_result = getattr(exc, "compile_result", None)
-    issues = getattr(compile_result, "issues", None)
-    if isinstance(issues, list) and issues:
-        return {str(getattr(issue, "rule_id", "")) for issue in issues}
-    return {exc.payload.code} if exc.payload is not None else set()
-
-
-def test_agent_missing_role_and_goal_reported_together(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # Body declares neither <role> nor <goal>: ONE compile must surface BOTH,
-    # not abort after the role check (the core P2 regression lock).
-    _write_agent_skill(tmp_path, body="Just prose, no tags.\n")
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    codes = _all_codes(excinfo.value)
     assert "[F-v3-agent-role-missing]" in codes
     assert "[F-v3-agent-goal-missing]" in codes
 
 
-def test_defects_in_separate_nodes_do_not_hide_each_other(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # Two agent phases, each missing role+goal: one compile must surface defects
-    # from BOTH files, not abort at the first node (collect-all layer 2).
-    (tmp_path / "GRAPH.md").write_text(
-        """---
-schema_version: "v0.3.0"
-name: collect-all-cross-node
-io:
-  inputs:
-    type: object
-    properties: {}
-  outputs:
-    type: object
-    properties: {}
-phases:
-  - first
-  - second
----
-<phase depends_on="input">first</phase>
-<phase depends_on="first" output>second</phase>
-""",
-        encoding="utf-8",
+def test_defects_in_separate_nodes_do_not_hide_each_other(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_agent_graph(
+        root,
+        phases=[("first", ("input",), False), ("second", ("first",), True)],
+        bodies={"first": "Plain prose.\n", "second": "Plain prose.\n"},
     )
-    for phase in ("first", "second"):
-        (tmp_path / "phases" / phase).mkdir(parents=True)
-        (tmp_path / "phases" / phase / "SKILL.md").write_text(
-            _AGENT_SKILL_FRONTMATTER + "Just prose, no tags.\n", encoding="utf-8"
-        )
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    paths = {issue.source_path for issue in _issues(_compile_error(root))}
 
-    issues = getattr(getattr(excinfo.value, "compile_result", None), "issues", [])
-    located_files = {str(getattr(issue, "source_path", "")) for issue in issues}
-    assert any("first" in loc for loc in located_files)
-    assert any("second" in loc for loc in located_files)
+    assert "phases/first/AGENT.md" in paths
+    assert "phases/second/AGENT.md" in paths
 
 
-# --------------------------------------------------------------------------- #
-# Stage-level collect-all (compile-rules §2.1 「同阶段尽量聚合」): independent   #
-# defects inside the topology stage (multiple islands / unknown deps), and      #
-# across the independent pre-barrier segments (topology + node contents), must  #
-# surface in ONE compile instead of revealing themselves one fix at a time.     #
-# --------------------------------------------------------------------------- #
-
-
-def _write_three_phase_graph(root: Path, phase_lines: list[str]) -> None:
-    """GRAPH.md with 3 phases a/b/c; frontmatter closes on file line 15, so the
-    body <phase> tags land on file lines 16/17/18."""
-    body = "\n".join(phase_lines)
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
-name: stage-collect-all-test
-io:
-  inputs:
-    type: object
-    properties: {{}}
-  outputs:
-    type: object
-    properties: {{}}
-phases:
-  - a
-  - b
-  - c
----
-{body}
-""",
-        encoding="utf-8",
-    )
-    for phase in ("a", "b", "c"):
-        (root / "phases" / phase).mkdir(parents=True)
-        (root / "phases" / phase / "SKILL.md").write_text(
-            _AGENT_SKILL_FRONTMATTER + "<role>R</role>\n<goal>G</goal>\n", encoding="utf-8"
-        )
-
-
-def _issues_with_code(exc: SkillLoadError, code: str) -> list[object]:
-    issues = getattr(getattr(exc, "compile_result", None), "issues", None) or []
-    return [issue for issue in issues if str(getattr(issue, "rule_id", "")) == code]
-
-
-def test_two_bare_phases_report_two_islands_together(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # b (line 17) and c (line 18) both declare no depends_on: ONE compile must
-    # flag BOTH islands, not abort at the first bare phase.
-    _write_three_phase_graph(
-        tmp_path,
-        [
-            '<phase depends_on="input" output>a</phase>',
-            "<phase>b</phase>",
-            "<phase>c</phase>",
+def test_two_unknown_dependencies_are_reported_together(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_agent_graph(
+        root,
+        phases=[
+            ("a", ("input",), False),
+            ("b", ("ghost-one",), True),
+            ("c", ("ghost-two",), True),
         ],
     )
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    unknown = [
+        issue
+        for issue in _issues(_compile_error(root))
+        if issue.rule_id == "[F-v3-graph-depends-unknown]"
+    ]
+    messages = " | ".join(issue.message for issue in unknown)
 
-    islands = _issues_with_code(excinfo.value, "[F-v3-graph-phase-island]")
-    axes = {(getattr(issue, "source_path", None), getattr(issue, "line", None)) for issue in islands}
-    field_paths = {getattr(issue, "field_path", None) for issue in islands}
-    assert len(islands) == 2, f"expected both islands, got: {islands}"
-    assert ("GRAPH.md", 17) in axes
-    assert ("GRAPH.md", 18) in axes
-    assert field_paths == {"b.depends_on", "c.depends_on"}
+    assert len(unknown) == 2
+    assert "ghost-one" in messages
+    assert "ghost-two" in messages
 
 
-def test_two_unknown_deps_reported_together(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # b -> ghost1 (line 17) and c -> ghost2 (line 18): ONE compile must flag
-    # BOTH unknown dependencies, not just unknown_deps[0].
-    _write_three_phase_graph(
-        tmp_path,
-        [
-            '<phase depends_on="input" output>a</phase>',
-            '<phase depends_on="ghost1">b</phase>',
-            '<phase depends_on="ghost2">c</phase>',
-        ],
+def test_topology_defect_does_not_hide_agent_body_defect(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_agent_graph(
+        root,
+        phases=[("a", ("input",), False), ("b", ("ghost",), True)],
+        bodies={"a": "<role>R</role>\n", "b": "<role>R</role>\n<goal>G</goal>\n"},
     )
 
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    codes = {issue.rule_id for issue in _issues(_compile_error(root))}
 
-    unknown = _issues_with_code(excinfo.value, "[F-v3-graph-depends-unknown]")
-    messages = " | ".join(str(getattr(issue, "message", "")) for issue in unknown)
-    assert len(unknown) == 2, f"expected both unknown deps, got: {unknown}"
-    assert "ghost1" in messages
-    assert "ghost2" in messages
-
-
-def test_topology_defect_does_not_hide_node_defect(
-    tmp_path: Path, mock_skill_resolver: object
-) -> None:
-    # A broken edge (island on c) and a node content defect (a missing <goal>)
-    # are independent: ONE compile must surface both, instead of the topology
-    # stage masking every node-level diagnostic.
-    _write_three_phase_graph(
-        tmp_path,
-        [
-            '<phase depends_on="input">a</phase>',
-            '<phase depends_on="a" output>b</phase>',
-            "<phase>c</phase>",
-        ],
-    )
-    (tmp_path / "phases" / "a" / "SKILL.md").write_text(
-        _AGENT_SKILL_FRONTMATTER + "<role>R</role>\n", encoding="utf-8"
-    )
-
-    with pytest.raises(SkillLoadError) as excinfo:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    codes = _all_codes(excinfo.value)
-    assert "[F-v3-graph-phase-island]" in codes
+    assert "[F-v3-graph-depends-unknown]" in codes
     assert "[F-v3-agent-goal-missing]" in codes

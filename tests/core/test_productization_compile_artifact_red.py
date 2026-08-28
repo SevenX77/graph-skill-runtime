@@ -18,12 +18,22 @@ def _write_text(path: Path, text: str) -> None:
 
 def _write_logic_skill(root: Path, *, ui_metadata: dict[str, Any] | None = None) -> None:
     metadata = ui_metadata or {"ui": {"nodes": {"draft": {"x": 1, "y": 2}}}}
+    ui_value = json.dumps(metadata["ui"], ensure_ascii=False, sort_keys=True)
     _write_text(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: productization-compile-artifact
-metadata: {metadata!r}
+name: skill
+description: Exercise deterministic compiled artifacts.
+metadata:
+  ui: {json.dumps(ui_value)}
+---
+""",
+    )
+    _write_text(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise deterministic compiled artifacts.
 io:
   inputs:
     type: object
@@ -36,14 +46,15 @@ io:
       answer:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
     )
     _write_text(
         root / "phases" / "draft" / "LOGIC.md",
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -81,7 +92,7 @@ def test_compile_artifact_hash_is_stable_across_temp_roots_and_mtime(
     shutil.copytree(first_root, second_root)
 
     first = _compile_artifact(first_root, skill_resolver=mock_skill_resolver)
-    os.utime(second_root / "GRAPH.md", (1_900_000_000, 1_900_000_000))
+    os.utime(second_root / "graph.yaml", (1_900_000_000, 1_900_000_000))
     second = _compile_artifact(second_root, skill_resolver=mock_skill_resolver)
 
     assert first.artifact_ref.content_hash == second.artifact_ref.content_hash
@@ -131,12 +142,11 @@ def test_execution_fingerprint_changes_when_graph_execution_semantics_change(
     _write_logic_skill(first_root)
     shutil.copytree(first_root, second_root)
 
-    graph_path = second_root / "GRAPH.md"
+    graph_path = second_root / "graph.yaml"
     graph_path.write_text(
-        """---
-schema_version: "v0.3.0"
-name: productization-compile-artifact
-metadata: {'ui': {'nodes': {'draft': {'x': 1, 'y': 2}}}}
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise deterministic compiled artifacts.
 io:
   inputs:
     type: object
@@ -149,17 +159,19 @@ io:
       answer:
         type: string
 phases:
-  - review
-  - draft
----
-<phase depends_on="input">review</phase>
-<phase depends_on="review" output>draft</phase>
+  - id: review
+    depends_on: [input]
+    output: false
+  - id: draft
+    depends_on: [review]
+    output: true
 """,
         encoding="utf-8",
     )
     _write_text(
         second_root / "phases" / "review" / "LOGIC.md",
         """---
+name: review
 io:
   inputs:
     type: object
@@ -245,12 +257,14 @@ def test_compile_artifact_writes_source_map_for_runtime_nodes(
     source_map_path = _file_uri_path(manifest.source_map_ref)
     assert source_map_path.is_file()
     source_map = json.loads(source_map_path.read_text(encoding="utf-8"))
-    graph_lines = (skill_root / "GRAPH.md").read_text(encoding="utf-8").splitlines()
-    draft_line = next(index for index, line in enumerate(graph_lines, start=1) if line.strip() == "- draft")
+    graph_lines = (skill_root / "graph.yaml").read_text(encoding="utf-8").splitlines()
+    draft_line = next(
+        index for index, line in enumerate(graph_lines, start=1) if line.strip() == "- id: draft"
+    )
 
     assert source_map["schema_version"] == "mvp1.source_map.v1"
     assert source_map["nodes"]["draft"]["node_id"] == "draft"
-    assert source_map["nodes"]["draft"]["source"]["path"] == "GRAPH.md"
+    assert source_map["nodes"]["draft"]["source"]["path"] == "graph.yaml"
     assert source_map["nodes"]["draft"]["source"]["line"] == draft_line
     assert source_map["nodes"]["draft"]["source"]["span"] == {
         "start_line": draft_line,

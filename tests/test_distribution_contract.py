@@ -31,11 +31,14 @@ def test_distribution_import_and_console_names_are_one_hard_cut() -> None:
     assert not (REPO_ROOT / "src" / "graph_agent").exists()
 
 
-def test_wheel_configuration_excludes_examples_and_stale_package_metadata() -> None:
+def test_business_examples_live_outside_the_wheel_package() -> None:
     configuration = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     wheel = configuration["tool"]["hatch"]["build"]["targets"]["wheel"]
+    package_examples = REPO_ROOT / "src" / "graph_skill_runtime" / "examples"
 
-    assert wheel["exclude"] == ["src/graph_skill_runtime/examples/**"]
+    assert wheel == {"packages": ["src/graph_skill_runtime"]}
+    assert (REPO_ROOT / "examples" / "hello-world" / "SKILL.md").is_file()
+    assert not any(candidate.is_file() for candidate in package_examples.rglob("*"))
     assert not (REPO_ROOT / "src" / "graph_skill_runtime" / "requirements.txt").exists()
     assert not (REPO_ROOT / "src" / "graph_skill_runtime" / "CHANGELOG.md").exists()
 

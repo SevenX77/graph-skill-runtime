@@ -26,11 +26,11 @@ def test_skill_compilation_error_formats_structured_context() -> None:
     )
 
 
-def test_compile_skill_file_path_is_rejected_for_v21(
+def test_compile_skill_rejects_a_file_instead_of_a_portable_root(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
     skill = tmp_path / "SKILL.md"
-    skill.write_text("---\nname: old\n---\n", encoding="utf-8")
+    skill.write_text("---\nname: portable\n---\n", encoding="utf-8")
 
-    with pytest.raises(SkillLoadError, match="expects a skill root directory"):
+    with pytest.raises(SkillLoadError, match="expects a portable gSkill root directory"):
         compile_skill(skill, cache=False, skill_resolver=mock_skill_resolver)

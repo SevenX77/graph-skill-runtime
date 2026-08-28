@@ -1,10 +1,12 @@
 ---
 module: 02-mechanism/01-compile
 doc: baseline
-status: audited-ready（现状对齐 pinned 代码 7cd4b9c；编译机制 = loader 校验流水线 + compiler 缓存壳）
+status: superseded（Phase 2 parser/loader/compiler 已取代本文的 v0.3 机制 baseline）
 ---
 
 # 01-compile — Baseline(当下代码实现逻辑)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 bundle compile 契约见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前实现见 [`parser.py`](../../../../src/graph_skill_runtime/core/parser.py)、[`loader.py`](../../../../src/graph_skill_runtime/core/loader.py) 与 [`compiler.py`](../../../../src/graph_skill_runtime/core/compiler.py)。后文只保留旧 `SkillLoader` v0.3 pipeline 的 pre-cutover evidence；其中现在时、行号和机制缺口不再描述当前 checkout。
 
 > **Scope**: 把磁盘 skill 源码读进来 → 校验 → 编成可信 AST(`CompiledSkill`)的引擎机制:`compiler.py`(公开入口+缓存)、`loader.py`(SkillLoader 校验流水线,1700 行)、`purity.py`(纯度扫描器)、`module_sandbox.py`(导入隔离)。
 > **现状一句话**:`compile_skill`(`compiler.py:41`)是带缓存的公开壳,真正干活的是 `SkillLoader.compile_skill`(`loader.py:146`)——它跑一整套校验(拓扑无环/无孤岛、IO 契约、mention 可达、action/tool 签名、**purity**),通过出 `CompiledSkill`,否则抛带 `[F-v3-*]` 码的错误。**编译期只读源码、不执行 action、不调 Agent。**

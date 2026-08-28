@@ -14,7 +14,10 @@ pinned here by building the violating skill and compiling it.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -22,8 +25,6 @@ from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.error_registry import ERROR_REGISTRY
 from graph_skill_runtime.core.exceptions import SkillLoadError
 from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
-
-from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 
 _DELETED = [
     "[F-v3-graph-phase-dir-missing]",
@@ -40,6 +41,75 @@ _DELETED = [
 ]
 
 
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _schema_yaml(properties: dict[str, Any], *, required: list[str] | None = None) -> str:
+    schema: dict[str, Any] = {"type": "object", "properties": properties}
+    if required is not None:
+        schema["required"] = required
+    return json.dumps(schema, ensure_ascii=False, indent=4).replace("\n", "\n    ")
+
+
+def _write_graph(
+    root: Path,
+    *,
+    graph_id: str,
+    inputs: dict[str, Any],
+    outputs: dict[str, Any],
+    required_inputs: list[str] | None = None,
+) -> None:
+    phase_id = "work" if graph_id == "root" else "inner"
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {graph_id}
+description: Exercise the portable subgraph seam.
+io:
+  inputs:
+    {_schema_yaml(inputs, required=required_inputs)}
+  outputs:
+    {_schema_yaml(outputs)}
+phases:
+  - id: {phase_id}
+    depends_on: [input]
+    output: true
+""",
+    )
+
+
+def _write_logic_phase(
+    root: Path,
+    phase_id: str,
+    *,
+    inputs: dict[str, Any],
+    outputs: dict[str, Any],
+    required: list[str] | None,
+    action_body: str,
+) -> None:
+    _write(
+        root / "phases" / phase_id / "LOGIC.md",
+        f"""---
+name: {phase_id}
+io:
+  inputs:
+    {_schema_yaml(inputs, required=required)}
+  outputs:
+    {_schema_yaml(outputs)}
+actions: [{phase_id}]
+validator: false
+---
+<action>{phase_id}</action>
+""",
+    )
+    _write(
+        root / "phases" / phase_id / "actions" / f"{phase_id}.py",
+        dedent(action_body).lstrip(),
+    )
+
+
 def test_no_adjudicated_dead_code_remains_registered() -> None:
     remaining = [code for code in _DELETED if code in ERROR_REGISTRY]
     assert remaining == [], (
@@ -51,14 +121,12 @@ def test_no_adjudicated_dead_code_remains_registered() -> None:
 def _child(root: Path, in_field: str, out_field: str) -> None:
     _write_graph(
         root,
-        name="seam-child",
+        graph_id="child",
         inputs={in_field: {"type": "string"}},
         outputs={out_field: {"type": "string"}},
-        phases=["inner"],
-        phase_edges='<phase depends_on="input" output>inner</phase>',
         required_inputs=[in_field],
     )
-    write_logic_phase(
+    _write_logic_phase(
         root,
         "inner",
         inputs={in_field: {"type": "string"}},
@@ -71,22 +139,38 @@ def _child(root: Path, in_field: str, out_field: str) -> None:
     )
 
 
-def _subgraph_md(phase_dir: Path, *, path: str, io_yaml: str, name: str = "work") -> None:
+def _subgraph_md(
+    phase_dir: Path, *, graph_id: str, io_yaml: str, name: str = "work"
+) -> None:
     phase_dir.mkdir(parents=True, exist_ok=True)
-    lines = ["---", f"name: {name}", f"path: {path}", *io_yaml.strip().split(chr(10)), "---"]
+    lines = [
+        "---",
+        f"name: {name}",
+        f"graph: {graph_id}",
+        *io_yaml.strip().split(chr(10)),
+        "---",
+    ]
     (phase_dir / "SUBGRAPH.md").write_text(chr(10).join(lines) + chr(10), encoding="utf-8")
 
 
-def _parent(root: Path) -> None:
+def _parent(parent: Path) -> Path:
+    root = parent / "seam-parent"
+    _write(
+        root / "SKILL.md",
+        """---
+name: seam-parent
+description: Exercise the portable subgraph seam.
+---
+""",
+    )
     _write_graph(
         root,
-        name="seam-parent",
+        graph_id="root",
         inputs={"text": {"type": "string"}},
         outputs={"result": {"type": "string"}},
-        phases=["work"],
-        phase_edges='<phase depends_on="input" output>work</phase>',
         required_inputs=["text"],
     )
+    return root
 
 
 def _codes_of(exc: SkillLoadError) -> set[str]:
@@ -123,8 +207,8 @@ class TestSubgraphSeamGates:
         runtime via [F-v3-runtime-state-mapping-failed]). This pin keeps the
         adjudication from re-wiring the two deleted 1:1 codes by accident.
         """
-        _parent(tmp_path)
-        _child(tmp_path / "child", "text", "result")
+        root = _parent(tmp_path)
+        _child(root / "graphs" / "child", "text", "result")
         io = """io:
   inputs:
     type: object
@@ -137,33 +221,34 @@ class TestSubgraphSeamGates:
     properties:
       result: {type: string}
       phantom: {type: string}"""
-        _subgraph_md(tmp_path / "phases" / "work", path="child", io_yaml=io)
+        _subgraph_md(root / "phases" / "work", graph_id="child", io_yaml=io)
 
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     def test_a_matching_seam_still_compiles(
         self, tmp_path: Path, mock_skill_resolver: object
     ) -> None:
-        _parent(tmp_path)
-        _child(tmp_path / "child", "text", "result")
-        _subgraph_md(tmp_path / "phases" / "work", path="child", io_yaml=IO_OK)
+        root = _parent(tmp_path)
+        _child(root / "graphs" / "child", "text", "result")
+        _subgraph_md(root / "phases" / "work", graph_id="child", io_yaml=IO_OK)
 
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     def test_an_invalid_subgraph_name_is_fatal(
         self, tmp_path: Path, mock_skill_resolver: object
     ) -> None:
-        """`name` must be an identifier, the same rule agent-embedded subgraph
-        declarations already enforce (manifest.SubgraphAST pattern). Compiled
-        CLEAN before wiring (probe 2026-08-19)."""
-        _parent(tmp_path)
-        _child(tmp_path / "child", "text", "result")
+        """A display name may contain spaces, but it must not be empty."""
+        root = _parent(tmp_path)
+        _child(root / "graphs" / "child", "text", "result")
         _subgraph_md(
-            tmp_path / "phases" / "work", path="child", io_yaml=IO_OK, name="bad name!"
+            root / "phases" / "work",
+            graph_id="child",
+            io_yaml=IO_OK,
+            name="",
         )
 
         with pytest.raises(SkillLoadError) as exc_info:
-            compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+            compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
         assert "[F-v3-subgraph-name-invalid]" in _codes_of(exc_info.value)
 
@@ -180,14 +265,14 @@ class TestResolverInterfaceGate:
         [F-v3-resolver-missing] already uses, not as aggregated SkillLoadError
         diagnostics.
         """
-        _parent(tmp_path)
-        _child(tmp_path / "child", "text", "result")
-        _subgraph_md(tmp_path / "phases" / "work", path="child", io_yaml=IO_OK)
+        root = _parent(tmp_path)
+        _child(root / "graphs" / "child", "text", "result")
+        _subgraph_md(root / "phases" / "work", graph_id="child", io_yaml=IO_OK)
 
         class NotAResolver:
             pass
 
         with pytest.raises(SkillResolutionError) as exc_info:
-            compile_skill(tmp_path, cache=False, skill_resolver=NotAResolver())
+            compile_skill(root, cache=False, skill_resolver=NotAResolver())
 
         assert exc_info.value.code == "[F-v3-resolver-interface-invalid]"

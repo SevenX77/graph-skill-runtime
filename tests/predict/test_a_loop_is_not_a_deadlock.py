@@ -49,26 +49,36 @@ def _write(path: Path, text: str) -> None:
 
 def _looping_skill(root: Path) -> Path:
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: loop-not-deadlock
+        root / "SKILL.md",
+        """---
+name: skill
+description: Prove a finite declared loop is not a predict deadlock.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Prove a finite declared loop is not a predict deadlock.
 io:
   inputs:
     {_schema({"items": {"type": "array"}}, required=["items"])}
   outputs:
     {_schema({"collected": {"type": "array"}})}
 phases:
-  - collect
-  - summarize
----
-<phase depends_on="input">collect</phase>
-<phase depends_on="collect" output>summarize</phase>
+  - id: collect
+    depends_on: [input]
+    output: false
+  - id: summarize
+    depends_on: [collect]
+    output: true
 """,
     )
     _write(
         root / "phases" / "collect" / "LOGIC.md",
         f"""---
+name: collect
 io:
   inputs:
     {_schema({"item": {}, "collected": {}}, required=["item", "collected"])}
@@ -96,6 +106,7 @@ iterate:
     _write(
         root / "phases" / "summarize" / "LOGIC.md",
         f"""---
+name: summarize
 io:
   inputs:
     {_schema({"collected": {}}, required=["collected"])}

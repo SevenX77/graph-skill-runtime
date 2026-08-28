@@ -11,8 +11,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field
 
 from graph_skill_runtime.core.checkpointer import checkpoint_serde
-from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
+from tests.legacy_fixture_adapter import compile_skill
 
 VALID_BUSINESS_MD = """## item-1
 - answer: ok

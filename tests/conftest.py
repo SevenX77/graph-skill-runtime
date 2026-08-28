@@ -14,7 +14,6 @@ runtime failure deep in a single test case.
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -41,59 +40,16 @@ class MockSkillResolver:
 
     def resolve_skill(self, skill_id: str) -> Path:
         validate_skill_id(skill_id)
-        fixtures = self.fixtures
-        registry = fixtures / "v030_skill_registry"
-        known = {
-            "fixture.echo_expert": registry / "echo_expert",
-            "demo.echo_agent": fixtures / "v030_agent_demo" / "registry" / "echo_agent",
-            "e2e.echo": fixtures / "v030_e2e_pipeline" / "registry" / "echo",
-            "e2e.expander": fixtures / "v030_e2e_pipeline" / "registry" / "expander",
-        }
-        if skill_id in known:
-            return known[skill_id]
-        relative = Path(*skill_id.split("."))
         candidates = (
             self.workspace_root / skill_id,
-            self.workspace_root / relative,
             self.workspace_root / "skills" / skill_id,
-            self.workspace_root / "skills" / relative,
             self.workspace_root / "registry" / skill_id,
-            self.workspace_root / "registry" / relative,
-            registry / skill_id,
-            registry / relative,
+            self.fixtures / skill_id,
         )
         for candidate in candidates:
-            if (candidate / "GRAPH.md").is_file():
+            if (candidate / "SKILL.md").is_file() and (candidate / "graph.yaml").is_file():
                 return candidate
-        phases_root = self.workspace_root / "phases"
-        if phases_root.is_dir():
-            for phase_dir in sorted(path for path in phases_root.iterdir() if path.is_dir()):
-                candidate = phase_dir / skill_id
-                if (candidate / "GRAPH.md").is_file():
-                    return candidate
-        tmp_matches = self._find_pytest_tmp_skill(skill_id)
-        if tmp_matches:
-            return max(tmp_matches, key=lambda path: path.stat().st_mtime_ns)
         raise SkillResolutionError(skill_id, "not registered in deterministic test resolver")
-
-    @staticmethod
-    def _find_pytest_tmp_skill(skill_id: str) -> list[Path]:
-        matches: list[Path] = []
-        tmp_roots = [
-            Path(tempfile.gettempdir()).resolve(),
-            Path(tempfile.gettempdir()),
-            Path("/tmp"),
-        ]
-        seen_roots: set[Path] = set()
-        for root in tmp_roots:
-            if root in seen_roots or not root.exists():
-                continue
-            seen_roots.add(root)
-            for tmp_root in root.glob("pytest-of-*"):
-                for candidate in tmp_root.rglob(skill_id):
-                    if candidate.is_dir() and (candidate / "GRAPH.md").is_file():
-                        matches.append(candidate.resolve())
-        return matches
 
 
 @pytest.fixture

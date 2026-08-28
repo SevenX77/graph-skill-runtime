@@ -1,4 +1,4 @@
-"""V2.1 public compile facade."""
+"""Public compiler for portable gSkill directories."""
 
 from __future__ import annotations
 
@@ -9,7 +9,10 @@ from typing import Any
 from graph_skill_runtime.core.cache import compute_cache_key, load_from_cache, save_to_cache
 from graph_skill_runtime.core.loader import CompiledSkill, SkillLoader
 from graph_skill_runtime.core.local_workspace_resolver import default_local_resolver_for_skill
-from graph_skill_runtime.core.skill_resolver_protocol import SkillResolverProtocol
+from graph_skill_runtime.core.skill_resolver_protocol import (
+    SkillResolverProtocol,
+    require_skill_resolver,
+)
 
 
 @dataclass
@@ -65,7 +68,7 @@ def compile_skill(
     runtime_input_fields: dict[str, set[str]] | None = None,
     allowed_roles: set[str] | None = None,
 ) -> CompiledSkill:
-    """Compile a V2.1 skill root into a CompiledSkill.
+    """Compile a portable gSkill root into a ``CompiledSkill``.
 
     ``chat_model`` is accepted for the stable T1.5 public signature; compilation itself
     is model-free. LangGraph assembly receives the model separately.
@@ -73,7 +76,10 @@ def compile_skill(
 
     del chat_model
     skill_root = Path(root)
-    resolver = skill_resolver or default_local_resolver_for_skill(skill_root)
+    resolver = require_skill_resolver(
+        skill_resolver or default_local_resolver_for_skill(skill_root),
+        caller="compile_skill",
+    )
     if runtime_input_fields is not None:
         cache = False
     if cache:

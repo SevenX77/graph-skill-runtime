@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.callbacks.events import InputDispatchEvent
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 from ..ws_e4_runtime_skills import write_serial_two_phase_skill
 

@@ -1,7 +1,7 @@
 """An output's `target` is an enum, and compile has to say so.
 
 A session probing the declaration contract wrote `target: __probe_invalid__`
-into GRAPH.md and compiled: `status: ok`, zero defects, and the junk value
+into graph.yaml and compiled: `status: ok`, zero defects, and the junk value
 carried straight into the manifest and io_schema (exp-b-round3, 2026-08-03).
 At run time the writer only fires for `file` or `artifact`, so the run produced
 no file and said nothing about why — the failure mode a user sees as
@@ -12,7 +12,7 @@ than in a Studio-side check; and with it in place the compiler can serve as the
 contract oracle a session naturally reaches for.
 
 It reports under the existing `[F-v3-graph-io-schema-invalid]` family rather than
-a new code: the registry is frozen at 97 codes by design (R4.3 / design §6.5), and
+a new code: the registry is frozen at 98 codes by design (R4.3 / design §6.5), and
 an unknown `target` IS an invalid inline io schema — the specific value and the
 legal set travel in the message and `field_path`, which is what a reader needs.
 """
@@ -26,10 +26,9 @@ import pytest
 from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphCompileError
 
-GRAPH_TEMPLATE = """---
-schema_version: "v0.3.0"
-name: target-demo
-description: target declaration probe
+GRAPH_TEMPLATE = """schema_version: gskill.graph.v1
+graph_id: root
+description: Target declaration probe.
 io:
   inputs:
     type: object
@@ -47,12 +46,13 @@ io:
           text:
             type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """
 
 LOGIC = """---
+name: draft
 io:
   inputs:
     type: object
@@ -70,8 +70,8 @@ validator: false
 <action>draft</action>
 """
 
-# The function is named after the declared action, per format SSOT
-# `docs/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3 ("文件必须导出同名函数").
+# The function is named after the declared action, per portable format contract
+# `docs/skill-spec/01-PORTABLE-GSKILL-V1.md` §5.1.
 # It used to be `run`, the mvp0 entrypoint convention
 # (`docs/engine/mvp0/skill-spec/03-logic-md-spec.md:94`), which no compile rule
 # caught while undeclared module functions were being registered as actions.
@@ -89,7 +89,11 @@ def _write_action(phase_dir):
 
 def _skill(root: Path, target_line: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "GRAPH.md").write_text(
+    (root / "SKILL.md").write_text(
+        f"---\nname: {root.name}\ndescription: Target declaration probe.\n---\n",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
         GRAPH_TEMPLATE.format(target_line=target_line), encoding="utf-8"
     )
     phase_dir = root / "phases" / "draft"

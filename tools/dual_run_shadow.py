@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""V2.1 dual-run shadow comparator.
+"""Portable runtime dual-run shadow comparator.
 
-The current V2.1 migration is a hard cutover, so this prep tool supports
-mode ``idempotency``: compile, assemble, and invoke the same V2.1 skill twice
+The portable format is a hard cutover, so this tool supports mode
+``idempotency``: compile, assemble, and invoke the same portable skill twice
 with deterministic fake inputs, then emit a field-level JSON diff.
 """
 
@@ -77,16 +77,16 @@ def compare_idempotency(
     *,
     chat_fixture: str = "none",
 ) -> dict[str, Any]:
-    output_a = _run_v21(
+    output_a = _run_portable(
         skill_root, input_data, run_id="dual-run-shadow-a", chat_fixture=chat_fixture
     )
-    output_b = _run_v21(
+    output_b = _run_portable(
         skill_root, input_data, run_id="dual-run-shadow-b", chat_fixture=chat_fixture
     )
     diff = diff_json(output_a, output_b)
     return {
         "mode": "idempotency",
-        "shadow_reference": "v21_repeat_run",
+        "shadow_reference": "portable_repeat_run",
         "skill_root": str(skill_root),
         "match": not diff["missing"] and not diff["extra"] and not diff["mismatch"],
         "diff": diff,
@@ -103,7 +103,7 @@ def diff_json(left: Any, right: Any, path: str = "$") -> dict[str, list[dict[str
     return diff
 
 
-def _run_v21(
+def _run_portable(
     skill_root: Path,
     input_data: dict[str, Any],
     *,

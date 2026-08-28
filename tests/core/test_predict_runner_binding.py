@@ -22,11 +22,21 @@ class RecordingAssembler:
         self.graph = RecordingGraph()
 
 
-def _write_v030_root(root: Path) -> Path:
-    (root / "GRAPH.md").write_text(
+def _write_portable_root(parent: Path) -> Path:
+    root = parent / "test-skill"
+    root.mkdir()
+    (root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
-name: test
+name: test-skill
+description: Runner binding fixture.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Runner binding fixture.
 io:
   inputs:
     type: object
@@ -35,7 +45,6 @@ io:
     type: object
     properties: {}
 phases: []
----
 """,
         encoding="utf-8",
     )
@@ -47,7 +56,7 @@ def test_run_skill_dict_omitted_mock_llm_passes_no_chat_model(
     tmp_path,
     mock_skill_resolver,
 ) -> None:
-    skill_root = _write_v030_root(tmp_path)
+    skill_root = _write_portable_root(tmp_path)
     chat_models: list[object] = []
     model_resolvers: list[object] = []
 
@@ -81,7 +90,7 @@ def test_run_skill_dict_explicit_mock_none_is_passed_as_chat_model(
     tmp_path,
     mock_skill_resolver,
 ) -> None:
-    skill_root = _write_v030_root(tmp_path)
+    skill_root = _write_portable_root(tmp_path)
     resolved_model = object()
     model_resolver = SimpleNamespace(resolve=lambda **_kwargs: resolved_model)
     chat_models: list[object] = []
@@ -117,7 +126,7 @@ def test_run_skill_dict_explicit_mock_none_is_passed_as_chat_model(
 def test_run_skill_dict_uses_model_resolver_when_mock_llm_omitted(
     monkeypatch, tmp_path, mock_skill_resolver
 ) -> None:
-    skill_root = _write_v030_root(tmp_path)
+    skill_root = _write_portable_root(tmp_path)
     model_resolver = SimpleNamespace(resolve=lambda **_kwargs: object())
     chat_models: list[object] = []
     model_resolvers: list[object] = []

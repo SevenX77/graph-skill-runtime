@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import hashlib
 import io
 import json
@@ -10,10 +9,12 @@ import zipfile
 from pathlib import Path
 from typing import Any, Literal, cast
 
+import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from graph_skill_runtime.core.authored_text import read_authored_text
 from graph_skill_runtime.core.compiler import compile_skill
+from graph_skill_runtime.core.parser import parse_markdown_parts
 from graph_skill_runtime.core.skill_resolver_protocol import SkillResolverProtocol
 
 logger = logging.getLogger(__name__)
@@ -72,24 +73,17 @@ def build_compiled_artifact_manifest(
 
 
 def _graph_file(source_path: Path) -> Path:
-    graph_path = source_path / "GRAPH.md"
-    if graph_path.exists():
-        return graph_path
-    return source_path / "GRAPH.markdown"
+    return source_path / "graph.yaml"
 
 
 def _phase_ids_from_graph(graph_text: str) -> list[str]:
-    from graph_skill_runtime.core.parser import _parse_frontmatter
-
-    frontmatter = _parse_frontmatter(graph_text)
-    phases = frontmatter.get("phases", [])
+    document = yaml.safe_load(graph_text)
+    phases = document.get("phases", []) if isinstance(document, dict) else []
     phase_ids: list[str] = []
     if isinstance(phases, list):
         for item in phases:
-            if isinstance(item, str):
-                phase_ids.append(item)
-            elif isinstance(item, dict):
-                phase_id = item.get("id") or item.get("name")
+            if isinstance(item, dict):
+                phase_id = item.get("id")
                 if isinstance(phase_id, str):
                     phase_ids.append(phase_id)
     return phase_ids
@@ -102,6 +96,8 @@ def _phase_line(graph_lines: list[str], phase_id: str) -> int:
     for index, line in enumerate(graph_lines, start=1):
         stripped = line.strip()
         if stripped in {plain, quoted_single, quoted_double}:
+            return index
+        if stripped.startswith("- id:") and phase_id in stripped:
             return index
         if stripped.startswith("phases:") and phase_id in stripped:
             return index
@@ -146,8 +142,83 @@ def _build_artifact_archive(source_path: Path, relative_paths: list[str]) -> byt
     return buffer.getvalue()
 
 
+def _canonical_skill_entry_for_fingerprint(path: Path) -> bytes:
+    frontmatter, body, _ = parse_markdown_parts(path)
+    stable_frontmatter = dict(frontmatter)
+    metadata = stable_frontmatter.get("metadata")
+    if isinstance(metadata, dict):
+        stable_metadata = dict(metadata)
+        stable_metadata.pop("ui", None)
+        stable_frontmatter["metadata"] = stable_metadata
+    canonical_frontmatter = json.dumps(
+        stable_frontmatter,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"---\n{canonical_frontmatter}\n---\n{body}".encode()
+
+
 def _default_artifact_output_root() -> Path:
     return Path(tempfile.gettempdir()) / "graph_skill_runtime" / "artifacts"
+
+
+def _artifact_relative_paths(source_path: Path) -> list[str]:
+    relative_paths: list[str] = []
+    for path in source_path.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(source_path)
+        if any(part.startswith(".") or part == "__pycache__" for part in relative.parts):
+            continue
+        if path.suffix in (".pyc", ".pyo", ".pyd"):
+            continue
+        relative_paths.append(relative.as_posix())
+    return sorted(relative_paths)
+
+
+def _fingerprint_file_content(source_path: Path, relative_path: str) -> bytes:
+    path = source_path / relative_path
+    content = path.read_bytes()
+    if relative_path == "SKILL.md":
+        try:
+            return _canonical_skill_entry_for_fingerprint(path)
+        except Exception as exc:
+            logger.warning(
+                "compile_artifact_fingerprint_skill_entry_fallback rel_path=%s error=%s",
+                relative_path,
+                exc,
+            )
+    elif relative_path.endswith("graph.yaml"):
+        try:
+            graph_document = yaml.safe_load(content.decode("utf-8"))
+            return json.dumps(graph_document, ensure_ascii=False, sort_keys=True).encode()
+        except Exception as exc:
+            logger.warning(
+                "compile_artifact_fingerprint_graph_fallback rel_path=%s error=%s",
+                relative_path,
+                exc,
+            )
+    return content
+
+
+def _execution_fingerprint(
+    source_path: Path,
+    relative_paths: list[str],
+    runtime_config_fingerprint: str | None,
+) -> str:
+    hasher = hashlib.sha256()
+    for relative_path in relative_paths:
+        hasher.update(relative_path.encode())
+        content = _fingerprint_file_content(source_path, relative_path)
+        hasher.update(len(content).to_bytes(8, "big"))
+        hasher.update(content)
+    if runtime_config_fingerprint:
+        runtime_bytes = runtime_config_fingerprint.encode()
+        hasher.update(b"runtime_config")
+        hasher.update(len(runtime_bytes).to_bytes(8, "big"))
+        hasher.update(runtime_bytes)
+    return f"sha256:{hasher.hexdigest()}"
 
 
 def compile_artifact(
@@ -170,61 +241,15 @@ def compile_artifact(
         runtime_input_fields=runtime_input_fields,
     )
 
-    # 2. Find all files, sort by POSIX relative path lexicographically, excluding metadata/cache files
-    relative_paths: list[str] = []
-    for p in source_path.rglob("*"):
-        if p.is_file():
-            rel_p = p.relative_to(source_path)
-            parts = rel_p.parts
-            if any(part.startswith(".") or part == "__pycache__" for part in parts):
-                continue
-            if p.suffix in (".pyc", ".pyo", ".pyd"):
-                continue
-            relative_paths.append(rel_p.as_posix())
-    relative_paths.sort()
-
-
-    # 3. Build the deterministic executable artifact bytes and hash that product payload.
+    relative_paths = _artifact_relative_paths(source_path)
     artifact_bytes = _build_artifact_archive(source_path, relative_paths)
     content_hash_hex = hashlib.sha256(artifact_bytes).hexdigest()
     content_hash = f"sha256:{content_hash_hex}"
-
-    # 4. Compute deterministic execution_fingerprint excluding metadata.ui
-    fingerprint_hasher = hashlib.sha256()
-    for rel_path in relative_paths:
-        fingerprint_hasher.update(rel_path.encode("utf-8"))
-        p = source_path / rel_path
-        content = p.read_bytes()
-
-        if rel_path in ("GRAPH.md", "GRAPH.markdown"):
-            try:
-                content_str = content.decode("utf-8")
-                from graph_skill_runtime.core.parser import _parse_frontmatter, _strip_frontmatter
-                fm = _parse_frontmatter(content_str)
-                body = _strip_frontmatter(content_str)
-
-                fm_copy = copy.deepcopy(fm)
-                if "metadata" in fm_copy and isinstance(fm_copy["metadata"], dict):
-                    fm_copy["metadata"].pop("ui", None)
-
-                fm_stable = json.dumps(fm_copy, sort_keys=True)
-                canon_str = f"---\n{fm_stable}\n---\n{body}"
-                content = canon_str.encode("utf-8")
-            except Exception as exc:
-                logger.warning(
-                    "compile_artifact_fingerprint_frontmatter_fallback rel_path=%s error=%s",
-                    rel_path,
-                    exc,
-                )
-
-        fingerprint_hasher.update(len(content).to_bytes(8, "big"))
-        fingerprint_hasher.update(content)
-    if runtime_config_fingerprint:
-        runtime_bytes = runtime_config_fingerprint.encode("utf-8")
-        fingerprint_hasher.update(b"runtime_config")
-        fingerprint_hasher.update(len(runtime_bytes).to_bytes(8, "big"))
-        fingerprint_hasher.update(runtime_bytes)
-    execution_fingerprint = f"sha256:{fingerprint_hasher.hexdigest()}"
+    execution_fingerprint = _execution_fingerprint(
+        source_path,
+        relative_paths,
+        runtime_config_fingerprint,
+    )
 
     objects_root = Path(artifact_output_root) if artifact_output_root is not None else _default_artifact_output_root()
     objects_dir = objects_root / content_hash_hex

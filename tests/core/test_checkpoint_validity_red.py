@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-from graph_skill_runtime.core.compiler import compile_skill
+from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:

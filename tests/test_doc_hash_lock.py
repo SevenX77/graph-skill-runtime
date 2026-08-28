@@ -29,6 +29,19 @@ def _is_sha256_hex(value: str) -> bool:
     return len(value) == 64 and all(character in string.hexdigits for character in value)
 
 
+def _frontmatter_status(path: Path) -> str | None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return None
+        if line.startswith("status:"):
+            value = line.removeprefix("status:").strip()
+            return value.split("（", 1)[0].split("(", 1)[0].strip()
+    return None
+
+
 def _assert_safe_relative_path(value: object, *, context: str) -> str:
     assert isinstance(value, str) and value, f"{context} must include a non-empty file path"
     relative_path = Path(value)
@@ -122,6 +135,8 @@ def _collect_hash_lock_violations(
         relative_path = doc_path.relative_to(docs_root).as_posix()
         if relative_path in expected_paths or doc_path.relative_to(docs_root).parent not in locked_dirs:
             continue
+        if _frontmatter_status(doc_path) != "audited-ready":
+            continue
         actual_hash = _sha256(doc_path)
         if (relative_path, actual_hash) not in approved_hashes:
             violations.append(
@@ -142,7 +157,10 @@ def test_hash_lock_reports_drift_missing_and_untracked_docs(tmp_path: Path) -> N
     tracked.write_text("silent drift\n", encoding="utf-8")
 
     new_doc = docs_root / "existing-unit" / "extra.md"
-    new_doc.write_text("new audited-style doc\n", encoding="utf-8")
+    new_doc.write_text("---\nstatus: audited-ready\n---\nnew audited doc\n", encoding="utf-8")
+
+    superseded_doc = docs_root / "existing-unit" / "history.md"
+    superseded_doc.write_text("---\nstatus: superseded\n---\nhistorical evidence\n", encoding="utf-8")
 
     violations = _collect_hash_lock_violations(
         docs_root=docs_root,
@@ -159,6 +177,7 @@ def test_hash_lock_reports_drift_missing_and_untracked_docs(tmp_path: Path) -> N
     )
     assert any("missing.md" in violation and "missing" in violation for violation in violations)
     assert any("existing-unit/extra.md" in violation and "not listed" in violation for violation in violations)
+    assert not any("existing-unit/history.md" in violation for violation in violations)
 
 
 def test_hash_lock_exemption_allows_only_exact_file_and_hash(tmp_path: Path) -> None:
@@ -212,6 +231,14 @@ exemptions:
 def test_engine_audited_ready_doc_hashes_match_baseline_or_exemption() -> None:
     expected_hashes = _load_expected_hashes()
     approved_hashes = _load_hash_exemptions()
+
+    wrong_statuses = {
+        relative_path: _frontmatter_status(DOCS_ROOT / relative_path)
+        for relative_path in expected_hashes
+        if (DOCS_ROOT / relative_path).exists()
+        and _frontmatter_status(DOCS_ROOT / relative_path) != "audited-ready"
+    }
+    assert not wrong_statuses, f"Engine doc hash lock contains non-audited-ready documents: {wrong_statuses}"
 
     violations = _collect_hash_lock_violations(
         docs_root=DOCS_ROOT,

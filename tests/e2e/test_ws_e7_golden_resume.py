@@ -45,26 +45,36 @@ def _skill(root: Path) -> None:
         required=["draft", "final"],
     )
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e7-golden-resume-e2e
+name: {root.name}
+description: Exercise golden evaluation and durable resume together.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise golden evaluation and durable resume together.
 io:
   inputs:
     {graph_input}
   outputs:
     {graph_output}
 phases:
-  - draft
-  - finish
----
-<phase depends_on="input">draft</phase>
-<phase depends_on="draft" output>finish</phase>
+  - id: draft
+    depends_on: [input]
+    output: false
+  - id: finish
+    depends_on: [draft]
+    output: true
 """,
     )
     _write(
         root / "phases" / "draft" / "LOGIC.md",
         f"""---
+name: draft
 io:
   inputs:
     {graph_input}
@@ -88,6 +98,7 @@ validator: false
     _write(
         root / "phases" / "finish" / "LOGIC.md",
         f"""---
+name: finish
 io:
   inputs:
     {_schema({"draft": {"type": "string"}}, required=["draft"])}

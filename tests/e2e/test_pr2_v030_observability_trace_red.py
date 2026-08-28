@@ -14,7 +14,7 @@ from graph_skill_runtime.callbacks.events import (
     ToolCallEvent,
 )
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
-from graph_skill_runtime.core.runner import _run_v030_skill_dict, run_skill
+from graph_skill_runtime.core.runner import _run_portable_skill_dict, run_skill
 from graph_skill_runtime.io.run_layout import runs_root
 
 
@@ -104,12 +104,20 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _write_v030_observable_skill(root: Path) -> None:
+def _write_portable_observable_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
-name: pr2-observability-red
+name: observable-skill
+description: Exercise portable runtime observability events.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise portable runtime observability events.
 io:
   inputs:
     type: object
@@ -125,14 +133,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -177,13 +186,13 @@ def _event_types(events: list[object]) -> set[type[object]]:
     return {type(event) for event in events}
 
 
-def test_v030_run_skill_emits_phase_llm_tool_events_from_graph_root(
+def test_run_skill_emits_phase_llm_tool_events_from_graph_root(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "observable_skill"
+    skill_root = tmp_path / "observable-skill"
     output_dir = tmp_path / "out"
-    _write_v030_observable_skill(skill_root)
+    _write_portable_observable_skill(skill_root)
     spy = SpyCallback()
 
     result = run_skill(
@@ -223,12 +232,12 @@ def test_v030_run_skill_emits_phase_llm_tool_events_from_graph_root(
     assert json.loads(inspect_event.result)["items"] == ["alpha", "beta"]
 
 
-def test_v030_run_skill_fails_when_agent_returns_without_finish_task(
+def test_run_skill_fails_when_agent_returns_without_finish_task(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "observable_skill"
-    _write_v030_observable_skill(skill_root)
+    skill_root = tmp_path / "observable-skill"
+    _write_portable_observable_skill(skill_root)
     spy = SpyCallback()
 
     result = run_skill(
@@ -251,16 +260,16 @@ def test_v030_run_skill_fails_when_agent_returns_without_finish_task(
     }
 
 
-def test_v030_run_skill_emits_phase_end_when_agent_raises(
+def test_run_skill_emits_phase_end_when_agent_raises(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "observable_skill"
-    _write_v030_observable_skill(skill_root)
+    skill_root = tmp_path / "observable-skill"
+    _write_portable_observable_skill(skill_root)
     spy = SpyCallback()
 
     with pytest.raises(GraphAgentFatalError):
-        _run_v030_skill_dict(
+        _run_portable_skill_dict(
             skill_root,
             mock_llm=V030UnknownToolChatModel(),
             callbacks=[spy],
@@ -279,13 +288,13 @@ def test_v030_run_skill_emits_phase_end_when_agent_raises(
     }
 
 
-def test_v030_run_skill_returns_real_trace_path_and_writes_typed_stream(
+def test_run_skill_returns_real_trace_path_and_writes_typed_stream(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "observable_skill"
+    skill_root = tmp_path / "observable-skill"
     trace_dir = tmp_path / "trace-output"
-    _write_v030_observable_skill(skill_root)
+    _write_portable_observable_skill(skill_root)
     events: list[object] = []
 
     result = run_skill(

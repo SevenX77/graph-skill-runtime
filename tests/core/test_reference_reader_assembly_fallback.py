@@ -38,12 +38,21 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _agent_skill(root: Path, *, reference_path: str = "references/guide.md") -> None:
+def _agent_skill(parent: Path, *, reference_path: str = "references/guide.md") -> Path:
+    root = parent / "reference-reader"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: reference-reader
+description: Exercise reference reader assembly behavior.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise reference reader assembly behavior.
 io:
   inputs:
     type: object
@@ -56,14 +65,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 io:
   inputs:
     type: object
@@ -88,6 +98,7 @@ Use @reference:Guide.
 </goal>
 """,
     )
+    return root
 
 
 def test_reader_failure_warns_and_fallback_markdown_enters_knowledge_base(
@@ -106,11 +117,11 @@ def test_reader_failure_warns_and_fallback_markdown_enters_knowledge_base(
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         FailingReaderRuntime,
     )
-    _agent_skill(tmp_path)
-    _write(tmp_path / "references" / "guide.md", "fallback source text " * 50)
+    skill_root = _agent_skill(tmp_path)
+    _write(skill_root / "references" / "guide.md", "fallback source text " * 50)
     chat = CapturePromptChatModel()
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled, chat_model=chat, skill_resolver=mock_skill_resolver
     ).graph
@@ -125,22 +136,22 @@ def test_reader_failure_warns_and_fallback_markdown_enters_knowledge_base(
 def test_invalid_reference_path_is_compile_fatal_not_reader_fallback(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _agent_skill(tmp_path, reference_path="../outside.md")
+    skill_root = _agent_skill(tmp_path, reference_path="../outside.md")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     assert exc_info.value.payload.code == "[F-v3-resource-reference-path-invalid]"
 
 
 def test_reference_path_escape_to_existing_file_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside = tmp_path / "outside.md"
     _write(outside, "external reference")
-    _agent_skill(tmp_path, reference_path=f"../{outside.name}")
+    skill_root = _agent_skill(tmp_path, reference_path=f"../{outside.name}")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     assert exc_info.value.payload.code == "[F-v3-resource-reference-path-invalid]"
 
 
@@ -163,11 +174,11 @@ def test_reference_reader_path_invalid_fatal_propagates_from_assembly(
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         PathInvalidReaderRuntime,
     )
-    _agent_skill(tmp_path)
-    _write(tmp_path / "references" / "guide.md", "reference body")
+    skill_root = _agent_skill(tmp_path)
+    _write(skill_root / "references" / "guide.md", "reference body")
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
-        compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
         assemble_graph(
             compiled,
             chat_model=CapturePromptChatModel(),
@@ -200,11 +211,11 @@ def test_reference_reader_runs_once_during_assembly_not_each_agent_turn(
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         CountingReaderRuntime,
     )
-    _agent_skill(tmp_path)
-    _write(tmp_path / "references" / "guide.md", "reference body")
+    skill_root = _agent_skill(tmp_path)
+    _write(skill_root / "references" / "guide.md", "reference body")
     chat = CapturePromptChatModel()
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     assemble_graph(compiled, chat_model=chat, skill_resolver=mock_skill_resolver)
 
     assert calls == ["main"]
@@ -229,11 +240,11 @@ def test_reader_output_invalid_falls_back_without_blocking_agent(
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         InvalidReaderRuntime,
     )
-    _agent_skill(tmp_path)
-    _write(tmp_path / "references" / "guide.md", "raw reference for fallback")
+    skill_root = _agent_skill(tmp_path)
+    _write(skill_root / "references" / "guide.md", "raw reference for fallback")
     chat = CapturePromptChatModel()
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled, chat_model=chat, skill_resolver=mock_skill_resolver
     ).graph

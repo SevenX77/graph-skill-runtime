@@ -23,15 +23,17 @@ class LocalWorkspaceResolver(SkillResolverProtocol):
 
     def resolve_skill(self, skill_id: str) -> Path:
         validate_skill_id(skill_id)
-        relative_candidates = (Path(skill_id), Path(*skill_id.split(".")))
         matches: list[Path] = []
         for base in self.search_paths:
-            for relative in relative_candidates:
-                candidate = _candidate_under_base(base, relative)
-                if candidate is None:
-                    continue
-                if candidate.is_dir() and (candidate / "GRAPH.md").is_file():
-                    matches.append(candidate)
+            candidate = _candidate_under_base(base, Path(skill_id))
+            if candidate is None:
+                continue
+            if (
+                candidate.is_dir()
+                and (candidate / "SKILL.md").is_file()
+                and (candidate / "graph.yaml").is_file()
+            ):
+                matches.append(candidate)
 
         unique_matches = tuple(dict.fromkeys(path.resolve() for path in matches))
         if len(unique_matches) == 1:
@@ -63,16 +65,9 @@ def default_local_resolver_for_compiled(compiled: Any) -> LocalWorkspaceResolver
     """Build a local resolver from a ``CompiledSkill`` when assembly is called directly."""
 
     roots: list[Path] = []
-    nodes = getattr(compiled, "nodes", ())
-    for node in nodes:
-        path = getattr(node, "path", None)
-        if path is None:
-            continue
-        phase_path = _normalize_path(path)
-        try:
-            roots.append(phase_path.parents[2])
-        except IndexError:
-            roots.append(phase_path.parent)
+    skill_root = getattr(compiled, "skill_root", None)
+    if skill_root is not None:
+        roots.append(_normalize_path(skill_root))
     roots.extend((Path.cwd(), Path.cwd() / "skills"))
     search_paths: list[Path] = []
     for root in roots:
@@ -84,19 +79,16 @@ def _default_search_paths(root: Path) -> tuple[Path, ...]:
     return (
         root,
         root / "skills",
-        root / "registry",
         root.parent,
         root.parent / "skills",
-        root.parent / "registry",
         Path.cwd(),
         Path.cwd() / "skills",
-        Path.cwd() / "registry",
     )
 
 
 def _skill_root_from_entrypoint(skill_path: str | Path) -> Path:
     entrypoint = _normalize_path(skill_path)
-    if entrypoint.name in {"GRAPH.md", "SKILL.md"}:
+    if entrypoint.name in {"graph.yaml", "SKILL.md"}:
         return entrypoint.parent
     return entrypoint
 

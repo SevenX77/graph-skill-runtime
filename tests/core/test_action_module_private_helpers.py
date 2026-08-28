@@ -27,9 +27,7 @@ Why that is wrong — dispatch is declaration-driven, never file-driven:
 - `loader.py:2802-2809` `_validate_logic_actions_declared` additionally pins the
   frontmatter list to the body `<action>` order, so the declaration is exact.
 
-Design source — `docs/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3, the
-format SSOT that `docs/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md:26-30`
-defers to:
+Design source — `docs/skill-spec/01-PORTABLE-GSKILL-V1.md` §5.1:
 
     | `actions` | yes | list[string] | action 名注册表 |
     LOGIC action 源文件位于 `phases/<phase_id>/actions/<action_name>.py`。
@@ -38,10 +36,8 @@ defers to:
 The signature rule is scoped to `<action_name>` — the declared name. Nothing in
 the design says the `actions/` module is a flat namespace holding only actions.
 
-Purity stays file-wide by design:
-`docs/mvp1/01-contract/03-compile-rules/mvp1-alignment.md:79` scopes it to
-the "action/tool Python 文件" — the FILE, not the function — so a helper's
-impurity must still be a compile FATAL.
+Purity stays file-wide by design, so a helper's impurity must still be a
+compile FATAL.
 """
 
 from __future__ import annotations
@@ -63,13 +59,18 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _logic_skill(root: Path, *, declared: list[str], action_source: str) -> None:
+def _logic_skill(root: Path, *, declared: list[str], action_source: str) -> Path:
     """Write a one-phase skill whose LOGIC declares `declared` in body order."""
+    root = root / "action-private-helpers"
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: action-private-helpers
+        root / "SKILL.md",
+        "---\nname: action-private-helpers\ndescription: Action registry fixture.\n---\n",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: action-private-helpers
+description: Action registry fixture.
 io:
   inputs:
     type: object
@@ -82,15 +83,16 @@ io:
       foo:
         type: integer
 phases:
-  - logic
----
-<phase depends_on="input" output>logic</phase>
+  - id: logic
+    depends_on: [input]
+    output: true
 """,
     )
     body = "\n".join(f"<action>{name}</action>" for name in declared)
     _write(
         root / "phases" / "logic" / "LOGIC.md",
         f"""---
+name: logic
 io:
   inputs:
     type: object
@@ -107,13 +109,14 @@ io:
 """,
     )
     _write(root / "phases" / "logic" / "actions" / "compute.py", action_source)
+    return root
 
 
 def test_module_level_private_helper_is_not_validated_as_an_action(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
     """The exact lab-skill shape: a 2-parameter module-level helper next to the action."""
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         declared=["compute"],
         action_source=(
@@ -126,7 +129,7 @@ def test_module_level_private_helper_is_not_validated_as_an_action(
         ),
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert sorted(compiled.actions.for_phase("logic")) == ["compute"]
 
@@ -135,7 +138,7 @@ def test_undeclared_helper_never_reaches_the_graph(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
     """A helper with a no-arg signature must not be registered, let alone executed."""
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         declared=["compute"],
         action_source=(
@@ -148,7 +151,7 @@ def test_undeclared_helper_never_reaches_the_graph(
         ),
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph
 
     result = graph.invoke(
@@ -162,14 +165,14 @@ def test_declared_action_with_a_bad_signature_is_still_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
     """Regression guard: filtering by declaration must not weaken the real rule."""
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         declared=["compute"],
         action_source="def compute(inputs, extra) -> dict:\n    return {'foo': extra}\n",
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     payload = exc_info.value.payload
     assert payload is not None
@@ -182,7 +185,7 @@ def test_declared_action_without_a_matching_function_is_compile_fatal(
 ) -> None:
     """`actions:` is the registry, so a declared name with no implementation must fail
     at compile — not with a runtime KeyError from ActionRegistry.resolve."""
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         declared=["compute"],
         action_source=(
@@ -192,7 +195,7 @@ def test_declared_action_without_a_matching_function_is_compile_fatal(
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     payload = exc_info.value.payload
     assert payload is not None
@@ -205,7 +208,7 @@ def test_helper_impurity_is_still_a_compile_fatal(
 ) -> None:
     """Purity is scoped to the FILE, so an impure helper stays fatal even though the
     helper is no longer an action."""
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         declared=["compute"],
         action_source=(
@@ -221,7 +224,7 @@ def test_helper_impurity_is_still_a_compile_fatal(
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     payload = exc_info.value.payload
     assert payload is not None

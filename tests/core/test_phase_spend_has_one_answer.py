@@ -31,7 +31,7 @@ from typing import Any
 
 from graph_skill_runtime.callbacks.events import PhaseEndEvent
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 #: Distinct per phase so a per-phase total cannot pass by accident.
 TOKENS = {"prepare": (13, 5), "draft": (29, 17)}

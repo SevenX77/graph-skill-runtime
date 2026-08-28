@@ -19,6 +19,7 @@ files:
   classification: feature
   feature_ids:
   - F-runtime-cli-adapter
+  - F-studio-skill-migration
 - path: src/graph_skill_runtime/adapters/engine.py
   classification: feature
   feature_ids:
@@ -241,6 +242,7 @@ files:
   - F-graph-skill-loading
   - F-iterate-runtime
   - F-agent-phase-orchestration
+  - F-portable-gskill-v1
 - path: src/graph_skill_runtime/core/local_workspace_resolver.py
   classification: feature
   feature_ids:
@@ -250,6 +252,7 @@ files:
   feature_ids:
   - F-graph-skill-loading
   - F-iterate-runtime
+  - F-portable-gskill-v1
 - path: src/graph_skill_runtime/core/mentions.py
   classification: feature
   feature_ids:
@@ -286,17 +289,10 @@ files:
 - path: src/graph_skill_runtime/core/schema_engine.py
   classification: detail
   feature_id: F-runtime-execution
-- path: src/graph_skill_runtime/core/serialize.py
-  classification: detail
-  feature_id: F-serialization-output
 - path: src/graph_skill_runtime/core/skill_resolver_protocol.py
   classification: feature
   feature_ids:
   - F-skill-resolution
-- path: src/graph_skill_runtime/core/skill_tool_factory.py
-  classification: feature
-  feature_ids:
-  - F-tool-call-binding
 - path: src/graph_skill_runtime/core/state.py
   classification: detail
   feature_id: F-state-blackboard
@@ -321,13 +317,6 @@ files:
 - path: src/graph_skill_runtime/core/validators/__init__.py
   classification: detail
   feature_id: F-logic-action-execution
-- path: src/graph_skill_runtime/examples/hello_world/script/__init__.py
-  classification: detail
-  feature_id: F-storage-io
-- path: src/graph_skill_runtime/examples/hello_world/script/greet.py
-  classification: feature
-  feature_ids:
-  - F-storage-io
 - path: src/graph_skill_runtime/io/__init__.py
   classification: detail
   feature_id: F-storage-io
@@ -403,6 +392,17 @@ files:
 - path: src/graph_skill_runtime/middleware/tracing.py
   classification: detail
   feature_id: F-middleware-mounting
+- path: src/graph_skill_runtime/migration/__init__.py
+  classification: detail
+  feature_id: F-studio-skill-migration
+- path: src/graph_skill_runtime/migration/atomic_publish.py
+  classification: feature
+  feature_ids:
+  - F-studio-skill-migration
+- path: src/graph_skill_runtime/migration/studio_v030.py
+  classification: feature
+  feature_ids:
+  - F-studio-skill-migration
 - path: src/graph_skill_runtime/models/__init__.py
   classification: feature
   feature_ids:

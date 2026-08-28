@@ -9,6 +9,8 @@ from pathlib import Path
 
 REQUIRED_MEMBERS = {
     "graph_skill_runtime/__init__.py",
+    "graph_skill_runtime/migration/atomic_publish.py",
+    "graph_skill_runtime/migration/studio_v030.py",
     "graph_skill_runtime/py.typed",
     "graph_skill_runtime/skills/builtin/md-patch/SKILL.md",
 }

@@ -1,7 +1,7 @@
 ---
 module: 01-contract/03-compile-rules
 doc: baseline
-status: drafted（现状对齐 WS-E3 P0-2 后代码 error_registry.py / loader.py / purity.py / exceptions.py / result.py；已移除 mvp0 SSOT 依赖；WS-E3 P0-1 已落 details+diagnostics 最小闭环；P0-2 已落 registry metadata + engine-side catalog export）
+status: superseded（Phase 2 bundle compile 与当前 98 码 catalog 已取代本文的 v0.3 baseline）
 binds_alignment: ./mvp1-alignment.md
 binds_code:
   - packages/graph-agent/src/graph_agent/core/error_registry.py:ERROR_REGISTRY
@@ -11,6 +11,8 @@ units: [U4, U11, U12]
 ---
 
 # 03-compile-rules — Baseline(当下代码实现逻辑)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 bundle compile 契约见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，98 码唯一目录见 [`skill-spec/11-error-code-spec.md`](../../../skill-spec/11-error-code-spec.md)，可执行规则见 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py) 与 [`error_registry.py`](../../../../src/graph_skill_runtime/core/error_registry.py)。后文只保留 v0.3 pre-cutover evidence；其中码数、路径和现在时均不得当作当前事实。
 
 > **Scope**: 编译规则与错误码现状。代码 SSOT 是 `error_registry.py:ERROR_REGISTRY`(96 个码及 level/stage/doc_link/remediation/doc_ref/doc_url/details_schema/schema_version/status)、`loader.py:SkillLoader.compile_skill`(DAG/IO/mention/purity/iterate 等校验聚合)、`purity.py:scan_python_purity`(action/tool Python 扫描器)。
 > **现状一句话**: registry 已有 96 个 `[F-v3-*]` 码；WS-E3 P0-2 没改 key set，只把 §4 全表中的修复建议补进 metadata，并提供 engine-side `export_error_catalog()` / `export_error_metadata(code)` JSON-safe 导出。loader 会在编译期聚合物理结构、frontmatter、DAG、IO、mention、subgraph/subagent resolver、iterate loop 输入字段、action purity 等校验；WS-E3 P0-1 已落 `ErrorPayload.details` + `GraphAgentError.context` 序列化 + `RunResult.diagnostics` 有界快照;purity 扫描器已从本地写 API 扩到 LE2 的 `run_skill` / 直接 FS / `sys.path` / 动态 import 高风险路径。

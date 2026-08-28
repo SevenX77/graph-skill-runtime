@@ -24,9 +24,9 @@ import pytest
 from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import SkillLoadError
 
-_GRAPH = """---
-schema_version: "v0.3.0"
-name: loop-accumulator
+_GRAPH = """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise loop accumulator dataflow.
 io:
   inputs:
     type: object
@@ -38,15 +38,19 @@ io:
     required: [report]
     properties:
       report: {type: string}
-phases: [crunch, finalize]
----
-<phase depends_on="input">crunch</phase>
-<phase depends_on="crunch" output>finalize</phase>
+phases:
+  - id: crunch
+    depends_on: [input]
+    output: false
+  - id: finalize
+    depends_on: [crunch]
+    output: true
 """
 
 # The body produces `round_result` every round; the engine folds that into the
 # `tally` accumulator and writes ONLY `tally` to the blackboard at the end.
 _CRUNCH = """---
+name: crunch
 actions:
   - crunch_one
 validator: false
@@ -77,6 +81,7 @@ io:
 """
 
 _FINALIZE = """---
+name: finalize
 actions:
   - render_report
 validator: false
@@ -109,12 +114,22 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
-def _loop_skill(root: Path, *, finalize_input: str) -> None:
-    _write(root / "GRAPH.md", _GRAPH)
+def _loop_skill(parent: Path, *, finalize_input: str) -> Path:
+    root = parent / "loop-accumulator"
+    _write(
+        root / "SKILL.md",
+        """---
+name: loop-accumulator
+description: Exercise loop accumulator dataflow.
+---
+""",
+    )
+    _write(root / "graph.yaml", _GRAPH)
     _write(root / "phases" / "crunch" / "LOGIC.md", _CRUNCH)
     _write(root / "phases" / "crunch" / "actions" / "crunch_one.py", _CRUNCH_ACTION)
     _write(root / "phases" / "finalize" / "LOGIC.md", _FINALIZE.format(finalize_input=finalize_input))
     _write(root / "phases" / "finalize" / "actions" / "render_report.py", _FINALIZE_ACTION)
+    return root
 
 
 def test_downstream_may_consume_the_accumulator(
@@ -122,9 +137,9 @@ def test_downstream_may_consume_the_accumulator(
 ) -> None:
     """`finalize` reads `tally`, the accumulator the loop actually writes. That
     is the only field the loop puts on the blackboard, so it must compile."""
-    _loop_skill(tmp_path, finalize_input="tally")
+    skill_root = _loop_skill(tmp_path, finalize_input="tally")
 
-    compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)  # must not raise
+    compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)  # must not raise
 
 
 def test_downstream_may_not_consume_a_per_round_output(
@@ -133,10 +148,10 @@ def test_downstream_may_not_consume_a_per_round_output(
     """`round_result` is the per-round body contract, folded into the
     accumulator and then dropped. A downstream phase asking for it is reading a
     field that never reaches the blackboard, and compile must say so."""
-    _loop_skill(tmp_path, finalize_input="round_result")
+    skill_root = _loop_skill(tmp_path, finalize_input="round_result")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
 
     issues = list(getattr(exc_info.value.compile_result, "issues", []) or [])
     codes = {str(getattr(issue, "rule_id", getattr(issue, "code", ""))) for issue in issues}

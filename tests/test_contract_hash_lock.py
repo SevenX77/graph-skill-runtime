@@ -37,11 +37,10 @@ EXPECTED_CONTRACT_HASHES = {
     # updated in the same PR).
     "docs/mvp0/public-api-contract.md": "68075217ba4c57feff2a5dce9b4d4e506d2a52095a4b2e891f0558baa60cd243",
     "docs/mvp0/feature-compliance-checklist.md": "77ea3efd4c6dfed5a09f496a82a1ba7ff3d2832ad1dc92ba9ac1f5cb759dc5c7",
-    # Re-pinned at the typed-runtime hard cut: a canonical source map now
-    # declares complete_inventory and a mandatory owner for detail files, and
-    # the schema no longer requires six removed monorepo vendor-debt symbols in
-    # every public contract map.
-    "spec/round28-manifest-schema.yaml": "0546cded8c3ca35ea8bc7c66a73e5cd701a9c32ef54560439c4de35755bc7299",
+    # Re-pinned at the portable gSkill v1 cutover: the contract map can now
+    # bind features to the implemented 01-PORTABLE-GSKILL-V1 sections instead
+    # of the superseded v0.3 format document.
+    "spec/round28-manifest-schema.yaml": "de27d0d2909f907fcd94ccfa14a282ca19f52fb8207e5f99a1eafb80fa72db81",
 }
 
 
