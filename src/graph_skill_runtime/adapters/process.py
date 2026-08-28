@@ -9,9 +9,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO
+from typing import IO, cast
 
 from graph_skill_runtime.adapters.windows_job import WindowsJob
 from graph_skill_runtime.ports.process import (
@@ -111,8 +112,14 @@ def _request_windows_tree_termination(spawned: _SpawnedProcess) -> None:
 
 
 def _signal_posix_process_group(process_id: int, requested_signal: int) -> bool:
+    # Platform stubs intentionally omit killpg on Windows even though this module
+    # is type-checked there; runtime dispatch guarantees this branch is POSIX-only.
+    kill_process_group = cast(
+        Callable[[int, int], None],
+        os.__dict__["killpg"],
+    )
     try:
-        os.kill(-process_id, requested_signal)
+        kill_process_group(process_id, requested_signal)
     except ProcessLookupError:
         return False
     return True

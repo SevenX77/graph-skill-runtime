@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import sys
+from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Any, cast
@@ -58,8 +59,12 @@ def _kernel32() -> Any:
 
 
 def _win32_error(operation: str) -> OSError:
-    error_code = ctypes.get_last_error()
-    return OSError(error_code, f"{operation} failed: {ctypes.FormatError(error_code)}")
+    # Platform stubs intentionally omit these APIs on POSIX even though this
+    # Windows adapter is type-checked there; _kernel32() guards every caller.
+    get_last_error = cast(Callable[[], int], ctypes.__dict__["get_last_error"])
+    format_error = cast(Callable[[int], str], ctypes.__dict__["FormatError"])
+    error_code = get_last_error()
+    return OSError(error_code, f"{operation} failed: {format_error(error_code)}")
 
 
 @dataclass
