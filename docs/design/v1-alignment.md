@@ -5,34 +5,36 @@ role: alignment
 status: drafted
 binds_baseline: ./baseline.md
 aligns_with: ../mvp1/INDEX.md
-updated: 2026-08-27
+updated: 2026-08-28
 ---
 
 # Graph Skill Runtime v1 目标设计
 
-本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1、Phase 2 portable 文件格式、Phase 3 中 root DAG 串行可定位 Agent wait point 的 durable host-native handoff、Phase 4 direct vendor CLI executor，以及 Phase 5 的 canonical MoirAI assets、六宿主 renderer、显式 installer 与 scoped discovery 已经按各自边界验收；Phase 3b 的 host-native 扩展和 Phase 6 packaged cross-platform/release acceptance 尚未实现。因此不能把完整 v1 当作当前能力。Gateway 与 Studio plugin 不属于本轮 release 交付；本文只保留其未来外部 Port/Adapter 所有权边界。
+本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1、Phase 2 portable 文件格式、Phase 3 中 root DAG 串行可定位 Agent wait point 的 durable host-native handoff、Phase 4 direct vendor CLI executor、Phase 5 的 canonical MoirAI integration，以及 Phase 6 的同候选制品跨平台 package/release acceptance 已经按各自边界验收；Phase 3b 的 host-native 扩展尚未实现，首次发布前命名裁决和真实 release/registry publication 也尚未闭合。因此不能把完整 v1 当作当前能力或已发布产品。Gateway 与 Studio plugin 不属于本轮 release 交付；本文只保留其未来外部 Port/Adapter 所有权边界。
 
-## 0. Implementation status（2026-08-27）
+## 0. Implementation status（2026-08-28）
 
 | 设计范围 | 当前状态 | 可观察事实或剩余边界 |
 | --- | --- | --- |
 | Phase 0：仓库提取与现状冻结 | **已实现** | 独立 GitHub repository 已建立；旧实现与 v0.3 格式已完成提取和 characterization；历史证据保留在 [`baseline.md`](./baseline.md) 与 `docs/mvp0/` |
-| Section 2：产品命名 | **已实现于源码与仓库** | distribution/import/command 是 `graph-skill-runtime` / `graph_skill_runtime` / `gskill`，当前版本 `0.1.0a1`；release workflow 已准备 build、wheel validation 与 OIDC Trusted Publishing，但 PyPI project/publisher 尚未配置，也没有实际发布 |
-| Section 3 与 Section 8 的 typed facade、配置、SDK/CLI/MCP 边界 | **已实现并由 Phase 4/5 扩展** | 顶层 77-symbol contract、closed/frozen/versioned runtime 与 integration models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication` 已落地；SDK 现有八个 runtime functions 与五个 integration functions，MCP 仍只有八个 runtime tools；Phase 4 增加 `AgentResource`，Phase 5 增加 18 个 integration exports |
+| Section 2：产品命名 | **已实现于源码与仓库** | distribution/import/command 是 `graph-skill-runtime` / `graph_skill_runtime` / `gskill`，当前版本 `0.1.0a1`；release workflow 已实现单次 build、三平台 acceptance 与 OIDC publish gate，但 PyPI project/publisher 尚未配置，也没有实际发布 |
+| Section 3 与 Section 8 的 typed facade、配置、SDK/CLI/MCP 边界 | **已实现并由 Phase 4/5 扩展** | 顶层 77-symbol contract、closed/frozen/versioned runtime 与 integration models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication` 已落地；顶层 Python function 为 14 个：`create_application` 加八个 runtime use cases，以及五个 integration functions；MCP 仍只有八个 runtime tools；Phase 4 增加 `AgentResource`，Phase 5 增加 18 个 integration exports |
 | Current engine bridge | **已实现于当前范围** | `CurrentEngineAdapter` 已用真实 portable `LOGIC` skill 验证显式 embedded compile/run，并把 bounded host-native run/resume/submit 接入同一 core；provider clients 仍只位于 optional `embedded` extra |
 | Section 4 至 Section 5：portable 格式与 flat graph registry | **Phase 2 已实现** | Production compile/run/SDK/CLI/MCP 只接受显式 root `SKILL.md` + `graph.yaml` bundle；内部 agent phase 使用 `AGENT.md`；graph registry 为单层 `graphs/<graph_id>/`；legacy v0.3 读取只存在于显式 converter 边界 |
 | Section 6 至 Section 7：host-native durable handoff | **Phase 3 当前范围已实现** | 支持 root DAG 内串行可定位的 Agent wait point：图 checkpoint 与 `AgentTask` 先后持久化后返回 `agent_required`；SDK/MCP/CLI submit 校验结果并继续同一 run；跨进程、非法输出纠正、精确重试、checkpoint-to-task 与 graph-commit-to-response 两个 crash window 均有因果测试 |
 | Phase 3b：host-native 扩展 | **drafted；未实现** | registry subgraph、graph/phase iterate、不可比较并行 wait point、普通 human/breakpoint typed resume，以及宿主 dispatched/started acknowledgment 与 capability negotiation 尚未完成 |
 | Phase 4：direct vendor CLI executors | **已实现于当前受限范围** | Claude、Codex、Copilot、Cursor、Gemini、OpenCode 的 capability-probed adapter、fresh top-level process、资源 materialization、schema validation、attempt lifecycle 与全进程树清理已落地；仅 Codex CLI `0.144.1` / Windows `10.0.26200` x64 有成功实机 smoke，其他组合不能由 fake tests 或动态 probe 推导为支持 |
 | Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply 已落地；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
-| Phase 6：跨平台 package/release acceptance | **drafted；未实现** | 尚未完成三平台 built-artifact install、CLI/MCP smoke、发布因果链与待声明 vendor/OS 组合实测 |
+| Phase 6：跨平台 package/release acceptance | **已验收于定义范围** | 一个 manifest-bound wheel/sdist 候选已在 Ubuntu、Windows、macOS 分别通过 pip-wheel、uv-wheel、pip-sdist 安装验收；CLI/MCP、host-native reopen/submit、SQLite、路径与 MoirAI lifecycle 的可观察行为一致。该范围是发布前候选验收，不是 registry publication，也不扩大 direct-vendor 支持矩阵 |
 | Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
 当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前 MoirAI inventory 的精确事实源是 `src/graph_skill_runtime/integrations/assets/moirai/integration.json`；renderer 与 installer 行为分别由 `integrations/renderers.py` 与 `integrations/installer.py` 拥有。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；实现存在、验收通过、未来边界与未支持声明必须分开，不能互相替代。
 
-当前 Phase 5 候选已完整重跑本地 required gates：全仓 Ruff green；strict mypy 覆盖 149 个 source files green；contract manifest validator green；完整 pytest 为 `1715 passed, 1 skipped in 83.51s`。`uv build` 成功生成 `0.1.0a1` source distribution 与 wheel，wheel smoke green。`pip-audit` 报告 `No known vulnerabilities found`，同时明确跳过尚未发布的本地 `graph-skill-runtime`；这只说明被解析 distributions 的已知漏洞检查结果，不是本仓源码安全审计、PyPI publication evidence 或 Phase 6 三平台发布验收。
+当前 Phase 5 候选已完整重跑本地 required gates：全仓 Ruff green；strict mypy 覆盖 149 个 source files green；contract manifest validator green；完整 pytest 为 `1715 passed, 1 skipped in 83.51s`。`uv build` 成功生成 `0.1.0a1` source distribution 与 wheel，wheel smoke green。`pip-audit` 报告 `No known vulnerabilities found`，同时明确跳过尚未发布的本地 `graph-skill-runtime`；这只说明被解析 distributions 的已知漏洞检查结果，不是本仓源码安全审计或 PyPI publication evidence。
 
-同一 commit `8928d13b32c800a2ad303d02e1bd96551f969ab5` 的 [GitHub Actions run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333) 已通过 `quality-gates`、Python 3.11/3.12/3.13 的 `runtime-tests`、`cross-platform-smoke (windows-latest)` 与 `cross-platform-smoke (macos-latest)`；CodeQL check 与其中的 `Analyze Python` 也通过。这是同一 source checkout 的远程平台与静态分析证据，不是三平台 packaged install/release acceptance，也没有在 macOS/Linux 执行真实 vendor CLI。
+同一 commit `8928d13b32c800a2ad303d02e1bd96551f969ab5` 的 [GitHub Actions run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333) 已通过 `quality-gates`、Python 3.11/3.12/3.13 的 `runtime-tests`、`cross-platform-smoke (windows-latest)` 与 `cross-platform-smoke (macos-latest)`；CodeQL check 与其中的 `Analyze Python` 也通过。这是 Phase 4 的同一 source checkout 远程平台与静态分析证据；它自身没有完成 packaged acceptance，也没有在 macOS/Linux 执行真实 vendor CLI。Phase 6 使用后续独立制品因果链完成三平台 packaged acceptance。
+
+Phase 6 实现提交 `f7d5340d0c822f62786046724473b9005c41f1b1` 的本地证据为 Ruff green、149-source strict mypy green、manifest validator green、`1716 passed, 1 skipped`、7 条 distribution-contract tests、resolved-distribution audit 无已知漏洞且跳过未发布本地包，以及 Windows/Python `3.11.15` 上同一候选的三个安装通道全部通过。[PR #9](https://github.com/SevenX77/graph-skill-runtime/pull/9) head 是 `f7d5340d`；[Actions run 33159834800](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33159834800) 实际检出的 synthetic merge 是 `67703295956350f6453dae24f4f0de50f8d448d9`，因此三份 acceptance evidence 的 `source_commit` 都是后者。Ubuntu、Windows、macOS 的报告具有相同 artifact-manifest digest，并在 Python `3.11.16` 上让 pip-wheel、uv-wheel、pip-sdist 三通道得到相同的 compile、predict/run、durable handoff、integration lifecycle 与零意外宿主状态改动结果。精确制品大小、SHA-256、平台与 job 结果由 [`../CROSS_PLATFORM.md`](../CROSS_PLATFORM.md) 统一记录；这些值标识该次候选，不是版本级常量。
 
 Phase 4 direct vendor CLI 的实机证据来自 Microsoft Windows `10.0.26200` x64、Python `3.11.15`。唯一成功 operational smoke 是 Codex CLI `0.144.1`：`run_id=codex-post-hardening-smoke`、`task_id=68c178f2-f453-510e-b80c-490ee366caab`、`attempt_id=9c8257a3-2e2a-4d16-aa83-7e141b47692e`、vendor `session_id=01a0465f-7593-78e3-acb4-88b3a0a11100`，输出 `echoed_note="post hardening verified"`，trace 顺序为 `agent_required` → `agent_dispatched` → `agent_started` → `agent_completed`，后三者共享同一 attempt id。Claude Code `2.1.222` 的 executable/version/help probe 通过，但 `auth status` exit 1；`gskill` 返回 `GSKILL_EXECUTOR_UNAVAILABLE`、`category=authentication-missing`、process exit 2，且未创建 handoff database。指定不存在的 Copilot executable 时，`gskill` 返回同一 error code、`category=executable-not-found`、process exit 2；immutable request snapshot 已存在，handoff database 不存在。这两条都是 fail-before-handoff 证据，不是成功支持证据。Copilot、Cursor、Gemini 与 OpenCode 未安装，Claude 未登录，macOS/Linux Phase 4 实机仍未验证。Phase 5 的 host projection discovery 是另一条验收边界，详见 Section 13；它不扩大 Phase 4 direct executor 的 operational support matrix。
 
@@ -70,13 +72,15 @@ PyPI、`pip` 和 `uv` 是 Python 软件的分发与安装方式；SDK 是调用�
 | Console command | `gskill` |
 | MCP server/tool namespace | `gskill` |
 
-这些工作名已经在当前 repository、distribution metadata、Python import 与 console entry point 中实现。GitHub repository `SevenX77/graph-skill-runtime` 已存在；PyPI 尚未发布，名称也不构成商标许可。repository 的 release workflow 已按 `v<pyproject version>` release tag 分离 build/publish jobs、校验 wheel 内容，并使用 OIDC Trusted Publishing；owner 仍须先在 PyPI 建立 project 与 trusted publisher。首次公开 registry 发布前还须完成占名与商标复核，若复核失败，应在发布前一次性裁决新名称，不能增加永久 alias。
+这些工作名已经在当前 repository、distribution metadata、Python import 与 console entry point 中实现。GitHub repository `SevenX77/graph-skill-runtime` 已存在；PyPI 尚未发布，名称也不构成商标许可。repository 的 release workflow 已按 `v<pyproject version>` release tag 分离一次 build、三平台 verify 与 publish：只有 build 和三平台 source/installed-package acceptance 全部成功，publish job 才能下载原始 distributions，并通过 OIDC Trusted Publishing 请求上传。owner 仍须先在 PyPI 建立 project 与 trusted publisher。首次公开 registry 发布前还须完成占名与商标复核，若复核失败，应在发布前一次性裁决新名称，不能增加永久 alias。
 
 选择完整的 `graph-skill-runtime`，而不是 `g-skill-runtime`，理由是 **Graph Skill** 是清楚的开放复合短语，读者不需要先解码缩写；`GSkill` 则是人为缩合，不是自然英文复合词。完整名字也直接说明包的职责是 graph skill 的 runtime，而不是一个泛化的 “G” 工具。
 
 ### 2.2 已核验的命名风险
 
 截至 2026-08-27，项目自己的 GitHub repository 已建立；精确的 `graph-skill-runtime`、`g-skill-runtime`、`graphskill-runtime` 在 npm 与 PyPI 均返回 404。这只是时间点观察，不构成 registry 占名或商标许可。
+
+截至 2026-08-28，repository 的 GitHub Release 列表为空，`graph-skill-runtime` 在 PyPI 与 TestPyPI 的 JSON endpoint 均返回 404。这是“尚未发布且 registry project 尚不存在”的时间点证据，不保证名称继续可用，也不能替代首次发布前的占名和商标裁决。
 
 相邻名称已经拥挤：npm 有直接竞品 [gwaghmar/graph 的 `graph-skill`](https://github.com/gwaghmar/graph)，GitHub 另有 [`ouyangyipeng/Graph-Skill`](https://github.com/ouyangyipeng/Graph-Skill)；`gskill` 还会让人联想到 G.SKILL 硬件品牌、GEPA 的 `gskill` 和 Go 生态同名工具。因此，发布前必须完成 PyPI/GitHub 占名、包名混淆检查、域名与商标复核。任何一项失败都应在发布前重新裁决名称，而不是为兼容 drafted 名称留下别名。
 
@@ -120,7 +124,7 @@ Python SDK、`gskill` CLI 与 `gskill` MCP server 均是薄 adapter：
 
 因此，`gskill compile`、MCP `compile` 和 `graph_skill_runtime.compile(...)` 必须返回同源诊断；`run`、`resume` 与 `submit_agent_result` 也不得各自实现状态转换。
 
-**Phase 1/4/5 实现说明**：上述 domain/application/ports/adapters/integrations 分层与七十七个顶层 typed symbols 已实现。八个 runtime SDK functions、`gskill` 的 runtime CLI commands 与八个 MCP runtime tools 共享同一个 `RuntimeApplication`；五个 integration SDK functions 与 `gskill integrations` CLI 共享显式 `IntegrationInstaller`，没有 installer MCP tool。Phase 4 增加公共 `AgentResource`；Phase 5 增加十三个 integration model/installer names 与五个 integration SDK functions，合计 18 个新增顶层 names。Runtime 公共 Pydantic contracts 位于 `domain/models.py`，integration 公共 Pydantic contracts 位于 `integrations/models.py`；两者都是 closed、frozen、带 `schema_version` 与 `kind` 的对象，构造后的嵌套 JSON collection 也不可变。`create_application` 是显式 composition root，每次调用构造独立 application，不持有全局 singleton。
+**Phase 1/4/5 实现说明**：上述 domain/application/ports/adapters/integrations 分层与七十七个顶层 typed symbols 已实现。顶层 Python function 精确为 14 个：`create_application` 加八个 runtime SDK use cases 构成九个 runtime/application entry points，五个 integration SDK functions 组成其余五个。八个 runtime use cases、`gskill` 的 runtime CLI commands 与八个 MCP runtime tools 共享同一个 `RuntimeApplication`；五个 integration SDK functions 与 `gskill integrations` CLI 共享显式 `IntegrationInstaller`，没有 installer MCP tool。Phase 4 增加公共 `AgentResource`；Phase 5 增加十三个 integration model/installer names 与五个 integration SDK functions，合计 18 个新增顶层 names。Runtime 公共 Pydantic contracts 位于 `domain/models.py`，integration 公共 Pydantic contracts 位于 `integrations/models.py`；两者都是 closed、frozen、带 `schema_version` 与 `kind` 的对象，构造后的嵌套 JSON collection 也不可变。`create_application` 是显式 composition root，每次调用构造独立 application，不持有全局 singleton。
 
 这一实现状态不表示所有目标用例已经具备完整执行语义。Phase 3 已让 `submit_agent_result` 在受支持的 host-native wait point 上完成 durable state transition；`resume(checkpoint_ref)` 只读取当前 durable wait 或 terminal response，普通 human/breakpoint typed resume 仍返回结构化 `GSKILL_NOT_IMPLEMENTED`。`RuntimeEvent.event_type` 已收紧为封闭的四十四值 Literal，并由 contract test 保证与当前全部 concrete `CallbackEvent` discriminator 精确相等。Host-native 有因果发出的 handoff lifecycle 是 `agent_required`、`agent_completed`、task-terminal `agent_failed` 与 `agent_result_rejected`；它仍没有 dispatched/started 宿主 acknowledgment。Phase 4 的 runtime-owned CLI attempt 则可以在 immutable attempt 建成后发 `agent_dispatched`，在 OS process-tree owner 建成后发 `agent_started`，并让成功 `agent_completed` 共享两者的 `attempt_id`。公共预测结果当前统一使用 `RunResult(mode="predict")`；是否另立 `PredictResult` 仍属于完整 v1 设计收敛事项，不能凭本文的目标清单虚构一个当前 export。
 
@@ -295,7 +299,7 @@ Timeout、cancel、正常 parent exit 都清理 owned process tree。这里借�
 
 这不是跨 vendor 的统一 OS sandbox。runtime 把资源内联到隔离 temp cwd、过滤环境、关闭 CLI 已暴露的 customization，并在 prompt 禁止额外 filesystem/shell/network/MCP/skill/subagent 工具；vendor-managed auth/config 仍可能生效，CLI 自己的 tool 与 sandbox 强度不同。当前 `allowed_paths` 权威约束的是 runtime resource materialization，不是“vendor 只能读取这些路径”。未来工具桥接必须另立 Port、权限和实机验收，不能从本实现推导。
 
-当前唯一成功支持声明是 Codex CLI `0.144.1` / Windows `10.0.26200` x64 / Python `3.11.15` 的真实 `gskill run`。Claude Code `2.1.222` 只证明 executable/version/help 通过后能因未登录而 fail-before-handoff；不存在 Copilot executable 的实测只证明 `executable-not-found` 同样发生在 handoff 前。六 adapter 的 fake-process tests 证明 contract shape，不证明真实 vendor/OS 支持。macOS/Linux 以及其他 vendor/version 组合仍须进入 Phase 6 或后续支持矩阵。
+当前唯一成功支持声明是 Codex CLI `0.144.1` / Windows `10.0.26200` x64 / Python `3.11.15` 的真实 `gskill run`。Claude Code `2.1.222` 只证明 executable/version/help 通过后能因未登录而 fail-before-handoff；不存在 Copilot executable 的实测只证明 `executable-not-found` 同样发生在 handoff 前。六 adapter 的 fake-process tests 证明 contract shape，不证明真实 vendor/OS 支持。Phase 6 的三平台 installed smoke 使用 deterministic host-native result submission，也不执行 vendor CLI；macOS/Linux 以及其他 vendor/version 组合仍须由后续支持矩阵中的真实 smoke 证明。
 
 ### 6.4 Adapter 3：`embedded`，可选 fallback
 
@@ -474,7 +478,7 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ## 13. 分阶段迁移
 
-每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1、Phase 2、下述受限 Phase 3、Phase 4 与定义范围内的 Phase 5 已验收；当前独立 distribution、portable gSkill v1 格式、bounded host-native protocol、direct vendor CLI protocol 与 optional MoirAI projection 是运行事实。Phase 3b 与 Phase 6 仍未实现。不能用 source presence、fake tests 或文档声明替代各阶段要求的验收证据。Phase 5 候选的本地 required gates 为 Ruff green、149-source strict mypy green、manifest validator green 与 `1715 passed, 1 skipped in 83.51s`；built artifact 和真实宿主 discovery 证据见本节 Phase 5。既有远程 quality/runtime/Windows/macOS source-checkout matrix 与本次 Windows host observation 都尚未完成 Phase 6 的三平台 packaged install/release 验收，也不能扩大 direct vendor CLI 或六宿主 operational support matrix。
+每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1、Phase 2、下述受限 Phase 3、Phase 4、定义范围内的 Phase 5 与 Phase 6 已验收；当前独立 distribution、portable gSkill v1 格式、bounded host-native protocol、direct vendor CLI protocol、optional MoirAI projection 与同候选三平台 package acceptance 是运行事实。工程阶段中 Phase 3b 仍未实现；完整 v1 还要求首次发布前命名裁决和真实 release/registry publication。不能用 source presence、fake tests、workflow 配置或文档声明替代各阶段要求的因果验收证据。Phase 5 以 source、built artifact 与真实宿主 discovery 三层证据闭合；Phase 6 则以 source gates、manifest-bound built artifact 和三平台隔离安装后的可观察行为闭合。两者都不能扩大 direct vendor CLI 或六宿主 operational support matrix，也不能把可发布候选写成已发布产品。
 
 ### Phase 0：契约冻结与 characterization
 
@@ -585,19 +589,27 @@ Windows `10.0.26200` x64 / Python `3.11.15` 上，Codex CLI `0.144.1` 的真实 
 
 ### Phase 6：跨平台 packaging 与 release acceptance
 
-**当前状态（2026-08-27）**：未实现，保持 drafted。同一 commit 的 source-checkout quality gate、Linux Python 3.11/3.12/3.13 runtime tests、Windows smoke 与 macOS smoke 已通过，但这组 jobs 没有在三平台安装并验收 built wheel/sdist，也没有执行 macOS/Linux real vendor CLI 或完成 release/publish 因果链。Phase 4 仍只有 Windows/Codex 一个成功 operational combination。release workflow 已准备，但 PyPI project 与 trusted publisher 尚未配置，也没有实际发布。
+**当前状态（2026-08-28）**：已在“同一 built candidate 的跨平台安装与发布前验收”范围内验收。该状态表示验收 evidence 绑定的 wheel/sdist 候选满足已定义的 package contract，并且 release workflow 只允许已通过三平台验证的原始 bytes 进入 publish job；它不表示已经创建 tag/GitHub Release、配置 PyPI project/trusted publisher，或向 PyPI/TestPyPI 上传。任何后续重建都是新候选，必须生成新 manifest 并重新验收。Phase 4 的成功 direct-vendor operational statement 仍只有 Windows/Codex 一项。
 
-**工作**：在 clean Python 3.11+ 环境构建并检查 wheel 与 source distribution，在 Ubuntu、Windows、macOS 运行同一权威测试、strict type、contract manifest、安装和 CLI/MCP smoke；核验路径、编码、文件锁、SQLite reopen、host-native 两步协议，以及每个准备声明的 vendor/version/OS direct-CLI 组合。发布前由 owner 配置 PyPI Trusted Publishing，并让 GitHub Release tag、package version、构建产物和 publish job 保持同一因果链。
+**已落实工作**：
 
-**退出判据**：完整 suite 与三平台矩阵在候选提交上通过；从构建产物而非 source tree 安装后，`graph_skill_runtime`、`gskill`、八个 MCP tools、portable compile/run、受支持的 handoff/reopen 路径与发布矩阵中每个 direct CLI 组合可用；wheel 不包含用户业务 gSkill；release tag 与版本检查阻止错误产物进入 publish job。只有真实 registry publish 才能声称 PyPI 已发布。
+- [`scripts/accept_release_artifacts.py`](../../scripts/accept_release_artifacts.py) 的 `validate` 要求 dist directory 恰好包含一个 wheel 和一个 `.tar.gz` sdist，检查 metadata、`py3-none-any`、`gskill` console entry 与安全 archive path；wheel 明确拒绝 symlink，sdist member 必须是 regular file 或 directory。Wheel 拒绝 `graph_agent/` 与 `graph_skill_runtime/examples/`，sdist 拒绝 `src/graph_agent/` 与 `src/graph_skill_runtime/examples/`；两者都对 MoirAI asset subtree 执行 manifest-owned closed inventory。Sdist 可以保留 repository-level examples/tests 作为源码语料，但这些内容不会进入 installed distribution 或注册到宿主。这不是整个 runtime archive 普通源码 member 的全量白名单。输出 `gskill.release-artifacts.v1` 绑定 supplied source commit、文件名、size 与 SHA-256。
+- `accept` 先让当前 wheel/sdist 的 size 与 SHA-256 精确匹配 manifest，重验 archive contract，再要求 `--expected-source-commit` 与 manifest 的 source commit 相等；随后把已验证 bytes 复制到隔离候选目录，分别建立 pip-wheel、uv-wheel、pip-sdist 环境，并输出 `gskill.package-acceptance.v1`。Evidence 记录实际消费的 manifest SHA-256；命令没有另一个外部 `--expected-manifest-hash` 参数，三平台 evidence 的相同 manifest digest 才证明它们消费同一 manifest。
+- internal `installed-smoke` 从 site-packages 导入且拒绝 base install 混入 provider extras、`graph_skill_runtime/examples/` 或任何 `graph.yaml`；检查 version、console entry 与只读 host detection；通过真实 stdio 枚举精确八个 MCP tools 并调用 `compile`；通过 installed CLI 运行 compile/inspect/predict/run；覆盖空格与非 ASCII path、Claude/Codex MoirAI project dry-run/install/idempotent/uninstall、host-native run→reopen→submit→duplicate submit→terminal reopen、SQLite integrity/rename/reopen、immutable request/trace、Windows handle release 与零意外宿主配置写入。
+- CI 的 `quality-gates` 以 `uv build --no-sources` 一次构建、validate 并上传 distributions+manifest；Ubuntu Python 3.11、Windows Python 3.11 与 macOS Python 3.11 的既有 required-check 路径下载并 accept 同一制品。Ubuntu Python 3.12/3.13 继续运行完整 source suite。Release workflow 同样一次构建并校验 tag/version，三平台同时做 source 和 installed-package verification；只有 build 与三个 verify 全部成功，publish 才下载原始 distributions 并请求 Trusted Publishing。
+- 该拓扑采用 [PyPA GitHub Actions publishing guide](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/) 的 build/publish 分离与 immutable artifact handoff，以避免每个平台重建出不同 bytes；采用 [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/using-a-publisher/) 的 named environment 加 `id-token: write`，避免长期 registry token；采用 [uv package guide](https://docs.astral.sh/uv/guides/package/) 的 `uv build --no-sources`，避免本地 workspace source override 掩盖不可发布的依赖关系。精确工程政策由 [`../CROSS_PLATFORM.md`](../CROSS_PLATFORM.md) 拥有。
 
-**失败出口**：不发布候选版本，也不以较少平台的本地结果冒充完整矩阵；修复 package、adapter 或平台差异后，从同一候选提交重新执行验收。Gateway/Studio plugins 不进入该阶段，不得为满足发布验收而把产品专用依赖或状态移入 runtime。
+**验收证据（已满足）**：本地实现提交 `f7d5340d0c822f62786046724473b9005c41f1b1` 通过 Ruff、149-source strict mypy、manifest validator、`1716 passed, 1 skipped`、7 条 distribution-contract tests 与三个 Windows/Python `3.11.15` 安装通道；dependency audit 对 resolved distributions 未发现已知漏洞，但跳过未发布本地包，因此不是源码安全审计或发布证据。PR #9 的 head 为 `f7d5340d`，Actions run `33159834800` 的实际 source checkout/binding 为 synthetic merge `67703295956350f6453dae24f4f0de50f8d448d9`；三平台 evidence 因此记录后者，并具有相同 manifest SHA-256、wheel/sdist size 与 digest。Linux x86_64、Windows 10 AMD64、Darwin arm64 均使用 Python `3.11.16`，三个安装通道均观察到 compile passed、predict/run completed、handoff `[agent_required, agent_required, completed, completed, completed]`、integration `[planned, installed, unchanged, uninstalled]` 与 `unexpected_host_state_changes=[]`。精确 artifact identities 与 job results 见 [`../CROSS_PLATFORM.md`](../CROSS_PLATFORM.md)。
+
+**退出判据（已满足）**：一个 source-bound candidate 在三平台从 built artifact 而非 source tree 安装，并证明 import/console、八工具 MCP surface、portable CLI execution、durable handoff/reopen、SQLite、路径与 integration ownership 行为；wheel 与从 wheel/sdist 构建出的 installed distribution 不含用户业务 gSkill。源码 sdist 可以携带 repository-owned example/test corpus，但安装过程不得投影或注册它。CI 与 release workflow 都阻止未通过全部 verifier 的候选进入 publish job。Installed smoke 使用 deterministic host-native submission，不是 real vendor CLI；因此本阶段不要求也不推导 macOS/Linux vendor operational support。
+
+**失败出口**：任何新候选只要 source binding、archive contract、任一安装通道或任一平台 observable behavior 不一致，就不得发布；修复后必须从新的精确 source commit 重建一对制品并完整重新验收，不能复用旧 manifest/hash 或以较少平台结果代替。Gateway/Studio plugins 不进入该阶段，不得为满足发布验收而把产品专用依赖或状态移入 runtime。实际 registry publish 仍须由 owner 创建 release/tag、完成名称裁决和 PyPI trusted-publisher 配置，并观察上传结果后才能声明。
 
 ## 14. v1 总体验收
 
-v1 只有同时满足以下条件才可标记完成：
+v1 只有同时满足以下条件才可标记完成。Phase 6 已满足下述 package-candidate 验收项，但 Phase 3b、首次发布前命名裁决和真实 registry publication 尚未闭合，因此本文继续保持 `drafted`：
 
-1. PyPI wheel 可在 clean Python 3.11+ 环境以 `pip` 和 `uv` 安装，提供 `graph_skill_runtime` 与 `gskill`，且安装零宿主配置副作用。
+1. 一个 source-bound candidate wheel 可在 clean Python 3.11+ 环境以 `pip` 和 `uv` 安装，source distribution 可由 `pip` 安装；三者提供 `graph_skill_runtime` 与 `gskill`，且安装本身零宿主配置副作用。实际 PyPI publication 必须上传已验收的同一 distributions，不得重新构建。
 2. 一个业务 gSkill 只有根 `SKILL.md` 被宿主发现，机器 topology 和具名 artifact declarations 只有 `graph.yaml` 定义，agent phase 只使用 `AGENT.md`；RunRequest 只按稳定 ID 请求已声明 artifact。
 3. 编译聚合报告 graph/phase id、unknown reference、duplicate 和 cycle；`gskill inspect --call-graph` 与实际 call edges 同源。
 4. SDK、CLI、MCP 对同一输入返回同源 diagnostics、result、events 与 error code；公开 config/executor/checkpoint 接缝没有未约束 `Any`。
@@ -605,7 +617,7 @@ v1 只有同时满足以下条件才可标记完成：
 6. checkpoint、trace、artifact 与 immutable run snapshot 可由因果证据关联到同一 run；重复 result 提交不会重复执行。
 7. config 五层优先级、RuntimeProfile/RunPreset 职责分离、持久非秘密默认值、immutable RunRequest、secret exclusion 与 state-dir 绝对路径在三平台通过测试。
 8. `gskill integrations install moirai` 的 dry-run、all-target conflict、manifest、因果安全 rollback、idempotency 与 safe uninstall 通过；六 renderer snapshots、built-wheel canonical inventory 与真实宿主 skill/agent/MCP discovery smoke 均有证据；显式安装前不投影宿主，安装资产也不包含用户业务 gSkill。Phase 5 已在当前定义范围满足本项，完整 v1 仍受其余未满足项约束。
-9. wheel/sdist、clean install、CLI/MCP smoke、SQLite reopen 与受支持 handoff 在 Ubuntu、Windows、macOS 的同一候选提交上通过；Gateway/Studio plugins 不是本轮验收依赖，未来只能消费公开 Port/Adapter 边界。
+9. wheel/sdist、clean install、CLI/MCP smoke、SQLite reopen 与受支持 handoff 在 Ubuntu、Windows、macOS 的同一候选提交上通过；Gateway/Studio plugins 不是本轮验收依赖，未来只能消费公开 Port/Adapter 边界。Phase 6 已用 manifest-bound 同一候选满足本项。
 10. Production runtime 只有 portable reader；旧 v0.3 契约保持 `superseded`，legacy parser 只服务显式 converter。当前 portable 规范处于 `audited-ready`；只有 owner 盖章并建立 SHA-256 哈希锁后才可标记 `FROZEN`。
 
 ## 15. 尚待实证的裁决
@@ -620,6 +632,7 @@ v1 只有同时满足以下条件才可标记完成：
 
 | 日期 | 修订 | 依据与边界 |
 | --- | --- | --- |
+| 2026-08-28 | 将 Phase 6 在 same-candidate cross-platform package/release-candidate acceptance 范围标为 accepted；继续区分可发布候选与已发布产品 | `accept_release_artifacts.py` 建立 source/size/SHA-256 manifest、三安装通道与 installed evidence；本地 gates/Windows exact-candidate 验收通过；PR #9 run `33159834800` 在 Linux x86_64、Windows 10 AMD64、Darwin arm64/Python 3.11.16 消费同一 manifest-bound wheel/sdist，并观察同源 CLI/MCP、handoff、SQLite、path 与 integration 结果。Workflow 采用 PyPA immutable handoff、uv `--no-sources` 与 PyPI OIDC gate。没有 tag release、GitHub Release、PyPI/TestPyPI project/upload 或 trusted-publisher 实证；real vendor support 仍只有 Windows/Codex；全文仍因 Phase 3b 与真实 release/registry publication 为 `drafted` |
 | 2026-08-27 | 将 Phase 5 在 canonical assets、六 renderer、explicit installer 与 scoped discovery 范围标为 accepted；收紧 causal rollback、OpenCode shared-config ownership 与 Codex identifier 边界 | Source candidate 通过 Ruff、149-source strict mypy、manifest validator 与 `1715 passed, 1 skipped in 83.51s`，六 renderer 的 project/user snapshot 已锁定；`0.1.0a1` wheel 精确含 28 个 MoirAI members，clean Python 3.11 wheel install/projection smoke 通过；Windows 上 Claude Code `2.1.222` 实证 skill/agent/MCP discovery 与 stdio startup，Codex CLI `0.144.1` 交叉实证 skill/MCP。Claude authenticated model execution 与 Codex custom-agent invocation 均未证明，六宿主 operational claim 不成立；全文仍因 Phase 3b/6 为 `drafted` |
 | 2026-08-27 | 将 Phase 4 direct vendor CLI executor 标为当前受限能力，新增 `AgentResource`、六 vendor protocol、attempt lifecycle 与跨平台 process-tree owner，并保持全文 `drafted` | 当前 source/manifest、43 条 Phase 4 focused tests、142-source strict mypy、Ruff、manifest validator 与完整 suite `1661 passed / 1 skipped in 116.69s`；build 同时产出 wheel/sdist，dependency audit 无已知 resolved-dependency 漏洞但跳过未发布的本地 distribution。同一 commit 的 Linux/Windows/macOS source-checkout matrix 与 CodeQL/Analyze Python 已通过，并包含 Darwin `killpg(EPERM)` 后 exact-PGID/effective-UID fallback 的 real macOS SIGKILL cleanup evidence。Windows/Codex `0.144.1` 仍是唯一成功 operational vendor smoke；该行当时的 Phase 5 状态已由上一行验收记录取代，Phase 3b/6 仍未完成，Gateway/Studio plugin 仍不在本 release |
 | 2026-08-27 | 将 Phase 6 裁决为跨平台 packaging/release acceptance；Gateway/Studio plugins 移出本轮 release，只保留未来 Port/Adapter owner 边界 | 本轮后续交付顺序固定为 vendor CLI、MoirAI、三平台发布验收；当前无 Gateway/Studio adapter，也不得把产品 plugin 当作 v1 release gate |
