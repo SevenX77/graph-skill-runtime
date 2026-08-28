@@ -21,9 +21,19 @@ features:
     type: state-isolation
     description: Resolved request models and every nested JSON collection are immutable after validation.
     evidence: tests/application/test_config_resolver.py::test_run_request_and_persisted_snapshot_are_immutable
+  - id: NFC-release-artifact-causal-acceptance
+    type: compatibility
+    description: One source commit produces one hash-bound wheel and source distribution;
+      the existing required jobs accept clean pip and uv installs from those bytes on
+      Ubuntu, Windows, and macOS before merge, while release publishing additionally
+      depends on the same three-platform artifact gate.
+    evidence: tests/test_distribution_contract.py::test_distribution_validator_requires_closed_wheel_and_sdist_inventories
   targeted_tests:
   - tests/test_public_api_contract.py::test_top_level_all_remains_the_declared_symbol_surface
   - tests/test_public_api_contract.py::test_public_contract_models_are_closed_frozen_and_versioned
+  - tests/test_distribution_contract.py::test_distribution_validator_requires_closed_wheel_and_sdist_inventories
+  - tests/test_distribution_contract.py::test_ci_required_jobs_carry_source_and_packaged_cross_platform_acceptance
+  - tests/test_distribution_contract.py::test_release_workflow_separates_build_from_oidc_publish
 - id: F-runtime-config-resolution
   description: Resolve portable defaults, user machine profile, project profile, named preset,
     and invocation overrides into one provenance-bearing run request.

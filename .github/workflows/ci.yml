@@ -42,19 +42,30 @@ jobs:
       - name: Dependency audit
         run: uv run pip-audit
       - name: Build wheel and source distribution
-        run: uv build
-      - name: Validate wheel contents
-        run: uv run python scripts/smoke_built_wheel.py dist/*.whl
-      - name: Smoke-test the built wheel
-        run: |
-          uv venv --python 3.11 .wheel-smoke
-          uv pip install --python .wheel-smoke/bin/python dist/*.whl
-          .wheel-smoke/bin/python -c "import importlib.util, graph_skill_runtime; from graph_skill_runtime.adapters.mcp import create_server; assert importlib.util.find_spec('openai') is None; assert importlib.util.find_spec('langchain_openai') is None; assert importlib.util.find_spec('dotenv') is None; print(graph_skill_runtime.__name__, create_server().name)"
-          .wheel-smoke/bin/gskill --version
+        run: uv build --no-sources
+      - name: Validate and bind release artifacts to this checkout
+        run: >-
+          uv run python scripts/accept_release_artifacts.py validate
+          --dist-dir dist
+          --manifest build/release-artifacts.json
+          --source-commit "${{ github.sha }}"
+      - name: Upload candidate distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+      - name: Upload release artifact manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-artifact-manifest
+          path: build/release-artifacts.json
+          if-no-files-found: error
 
   runtime-tests:
+    needs: quality-gates
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -85,16 +96,46 @@ jobs:
           files: coverage-runtime.xml
           flags: runtime
           fail_ci_if_error: false
+      - name: Download candidate distributions
+        if: matrix.python-version == '3.11'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-distributions
+          path: candidate/dist
+      - name: Download release artifact manifest
+        if: matrix.python-version == '3.11'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifact-manifest
+          path: candidate/build
+      - name: Accept pip, uv, CLI, MCP, and durable behavior from built artifacts
+        if: matrix.python-version == '3.11'
+        run: >-
+          uv run --no-project --python 3.11 python scripts/accept_release_artifacts.py accept
+          --dist-dir candidate/dist
+          --manifest candidate/build/release-artifacts.json
+          --expected-source-commit "${{ github.sha }}"
+          --logic-skill examples/hello-world
+          --agent-skill tests/fixtures/demo-echo-agent
+          --evidence build/package-acceptance-ubuntu.json
+      - name: Upload Ubuntu package acceptance evidence
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-acceptance-ubuntu-python-3.11
+          path: build/package-acceptance-ubuntu.json
+          if-no-files-found: error
 
   cross-platform-smoke:
+    needs: quality-gates
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     env:
-      UV_PYTHON: "3.12"
+      UV_PYTHON: "3.11"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
@@ -102,8 +143,43 @@ jobs:
         with:
           version: latest
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.11
       - name: Sync dependencies
         run: uv sync --extra dev
+      - name: Ruff
+        run: uv run ruff check src tests scripts tools
+      - name: Mypy strict
+        run: uv run mypy --strict src
+      - name: Validate feature contracts
+        run: >-
+          uv run python scripts/validate_round28_manifest.py
+          spec/features.yaml
+          spec/source_file_map.yaml
+          spec/contract_map.yaml
       - name: Run tests
         run: uv run pytest --tb=short -q
+      - name: Download candidate distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-distributions
+          path: candidate/dist
+      - name: Download release artifact manifest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifact-manifest
+          path: candidate/build
+      - name: Accept pip, uv, CLI, MCP, and durable behavior from built artifacts
+        run: >-
+          uv run --no-project --python 3.11 python scripts/accept_release_artifacts.py accept
+          --dist-dir candidate/dist
+          --manifest candidate/build/release-artifacts.json
+          --expected-source-commit "${{ github.sha }}"
+          --logic-skill examples/hello-world
+          --agent-skill tests/fixtures/demo-echo-agent
+          --evidence build/package-acceptance-${{ matrix.os }}.json
+      - name: Upload package acceptance evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-acceptance-${{ matrix.os }}-python-3.11
+          path: build/package-acceptance-${{ matrix.os }}.json
+          if-no-files-found: error
