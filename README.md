@@ -20,7 +20,7 @@ The current checkout provides the typed runtime facade and configuration boundar
 - durable root-DAG Agent waits: a LangGraph SQLite checkpoint, a separate `agent-handoffs.sqlite3` task/result owner, cross-process submission, exact-retry idempotency, and recovery across both the checkpoint-to-task and graph-commit-to-response crash windows;
 - a public `AgentResource` contract that lets an Agent task identify declared references and examples without duplicating their filesystem paths in rendered instructions;
 - direct `cli` execution for Claude, Codex, GitHub Copilot, Cursor, Gemini, and OpenCode through capability-probed vendor adapters, bounded task materialization, schema-validated output, and causal attempt events;
-- shell-free process-tree ownership: Win32 Job Objects on Windows and process groups on POSIX, with whole-tree cleanup after success, timeout, cancellation, or parent exit;
+- shell-free process-tree ownership: Win32 Job Objects on Windows and process groups on POSIX, with a bounded exact-PGID/effective-UID fallback when a POSIX group signal is denied and whole-tree cleanup after success, timeout, cancellation, or parent exit;
 - the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded portable `LOGIC` skill;
 - one production reader for the portable root `SKILL.md` plus `graph.yaml` format, with a flat graph registry and no legacy fallback;
 - an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source.
@@ -156,6 +156,8 @@ All six protocol adapters and their fake-process contract tests are implemented.
 | Cursor | CLI-exposed and required | Rejected | `vendor-default` | CLI not installed on the evidence host |
 | Gemini | `not-exposed`; login failures surface from execution | Brokered `@name` request | `vendor-default` | CLI not installed on the evidence host |
 | OpenCode | `not-exposed`; login failures surface from execution | Direct `--agent` | `vendor-default` | CLI not installed on the evidence host |
+
+Source-checkout CI on commit [`8928d13`](https://github.com/SevenX77/graph-skill-runtime/commit/8928d13b32c800a2ad303d02e1bd96551f969ab5) passed quality gates, Python 3.11/3.12/3.13 runtime tests, and both Windows and macOS cross-platform smoke jobs in [workflow run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333); the CodeQL check, including Analyze Python, also passed. This verifies the tested source-checkout contracts on those runners. It does not install or execute the six real vendor CLIs, prove macOS/Linux vendor support, complete packaged-artifact install/release acceptance, or expand the operational support row beyond Windows/Codex `0.144.1`.
 
 Each Agent task gets a new process and temporary working directory. The runtime passes no resume, continue, or prior session id. Claude and Codex explicitly disable session persistence; the other four may still save session records according to vendor defaults. “Fresh top-level session” therefore means no runtime-requested continuation of a prior task, not a blank vendor user configuration and not a native child of the current host conversation.
 
