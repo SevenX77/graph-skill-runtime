@@ -56,9 +56,16 @@ def _json_object(raw: str | None, *, option: str) -> JsonObject | None:
 def _executor(args: argparse.Namespace) -> RuntimeProfileOverlay:
     executor_kind = getattr(args, "executor", None)
     state_dir = getattr(args, "state_dir", None)
-    vendor = getattr(args, "vendor", None)
-    if vendor is not None and executor_kind != "cli":
-        raise ValueError("--vendor requires --executor=cli")
+    cli_options = (
+        ("vendor", "--vendor"),
+        ("agent_profile", "--agent-profile"),
+        ("model", "--model"),
+        ("executable", "--executable"),
+        ("timeout_seconds", "--timeout-seconds"),
+    )
+    for attribute, option in cli_options:
+        if getattr(args, attribute, None) is not None and executor_kind != "cli":
+            raise ValueError(f"{option} requires --executor=cli")
     if executor_kind is None:
         return RuntimeProfileOverlay(state_dir=state_dir)
     executor: ExecutorConfig
@@ -67,9 +74,17 @@ def _executor(args: argparse.Namespace) -> RuntimeProfileOverlay:
     elif executor_kind == "embedded":
         executor = EmbeddedExecutorConfig()
     else:
+        vendor = getattr(args, "vendor", None)
         if vendor is None:
             raise ValueError("--vendor is required when --executor=cli")
-        executor = CliExecutorConfig(vendor=vendor)
+        timeout_seconds = getattr(args, "timeout_seconds", None)
+        executor = CliExecutorConfig(
+            vendor=vendor,
+            agent_profile=getattr(args, "agent_profile", None),
+            model_override=getattr(args, "model", None),
+            executable=getattr(args, "executable", None),
+            timeout_seconds=600.0 if timeout_seconds is None else timeout_seconds,
+        )
     return RuntimeProfileOverlay(executor=executor, state_dir=state_dir)
 
 
@@ -110,6 +125,17 @@ def _add_invocation_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--vendor",
         choices=("claude", "codex", "copilot", "cursor", "gemini", "opencode"),
+    )
+    parser.add_argument(
+        "--agent-profile",
+        help="Vendor-native agent selector (Copilot, Gemini, or OpenCode only)",
+    )
+    parser.add_argument("--model", help="Vendor-native model identifier")
+    parser.add_argument("--executable", help="CLI executable name or absolute path")
+    parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        help="Maximum wall time for each vendor Agent process",
     )
     parser.add_argument("--inputs-json", help="Non-secret business inputs as a JSON object")
 

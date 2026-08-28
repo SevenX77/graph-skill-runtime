@@ -252,11 +252,13 @@ features:
   error_codes_secondary: []
   events_primary:
   - AgentCompletedEvent
+  - AgentDispatchedEvent
   - AgentExitDecisionEvent
   - AgentFailedEvent
   - AgentLoopIterationEvent
   - AgentRequiredEvent
   - AgentResultRejectedEvent
+  - AgentStartedEvent
   events_secondary: []
   non_functional_contracts: []
   targeted_tests:

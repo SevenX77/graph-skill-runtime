@@ -7,6 +7,7 @@ from graph_skill_runtime.application.config import ConfigurationError as Configu
 from graph_skill_runtime.application.service import RuntimeApplication as RuntimeApplication
 from graph_skill_runtime.composition import create_application as create_application
 from graph_skill_runtime.domain.models import AgentRequired as AgentRequired
+from graph_skill_runtime.domain.models import AgentResource as AgentResource
 from graph_skill_runtime.domain.models import AgentResult as AgentResult
 from graph_skill_runtime.domain.models import AgentTask as AgentTask
 from graph_skill_runtime.domain.models import ArtifactRequest as ArtifactRequest
@@ -64,6 +65,7 @@ from graph_skill_runtime.sdk import submit_agent_result as submit_agent_result
 __all__ = [
     "AgentExecutor",
     "AgentRequired",
+    "AgentResource",
     "AgentResult",
     "AgentTask",
     "ArtifactRequest",

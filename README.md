@@ -1,23 +1,26 @@
 # Graph Skill Runtime
 
-Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. The Phase 1 typed runtime foundation, Phase 2 portable gSkill format, and bounded Phase 3 durable host-native handoff are implemented in this repository. The distribution is `graph-skill-runtime` version `0.1.0a1`, the import is `graph_skill_runtime`, and the console command is `gskill`.
+Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. The Phase 1 typed runtime foundation, Phase 2 portable gSkill format, bounded Phase 3 durable host-native handoff, and Phase 4 direct vendor CLI executor are implemented in this repository. `graph-skill-runtime` version `0.1.0a1` is one Python distribution installable with `pip` or `uv`; it provides both the importable `graph_skill_runtime` SDK and the `gskill` console command, including its MCP transport.
 
 This is an alpha source release, not a PyPI release. The repository exists at [SevenX77/graph-skill-runtime](https://github.com/SevenX77/graph-skill-runtime); `main` is pull-request-only and has completed a green six-job CI run. The [release workflow](.github/workflows/release.yml) is prepared to verify a GitHub Release tag `v<pyproject version>`, build and inspect the wheel and source distribution, and publish through PyPI Trusted Publishing with OpenID Connect (OIDC). That workflow is release automation, not publication evidence: the PyPI project and trusted publisher still require owner configuration, and no package has been published.
 
 ## Current capability boundary
 
-The current checkout provides the typed runtime facade and configuration boundary, the portable format cutover, and the supported Phase 3 host-native handoff:
+The current checkout provides the typed runtime facade and configuration boundary, the portable format cutover, the supported Phase 3 host-native handoff, and the bounded Phase 4 direct CLI executor:
 
-- exactly 58 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
+- exactly 59 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
 - closed, frozen Pydantic request and result models with `schema_version` and `kind` discriminators;
 - immutable nested JSON collections after model construction;
-- a closed 42-value `RuntimeEvent.event_type` catalog kept exactly equal to every concrete internal `CallbackEvent` variant by contract test;
+- a closed 44-value `RuntimeEvent.event_type` catalog kept exactly equal to every concrete internal `CallbackEvent` variant by contract test;
 - eight Python use-case functions: `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`;
 - the `gskill` CLI and eight same-named MCP tools as thin adapters over one `RuntimeApplication`;
 - explicit dependency composition through `create_application`, with no process-global application singleton;
 - deterministic configuration precedence and provenance-bearing immutable run requests;
 - create-once local request snapshots at `<state_root>/runs/<run_id>/request.json`;
 - durable root-DAG Agent waits: a LangGraph SQLite checkpoint, a separate `agent-handoffs.sqlite3` task/result owner, cross-process submission, exact-retry idempotency, and recovery across both the checkpoint-to-task and graph-commit-to-response crash windows;
+- a public `AgentResource` contract that lets an Agent task identify declared references and examples without duplicating their filesystem paths in rendered instructions;
+- direct `cli` execution for Claude, Codex, GitHub Copilot, Cursor, Gemini, and OpenCode through capability-probed vendor adapters, bounded task materialization, schema-validated output, and causal attempt events;
+- shell-free process-tree ownership: Win32 Job Objects on Windows and process groups on POSIX, with whole-tree cleanup after success, timeout, cancellation, or parent exit;
 - the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded portable `LOGIC` skill;
 - one production reader for the portable root `SKILL.md` plus `graph.yaml` format, with a flat graph registry and no legacy fallback;
 - an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source.
@@ -45,7 +48,9 @@ Production compile, predict, run, inspect, SDK, CLI, and MCP paths do not sniff 
 
 The default executor is `host-native`. A graph with no Agent phase runs directly. For a supported Agent phase in the root DAG, `run` saves the request, durably checkpoints immediately before that phase, persists a provider-neutral `AgentTask`, and returns `RunResult(status="agent_required")`. If the process stops after the graph checkpoint but before the task row is written, repeating the same run reconstructs the public task from that existing Agent breakpoint without invoking or replaying the already-completed graph prefix. The host must create a fresh clean-context native subagent, give it the task, and submit its typed result; the runtime does not call a model, create the host child itself, or silently fall back to another executor.
 
-The current address is narrow by design. Agent phases in registry subgraphs, graph-level iterate, Agent phase iterate, and incomparable parallel branches fail fast. Host-native Agent handoff requires a SQLite checkpoint store. `resume(checkpoint_ref)` only reads the durable current wait or terminal response; Agent output must use `submit_agent_result`. Ordinary human/breakpoint typed resume is not yet implemented. Vendor CLI executors, MoirAI installation, and cross-platform package/release acceptance are later phases. Gateway and Studio plugins are not deliverables in this release line; any future integration must stay behind the documented Port/Adapter boundaries.
+The current Agent address is narrow by design. Agent phases in registry subgraphs, graph-level iterate, Agent phase iterate, and incomparable parallel branches fail fast for both `host-native` and `cli`. Host-native Agent handoff requires a SQLite checkpoint store. `resume(checkpoint_ref)` only reads the durable current wait or terminal response; Agent output must use `submit_agent_result`. Ordinary human/breakpoint typed resume is not yet implemented.
+
+The default executor remains `host-native`; only an explicit `executor=cli` enters the direct vendor path. A `LOGIC`-only graph completes without constructing or probing a vendor executor even when its profile selects `cli`. Before creating a handoff task, a CLI run probes the executable, required flags, and any vendor-exposed authentication status, and rejects Agent declarations that require the not-yet-bridged portable tools, subagents, subgraphs, or framework context access. There is no silent `embedded` fallback. MoirAI installation and cross-platform package/release acceptance remain later phases. Gateway and Studio plugins are not deliverables in this release line; any future integration must stay behind the documented Port/Adapter boundaries.
 
 ## User-owned graph skills
 
@@ -127,7 +132,36 @@ For a supported Agent wait, the JSON result has `status: "agent_required"`; this
 uv run gskill submit host-demo --state-root /absolute/path/to/state --checkpoint-ref 'gskill-handoff-v1:<task-id>' --result-json '{"schema_version":"gskill.agent-result.v1","kind":"agent_result","task_id":"<task-id>","status":"completed","output":{"answer":"..."},"executor_id":"host-native-subagent","provenance":{"session":"fresh"}}'
 ```
 
-Replace `<task-id>` and the example `output` with the values required by the returned task. Durable `output` and `provenance` reject literal values under secret-shaped keys. `gskill submit` validates the task identity and output schema, writes a completed phase into the existing graph state, and returns either the next `agent_required` wait or the terminal result for the same `run_id`. A terminal `failed` or `cancelled` result does not execute the Agent phase: it idempotently fails the run and emits `agent_failed`. The equivalent submission entry points are Python `submit_agent_result(...)` and the MCP `submit_agent_result` tool. A future vendor CLI executor would start a fresh top-level vendor session; it is not this native-child protocol.
+Replace `<task-id>` and the example `output` with the values required by the returned task. Durable `output` and `provenance` reject literal values under secret-shaped keys. `gskill submit` validates the task identity and output schema, writes a completed phase into the existing graph state, and returns either the next `agent_required` wait or the terminal result for the same `run_id`. A terminal `failed` or `cancelled` result does not execute the Agent phase: it idempotently fails the run and emits `agent_failed`. The equivalent submission entry points are Python `submit_agent_result(...)` and the MCP `submit_agent_result` tool. Direct vendor CLI execution instead starts one fresh vendor-native top-level process session for each task; it is not this native-child protocol.
+
+## Direct vendor CLI execution
+
+Select the CLI path explicitly and provide the business gSkill as usual:
+
+```bash
+uv run gskill run /absolute/path/to/my-skill --executor cli --vendor codex --run-id cli-demo --state-dir /absolute/path/to/state --inputs-json '{"question":"Why?"}'
+```
+
+The six accepted vendors are `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`. Optional CLI projections are `--agent-profile`, `--model`, `--executable`, and `--timeout-seconds`. `--executable` accepts a PATH basename or an absolute path; a relative path containing a separator fails before execution. The timeout defaults to 600 seconds and must be greater than zero and no more than 86,400 seconds.
+
+`--agent-profile` is deliberately narrower than a generic “subagent” switch. Copilot and OpenCode pass it through their documented `--agent` selectors. Gemini prefixes `@<name>` to the task context so its main CLI agent can broker a request to that named subagent. Claude cannot select a custom agent under the required safe mode, Codex `--profile` selects configuration rather than a child agent, and Cursor has no documented direct selector, so those three reject `agent_profile` during configuration validation. If `--model` is omitted, the vendor chooses its own default. GitHub Copilot CLI is an agent product rather than a foundation model named “Copilot”; its current default and selectable models are vendor-managed, so the runtime does not hard-code them ([official CLI reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)).
+
+All six protocol adapters and their fake-process contract tests are implemented. An adapter implementation is not a blanket operating-system or version support claim. The current real-machine evidence is Windows `10.0.26200` x64 with Python `3.11.15`:
+
+| Vendor adapter | Authentication probe | Agent profile | Session persistence provenance | Real operational evidence |
+| --- | --- | --- | --- | --- |
+| Claude | CLI-exposed and required | Rejected | `disabled` | Claude Code `2.1.222` passed executable/version/help probing but failed its auth probe; no successful run claim |
+| Codex | CLI-exposed and required | Rejected | `disabled` | Codex CLI `0.144.1` completed a real gSkill run on this Windows host |
+| Copilot | `not-exposed`; login failures surface from execution | Direct `--agent` | `vendor-default` | CLI not installed on the evidence host |
+| Cursor | CLI-exposed and required | Rejected | `vendor-default` | CLI not installed on the evidence host |
+| Gemini | `not-exposed`; login failures surface from execution | Brokered `@name` request | `vendor-default` | CLI not installed on the evidence host |
+| OpenCode | `not-exposed`; login failures surface from execution | Direct `--agent` | `vendor-default` | CLI not installed on the evidence host |
+
+Each Agent task gets a new process and temporary working directory. The runtime passes no resume, continue, or prior session id. Claude and Codex explicitly disable session persistence; the other four may still save session records according to vendor defaults. “Fresh top-level session” therefore means no runtime-requested continuation of a prior task, not a blank vendor user configuration and not a native child of the current host conversation.
+
+The complete business prompt never enters process argv: Claude, Codex, Cursor, and Gemini receive it on UTF-8 stdin; Copilot and OpenCode receive it through a temporary UTF-8 `agent-task.md`. Declared resources are read only when their resolved files fall under `AgentTask.allowed_paths`, then materialized as handle, summary, and content without their original paths. Aggregate resource input is limited to 1 MiB, the final prompt to 2 MiB, the output schema to 1 MiB, combined stdout and stderr to 4 MiB, and the Codex final-response file to 4 MiB. Every successful output is validated with Draft 2020-12 JSON Schema even when a vendor also applies a native schema. Invalid output and nonzero-exit diagnostics retain only an output SHA-256, never the raw rejected payload.
+
+This is not one uniform cross-vendor operating-system sandbox. The runtime uses a fresh temporary working directory, a minimal allowlisted environment, vendor-exposed customization controls, and a prompt that forbids extra filesystem, shell, network, MCP, skill, and subagent tools. Vendor-managed credentials and configuration can still apply, and each CLI has different tool and sandbox strength. On this path, `allowed_paths` authorizes runtime resource materialization; it does not promise that an arbitrary vendor process can read only those paths. See the [cross-platform policy](docs/CROSS_PLATFORM.md) for process-tree ownership and the exact verification boundary.
 
 ## Configuration
 

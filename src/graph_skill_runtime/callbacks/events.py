@@ -782,11 +782,40 @@ class AgentRequiredEvent(_EventBase):
     checkpoint_ref: str
 
 
+class AgentDispatchedEvent(_EventBase):
+    """A CLI adapter accepted one immutable task for a fresh process attempt."""
+
+    event_type: Literal["agent_dispatched"] = "agent_dispatched"
+    handoff_event_id: str
+    attempt_id: str
+    run_id: str
+    task_id: str
+    phase_name: str
+    executor_id: str
+    vendor: str
+    fresh_top_level_session: bool
+
+
+class AgentStartedEvent(_EventBase):
+    """The operating system returned a process id for a CLI attempt."""
+
+    event_type: Literal["agent_started"] = "agent_started"
+    handoff_event_id: str
+    attempt_id: str
+    run_id: str
+    task_id: str
+    phase_name: str
+    executor_id: str
+    vendor: str
+    process_id: int = Field(gt=0)
+
+
 class AgentCompletedEvent(_EventBase):
     """The host returned a completed AgentResult and it was accepted."""
 
     event_type: Literal["agent_completed"] = "agent_completed"
     handoff_event_id: str
+    attempt_id: str | None = None
     run_id: str
     task_id: str
     phase_name: str
@@ -806,6 +835,9 @@ class AgentFailedEvent(_EventBase):
     status: Literal["failed", "cancelled"]
     error_code: str
     error_message: str
+    attempt_id: str | None = None
+    retryable: bool = False
+    task_terminal: bool = True
 
 
 class AgentResultRejectedEvent(_EventBase):
@@ -855,6 +887,8 @@ CallbackEvent = Annotated[
     | InterruptedEvent
     | ResumedEvent
     | AgentRequiredEvent
+    | AgentDispatchedEvent
+    | AgentStartedEvent
     | AgentCompletedEvent
     | AgentFailedEvent
     | AgentResultRejectedEvent
@@ -907,6 +941,8 @@ __all__ = [
     "InterruptedEvent",
     "ResumedEvent",
     "AgentRequiredEvent",
+    "AgentDispatchedEvent",
+    "AgentStartedEvent",
     "AgentCompletedEvent",
     "AgentFailedEvent",
     "AgentResultRejectedEvent",

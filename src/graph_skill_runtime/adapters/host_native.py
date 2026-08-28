@@ -19,6 +19,7 @@ from graph_skill_runtime.core.manifest import AgentNodeAST
 from graph_skill_runtime.core.result import RunResult as CoreRunResult
 from graph_skill_runtime.domain.models import (
     AgentRequired,
+    AgentResource,
     AgentResult,
     AgentTask,
     JsonObject,
@@ -131,7 +132,11 @@ def _phase_inputs(schema: dict[str, object], context: dict[str, object]) -> Json
     return _JSON_OBJECT.validate_python(selected)
 
 
-def _instructions(node: AgentNodeAST, inputs: JsonObject) -> str:
+def _instructions(
+    node: AgentNodeAST,
+    inputs: JsonObject,
+    resources: tuple[AgentResource, ...],
+) -> str:
     steps = "\n".join(
         f"{index}. {step.name}: {step.content}"
         for index, step in enumerate(node.steps, start=1)
@@ -139,6 +144,10 @@ def _instructions(node: AgentNodeAST, inputs: JsonObject) -> str:
     protocols = "\n".join(
         f"- {protocol.content}" for protocol in node.protocols
     ) or "- Follow the host's normal safety and tool policies."
+    resource_registry = "\n".join(
+        f"- @{resource.kind}:{resource.resource_id} — {resource.summary}"
+        for resource in resources
+    ) or "- None."
     return (
         "Execute one graph-skill Agent phase in a fresh, clean host-native "
         "subagent context. Do not run or resume the parent graph yourself.\n\n"
@@ -146,12 +155,45 @@ def _instructions(node: AgentNodeAST, inputs: JsonObject) -> str:
         f"Goal\n{node.goal}\n\n"
         f"Steps\n{steps}\n\n"
         f"Protocols\n{protocols}\n\n"
+        f"Declared resources\n{resource_registry}\n\n"
         "Inputs (JSON)\n"
         f"{json.dumps(inputs, ensure_ascii=False, indent=2, sort_keys=True)}\n\n"
         "Return exactly one JSON object that validates against this output "
         "schema; do not wrap it in Markdown:\n"
         f"{json.dumps(node.io.outputs, ensure_ascii=False, indent=2, sort_keys=True)}"
     )
+
+
+def _declared_resource_path(skill_root: Path, relative: str) -> Path:
+    candidate = (skill_root / relative).resolve(strict=False)
+    if not candidate.is_relative_to(skill_root):
+        raise HostNativeContractError(
+            f"declared Agent resource escapes the skill root: {relative}"
+        )
+    return candidate
+
+
+def _resources(request: RunRequest, node: AgentNodeAST) -> tuple[AgentResource, ...]:
+    skill_root = Path(request.profile.skill_root).resolve(strict=False)
+    references = tuple(
+        AgentResource(
+            kind="reference",
+            resource_id=item.id,
+            path=str(_declared_resource_path(skill_root, item.path)),
+            summary=item.summary,
+        )
+        for item in node.references
+    )
+    examples = tuple(
+        AgentResource(
+            kind="example",
+            resource_id=item.id,
+            path=str(_declared_resource_path(skill_root, item.path)),
+            summary=item.summary,
+        )
+        for item in node.examples
+    )
+    return references + examples
 
 
 def _allowed_paths(request: RunRequest, node: AgentNodeAST) -> tuple[str, ...]:
@@ -163,11 +205,7 @@ def _allowed_paths(request: RunRequest, node: AgentNodeAST) -> tuple[str, ...]:
     declared.extend(item.path for item in node.examples)
     result: list[str] = []
     for relative in declared:
-        candidate = (skill_root / relative).resolve(strict=False)
-        if not candidate.is_relative_to(skill_root):
-            raise HostNativeContractError(
-                f"declared Agent resource escapes the skill root: {relative}"
-            )
+        candidate = _declared_resource_path(skill_root, relative)
         result.append(str(candidate))
     return tuple(dict.fromkeys(result))
 
@@ -227,15 +265,17 @@ def build_agent_handoff(
             ]
         )
     )
+    resources = _resources(request, phase.ast)
     task = AgentTask(
         task_id=task_id,
         run_id=request.run_id,
         address=address,
-        instructions=_instructions(phase.ast, inputs),
+        instructions=_instructions(phase.ast, inputs, resources),
         inputs=inputs,
         output_schema=_JSON_OBJECT.validate_python(phase.ast.io.outputs),
         allowed_tools=tools,
         allowed_paths=_allowed_paths(request, phase.ast),
+        resources=resources,
         network=request.profile.profile.permissions.network,
         deadline=_deadline(request, address),
         required_capabilities=request.profile.profile.required_capabilities,

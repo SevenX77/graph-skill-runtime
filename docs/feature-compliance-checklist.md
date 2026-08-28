@@ -88,6 +88,20 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
   - `tests/application/test_host_native_handoff.py::test_mcp_projects_the_same_host_native_submit_protocol`
 - `[Covered By: tests/application/test_host_native_handoff.py::test_host_native_task_survives_process_boundary_and_resumes_same_run]`
 
+### F-agent-cli-executors: Execute supported root-DAG Agent phases through capability-probed vendor CLI processes, validate the same provider-neutral AgentTask and AgentResult contracts, and resume the durable graph run only after schema-valid output.
+
+- **Boundary**: lifecycle-behavior - vendor adapter contracts, process-tree tests, and durable CLI retry integration
+- **Sources**: `public-api`, `source-file-map`
+- **Core paths**: `src/graph_skill_runtime/adapters/cli.py`, `src/graph_skill_runtime/adapters/engine.py`, `src/graph_skill_runtime/adapters/host_native.py`, `src/graph_skill_runtime/adapters/host_native_runtime.py`, `src/graph_skill_runtime/adapters/process.py`, `src/graph_skill_runtime/adapters/vendor_cli/executor.py`, `src/graph_skill_runtime/adapters/vendor_cli/runtime.py`, `src/graph_skill_runtime/adapters/vendor_cli/vendors.py`, `src/graph_skill_runtime/adapters/windows_job.py`, `src/graph_skill_runtime/callbacks/events.py`, `src/graph_skill_runtime/domain/models.py`, `src/graph_skill_runtime/ports/process.py`
+- **Primary contracts**: 0 error codes, 2 events
+- **Targeted tests**:
+  - `tests/adapters/test_vendor_cli_executor.py::test_each_vendor_probes_builds_a_fresh_session_and_parses_one_agent_result`
+  - `tests/adapters/test_process_runner.py::test_timeout_terminates_the_whole_process_tree`
+  - `tests/application/test_cli_runtime.py::test_cli_runtime_closes_one_agent_wait_with_causal_events`
+  - `tests/application/test_cli_runtime.py::test_cli_runtime_rejects_unbridged_agent_capabilities_before_handoff`
+  - `tests/application/test_cli_runtime.py::test_cli_failure_preserves_same_durable_task_for_retry`
+- `[Covered By: tests/adapters/test_vendor_cli_executor.py::test_each_vendor_probes_builds_a_fresh_session_and_parses_one_agent_result]`
+
 ### F-md-frontmatter-parsing: Parse markdown frontmatter and body into stable skill metadata and diagnostics.
 
 - **Boundary**: lifecycle-behavior - skill parser contract
@@ -196,7 +210,7 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 
 - **Boundary**: externally-observable-behavior - CallbackEvent union
 - **Sources**: `public-api`, `source-file-map`
-- **Core paths**: `src/graph_skill_runtime/callbacks/base.py`, `src/graph_skill_runtime/callbacks/emit.py`, `src/graph_skill_runtime/core/event_contracts.py`
+- **Core paths**: `src/graph_skill_runtime/callbacks/base.py`, `src/graph_skill_runtime/callbacks/emit.py`, `src/graph_skill_runtime/callbacks/events.py`, `src/graph_skill_runtime/core/event_contracts.py`
 - **Primary contracts**: 0 error codes, 1 events
 - `[Covered By: tests/callbacks/test_events.py::TestUnionDiscriminator::test_unknown_event_type_rejected]`
 

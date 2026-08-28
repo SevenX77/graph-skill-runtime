@@ -22,6 +22,7 @@ from graph_skill_runtime.callbacks import events as callback_events
 EXPECTED_PUBLIC_SYMBOLS = {
     "AgentExecutor",
     "AgentRequired",
+    "AgentResource",
     "AgentResult",
     "AgentTask",
     "ArtifactRequest",

@@ -7,7 +7,7 @@ updated: 2026-08-27
 
 # Public API Contract
 
-This document records the implemented top-level Python contract for `graph-skill-runtime` `0.1.0a1`. Phase 2 changed the accepted business-skill format, and Phase 3 added bounded durable host-native execution semantics; neither change altered the 58-symbol Phase 1 facade. The executable symbol source is [`graph_skill_runtime.__all__`](../src/graph_skill_runtime/__init__.py); this document must contain exactly one strict `## <symbol>` heading for each of those 58 names. The distribution has not been published to PyPI.
+This document records the implemented top-level Python contract for `graph-skill-runtime` `0.1.0a1`. Phase 2 changed the accepted business-skill format, Phase 3 added bounded durable host-native execution semantics, and Phase 4 added direct vendor CLI execution plus the public `AgentResource` model. The executable symbol source is [`graph_skill_runtime.__all__`](../src/graph_skill_runtime/__init__.py); this document must contain exactly one strict `## <symbol>` heading for each of those 59 names. The distribution has not been published to PyPI.
 
 ## 1. Contract-wide rules
 
@@ -27,7 +27,13 @@ The default executor is `host-native`. `run` first persists the immutable `RunRe
 
 The host creates a fresh, clean-context native subagent and supplies the returned task. It submits an `AgentResult` through the Python `submit_agent_result` facade, the same-named MCP tool, or CLI `gskill submit`. The runtime reloads the immutable request snapshot, verifies that the handoff owns that exact request, validates run/task identity and completed output against the task's JSON Schema, records one external phase completion in the same graph state, and continues the same run. A failed or cancelled `AgentResult` does not execute that phase; it idempotently terminates the handoff with a failed `RunResult` and emits `agent_failed`. The cooperative adapter does not call a model, create a host child by itself, or silently fall back to `embedded` or `cli`. `agent_required` is a successful protocol status; the CLI returns exit code zero for it.
 
-The implemented wait-point address is intentionally bounded. Agent phases in registry subgraphs, graph-level iterate containing Agent, Agent phase iterate, and Agent phases on incomparable parallel branches fail fast. Host-native Agent handoff requires `SqliteCheckpointStoreConfig`; a host-native graph without Agent phases does not require a handoff. `resume(checkpoint_ref)` reads the current durable wait or terminal response but never applies Agent output. Advancing an Agent phase requires `submit_agent_result`. Standalone typed human/breakpoint resume without a handoff reference remains unimplemented. Vendor CLI executors remain unavailable; their processes are future fresh top-level vendor sessions, not native children of the current host conversation.
+The implemented wait-point address is intentionally bounded. Agent phases in registry subgraphs, graph-level iterate containing Agent, Agent phase iterate, and Agent phases on incomparable parallel branches fail fast for both `host-native` and `cli`. Host-native Agent handoff requires `SqliteCheckpointStoreConfig`; a graph without Agent phases does not require a handoff. `resume(checkpoint_ref)` reads the current durable wait or terminal response but never applies Agent output. Advancing a host-native Agent phase requires `submit_agent_result`. Standalone typed human/breakpoint resume without a handoff reference remains unimplemented.
+
+The default executor remains `host-native`. Only an explicitly resolved `CliExecutorConfig` enters `CliRuntimeAdapter`; a `LOGIC`-only graph completes without constructing or probing a vendor executor. For an Agent graph, the runtime validates the bounded topology, probes the executable/version/required flags and any vendor-exposed authentication status, and rejects portable tools, subagents, subgraphs, and framework context access before it creates a handoff task. A passing preflight uses the durable host-native task/result transition internally, but it executes each exposed task immediately through a fresh Claude, Codex, GitHub Copilot, Cursor, Gemini, or OpenCode top-level process. It never selects `embedded` implicitly.
+
+Each CLI attempt has one `attempt_id`. Building its immutable invocation emits `agent_dispatched`; creation of the owned operating-system process tree emits `agent_started`; an accepted result emits `agent_completed` with the same id. Failure after dispatch emits `agent_failed` with `task_terminal=false`, preserves the durable task, and allows the same run/task to retry when the error is retryable. Preflight failure happens before the handoff database or task exists. A host-native submitted failure or cancellation remains task-terminal and may have no attempt id.
+
+The CLI path passes the complete business prompt through UTF-8 stdin or a temporary UTF-8 file, never argv. It materializes a declared resource only when its resolved file falls within `AgentTask.allowed_paths`; the prompt receives the resource handle, summary, and content, not the original path. Aggregate resource input is limited to 1 MiB, the final prompt to 2 MiB, the output schema to 1 MiB, combined stdout and stderr to 4 MiB, and the Codex final-response file to 4 MiB. Every output is validated with Draft 2020-12 JSON Schema. Literal secret-shaped output or provenance is rejected, and invalid-output/nonzero-exit details retain only an output SHA-256 rather than the rejected text.
 
 The Port types below define provider-neutral boundaries. Their presence does not imply that the current composition ships a default adapter for every Port.
 
@@ -35,7 +41,7 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: protocol for a direct executor that executes one `AgentTask` without owning graph checkpoint state.
 - **Interface**: read-only `executor_id: str`; `execute(task: AgentTask) -> AgentResult`.
-- **Failure semantics**: an implementation reports terminal task failure in `AgentResult`; transport or adapter exceptions are implementation-boundary failures. The cooperative host-native path uses durable external submission rather than calling this `execute` method. No vendor CLI `AgentExecutor` ships yet.
+- **Failure semantics**: an implementation reports terminal task failure in `AgentResult`; transport or adapter exceptions are implementation-boundary failures. The cooperative host-native path uses durable external submission rather than calling this `execute` method. Phase 4 supplies an internal capability-probed vendor CLI implementation behind `CliRuntimeAdapter`; its attempt failure does not consume the durable task.
 
 ## AgentRequired
 
@@ -43,17 +49,25 @@ The Port types below define provider-neutral boundaries. Their presence does not
 - **Fields**: `task: AgentTask`, non-empty `checkpoint_ref`, and `submit_methods`, defaulting to the wire methods `("mcp", "cli")`. The Python facade exposes the same submission use case even though it is not repeated in this transport-advertisement tuple.
 - **Failure semantics**: invalid task or empty checkpoint reference fails validation. Current host-native references use `gskill-handoff-v1:<task-id>`; callers must treat them as opaque and must not substitute a private LangGraph checkpoint id or namespace.
 
+## AgentResource
+
+- **Responsibility**: identify one declared Agent reference or example as structured task data while keeping resource location separate from rendered instructions.
+- **Fields**: `schema_version="gskill.agent-resource.v1"`, `kind` (`reference` or `example`), identifier-shaped `resource_id`, non-empty absolute `path` in runtime-built tasks, and non-empty `summary`.
+- **Current behavior**: host-native task construction resolves each declared resource beneath the business skill root and carries the absolute path for an enforcing host. The instructions resource registry contains only `@reference:<id>` or `@example:<id>` plus the summary. The CLI materializer resolves and reads the file only when it is a regular file within `AgentTask.allowed_paths`, then inlines handle, summary, and UTF-8 content without exposing the original path in the prompt.
+- **Failure semantics**: invalid identifiers or blank path/summary fail model validation. Escaping, unavailable, non-UTF-8, or over-limit resources fail at the constructing or materializing boundary; there is no filesystem lookup or global business-skill discovery in the model itself.
+
 ## AgentResult
 
 - **Responsibility**: terminal result returned by an agent executor.
 - **Fields**: non-empty `task_id`, `status` (`completed`, `failed`, or `cancelled`), optional JSON `output`, optional `RuntimeErrorPayload`, non-empty `executor_id`, and JSON `provenance`.
+- **Current CLI provenance**: a completed direct attempt records vendor, executable basename, probed version and capabilities, auth-probe status, fresh-top-level-session truth, session-persistence policy, duration, schema-enforcement mode, and optional requested model/profile or vendor session id. It does not persist the full prompt, argv, credentials, or rejected raw output.
 - **Failure semantics**: `completed` requires `output`; `failed` and `cancelled` require `error`. A missing required terminal payload fails validation. Literal values under structurally secret-shaped keys are rejected in both `output` and `provenance`, because the durable handoff store persists the complete result. Host-native submission hashes that complete canonical result, including executor identity and provenance, for exact-retry and conflict decisions.
 
 ## AgentTask
 
 - **Responsibility**: least-authority, provider-neutral unit of work for one agent phase.
-- **Fields**: task/run identity, `PhaseAddress`, instructions, JSON inputs and output schema, allowed tools and paths, network policy, optional deadline, and required capabilities.
-- **Current construction**: the host-native adapter derives the address from the paused root graph phase; renders host-neutral role, goal, steps, protocols, typed inputs, and output JSON Schema; derives permissions from the immutable run profile; and assigns deterministic task identity from the run, address, and private checkpoint location.
+- **Fields**: task/run identity, `PhaseAddress`, instructions, JSON inputs and output schema, allowed tools and paths, immutable `resources: tuple[AgentResource, ...]`, network policy, optional deadline, and required capabilities.
+- **Current construction**: the host-native adapter derives the address from the paused root graph phase; renders host-neutral role, goal, steps, protocols, a path-free resource registry, typed inputs, and output JSON Schema; resolves declared resource paths structurally; derives permissions from the immutable run profile; and assigns deterministic task identity from the run, address, and private checkpoint location. A direct CLI run consumes the same task after rejecting unbridged tools, subagents, subgraphs, and context access before handoff creation.
 - **Failure semantics**: empty identities or instructions, invalid identifiers, an invalid network discriminator, or non-JSON payloads fail validation. A task is a business-skill execution request, not a bundled or globally registered business gSkill.
 
 ## ArtifactRequest
@@ -76,9 +90,11 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 ## CliExecutorConfig
 
-- **Responsibility**: select a future vendor CLI executor without embedding provider objects in the public API.
-- **Fields**: `kind="cli"`, vendor (`claude`, `codex`, `copilot`, `cursor`, `gemini`, or `opencode`), optional `agent_profile`, and optional `model_override`.
-- **Failure semantics**: an unsupported vendor or unknown field fails validation. Phase 4 has no executable probe, argv builder, or vendor process adapter yet; a resolved CLI run returns `GSKILL_EXECUTOR_UNAVAILABLE`. Future vendor CLI calls create fresh top-level sessions and are not the current host's native child context.
+- **Responsibility**: select one implemented direct vendor CLI executor without embedding provider objects in the public API.
+- **Fields**: `kind="cli"`; vendor (`claude`, `codex`, `copilot`, `cursor`, `gemini`, or `opencode`); optional identifier-shaped `agent_profile`; optional `model_override`; optional `executable`; and `timeout_seconds`, defaulting to 600 and constrained to `(0, 86400]`.
+- **Selector semantics**: `agent_profile` is valid only for Copilot, Gemini, and OpenCode. Copilot/OpenCode project it as direct `--agent`; Gemini prefixes `@<name>` to stdin as a request for its main agent to broker the named subagent. Claude safe mode cannot select a custom agent, Codex `--profile` is configuration rather than a child-agent selector, and Cursor exposes no documented direct selector, so those configurations fail validation. An omitted `model_override` leaves model selection to the vendor.
+- **Executable semantics**: `executable` may be a PATH basename or absolute path. A configured relative path containing `/` or `\` is ambiguous and fails before lookup; an absolute path must be a runnable file. With no override, the vendor adapter searches its documented basename.
+- **Failure semantics**: unsupported vendors, unknown fields, blank/control-line text, invalid agent-profile/vendor combinations, and invalid timeouts fail validation or preflight. Missing executable/version/help flag/auth/capability returns structured `GSKILL_EXECUTOR_UNAVAILABLE`; invalid task/config or an unbridged task capability is non-retryable. The adapter never falls back to another executor.
 
 ## CompareCandidate
 
@@ -139,7 +155,7 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: protocol for receiving ordered public `RuntimeEvent` envelopes.
 - **Interface**: `emit(event: RuntimeEvent) -> None`.
-- **Failure semantics**: ordering, durability, and sink I/O failures belong to the adapter. The default composition does not inject an `EventSink`. Current trace emission has causal evidence for `agent_required`, `agent_completed`, `agent_failed`, and `agent_result_rejected`; it does not claim `agent_dispatched` or `agent_started` without a future host acknowledgment contract.
+- **Failure semantics**: ordering, durability, and sink I/O failures belong to the adapter. The default composition does not inject an `EventSink`. Current trace emission has causal evidence for `agent_required`, `agent_completed`, `agent_failed`, and `agent_result_rejected` on cooperative handoffs, plus `agent_dispatched` and `agent_started` for runtime-owned CLI attempts. Those two attempt events do not imply a host-native acknowledgment contract.
 
 ## GoldenEvaluationRequest
 
@@ -193,7 +209,7 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: describe the run's requested network and filesystem policy without binding the public API to one host.
 - **Fields**: `network` (`deny`, `host-policy`, or `allow`, default `host-policy`) and `filesystem` (`declared-only` or `skill-and-state`, default `skill-and-state`).
-- **Failure semantics**: unknown policy values fail validation. The host-native adapter projects this policy into `AgentTask.network` and `allowed_paths`; the external host remains responsible for enforcing the declared restrictions when it creates the native subagent.
+- **Failure semantics**: unknown policy values fail validation. The host-native adapter projects this policy into `AgentTask.network` and `allowed_paths`; the external host remains responsible for enforcing the declared restrictions when it creates the native subagent. On the current CLI path, `allowed_paths` authorizes runtime resource materialization. It is not a promise that a vendor process is confined to those paths, and the public policy is not a cross-vendor hard sandbox.
 
 ## PhaseAddress
 
@@ -259,14 +275,14 @@ The Port types below define provider-neutral boundaries. Their presence does not
 - **Responsibility**: single transport-independent owner of use-case ordering.
 - **Construction**: requires explicit `ConfigResolver`, `RuntimeEngine`, and `RunSnapshotStore` dependencies.
 - **Interface**: `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `evaluate_golden`, `inspect`, and `load_run_request`. `predict` and `run` resolve and save the request before calling or selecting an engine path.
-- **Current ordering**: `resume` and `submit_agent_result` reload the immutable request snapshot rather than re-resolving changed configuration. They validate supplied state/skill identity before delegating to the engine.
-- **Failure semantics**: vendor `cli` execution returns `GSKILL_EXECUTOR_UNAVAILABLE`; bounded host-native execution and submission use typed `RunResult` outcomes. Missing snapshots return `GSKILL_SNAPSHOT_NOT_FOUND`, and mismatched immutable roots return `GSKILL_INVALID_REQUEST`. Dependency exceptions otherwise retain their native boundary unless a called adapter returns a structured result.
+- **Current ordering**: `resume` and `submit_agent_result` reload the immutable request snapshot rather than re-resolving changed configuration. They validate supplied state/skill identity before delegating to the engine. `run` persists the request before executor selection; the CLI engine path then compiles and validates topology, skips all vendor construction for a pure `LOGIC` graph, or performs vendor/task-capability preflight before durable handoff creation.
+- **Failure semantics**: bounded host-native and direct CLI execution return typed `RunResult` outcomes. A CLI preflight or attempt maps its category and retryability into `GSKILL_EXECUTOR_UNAVAILABLE`, `GSKILL_INVALID_REQUEST`, or `GSKILL_RUN_FAILED` without selecting a fallback. Missing snapshots return `GSKILL_SNAPSHOT_NOT_FOUND`, and mismatched immutable roots return `GSKILL_INVALID_REQUEST`. Dependency exceptions otherwise retain their native boundary unless a called adapter returns a structured result.
 
 ## RuntimeEngine
 
 - **Responsibility**: provider-neutral Port behind `RuntimeApplication` for current engine capabilities.
 - **Interface**: `compile(CompileRequest)`, `predict(RunRequest)`, `run(RunRequest)`, `resume(ResumeRequest, RunRequest)`, `submit_agent_result(SubmitAgentResultRequest, RunRequest)`, `evaluate_golden(GoldenEvaluationRequest)`, and `inspect(InspectRequest)`, each returning its typed result.
-- **Failure semantics**: adapters should project expected domain failures into typed results. `CurrentEngineAdapter` implements portable compile/predict/run/golden/inspect plus bounded host-native wait inspection and result submission; ordinary human/breakpoint resume remains not implemented at this facade.
+- **Failure semantics**: adapters should project expected domain failures into typed results. `CurrentEngineAdapter` implements portable compile/predict/run/golden/inspect, bounded host-native wait inspection and result submission, and explicit direct CLI execution through `CliRuntimeAdapter`; ordinary human/breakpoint resume remains not implemented at this facade.
 
 ## RuntimeErrorCode
 
@@ -278,13 +294,14 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: provider-neutral structured failure body.
 - **Fields**: `RuntimeErrorCode`, non-empty message, `retryable` flag, optional phase and source path, and JSON details.
-- **Failure semantics**: invalid code, blank message, non-JSON details, or unknown fields fail validation. Callers should branch on `code`, not parse message text.
+- **Failure semantics**: invalid code, blank message, non-JSON details, or unknown fields fail validation. Callers should branch on `code`, then use structured detail fields such as CLI `category`, `vendor`, `task_id`, `checkpoint_ref`, or `output_sha256`; they must not parse message text or expect rejected raw process output.
 
 ## RuntimeEvent
 
 - **Responsibility**: versioned public transport envelope around one observable event.
-- **Fields**: `event_type` is a closed 42-value Literal: `agent_completed`, `agent_exit_decision`, `agent_failed`, `agent_loop_iteration`, `agent_required`, `agent_result_rejected`, `ambiguity_logged`, `artifact_saved`, `blackboard_reduce`, `builtin_subagent_enter`, `builtin_subagent_exit`, `builtin_subagent_fallback`, `compaction`, `dead_end_pruned`, `edge_end`, `edge_start`, `finish_task_verdict`, `input_dispatch`, `input_file_injected`, `interrupted`, `llm_call`, `llm_call_settings`, `llm_delta`, `llm_route_decision`, `loop_detected`, `nudge`, `parallel_map_group_ended`, `parallel_map_group_started`, `phase_end`, `phase_start`, `predict_chain_start`, `prompt_captured`, `protocol_violation`, `resumed`, `run_ended`, `run_started`, `runtime_input_injected`, `tool_call`, `tool_call_started`, `tool_error_handled`, `tool_history_repaired`, or `working_memory_update`. The remaining fields are non-empty `run_id`, non-negative `sequence`, non-empty timestamp, and JSON payload.
-- **Current handoff evidence**: the host-native adapter emits `agent_required` after durable task creation, `agent_completed` or `agent_failed` for a submitted terminal result, and `agent_result_rejected` for rejected identity or output-contract evidence. Each trace event carries a deterministic `handoff_event_id`, and the local append path performs best-effort deduplication. Trace JSONL and handoff SQLite are separate owners, so consumers must treat delivered lifecycle evidence as causally at-least-once and deduplicate by that id; event presence is not a cross-owner commit proof, and there is no global exactly-once delivery promise. `agent_dispatched` and `agent_started` are deliberately absent because the runtime has no host acknowledgment proving those transitions.
+- **Fields**: `event_type` is a closed 44-value Literal: `agent_completed`, `agent_dispatched`, `agent_exit_decision`, `agent_failed`, `agent_loop_iteration`, `agent_required`, `agent_result_rejected`, `agent_started`, `ambiguity_logged`, `artifact_saved`, `blackboard_reduce`, `builtin_subagent_enter`, `builtin_subagent_exit`, `builtin_subagent_fallback`, `compaction`, `dead_end_pruned`, `edge_end`, `edge_start`, `finish_task_verdict`, `input_dispatch`, `input_file_injected`, `interrupted`, `llm_call`, `llm_call_settings`, `llm_delta`, `llm_route_decision`, `loop_detected`, `nudge`, `parallel_map_group_ended`, `parallel_map_group_started`, `phase_end`, `phase_start`, `predict_chain_start`, `prompt_captured`, `protocol_violation`, `resumed`, `run_ended`, `run_started`, `runtime_input_injected`, `tool_call`, `tool_call_started`, `tool_error_handled`, `tool_history_repaired`, or `working_memory_update`. The remaining fields are non-empty `run_id`, non-negative `sequence`, non-empty timestamp, and JSON payload.
+- **Current handoff evidence**: the host-native adapter emits `agent_required` after durable task creation, `agent_completed` or task-terminal `agent_failed` for a submitted terminal result, and `agent_result_rejected` for rejected identity or output-contract evidence. Each trace event carries a deterministic `handoff_event_id`, and the local append path performs best-effort deduplication. Trace JSONL and handoff SQLite are separate owners, so consumers must treat delivered lifecycle evidence as causally at-least-once and deduplicate by that id; event presence is not a cross-owner commit proof, and there is no global exactly-once delivery promise.
+- **Current CLI attempt evidence**: after building one immutable vendor invocation, the CLI adapter emits `agent_dispatched`; after the process-tree owner exists, it emits `agent_started`. Both require a non-empty `attempt_id`; `AgentStartedEvent.process_id` identifies the runtime-owned process-tree root and, on Windows, is the assigned supervisor PID rather than a guaranteed direct vendor PID. Accepted completion carries the same attempt id. A failure after dispatch carries that id, `task_terminal=false`, and its retryability; the durable task remains available. Host-native terminal failure/cancellation remains `task_terminal=true` with an optional absent attempt id.
 - **Failure semantics**: any event type outside that catalog, an invalid identity, a negative sequence, or a non-JSON payload fails validation. The [public API contract test](../tests/test_public_api_contract.py) proves this catalog is exactly equal to every concrete `CallbackEvent` discriminator in `callbacks/events.py`.
 
 ## RuntimeProfile
@@ -385,8 +402,8 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: resolve one invocation, persist its immutable request, and select the explicitly resolved executor path.
 - **Signature**: `run(invocation: RunInvocation, *, application: RuntimeApplication | None = None) -> RunResult`.
-- **Current behavior**: host-native is the default. It completes a graph with no Agent phases directly or returns a durable `agent_required` wait for a supported root Agent phase. Explicit `embedded` calls the current engine path. `cli` remains unavailable.
-- **Failure semantics**: unsupported host-native topology or checkpoint configuration returns `GSKILL_INVALID_REQUEST`; vendor CLI returns `GSKILL_EXECUTOR_UNAVAILABLE`. Configuration and snapshot-collision errors propagate at the Python boundary. No implicit fallback occurs.
+- **Current behavior**: host-native is the default. It completes a graph with no Agent phases directly or returns a durable `agent_required` wait for a supported root Agent phase. Explicit `embedded` calls the current engine path. Explicit `cli` completes pure `LOGIC` without a vendor probe or, for supported Agent phases, probes one selected vendor and closes each durable wait through a fresh top-level process before returning the terminal run result.
+- **Failure semantics**: unsupported topology or host-native checkpoint configuration returns `GSKILL_INVALID_REQUEST`. CLI invalid configuration/task and unbridged capabilities are non-retryable; missing executable/required flag/authentication or another repairable environment condition returns structured `GSKILL_EXECUTOR_UNAVAILABLE`; timeout, cancellation, output limit, nonzero exit, and invalid output return a structured failed result with category and retryability. A post-dispatch failure preserves the task for the same run to retry. Configuration and snapshot-collision errors propagate at the Python boundary. No implicit fallback occurs.
 
 ## submit_agent_result
 

@@ -121,12 +121,15 @@ def _emit_agent_terminal(
     record: AgentHandoffRecord,
     result: AgentResult,
     result_hash: str,
+    *,
+    attempt_id: str | None = None,
 ) -> None:
     event_id = f"agent-result:{record.task.task_id}:{result_hash}"
     event: AgentCompletedEvent | AgentFailedEvent
     if result.status == "completed":
         event = AgentCompletedEvent(
             handoff_event_id=event_id,
+            attempt_id=attempt_id,
             run_id=request.run_id,
             task_id=result.task_id,
             phase_name=record.task.address.phase_id,
@@ -298,6 +301,8 @@ class HostNativeRuntimeAdapter:
         self,
         request: SubmitAgentResultRequest,
         run_request: RunRequest,
+        *,
+        attempt_id: str | None = None,
     ) -> RunResult:
         from graph_skill_runtime.core.compiler import compile_skill
         from graph_skill_runtime.core.runner import ExternalPhaseCompletion, resume_skill
@@ -326,6 +331,7 @@ class HostNativeRuntimeAdapter:
                     active_record,
                     agent_result,
                     durable_result_hash,
+                    attempt_id=attempt_id,
                 )
                 if agent_result.status != "completed":
                     assert agent_result.error is not None
@@ -381,6 +387,7 @@ class HostNativeRuntimeAdapter:
                 record,
                 request.result,
                 result_hash,
+                attempt_id=attempt_id,
             )
             if response.agent_required is not None:
                 next_record = store.load(response.agent_required.checkpoint_ref)
