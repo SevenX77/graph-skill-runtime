@@ -18,7 +18,8 @@ Repository text and text exchanged by the runtime use UTF-8. Repository line end
 | Python child-process default | Tests set `PYTHONUTF8=1` for child Python processes; CI sets it for jobs |
 | Atomic cache publication | [`save_to_cache`](../src/graph_skill_runtime/core/cache.py) writes a unique sibling temporary file and publishes with `os.replace` |
 | Vendor process-tree ownership | [`SubprocessProcessRunner`](../src/graph_skill_runtime/adapters/process.py) uses a Win32 Job Object on Windows and a new process group on POSIX; a denied POSIX group signal falls back only to bounded exact-PGID/effective-UID member signaling |
-| Platform CI configuration | [CI](../.github/workflows/ci.yml) defines Linux gates and tests, plus Python 3.12 smoke jobs on `windows-latest` and `macos-latest` |
+| Platform CI configuration | [CI](../.github/workflows/ci.yml) builds one candidate on Ubuntu with Python 3.11, runs source tests on Ubuntu Python 3.11/3.12/3.13, and accepts that same candidate on Ubuntu, Windows, and macOS with Python 3.11 |
+| Release-artifact binding | [`accept_release_artifacts.py`](../scripts/accept_release_artifacts.py) records one exact source commit plus wheel/sdist filename, size, and SHA-256 in `gskill.release-artifacts.v1`; its acceptance evidence records the consumed manifest SHA-256 |
 
 These controls are configured in the checkout. CI configuration is not evidence that a particular workflow, platform, vendor CLI, or version has passed; support statements require the recorded result of an affected-platform run.
 
@@ -118,13 +119,33 @@ Windows and POSIX implementations must have the same observable wait and failure
 
 Atomic replacement and locking solve different problems. Replacement prevents readers from observing half a snapshot; a lock coordinates a larger read-modify-write transaction. Use only the mechanism required by the state contract, and test interleavings rather than treating either mechanism as a general concurrency cure.
 
+## Immutable release-candidate boundary
+
+Phase 6 accepts one built candidate through [`scripts/accept_release_artifacts.py`](../scripts/accept_release_artifacts.py). The boundary has two public repository commands and one internal worker:
+
+- `validate` requires the distribution directory to contain exactly one wheel and one `.tar.gz` source distribution. It validates distribution/version/`Requires-Python` metadata, the `gskill` entry point, the wheel's `py3-none-any` pure-Python declaration, and portable archive names. It rejects wheel symlinks; each source-distribution member must be a regular file or directory. The wheel rejects `graph_agent/` and `graph_skill_runtime/examples/`; the sdist rejects `src/graph_agent/` and `src/graph_skill_runtime/examples/`. Both treat the MoirAI asset subtree as the exact closed inventory derived from packaged `integration.json`. The sdist may contain repository-level examples and tests as source corpus; it does not install them as package content. The validator does not freeze every ordinary runtime source member into one full-archive whitelist. It writes `gskill.release-artifacts.v1` with the supplied exact source commit and the two artifacts' filenames, positive sizes, and SHA-256 values.
+- `accept` loads that manifest, requires each artifact's current size and SHA-256 to match its manifest entry, revalidates both archives, and requires `--expected-source-commit` to equal the manifest's source commit. It copies only those verified bytes into a temporary immutable-candidate directory, installs pip-wheel, uv-wheel, and pip-sdist channels in separate controlled environments, and writes `gskill.package-acceptance.v1`. The evidence records the SHA-256 of the manifest it consumed. The command has no external expected-manifest-hash input; equal `artifact_manifest_sha256` values across platform evidence prove that those runs consumed the same manifest.
+- `installed-smoke` is the internal per-channel worker. The isolated environment's Python executes the worker, and `graph_skill_runtime` must resolve inside that environment rather than the checkout. It rejects provider extras, installed `graph_skill_runtime/examples/`, and installed `graph.yaml`; checks distribution/version/console identity and the six-target read-only host detector; opens a real stdio MCP session, enumerates exactly the eight public runtime tools, and successfully invokes MCP `compile`. It exercises the installed CLI's compile/inspect/predict/run behavior with spaces and non-ASCII text, and the installed MoirAI CLI's Claude/Codex project lifecycle `planned → installed → unchanged → uninstalled`.
+
+The installed handoff smoke uses the deterministic host-native protocol rather than a vendor executable. It observes `run → reopened agent_required → submit completed → exact duplicate completed → reopened terminal completed`, checks both SQLite databases with `PRAGMA integrity_check`, renames and reopens them after closing connections, and requires the immutable request snapshot and trace. On Windows, successful database rename also proves that the acceptance process released incompatible file handles. Controlled HOME/config/cache snapshots must show no unexpected host-state mutation; only the runtime-owned compile cache is permitted.
+
+The release topology borrows three mature packaging choices:
+
+- The [PyPA GitHub Actions publishing guide](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/) separates build from publish and hands an immutable artifact between jobs. This repository likewise builds once, validates and uploads that candidate, and makes every platform and the publisher download it; it does not rebuild independently before upload.
+- [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/using-a-publisher/) binds publication to a named GitHub environment and short-lived OpenID Connect identity. The publish job therefore uses environment `pypi` and the narrow `id-token: write` permission, with no long-lived package token in workflow configuration.
+- The [uv package guide](https://docs.astral.sh/uv/guides/package/) defines `uv build --no-sources` as the check that a package builds without local source overrides. Both CI and release use it so a workspace-only `tool.uv.sources` path cannot make an otherwise unpublishable candidate appear valid.
+
+These choices prove provenance and pre-publication behavior, not registry state. A later release must still use the exact accepted bytes. Creating a tag, publishing a GitHub Release, configuring the PyPI project/trusted publisher, and observing the registry upload are external actions; none has occurred for `0.1.0a1`.
+
 ## CI and verification evidence
 
 The configured CI topology is:
 
-- Ubuntu quality gates: Ruff, strict mypy, contract-manifest validation, dependency audit, and build;
-- Ubuntu runtime tests on Python 3.11, 3.12, and 3.13;
-- full pytest smoke runs on Windows and macOS with Python 3.12.
+- `quality-gates` on Ubuntu/Python 3.11 runs Ruff, strict mypy, contract-manifest validation, and dependency audit. It builds once with `uv build --no-sources`, validates the wheel/source-distribution pair, and uploads those distributions with their artifact manifest.
+- `runtime-tests` runs the complete pytest suite, including distribution-contract tests, on Ubuntu/Python 3.11, 3.12, and 3.13. The Python 3.11 job also downloads and accepts the candidate built by `quality-gates`.
+- `cross-platform-smoke` runs Ruff, strict mypy, contract-manifest validation, and the complete pytest suite, then accepts that same candidate on Windows/Python 3.11 and macOS/Python 3.11.
+
+The repository's exact required checks are `quality-gates`, `runtime-tests (3.11)`, `runtime-tests (3.12)`, `runtime-tests (3.13)`, `cross-platform-smoke (windows-latest)`, and `cross-platform-smoke (macos-latest)`. The latter five jobs declare `needs: quality-gates`; reusing these existing required-check names places same-candidate artifact acceptance on the merge-gating path rather than creating an advisory side job.
 
 A configuration entry or successful Linux run does not prove Windows or macOS behavior. A change to paths, encodings, subprocesses, atomic writes, locks, SQLite storage, or cleanup must have an OS-independent unit test where possible and a real affected-platform run where platform semantics matter. Record the command, operating system, Python version, and observed result before claiming support.
 
@@ -132,7 +153,33 @@ The current Phase 4 real-machine record is Microsoft Windows `10.0.26200` x64 wi
 
 Remote source-checkout evidence now exists on the same implementation commit [`8928d13`](https://github.com/SevenX77/graph-skill-runtime/commit/8928d13b32c800a2ad303d02e1bd96551f969ab5). [Workflow run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333) passed `quality-gates`, `runtime-tests` for Python 3.11/3.12/3.13, `cross-platform-smoke (windows-latest)`, and `cross-platform-smoke (macos-latest)`. The CodeQL check also passed, including `Analyze Python`. The real macOS process test starts a descendant that ignores `SIGTERM` and verifies that the subsequent `SIGKILL` cleanup prevents it from surviving.
 
-Fake-process adapter tests prove command construction, parsing, limits, lifecycle mapping, and failure behavior independent of an installed vendor. The remote Windows/macOS jobs prove the tested source-checkout process semantics on those runners, including the Darwin permission fallback; CodeQL proves only that its configured analysis completed successfully. None of these signals turn an uninstalled vendor into a supported operational combination, prove real vendor execution on macOS/Linux, install the built distribution across the release matrix, or constitute Phase 6 packaging/release acceptance. Dynamic executable/version/help/auth probes decide whether one local attempt can proceed; they are not a release-wide promise for every CLI version or operating system.
+Fake-process adapter tests prove command construction, parsing, limits, lifecycle mapping, and failure behavior independent of an installed vendor. The Phase 4 remote Windows/macOS jobs prove the tested source-checkout process semantics on those runners, including the Darwin permission fallback; CodeQL proves only that its configured analysis completed successfully. Dynamic executable/version/help/auth probes decide whether one local attempt can proceed; they are not a release-wide promise for every CLI version or operating system.
+
+### Phase 6 acceptance evidence — 2026-08-28
+
+Local validation on implementation commit `f7d5340d0c822f62786046724473b9005c41f1b1` passed Ruff, strict mypy over 149 source files, the contract-manifest validator, `1716 passed, 1 skipped`, seven distribution-contract tests, and `pip-audit` with no known vulnerabilities among resolved distributions. The audit skipped the unpublished local project; it is neither a source-code security audit nor publication evidence. On Python `3.11.15` / Windows 10 AMD64, one exact local candidate passed pip-wheel, uv-wheel, and pip-sdist acceptance. Documentation changes alter distribution bytes, so that local candidate's hashes are evidence for that run rather than fixed version constants.
+
+[PR #9](https://github.com/SevenX77/graph-skill-runtime/pull/9) had head `f7d5340d`; [Actions run 33159834800](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33159834800) checked out synthetic merge `67703295956350f6453dae24f4f0de50f8d448d9`. The latter, not the PR head, is the `source_commit` recorded by all three platform acceptance reports. The run completed `quality-gates` in 39 seconds, runtime tests in 4m08s / 2m35s / 2m17s for Python 3.11 / 3.12 / 3.13, Windows smoke in 5m04s, and macOS smoke in 3m44s. CodeQL `Analyze Python` also succeeded in 1m17s; it remains analysis evidence, not artifact acceptance.
+
+The platform reports bind the candidate as follows:
+
+| Evidence field | Value on Ubuntu, Windows, and macOS |
+| --- | --- |
+| Distribution/version | `graph-skill-runtime` / `0.1.0a1` |
+| Source commit | `67703295956350f6453dae24f4f0de50f8d448d9` |
+| Artifact-manifest SHA-256 | `36769e48c89a3396ee38fea72aa0d2c3f0ae3aad98dab242bcc2f719ac6993ca` |
+| Wheel | SHA-256 `fc9e3508ba134cb82593d1175777ad8d237622effad9e5d1ceac9a528614888b`; 477655 bytes |
+| Source distribution | SHA-256 `674cea440f513e17d8856dcbbe0129981dfd55cc305a593e62a1ba2f3c76f75d`; 1451852 bytes |
+
+The equal manifest digest proves that the three reports consumed the same manifest; the recorded artifact size and SHA-256 values bind that manifest to the wheel and source distribution. `accept` itself has no separate expected-manifest-hash parameter. These values identify this first accepted remote candidate and do not permanently define every `0.1.0a1` build.
+
+| Acceptance environment | Installed channels | Shared observable result |
+| --- | --- | --- |
+| Linux x86_64, Python 3.11.16 | pip-wheel, uv-wheel, pip-sdist | compile passed; predict/run completed; handoff statuses `[agent_required, agent_required, completed, completed, completed]`; integration statuses `[planned, installed, unchanged, uninstalled]`; unexpected host-state changes `[]` |
+| Windows 10 AMD64, Python 3.11.16 | pip-wheel, uv-wheel, pip-sdist | same |
+| Darwin arm64, Python 3.11.16 | pip-wheel, uv-wheel, pip-sdist | same |
+
+These observations satisfy Phase 6's defined cross-platform package/release-candidate exit criteria. They do not execute real vendor CLIs: the installed handoff uses deterministic host-native result submission, so the direct-vendor support statement remains the Windows/Codex record above. They also do not prove publication. As observed on 2026-08-28, the repository release list was empty and the `graph-skill-runtime` JSON endpoints on both PyPI and TestPyPI returned 404; no tag release, GitHub Release, registry upload, PyPI project, or trusted-publisher relationship had been created or exercised.
 
 Run the local baseline gates from the repository root:
 
@@ -141,9 +188,11 @@ uv run ruff check src tests scripts tools
 uv run mypy --strict src
 uv run pytest --tb=short -q
 uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml
-uv build
+uv build --no-sources
 uv run pip-audit
 ```
+
+Use the exact `validate` and `accept` command forms in the [repository guide](../README.md#phase-6-package-acceptance-and-publication-boundary) when establishing acceptance for a release candidate.
 
 ## Review checklist
 
@@ -159,4 +208,6 @@ Before merging a cross-platform-sensitive change, verify that:
 - resource materialization and process-tree ownership are not described as a cross-vendor hard sandbox;
 - replacement or locking behavior has one owner and the same observable contract on Windows and POSIX;
 - tests prove the resulting state or failure, not merely that a function or command returned;
-- actual platform results are distinguished from configured but unrun CI.
+- actual platform results are distinguished from configured but unrun CI;
+- every platform acceptance report names the expected source commit and records the same consumed-manifest digest before results are combined;
+- acceptance, release creation, and registry publication are reported as separate states.

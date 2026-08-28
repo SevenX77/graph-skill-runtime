@@ -2,7 +2,7 @@
 doc: INDEX
 role: index
 status: living
-updated: 2026-08-27
+updated: 2026-08-28
 ---
 
 # Graph Skill Runtime MVP1 文档索引
@@ -17,7 +17,9 @@ updated: 2026-08-27
 | Error code、level、stage、正向定义、原因、修复与 owning spec | [`skill-spec/11-error-code-spec.md`](../skill-spec/11-error-code-spec.md) | `living` 唯一 catalog，与 `ERROR_REGISTRY` 双射 |
 | Parser、loader、bundle inventory、compile 聚合与 flat graph call resolution | [`parser.py`](../../src/graph_skill_runtime/core/parser.py)、[`loader.py`](../../src/graph_skill_runtime/core/loader.py)、[`compiler.py`](../../src/graph_skill_runtime/core/compiler.py) | 当前可执行行为；格式与错误语义仍分别回到 `01` 与 `11` |
 | Graph/phase typed manifest 与本地 resolver | [`manifest.py`](../../src/graph_skill_runtime/core/manifest.py)、[`local_workspace_resolver.py`](../../src/graph_skill_runtime/core/local_workspace_resolver.py) | 当前可执行结构与解析；内部 graph id 由 portable flat registry 拥有 |
-| Typed SDK/CLI/MCP facade | [Public API contract](../public-api-contract.md) 与 [`graph_skill_runtime.__all__`](../../src/graph_skill_runtime/__init__.py) | 58-symbol Phase 1 facade 保持不变 |
+| Typed SDK/CLI/MCP facade | [Public API contract](../public-api-contract.md) 与 [`graph_skill_runtime.__all__`](../../src/graph_skill_runtime/__init__.py) | 当前精确为 77 个 top-level symbols 与 14 个 top-level Python functions：9 个 runtime/application entry points 加 5 个 integration functions；MCP 仍只有 8 个 runtime tools。Phase 4 增加 `AgentResource`，Phase 5 增加 18 个 integration exports |
+| Optional MoirAI host integration | [`integration.json`](../../src/graph_skill_runtime/integrations/assets/moirai/integration.json) 与 [完整 v1 设计](../design/v1-alignment.md) | Phase 5 当前 owner：canonical inventory、六 renderer、显式 installer 与 scoped discovery；不在本索引复制 inventory 或验收证据 |
+| Cross-platform release-candidate acceptance | [Cross-platform policy](../CROSS_PLATFORM.md) 与 [`accept_release_artifacts.py`](../../scripts/accept_release_artifacts.py) | Phase 6 当前 owner：同一 manifest-bound wheel/sdist 的三平台安装验收；它是 pre-publication evidence，不是 registry publication |
 
 Production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取 portable contract。Legacy v0.3 parser 只在显式 `gskill migrate studio-skill` converter 中可达；[`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 是 `superseded` converter 输入与历史证据。
 
@@ -87,4 +89,4 @@ Production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取 porta
 - Superseded v0.3 converter input: [`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md).
 - MVP1 historical syntax and mechanism documents must not duplicate or override portable `01`.
 - `_migration-src` is no longer part of the live doc set.
-- Complete v1 design: [`design/v1-alignment.md`](../design/v1-alignment.md). It remains `drafted` because Phase 3 through Phase 6 are not implemented, even though Phase 2 is current.
+- Complete v1 design: [`design/v1-alignment.md`](../design/v1-alignment.md). Bounded Phase 3、Phase 4、Phase 5 与 pre-publication Phase 6 已按各自范围验收；Phase 3b、首次发布前命名裁决与真实 release/registry publication 仍未闭合，因此完整设计保持 `drafted`。
