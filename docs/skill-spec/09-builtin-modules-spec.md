@@ -1,10 +1,8 @@
 ---
 status: retired
-updated: 2026-06-28
+updated: 2026-08-27
 ---
 
 # Builtin Modules Spec Retired
 
-本页不再承载 builtin module 文件格式模板。
-
-工具和内置能力的运行机制属于 MVP1 mechanism 层，见 `docs/engine/mvp1/02-mechanism/05-run-inner/04-tools/`。
+本页是 v0.3 builtin module 说明的退役导航，不承载当前模板。当前 portable 业务 tool scope、显式 `AGENT.md.tools` 清单与 framework builtin 边界见 [`01-PORTABLE-GSKILL-V1.md` §6](./01-PORTABLE-GSKILL-V1.md#6-flat-graph-registry调用图与资源)；运行实现以当前源码为准。

@@ -52,12 +52,12 @@ def _logic_phase(root: Path, name: str, *, inputs: dict[str, Any], required: lis
     _write(
         root / "phases" / name / "LOGIC.md",
         f"""---
+name: {name}
 io:
   inputs:
     {_schema(inputs, required=required)}
   outputs:
     {_schema({_FIELD: {"type": "string"}})}
-actions: [{name}]
 validator: false
 ---
 <action>{name}</action>
@@ -72,21 +72,26 @@ validator: false
 def _overwriting_skill(root: Path) -> Path:
     """Two chained phases that both declare the same output field."""
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: conflict-names-both-phases
+        root / "SKILL.md",
+        f"---\nname: {root.name}\ndescription: Conflict diagnostic fixture.\n---\n",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: conflict-graph
+description: Conflict diagnostic graph.
 io:
   inputs:
     {_schema({"topic": {"type": "string"}}, required=["topic"])}
   outputs:
     {_schema({_FIELD: {"type": "string"}})}
 phases:
-  - {_UPSTREAM}
-  - {_DOWNSTREAM}
----
-<phase depends_on="input">{_UPSTREAM}</phase>
-<phase depends_on="{_UPSTREAM}" output>{_DOWNSTREAM}</phase>
+  - id: {_UPSTREAM}
+    depends_on: [input]
+    output: false
+  - id: {_DOWNSTREAM}
+    depends_on: [{_UPSTREAM}]
+    output: true
 """,
     )
     _logic_phase(root, _UPSTREAM, inputs={"topic": {"type": "string"}}, required=["topic"])

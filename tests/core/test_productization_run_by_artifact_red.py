@@ -99,10 +99,18 @@ def _write_text(path: Path, text: str) -> None:
 
 def _write_two_phase_logic_skill(root: Path) -> None:
     _write_text(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: artifact-runtime-real-graph
+description: Execute a compiled two-phase graph artifact.
+---
+""",
+    )
+    _write_text(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Execute a compiled two-phase graph artifact.
 io:
   inputs:
     type: object
@@ -117,16 +125,18 @@ io:
       answer:
         type: string
 phases:
-  - prepare
-  - draft
----
-<phase depends_on="input">prepare</phase>
-<phase depends_on="prepare" output>draft</phase>
+  - id: prepare
+    depends_on: [input]
+    output: false
+  - id: draft
+    depends_on: [prepare]
+    output: true
 """,
     )
     _write_text(
         root / "phases" / "prepare" / "LOGIC.md",
         """---
+name: prepare
 io:
   inputs:
     type: object
@@ -150,6 +160,7 @@ io:
     _write_text(
         root / "phases" / "draft" / "LOGIC.md",
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -174,10 +185,18 @@ io:
 
 def _write_single_agent_skill(root: Path) -> None:
     _write_text(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: artifact-runtime-predict-agent
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: Predict a compiled single-agent artifact.
+---
+""",
+    )
+    _write_text(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Predict a compiled single-agent artifact.
 io:
   inputs:
     type: object
@@ -190,14 +209,15 @@ io:
       answer:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
     )
     _write_text(
-        root / "phases" / "draft" / "SKILL.md",
+        root / "phases" / "draft" / "AGENT.md",
         """---
+name: draft
 llm_role: analyst
 io:
   inputs:
@@ -226,10 +246,18 @@ Call @tool:finish_task with the answer.
 
 def _write_complex_agent_skill(root: Path) -> None:
     _write_text(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: artifact-runtime-predict-complex-agent
+description: Predict a compiled complex-agent artifact.
+---
+""",
+    )
+    _write_text(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Predict a compiled complex-agent artifact.
 io:
   inputs:
     type: object
@@ -261,14 +289,15 @@ io:
       segments_summary:
         type: string
 phases:
-  - segment
----
-<phase depends_on="input" output>segment</phase>
+  - id: segment
+    depends_on: [input]
+    output: true
 """,
     )
     _write_text(
-        root / "phases" / "segment" / "SKILL.md",
+        root / "phases" / "segment" / "AGENT.md",
         """---
+name: segment
 llm_role: analyst
 io:
   inputs:
@@ -620,8 +649,8 @@ def test_predict_graph_resolves_engine_predict_model_before_live_provider(
     from graph_skill_runtime.core import graph_assembler
     from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
     from graph_skill_runtime.core._predict_internal.strategy import MockStrategy
-    from graph_skill_runtime.core.compiler import compile_skill
     from graph_skill_runtime.core.runner import SDKPredictContext
+    from tests.legacy_fixture_adapter import compile_skill
 
     skill_root = tmp_path / "artifact-runtime-predict-agent"
     _write_single_agent_skill(skill_root)
@@ -667,8 +696,8 @@ def test_predict_graph_predict_context_overrides_explicit_chat_model(
     from graph_skill_runtime.core import graph_assembler
     from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
     from graph_skill_runtime.core._predict_internal.strategy import MockStrategy
-    from graph_skill_runtime.core.compiler import compile_skill
     from graph_skill_runtime.core.runner import SDKPredictContext
+    from tests.legacy_fixture_adapter import compile_skill
 
     skill_root = tmp_path / "artifact-runtime-predict-explicit-chat-model"
     _write_single_agent_skill(skill_root)

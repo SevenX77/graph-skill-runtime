@@ -30,6 +30,7 @@ def _logic_phase(root: Path, name: str, *, inputs: str, outputs: str, action: st
     _write(
         root / "phases" / name / "LOGIC.md",
         f"""---
+name: {name}
 actions: [{action}]
 validator: false
 io:
@@ -46,14 +47,22 @@ io:
     _write(root / "phases" / name / "actions" / f"{action}.py", body)
 
 
-def _diamond_skill(root: Path) -> None:
+def _diamond_skill(parent: Path) -> Path:
     """input -> seed -> (left | right) -> join; pure LOGIC nodes, no LLM."""
 
+    root = parent / "par-diamond"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: par-diamond
+description: Minimal parallel fan-out probe with pure logic nodes.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
 description: Minimal parallel fan-out probe with pure logic nodes.
 io:
   inputs:
@@ -66,12 +75,19 @@ io:
     required: [combined]
     properties:
       combined: {type: object}
-phases: [seed, left, right, join]
----
-<phase depends_on="input">seed</phase>
-<phase depends_on="seed">left</phase>
-<phase depends_on="seed">right</phase>
-<phase depends_on="left,right" output>join</phase>
+phases:
+  - id: seed
+    depends_on: [input]
+    output: false
+  - id: left
+    depends_on: [seed]
+    output: false
+  - id: right
+    depends_on: [seed]
+    output: false
+  - id: join
+    depends_on: [left, right]
+    output: true
 """,
     )
     _logic_phase(
@@ -126,6 +142,7 @@ phases: [seed, left, right, join]
             "    return {\"combined\": {\"left\": inputs[\"left_result\"], \"right\": inputs[\"right_result\"]}}\n"
         ),
     )
+    return root
 
 
 def _initial_state(**fields: object) -> WorkflowState:
@@ -137,8 +154,8 @@ def _initial_state(**fields: object) -> WorkflowState:
 
 
 def test_diamond_fanout_executes_and_join_sees_both_branches(tmp_path: Path) -> None:
-    _diamond_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False)
+    skill_root = _diamond_skill(tmp_path)
+    compiled = compile_skill(skill_root, cache=False)
     graph = assemble_graph(compiled)
 
     result = graph.graph.invoke(_initial_state(seed_value=7))
@@ -156,10 +173,10 @@ def test_parallel_writers_of_same_field_are_rejected(tmp_path: Path) -> None:
     rejected at compile time (illegal state made unrepresentable) — or, if the
     compile rule is deferred, at runtime with a fatal naming the field."""
 
-    _diamond_skill(tmp_path)
+    skill_root = _diamond_skill(tmp_path)
     # Rewrite right to clash with left on 'left_result'.
     _logic_phase(
-        tmp_path,
+        skill_root,
         "right",
         inputs="""    required: [base]
     properties:
@@ -171,8 +188,9 @@ def test_parallel_writers_of_same_field_are_rejected(tmp_path: Path) -> None:
         body="def right_out(inputs):\n    return {\"left_result\": inputs[\"base\"] + 2}\n",
     )
     _write(
-        tmp_path / "phases" / "join" / "LOGIC.md",
+        skill_root / "phases" / "join" / "LOGIC.md",
         """---
+name: join
 actions: [join_out]
 validator: false
 io:
@@ -191,9 +209,9 @@ io:
 """,
     )
     _write(
-        tmp_path / "phases" / "join" / "actions" / "join_out.py",
+        skill_root / "phases" / "join" / "actions" / "join_out.py",
         "def join_out(inputs):\n    return {\"combined\": {\"got\": inputs[\"left_result\"]}}\n",
     )
 
     with pytest.raises(SkillLoadError):
-        compile_skill(tmp_path, cache=False)
+        compile_skill(skill_root, cache=False)

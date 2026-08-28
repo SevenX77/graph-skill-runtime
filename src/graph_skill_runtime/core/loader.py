@@ -1,4 +1,4 @@
-"""V0.3.0 graph skill loader: route GRAPH.md + phase node documents."""
+"""Portable gSkill loader for root Agent Skills metadata and graph bundles."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import ast
 import importlib.util
 import inspect
 import logging
-import os
 import re
 import sys
 import traceback
@@ -16,20 +15,26 @@ from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import Any, Literal, NoReturn, TypeVar, get_origin
 
+import yaml
 from jsonschema.exceptions import SchemaError
 from jsonschema.validators import Draft202012Validator
 from pydantic import BaseModel, ValidationError
+from ruamel.yaml import YAML as RuamelYAML
+from ruamel.yaml.error import YAMLError as RuamelYAMLError
 
 from graph_skill_runtime.core.actions import ActionDef, ActionRegistry, ToolDef, ToolRegistry
 from graph_skill_runtime.core.authored_text import read_authored_text
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError, SkillLoadError, make_error_payload
 from graph_skill_runtime.core.local_workspace_resolver import default_local_resolver_for_skill
 from graph_skill_runtime.core.manifest import (
+    GRAPH_ID_PATTERN,
     AgentNodeAST,
     GraphManifest,
+    GraphPhaseRef,
     IterateSpec,
     LogicNodeAST,
     PhaseIOSchema,
+    RootSkillManifest,
     SubgraphNodeAST,
 )
 from graph_skill_runtime.core.mentions import first_broken_mention, scan_mentions
@@ -55,13 +60,13 @@ PhaseAST = LogicNodeAST | SubgraphNodeAST | AgentNodeAST
 _PHASE_FILE_TO_MODE: dict[str, str] = {
     "LOGIC.md": "logic",
     "SUBGRAPH.md": "subgraph",
-    "SKILL.md": "agent",
+    "AGENT.md": "agent",
 }
 
 
 @dataclass(frozen=True)
 class PhaseDocument:
-    """One routed V2.1 phase document plus its typed AST."""
+    """One routed portable phase document plus its typed AST."""
 
     phase_name: str
     path: Path
@@ -73,7 +78,7 @@ class PhaseDocument:
 
 @dataclass(frozen=True)
 class CompiledSkill:
-    """T0.1 route/parse result emitted by SkillLoader."""
+    """One compiled graph plus the business skill's flat graph registry."""
 
     raw: dict[str, Any]
     manifest: GraphManifest
@@ -82,11 +87,15 @@ class CompiledSkill:
     tools: ToolRegistry = field(default_factory=ToolRegistry.empty)
     subagents_by_phase: dict[str, list[CompiledSubagent]] = field(default_factory=dict)
     phase_tokens: dict[str, PhaseTokenInfo] = field(default_factory=dict)
+    skill_manifest: RootSkillManifest | None = None
+    skill_root: Path = Path(".")
+    graph_root: Path = Path(".")
+    graph_registry: dict[str, CompiledSkill] = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True)
 class CompiledSubagent:
-    """Resolved sub-skill metadata declared on a parent SKILL phase."""
+    """Resolved external Agent Skill metadata declared on a parent AGENT phase."""
 
     parent_phase_id: str
     name: str
@@ -99,37 +108,19 @@ class CompiledSubagent:
 
 
 @dataclass(frozen=True)
-class PhaseAttributeSpan:
-    """Source span for one attribute inside a root GRAPH.md phase tag."""
-
-    name: str
-    value: str
-    quote: str
-    attr_start: int
-    attr_end: int
-    value_start: int
-    value_end: int
-    line_start: int
-    line_end: int
-
-
-@dataclass(frozen=True)
 class PhaseTokenInfo:
-    """Internal source token metadata for serializer round-trip work."""
+    """Portable source metadata for one ``graph.yaml`` phase entry."""
 
     phase_id: str
     raw_text: str
-    start_offset: int
-    end_offset: int
     line_start: int
     line_end: int
     attrs: dict[str, str]
-    attr_spans: dict[str, PhaseAttributeSpan]
 
 
 @dataclass(frozen=True)
 class BodyPhaseRef:
-    """One GRAPH.md body ``<phase>`` topology declaration."""
+    """Normalized topology declaration from one ``graph.yaml`` phase entry."""
 
     name: str
     depends_on: tuple[str, ...]
@@ -142,7 +133,7 @@ class BodyPhaseRef:
 
 
 class SkillLoader:
-    """Thin V0.3.0 parser/route orchestrator."""
+    """Compile a portable business gSkill and its flat graph registry."""
 
     def __init__(
         self,
@@ -195,7 +186,66 @@ class SkillLoader:
         _compilation_cache: dict[str, CompiledSkill] | None,
         allowed_roles: set[str] | None,
     ) -> CompiledSkill:
-        resolver = skill_resolver or default_local_resolver_for_skill(root)
+        _guard_portable_skill_root(root)
+        skill_manifest = _load_root_skill_manifest(root)
+
+        graph_roots = [root]
+        graphs_dir = root / "graphs"
+        if graphs_dir.exists():
+            graph_roots.extend(sorted(path for path in graphs_dir.iterdir() if path.is_dir()))
+        registry_slots = {path.name for path in graph_roots[1:]}
+
+        graph_registry: dict[str, CompiledSkill] = {}
+        compiled_graphs: list[CompiledSkill] = []
+        errors: list[SkillLoadError] = []
+        for graph_root in graph_roots:
+            try:
+                compiled_graphs.append(
+                    self._compile_graph_from_root(
+                        graph_root,
+                        business_root=root,
+                        skill_manifest=skill_manifest,
+                        graph_registry=graph_registry,
+                        skill_resolver=skill_resolver,
+                        runtime_input_fields=runtime_input_fields,
+                        _loading_stack=_loading_stack,
+                        _compilation_cache=_compilation_cache,
+                        allowed_roles=allowed_roles,
+                    )
+                )
+            except SkillLoadError as exc:
+                errors.append(exc)
+        registry_diags = (
+            _validate_graph_registry(
+                root,
+                compiled_graphs,
+                registry_slots=registry_slots,
+            )
+            if compiled_graphs
+            else []
+        )
+        if registry_diags:
+            errors.append(_diags_error(registry_diags))
+        if errors:
+            _raise_collected_errors(errors)
+
+        graph_registry.update({graph.manifest.graph_id: graph for graph in compiled_graphs})
+        return compiled_graphs[0]
+
+    def _compile_graph_from_root(
+        self,
+        root: Path,
+        *,
+        business_root: Path,
+        skill_manifest: RootSkillManifest,
+        graph_registry: dict[str, CompiledSkill],
+        skill_resolver: SkillResolverProtocol | None,
+        runtime_input_fields: dict[str, set[str]] | None,
+        _loading_stack: tuple[str, ...],
+        _compilation_cache: dict[str, CompiledSkill] | None,
+        allowed_roles: set[str] | None,
+    ) -> CompiledSkill:
+        resolver = skill_resolver or default_local_resolver_for_skill(business_root)
         root_key = str(root.resolve())
         if root_key in _loading_stack:
             detail = f"recursive skill compilation cycle detected at {root_key}"
@@ -204,7 +254,7 @@ class SkillLoader:
                 payload=make_error_payload(
                     "[F-v3-compile-recursion-cycle]",
                     detail,
-                    source_path=_payload_source_path(root / "GRAPH.md"),
+                    source_path=_payload_source_path(root / "graph.yaml"),
                 ),
             )
         if len(_loading_stack) >= 20:
@@ -214,7 +264,7 @@ class SkillLoader:
                 payload=make_error_payload(
                     "[F-v3-compile-depth-exceeded]",
                     detail,
-                    source_path=_payload_source_path(root / "GRAPH.md"),
+                    source_path=_payload_source_path(root / "graph.yaml"),
                 ),
             )
         if _compilation_cache is None:
@@ -222,14 +272,14 @@ class SkillLoader:
         if root_key in _compilation_cache:
             return _compilation_cache[root_key]
         loading_stack = (*_loading_stack, root_key)
-        _guard_v030_root(root)
+        _guard_graph_root(root)
 
-        graph_path = root / "GRAPH.md"
-        graph_frontmatter, graph_body, line_meta = parse_markdown_parts(graph_path)
-        del line_meta
+        graph_path = root / "graph.yaml"
+        graph_frontmatter = _read_graph_yaml(graph_path)
+        graph_body = ""
         _reject_deprecated_physical_io(root)
         manifest, fm_diags, manifest_poisoned = _build_graph_manifest(graph_path, graph_frontmatter)
-        body_phase_refs = _extract_body_phase_refs(graph_path, graph_body)
+        body_phase_refs = [] if manifest_poisoned else _phase_refs_from_manifest(graph_path, manifest)
         phase_tokens: dict[str, PhaseTokenInfo] = {ref.name: ref.token for ref in body_phase_refs}
 
         batch_errors: list[SkillLoadError] = []
@@ -260,7 +310,7 @@ class SkillLoader:
         if not manifest_poisoned:
             graph_topology = _validate_graph_topology(
                 graph_path,
-                manifest.phases,
+                [phase.id for phase in manifest.phases],
                 body_phase_refs,
                 root,
                 graph_diags,
@@ -290,7 +340,7 @@ class SkillLoader:
                 frontmatter, body, _ = parse_markdown_parts(phase_file)
                 _reject_phase_forbidden_metadata(phase_file, frontmatter)
                 scan_forbidden_topology_tags(phase_file, body)
-                doc = _build_phase_document(phase_name, phase_file, mode, frontmatter, body)
+                doc = build_phase_document(phase_name, phase_file, mode, frontmatter, body)
                 phase_docs.append(doc)
 
                 # R3.1 check node-level role
@@ -394,16 +444,7 @@ class SkillLoader:
 
         post_diags: list[_Diag] = []
 
-        _validate_agent_resource_paths(root, phase_docs, post_diags)
-        _validate_subgraph_io_contracts(
-            root,
-            phase_docs,
-            skill_resolver=resolver,
-            _loading_stack=loading_stack,
-            _compilation_cache=_compilation_cache,
-            diags=post_diags,
-            poisoned_phases=poisoned_phases,
-        )
+        _validate_agent_resource_paths(business_root, phase_docs, post_diags)
         _validate_iterate_compile_contracts(phase_docs, post_diags)
         _validate_static_dataflow(
             graph_path,
@@ -427,7 +468,7 @@ class SkillLoader:
         subagents_by_phase: dict[str, list[CompiledSubagent]] = {}
 
         try:
-            actions, tools = _discover_actions_and_tools(root, phase_docs)
+            actions, tools = _discover_actions_and_tools(business_root, phase_docs)
         except SkillLoadError as exc:
             _append_issues_as_diags(post_diags, exc)
             discovery_failed = True
@@ -486,7 +527,7 @@ class SkillLoader:
             ],
         }
         safe_root = root_key.replace("\r", "").replace("\n", "")
-        logger.info("Compiled V0.3.0 graph skill root=%s phases=%d", safe_root, len(phase_docs))
+        logger.info("Compiled portable graph root=%s phases=%d", safe_root, len(phase_docs))
         compiled = CompiledSkill(
             raw=raw,
             manifest=manifest,
@@ -495,47 +536,13 @@ class SkillLoader:
             tools=tools,
             subagents_by_phase=subagents_by_phase,
             phase_tokens=phase_tokens,
+            skill_manifest=skill_manifest,
+            skill_root=business_root.resolve(),
+            graph_root=root.resolve(),
+            graph_registry=graph_registry,
         )
         _compilation_cache[root_key] = compiled
         return compiled
-
-
-def load_workflow_from_md(
-    md_path: str | Path,
-    callbacks: list[Any] | None = None,
-    model_resolver: Any | None = None,
-    *,
-    skill_resolver: SkillResolverProtocol,
-    _loading_stack: set[str] | None = None,
-) -> Any:
-    """V0.3.0 temporary runtime wrapper.
-
-    T0.1 owns document routing only.  Runtime LangGraph assembly lands in
-    T1.5, so this wrapper rejects file paths and then fails explicitly after
-    proving the V2.1 root can compile.
-    """
-    del _loading_stack
-    root = Path(md_path)
-    if root.is_file():
-        _fatal(
-            root,
-            1,
-            "load_workflow_from_md now accepts a V0.3.0 skill root directory",
-            code="[F-v3-graph-root-missing]",
-        )
-    from graph_skill_runtime.core.compiler import compile_skill
-    from graph_skill_runtime.core.graph_assembler import assemble_graph
-
-    chat_model = None
-    if model_resolver is not None:
-        chat_model = model_resolver.resolve(phase_name="<workflow>")
-    resolver = require_skill_resolver(skill_resolver, caller="load_workflow_from_md")
-    return assemble_graph(
-        compile_skill(root, skill_resolver=resolver),
-        chat_model=chat_model,
-        callbacks=callbacks,
-        skill_resolver=resolver,
-    ).graph
 
 
 _CODE_PREFIX_RE = re.compile(r"^\[(F-v3-[a-z0-9-]+)\]\s*(.*)$", re.DOTALL)
@@ -594,7 +601,7 @@ def _io_fatal(
 # Collect-all diagnostics (compile/lint is static analysis, not a run): gather  #
 # every independent defect in one pass instead of aborting at the first         #
 # ``_fatal``. Structural failures that make further parsing impossible still    #
-# abort (missing GRAPH.md, phase-name-set mismatch); the topology stage, root   #
+# abort (missing graph.yaml, phase-name-set mismatch); the topology stage,     #
 # IO schema, and per-node content checks all accumulate. The full set rides on  #
 # ``exc.compile_result.issues`` — the ONE seam every Studio consumer (compile   #
 # drawer AND realtime lint) projects; the primary ``payload`` stays the first   #
@@ -699,7 +706,7 @@ def _append_issues_as_diags(diags: list[_Diag], exc: SkillLoadError) -> None:
         field_path = getattr(issue, "field_path", None)
         diags.append(
             _Diag(
-                Path(str(source_path)) if source_path else Path("GRAPH.md"),
+                Path(str(source_path)) if source_path else Path("graph.yaml"),
                 line if isinstance(line, int) else 1,
                 str(rule_id or "[F-v3-graph-root-missing]"),
                 str(message),
@@ -851,85 +858,233 @@ def _frontmatter_loc_line(path: Path, frontmatter: dict[str, Any], loc: tuple[An
     return 1
 
 
-def _guard_v030_root(skill_root: Path) -> None:
-    if not skill_root.exists():
-        _fatal(skill_root / "GRAPH.md", 1, "missing required GRAPH.md")
-    if not skill_root.is_dir():
+def _guard_portable_skill_root(skill_root: Path) -> None:
+    if skill_root.exists() and not skill_root.is_dir():
         _fatal(
             skill_root,
             1,
-            "V0.3.0 compile_skill expects a skill root directory",
+            "compile_skill expects a portable gSkill root directory",
             code="[F-v3-graph-root-missing]",
         )
-
+    diags: list[_Diag] = []
     root_skill = skill_root / "SKILL.md"
-    if root_skill.exists():
-        _fatal(
-            root_skill,
-            1,
-            "schema 2.0 root SKILL.md is not supported; use GRAPH.md",
-            code="[F-v3-graph-root-missing]",
+    if not root_skill.is_file():
+        diags.append(
+            _Diag(root_skill, 1, "[F-v3-skill-entry-missing]", "missing required root SKILL.md")
         )
+    root_graph = skill_root / "graph.yaml"
+    if not root_graph.is_file():
+        diags.append(
+            _Diag(root_graph, 1, "[F-v3-graph-root-missing]", "missing required root graph.yaml")
+        )
+    legacy_graph = skill_root / "GRAPH.md"
+    if legacy_graph.exists():
+        diags.append(
+            _Diag(
+                legacy_graph,
+                1,
+                "[F-v3-graph-root-missing]",
+                "legacy GRAPH.md is not accepted; run gskill migrate studio-skill",
+            )
+        )
+    nested_entries = (
+        sorted(path for path in skill_root.rglob("SKILL.md") if path != root_skill)
+        if skill_root.is_dir()
+        else []
+    )
+    if nested_entries:
+        diags.extend(
+            _Diag(
+                entry,
+                1,
+                "[F-v3-skill-entry-nested]",
+                "only the business skill root may contain SKILL.md; internal agent phases use AGENT.md",
+            )
+            for entry in nested_entries
+        )
+    graphs_dir = skill_root / "graphs"
+    if graphs_dir.exists() and not graphs_dir.is_dir():
+        diags.append(
+            _Diag(
+                graphs_dir,
+                1,
+                "[F-v3-graph-registry-invalid]",
+                "graphs must be a directory",
+            )
+        )
+    elif graphs_dir.is_dir():
+        for entry in sorted(graphs_dir.iterdir()):
+            if not entry.is_dir() or entry.is_symlink():
+                diags.append(
+                    _Diag(
+                        entry,
+                        1,
+                        "[F-v3-graph-registry-invalid]",
+                        "every direct graphs/ entry must be a real registry graph directory",
+                    )
+                )
+                continue
+            if re.fullmatch(GRAPH_ID_PATTERN, entry.name) is None:
+                diags.append(
+                    _Diag(
+                        entry,
+                        1,
+                        "[F-v3-graph-registry-invalid]",
+                        "registry graph directory names must be valid graph ids",
+                    )
+                )
+            nested_registry = entry / "graphs"
+            if nested_registry.exists():
+                diags.append(
+                    _Diag(
+                        nested_registry,
+                        1,
+                        "[F-v3-graph-registry-invalid]",
+                        "registry graph directories cannot contain another graphs/ registry",
+                    )
+                )
+        for nested_graph in sorted(graphs_dir.rglob("graph.yaml")):
+            if nested_graph.parent.parent != graphs_dir:
+                diags.append(
+                    _Diag(
+                        nested_graph,
+                        1,
+                        "[F-v3-graph-registry-invalid]",
+                        "registry graphs must be flat at graphs/<graph_id>/graph.yaml",
+                    )
+                )
+    if diags:
+        _raise_diags(diags)
 
-    graph = skill_root / "GRAPH.md"
+
+def _load_root_skill_manifest(skill_root: Path) -> RootSkillManifest:
+    skill_path = skill_root / "SKILL.md"
+    try:
+        frontmatter, _body, _line_meta = parse_markdown_parts(skill_path)
+        manifest = RootSkillManifest.model_validate(frontmatter)
+    except ValidationError as exc:
+        loc = _first_validation_loc(exc)
+        _fatal(
+            skill_path,
+            _frontmatter_loc_line(skill_path, frontmatter, loc),
+            f"invalid Agent Skills metadata: {exc}",
+            code="[F-v3-skill-metadata-invalid]",
+            field_path=_field_path_from_loc(loc),
+        )
+    if manifest.name != skill_root.name:
+        _fatal(
+            skill_path,
+            _frontmatter_key_line(skill_path, "name"),
+            f"Agent Skills name {manifest.name!r} must match directory {skill_root.name!r}",
+            code="[F-v3-skill-name-directory-mismatch]",
+            field_path="name",
+        )
+    return manifest
+
+
+def _guard_graph_root(graph_root: Path) -> None:
+    diags: list[_Diag] = []
+    graph = graph_root / "graph.yaml"
     if not graph.is_file():
-        _fatal(graph, 1, "missing required GRAPH.md")
+        diags.append(_Diag(graph, 1, "[F-v3-graph-root-missing]", "missing required graph.yaml"))
 
-    phases = skill_root / "phases"
+    phases = graph_root / "phases"
     if not phases.is_dir() or not any(p.is_dir() for p in phases.iterdir()):
-        _fatal(
-            phases,
-            1,
-            "missing phases directory or phase entries",
-            code="[F-v3-graph-phases-dir-missing]",
+        diags.append(
+            _Diag(
+                phases,
+                1,
+                "[F-v3-graph-phases-dir-missing]",
+                "missing phases directory or phase entries",
+            )
         )
-    if (skill_root / "actions").exists():
-        _actions_fatal(
-            skill_root / "actions",
-            1,
-            "root-level actions/ is not allowed",
-            code="[F-v3-logic-action-dir-missing]",
+    if (graph_root / "actions").exists():
+        diags.append(
+            _Diag(
+                graph_root / "actions",
+                1,
+                "[F-v3-logic-action-dir-missing]",
+                "graph-level actions/ is not allowed",
+            )
         )
+    if diags:
+        _raise_diags(diags)
+
+
+def _read_graph_yaml(path: Path) -> dict[str, Any]:
+    try:
+        yaml_reader = RuamelYAML(typ="safe")
+        yaml_reader.allow_duplicate_keys = False
+        loaded = yaml_reader.load(read_authored_text(path))
+    except RuamelYAMLError as exc:
+        _graph_fatal(
+            path,
+            getattr(getattr(exc, "problem_mark", None), "line", 0) + 1,
+            f"[F-v3-graph-schema-unknown-field] invalid graph.yaml: {exc}",
+        )
+    if not isinstance(loaded, dict):
+        _graph_fatal(
+            path,
+            1,
+            "[F-v3-graph-schema-unknown-field] graph.yaml must contain one mapping",
+        )
+    return loaded
 
 
 def _discover_phase_files(skill_root: Path) -> list[tuple[str, Path, str]]:
     phases_root = skill_root / "phases"
     discovered: list[tuple[str, Path, str]] = []
+    diags: list[_Diag] = []
     for phase_dir in sorted(p for p in phases_root.iterdir() if p.is_dir()):
-        nested_graph = phase_dir / "GRAPH.md"
+        nested_graph = phase_dir / "graph.yaml"
         if nested_graph.exists():
-            _fatal(
-                nested_graph,
-                1,
-                "GRAPH.md is only allowed at skill root",
-                code="[F-v3-graph-root-missing]",
+            diags.append(
+                _Diag(
+                    nested_graph,
+                    1,
+                    "[F-v3-graph-root-missing]",
+                    "graph.yaml is only allowed at a root or graphs/<graph_id> directory",
+                )
+            )
+        legacy_agent = phase_dir / "SKILL.md"
+        if legacy_agent.exists():
+            diags.append(
+                _Diag(
+                    legacy_agent,
+                    1,
+                    "[F-v3-graph-phase-node-missing]",
+                    "phase SKILL.md is not accepted; internal agent phases use AGENT.md",
+                )
             )
 
         phase_files = [phase_dir / name for name in _PHASE_FILE_TO_MODE if (phase_dir / name).exists()]
         if len(phase_files) > 1:
             names = ", ".join(path.name for path in phase_files)
-            _fatal(
-                phase_files[1],
-                1,
-                f"[F-v3-graph-phase-mode-ambiguous] phase directory contains multiple node files: {names}",
+            diags.append(
+                _Diag(
+                    phase_files[1],
+                    1,
+                    "[F-v3-graph-phase-mode-ambiguous]",
+                    f"phase directory contains multiple node files: {names}",
+                )
             )
+            continue
         if not phase_files:
-            _fatal(
-                phase_dir,
-                1,
-                "[F-v3-graph-phase-node-missing] phase directory must contain LOGIC.md, SUBGRAPH.md, or SKILL.md",
+            diags.append(
+                _Diag(
+                    phase_dir,
+                    1,
+                    "[F-v3-graph-phase-node-missing]",
+                    "phase directory must contain LOGIC.md, SUBGRAPH.md, or AGENT.md",
+                )
             )
+            continue
 
         phase_file = phase_files[0]
         discovered.append((phase_dir.name, phase_file, _PHASE_FILE_TO_MODE[phase_file.name]))
 
-    if not discovered:
-        _fatal(
-            phases_root,
-            1,
-            "missing phases directory or phase entries",
-            code="[F-v3-graph-phases-dir-missing]",
-        )
+    if diags:
+        _raise_diags(diags)
     return discovered
 
 
@@ -952,7 +1107,7 @@ def _discover_actions_and_tools(
                 _actions_fatal(
                     tools_dir,
                     1,
-                    "tools/ is only allowed for SKILL phases",
+                    "tools/ is only allowed for AGENT phases",
                     code="[F-v3-agent-tool-unknown]",
                 )
             if actions_dir.exists():
@@ -999,143 +1154,136 @@ def _reject_deprecated_physical_io(skill_root: Path) -> None:
             )
 
 
-def _validate_subgraph_io_contracts(
+def _validate_graph_registry(
     skill_root: Path,
-    phase_docs: list[PhaseDocument],
+    graphs: list[CompiledSkill],
     *,
-    skill_resolver: SkillResolverProtocol | None,
-    _loading_stack: tuple[str, ...],
-    _compilation_cache: dict[str, CompiledSkill],
-    diags: list[_Diag],
-    poisoned_phases: set[str],
-) -> None:
-    """Compile each subgraph's child so a parent compile validates its children."""
-    for doc in phase_docs:
-        if not isinstance(doc.ast, SubgraphNodeAST):
-            continue
-        child_root: Path | None = None
-        _validate_subgraph_node_name(doc, diags)
-        try:
-            resolver = require_skill_resolver(skill_resolver, caller="SkillLoader.compile_skill")
-            child_root = _resolve_subgraph_path_root(skill_root, doc.path, doc.ast.path)
-            SkillLoader(validate_context_writes=False).compile_skill(
-                child_root,
-                skill_resolver=resolver,
-                _loading_stack=_loading_stack,
-                _compilation_cache=_compilation_cache,
-            )
-        except SkillLoadError as exc:
-            for issue in _issues_of(exc):
-                diags.append(
-                    _diag_from_child_issue(
-                        issue,
-                        fallback_path=doc.path,
-                        child_root=child_root if child_root is not None else skill_root,
-                    )
-                )
-            poisoned_phases.add(doc.phase_name)
+    registry_slots: set[str],
+) -> list[_Diag]:
+    """Validate the business skill's flat graph registry and explicit call graph."""
+
+    diags: list[_Diag] = []
+    by_id: dict[str, CompiledSkill] = {}
+    for graph in graphs:
+        graph_id = graph.manifest.graph_id
+        existing = by_id.get(graph_id)
+        if existing is not None:
             diags.append(
                 _Diag(
-                    path=doc.path,
-                    line=1,
-                    code="[F-v3-agent-subgraph-invalid]",
-                    message=(
-                        "[F-v3-agent-subgraph-invalid] Subgraph compile failed: "
-                        f"skipped cascade check due to poisoned child skill at path {doc.ast.path}"
-                    ),
-                    field_path="path",
+                    graph.graph_root / "graph.yaml",
+                    _frontmatter_key_line(graph.graph_root / "graph.yaml", "graph_id"),
+                    "[F-v3-graph-id-duplicate]",
+                    f"graph_id {graph_id!r} is also declared by {existing.graph_root}",
+                    field_path="graph_id",
+                )
+            )
+        else:
+            by_id[graph_id] = graph
+
+        if graph.graph_root != skill_root.resolve() and graph.graph_root.name != graph_id:
+            diags.append(
+                _Diag(
+                    graph.graph_root / "graph.yaml",
+                    _frontmatter_key_line(graph.graph_root / "graph.yaml", "graph_id"),
+                    "[F-v3-graph-id-directory-mismatch]",
+                    f"registry directory {graph.graph_root.name!r} must equal graph_id {graph_id!r}",
+                    field_path="graph_id",
+                )
+            )
+        if graph.graph_root != skill_root.resolve() and graph.manifest.artifacts:
+            diags.append(
+                _Diag(
+                    graph.graph_root / "graph.yaml",
+                    _frontmatter_key_line(graph.graph_root / "graph.yaml", "artifacts"),
+                    "[F-v3-artifact-declaration-invalid]",
+                    "artifacts may be declared only by the root graph",
+                    field_path="artifacts",
                 )
             )
 
+    root_graph = next((graph for graph in graphs if graph.graph_root == skill_root.resolve()), None)
+    if root_graph is not None:
+        output_fields = set(root_graph.manifest.io.outputs.get("properties", {}))
+        for index, artifact in enumerate(root_graph.manifest.artifacts):
+            unknown = sorted(set(artifact.fields) - output_fields)
+            if unknown:
+                diags.append(
+                    _Diag(
+                        root_graph.graph_root / "graph.yaml",
+                        _frontmatter_key_line(root_graph.graph_root / "graph.yaml", "artifacts"),
+                        "[F-v3-artifact-declaration-invalid]",
+                        f"artifact {artifact.artifact_id!r} names unknown graph output fields: {', '.join(unknown)}",
+                        field_path=f"artifacts.{index}.fields",
+                    )
+                )
 
-def _diag_from_child_issue(issue: Any, *, fallback_path: Path, child_root: Path) -> _Diag:
-    """Carry one of a child skill's diagnostics into the parent's list.
+    compiled_registry_ids = {
+        graph.manifest.graph_id for graph in graphs if graph.graph_root != skill_root.resolve()
+    }
+    known_registry_targets = compiled_registry_ids | registry_slots
+    adjacency: dict[str, set[str]] = {graph_id: set() for graph_id in by_id}
+    edge_sources: dict[tuple[str, str], tuple[Path, str]] = {}
+    for graph_id, graph in by_id.items():
+        for doc in graph.nodes:
+            refs: list[tuple[str, str]] = []
+            if isinstance(doc.ast, SubgraphNodeAST):
+                refs.append((doc.ast.graph, "graph"))
+            elif isinstance(doc.ast, AgentNodeAST):
+                refs.extend((item.graph, "subgraphs") for item in doc.ast.subgraphs)
+            for target, field_path in refs:
+                if target not in known_registry_targets:
+                    diags.append(
+                        _Diag(
+                            doc.path,
+                            _frontmatter_key_line(doc.path, field_path),
+                            "[F-v3-graph-reference-unknown]",
+                            f"graph {graph_id!r} references graph {target!r}, which is not in the flat registry",
+                            field_path=field_path,
+                        )
+                    )
+                    continue
+                if target not in adjacency:
+                    # The directory occupies this registry id but its own graph
+                    # failed compilation. Its primary diagnostic already names
+                    # that defect; reporting every caller as an unknown graph is
+                    # a misleading cascade until the target can be compiled.
+                    continue
+                adjacency[graph_id].add(target)
+                edge_sources[(graph_id, target)] = (doc.path, field_path)
 
-    Exactly one axis is REBUILT here — ``source_path``. It only means anything
-    against a stated root, and the child stated its own, so the child-relative
-    answer is re-rooted before the parent renders it against the parent root on
-    the way out (``_relocate_diagnostics_to_root``).
+    state: dict[str, str] = {}
+    stack: list[str] = []
+    reported: set[tuple[str, ...]] = set()
 
-    Every other axis is CARRIED, and that is the point of this function
-    existing. The seam used to name the fields it copied, which meant a
-    structured fact added to ``CompileIssue`` travelled correctly everywhere
-    except across a subgraph boundary — with nothing failing to say so.
-    ``conflicting_phase`` proved it: added so the overwrite rule could name the
-    other phase structurally, it arrived ``None`` one subgraph deep and the
-    canvas was back to reading the English sentence (ledger K6). Adding a field
-    to ``CompileIssue`` now means deciding here which of the two it is;
-    ``test_a_child_diagnostic_keeps_every_axis`` fails until it is decided.
+    def visit(graph_id: str) -> None:
+        state[graph_id] = "gray"
+        stack.append(graph_id)
+        for target in sorted(adjacency[graph_id]):
+            if state.get(target) == "gray":
+                start = stack.index(target)
+                cycle = tuple(stack[start:] + [target])
+                normalized = tuple(sorted(set(cycle)))
+                if normalized not in reported:
+                    reported.add(normalized)
+                    source_path, field_path = edge_sources[(graph_id, target)]
+                    diags.append(
+                        _Diag(
+                            source_path,
+                            _frontmatter_key_line(source_path, field_path),
+                            "[F-v3-graph-call-cycle]",
+                            "graph call cycle detected: " + " -> ".join(cycle),
+                            field_path=field_path,
+                        )
+                    )
+            elif state.get(target) is None:
+                visit(target)
+        stack.pop()
+        state[graph_id] = "black"
 
-    ``severity`` is neither: the loader raises FATALs only, and says so once in
-    ``_compile_result`` rather than per diagnostic.
-    """
-    path = Path(issue.source_path) if issue.source_path else fallback_path
-    if not path.is_absolute():
-        path = child_root / path
-    return _Diag(
-        path=path,
-        line=issue.line or 1,
-        code=issue.rule_id,
-        message=issue.message,
-        field_path=issue.field_path,
-        conflicting_phase=issue.conflicting_phase,
-    )
-
-
-_SUBGRAPH_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
-def _validate_subgraph_node_name(doc: PhaseDocument, diags: list[_Diag]) -> None:
-    """A SUBGRAPH.md `name` follows the identifier rule.
-
-    The same rule agent-embedded subgraph declarations already enforce
-    (`manifest.SubgraphAST`, pattern + `[F-v3-agent-subgraph-invalid]`); the
-    phase-node variant had the spec'd code registered but no emitter
-    (adjudication 2026-08-19 — `name: bad sub!` compiled clean).
-    """
-    name = doc.ast.name
-    if name is None or _SUBGRAPH_NAME_RE.match(name):
-        return
-    diags.append(
-        _Diag(
-            path=doc.path,
-            line=_frontmatter_key_line(doc.path, "name"),
-            code="[F-v3-subgraph-name-invalid]",
-            message=f"[F-v3-subgraph-name-invalid] subgraph name {name!r} is not a valid identifier",
-            field_path="name",
-        )
-    )
-
-
-def _resolve_subgraph_path_root(skill_root: Path, source_path: Path, value: str) -> Path:
-    root_resolved = skill_root.resolve()
-    candidate = Path(value)
-    if candidate.is_absolute():
-        resolved = candidate.resolve()
-    else:
-        resolved = (root_resolved / candidate).resolve()
-    try:
-        resolved.relative_to(root_resolved)
-    except ValueError as exc:
-        _fatal(
-            source_path,
-            _frontmatter_key_line(source_path, "path"),
-            f"[F-v3-subgraph-target-skill-invalid] subgraph path {value!r} escapes skill root {root_resolved}",
-        )
-        raise AssertionError("unreachable") from exc
-    if not resolved.is_dir():
-        _fatal(
-            source_path,
-            _frontmatter_key_line(source_path, "path"),
-            f"[F-v3-subgraph-target-skill-invalid] subgraph path {value!r} is not a directory",
-        )
-    if not (resolved / "GRAPH.md").is_file():
-        _fatal(
-            source_path,
-            _frontmatter_key_line(source_path, "path"),
-            f"[F-v3-subgraph-target-skill-invalid] subgraph path {value!r} has no GRAPH.md",
-        )
-    return resolved
+    for graph_id in adjacency:
+        if state.get(graph_id) is None:
+            visit(graph_id)
+    return diags
 
 
 def _validate_agent_resource_paths(
@@ -1401,7 +1549,7 @@ def _validate_agent_declared_tools(
                         doc.path,
                         _frontmatter_key_line(doc.path, "tools"),
                         "[F-v3-agent-tool-reserved]",
-                        f"tool {tool_name!r} in SKILL phase {doc.phase_name!r} is a "
+                    f"tool {tool_name!r} in AGENT phase {doc.phase_name!r} is a "
                         "built-in framework tool: it is always available and must not "
                         "be declared in `tools`; remove the line",
                         field_path="tools",
@@ -1415,7 +1563,7 @@ def _validate_agent_declared_tools(
                     doc.path,
                     _frontmatter_key_line(doc.path, "tools"),
                     "[F-v3-agent-tool-unknown]",
-                    f"tool {tool_name!r} in SKILL phase {doc.phase_name!r} is not declared",
+                    f"tool {tool_name!r} in AGENT phase {doc.phase_name!r} is not declared",
                     field_path="tools",
                 )
             )
@@ -1438,7 +1586,7 @@ def _subagent_tool_def(
     return ToolDef(
         id=tool_name,
         phase_id=phase_id,
-        path=subagent.root / "GRAPH.md",
+        path=subagent.root / "graph.yaml",
         func=_pending_call_subagent_tool,
         description=(
             f"{subagent.description}\n\n"
@@ -1458,10 +1606,10 @@ def _subagent_tool_def(
 
 
 def _pending_call_subagent_tool(inputs: list[Any]) -> list[dict[str, Any]]:
-    """Placeholder for Phase 2 executor-owned subagent dispatch."""
+    """Placeholder for executor-owned subagent dispatch."""
 
     del inputs
-    raise NotImplementedError("call_subagent runtime is implemented in Phase 2 Executor")
+    raise NotImplementedError("call_subagent runtime requires an AgentExecutor adapter")
 
 
 def _subagent_input_model_name(phase_id: str, subagent_name: str) -> str:
@@ -1477,17 +1625,15 @@ def _load_action_dir(
 ) -> dict[str, ActionDef]:
     """Bind each DECLARED action name to the same-named function in `actions/*.py`.
 
-    The `actions:` list is the action registry (format SSOT
-    `docs/skill-spec/00-FORMAT-GROUND-TRUTH.md` §3: "actions | list[string] |
-    action 名注册表", and the file "必须导出同名函数"), and it is also the only thing
+    The `actions:` list is the action registry (portable format contract
+    `docs/skill-spec/01-PORTABLE-GSKILL-V1.md` §5.1), and it is also the only thing
     `graph_assembler._build_logic_node` ever dispatches. So the declaration decides
     which module-level functions are actions; every other function in the file is an
     ordinary private helper the author is free to write, and the action signature rule
     does not apply to it.
 
-    Purity deliberately keeps a wider, file-level scope
-    (`docs/mvp1/01-contract/03-compile-rules/mvp1-alignment.md:79` scopes it to
-    the "action/tool Python 文件"): a helper can be impure just as easily as an action.
+    Purity deliberately keeps a wider, file-level scope: a helper can be impure
+    just as easily as an action.
     """
     declared = dict.fromkeys(declared_actions)
     by_id: dict[str, ActionDef] = {}
@@ -1641,12 +1787,12 @@ def _validate_tool_signature(path: Path, func: Callable[..., object]) -> None:
 
 
 def _route_document(file_path: Path) -> RouteKind:
-    if file_path.name == "GRAPH.md":
+    if file_path.name == "graph.yaml":
         if file_path.parent.name == "phases" or file_path.parent.parent.name == "phases":
             _fatal(
                 file_path,
                 1,
-                "GRAPH.md is only allowed at skill root",
+                "graph.yaml is only allowed at the skill root or graphs/<graph_id>",
                 code="[F-v3-graph-root-missing]",
             )
         return "graph"
@@ -1655,13 +1801,13 @@ def _route_document(file_path: Path) -> RouteKind:
     _fatal(
         file_path,
         1,
-        "unsupported V0.3.0 document filename",
+        "unsupported portable gSkill document filename",
         code="[F-v3-graph-root-missing]",
     )
 
 
 def _reject_phase_forbidden_metadata(path: Path, frontmatter: dict[str, Any]) -> None:
-    for key in ("mode", "schema_version", "graph_skill_id", "phase_id"):
+    for key in ("mode", "schema_version", "graph_skill_id", "phase_id", "raw_blocks", "system_prompt"):
         if key not in frontmatter:
             continue
         domain = _PHASE_FILE_TO_MODE.get(path.name, "graph")
@@ -1679,36 +1825,6 @@ def _build_graph_manifest(
     frontmatter: dict[str, Any],
 ) -> tuple[GraphManifest, list[_Diag], bool]:
     data = dict(frontmatter)
-    if data.get("schema_version") != "v0.3.0":
-        _graph_fatal(
-            path,
-            1,
-            '[F-v3-graph-schema-version-mismatch] GRAPH.md schema_version must be exactly "v0.3.0"',
-            field_path="schema_version",
-        )
-    if "io_inputs_ref" in data or "io_outputs_ref" in data:
-        deprecated_field_path = "io_inputs_ref" if "io_inputs_ref" in data else "io_outputs_ref"
-        _graph_fatal(
-            path,
-            1,
-            "[F-v3-graph-io-physical-file-deprecated] io_inputs_ref/io_outputs_ref are not supported",
-            field_path=deprecated_field_path,
-        )
-    if "phases" not in data:
-        _graph_fatal(
-            path,
-            1,
-            "[F-v3-graph-phases-missing] GRAPH.md must declare YAML frontmatter phases",
-            field_path="phases",
-        )
-    if not isinstance(data.get("phases"), list):
-        _graph_fatal(
-            path,
-            _frontmatter_key_line(path, "phases"),
-            "[F-v3-graph-phases-missing] GRAPH.md phases must be a list[str]",
-            field_path="phases",
-        )
-
     try:
         manifest = GraphManifest.model_validate(data)
         return manifest, [], False
@@ -1724,13 +1840,31 @@ def _build_graph_manifest(
             code = None
             clean_msg = msg
 
-            if loc == ("io",):
+            if loc == ("schema_version",):
+                code = "[F-v3-graph-schema-version-mismatch]"
+            elif loc == ("io",):
                 if type_ == "missing":
                     code = "[F-v3-graph-io-schema-invalid]"
                 else:
                     code = "[F-v3-graph-io-not-object]"
-            elif type_ == "missing" and loc == ("name",):
+            elif loc == ("graph_id",):
                 code = "[F-v3-graph-name-invalid]"
+            elif loc == ("phases",):
+                code = "[F-v3-graph-phases-missing]"
+            elif len(loc) >= 3 and loc[0] == "phases" and loc[2] == "id":
+                code = "[F-v3-graph-phase-id-invalid]"
+            elif len(loc) >= 3 and loc[0] == "phases" and loc[2] == "depends_on":
+                code = "[F-v3-graph-depends-unknown]"
+            elif len(loc) >= 3 and loc[0] == "phases" and loc[2] == "output":
+                code = "[F-v3-graph-output-phase-invalid]"
+            elif loc and loc[0] == "artifacts":
+                code = "[F-v3-artifact-declaration-invalid]"
+            elif loc == () and "phase ids must be unique" in msg:
+                code = "[F-v3-graph-phase-id-duplicate]"
+            elif loc == () and "at least one output phase" in msg:
+                code = "[F-v3-graph-output-phase-invalid]"
+            elif loc == () and "artifact ids must be unique" in msg:
+                code = "[F-v3-artifact-declaration-invalid]"
 
             if code is None:
                 match = re.search(r"\[(F-v3-[a-z0-9-]+)\]", msg)
@@ -1753,14 +1887,59 @@ def _build_graph_manifest(
                 )
             )
 
-        constructed_data = dict(data)
-        if "io" not in constructed_data or not isinstance(constructed_data["io"], dict):
-            constructed_data["io"] = PhaseIOSchema(
-                inputs={"dummy": {"type": "string"}},
-                outputs={"dummy": {"type": "string"}},
-            )
-        manifest = GraphManifest.model_construct(**constructed_data)
+        placeholder_io = PhaseIOSchema(
+            inputs={"type": "object", "properties": {"dummy": {"type": "string"}}},
+            outputs={"type": "object", "properties": {"dummy": {"type": "string"}}},
+        )
+        manifest = GraphManifest.model_construct(
+            schema_version="gskill.graph.v1",
+            graph_id="invalid-graph",
+            description="",
+            llm_role=None,
+            io=placeholder_io,
+            phases=(GraphPhaseRef(id="invalid", depends_on=("input",), output=True),),
+            iterate=None,
+            artifacts=(),
+        )
         return manifest, diags, True
+
+
+def _phase_refs_from_manifest(graph_path: Path, manifest: GraphManifest) -> list[BodyPhaseRef]:
+    """Adapt typed YAML phase declarations to the characterized topology engine."""
+
+    lines = read_authored_text(graph_path).splitlines()
+    refs: list[BodyPhaseRef] = []
+    for phase in manifest.phases:
+        phase_line = _yaml_phase_id_line(lines, phase.id)
+        attrs = {
+            "depends_on": ",".join(phase.depends_on),
+            "output": "true" if phase.output else "false",
+        }
+        token = PhaseTokenInfo(
+            phase_id=phase.id,
+            raw_text=yaml.safe_dump(phase.model_dump(mode="json"), sort_keys=False).rstrip(),
+            line_start=phase_line,
+            line_end=phase_line,
+            attrs=attrs,
+        )
+        refs.append(
+            BodyPhaseRef(
+                name=phase.id,
+                depends_on=phase.depends_on,
+                output=phase.output,
+                token=token,
+                diag_line=phase_line,
+            )
+        )
+    return refs
+
+
+def _yaml_phase_id_line(lines: list[str], phase_id: str) -> int:
+    pattern = re.compile(rf"^\s*-\s*id\s*:\s*['\"]?{re.escape(phase_id)}['\"]?\s*(?:#.*)?$")
+    for index, line in enumerate(lines, start=1):
+        if pattern.match(line):
+            return index
+    return 1
 
 
 def get_phase_token_info(compiled: CompiledSkill, phase_id: str) -> PhaseTokenInfo | None:
@@ -1772,75 +1951,6 @@ def get_phase_token_info(compiled: CompiledSkill, phase_id: str) -> PhaseTokenIn
     """
 
     return compiled.phase_tokens.get(phase_id)
-
-
-def _phase_attr_spans(
-    attrs_raw: str,
-    attr_raw_start: int,
-    graph_text: str,
-) -> dict[str, PhaseAttributeSpan]:
-    spans: dict[str, PhaseAttributeSpan] = {}
-    for match in _ATTR_RE.finditer(attrs_raw):
-        name = match.group(1)
-        value = match.group(3)
-        attr_start = attr_raw_start + match.start()
-        attr_end = attr_raw_start + match.end()
-        value_start = attr_raw_start + match.start(3)
-        value_end = attr_raw_start + match.end(3)
-        spans[name] = PhaseAttributeSpan(
-            name=name,
-            value=value,
-            quote=match.group(2),
-            attr_start=attr_start,
-            attr_end=attr_end,
-            value_start=value_start,
-            value_end=value_end,
-            line_start=graph_text[:attr_start].count("\n") + 1,
-            line_end=graph_text[:attr_end].count("\n") + 1,
-        )
-    return spans
-
-
-_PHASE_TAG_RE = re.compile(r"<phase\b([^>]*)>(.*?)</phase>", re.IGNORECASE | re.DOTALL)
-
-
-def _extract_body_phase_refs(graph_path: Path, graph_body: str) -> list[BodyPhaseRef]:
-    refs: list[BodyPhaseRef] = []
-    for match in _PHASE_TAG_RE.finditer(graph_body):
-        attrs_raw = match.group(1)
-        attrs = _parse_attrs(attrs_raw)
-        name = match.group(2).strip()
-        if not name:
-            _graph_fatal(
-                graph_path,
-                _body_file_line(graph_path, graph_body, match.start()),
-                "[F-v3-graph-phase-id-invalid] body <phase> name is empty",
-            )
-        depends_raw = attrs.get("depends_on")
-        depends_on = (
-            tuple(dep for dep in re.split(r"[\s,]+", depends_raw.strip()) if dep) if depends_raw is not None else ()
-        )
-        attr_raw_start = match.start(1)
-        token = PhaseTokenInfo(
-            phase_id=name,
-            raw_text=match.group(0),
-            start_offset=match.start(),
-            end_offset=match.end(),
-            line_start=_xml_line(graph_body, match.start()),
-            line_end=_xml_line(graph_body, match.end()),
-            attrs=attrs,
-            attr_spans=_phase_attr_spans(attrs_raw, attr_raw_start, graph_body),
-        )
-        refs.append(
-            BodyPhaseRef(
-                name=name,
-                depends_on=depends_on,
-                output="output" in attrs_raw.split(),
-                token=token,
-                diag_line=_body_file_line(graph_path, graph_body, match.start()),
-            )
-        )
-    return refs
 
 
 def _validate_graph_topology(
@@ -1861,7 +1971,7 @@ def _validate_graph_topology(
     """
     _validate_graph_phase_declarations(graph_path, phases, body_phase_refs)
     body_names = [ref.name for ref in body_phase_refs]
-    _validate_phase_name_sets(graph_path, phases, body_names, skill_root)
+    _validate_phase_name_sets(graph_path, phases, body_names, skill_root, diags)
     adjacency, input_roots, flagged = _collect_graph_dependencies(
         graph_path,
         phases,
@@ -1879,8 +1989,6 @@ def _validate_graph_topology(
     # cascade of it.
     _validate_no_islands(graph_path, adjacency, input_roots, line_by_name, diags, flagged | cycle_nodes)
     _validate_output_phases(graph_path, body_phase_refs, adjacency, diags)
-    for phase in phases:
-        _validate_phase_dir(graph_path, phase, skill_root, diags)
     return {
         "phases": [
             {
@@ -1903,19 +2011,19 @@ def _validate_graph_phase_declarations(
         _graph_fatal(
             graph_path,
             1,
-            "[F-v3-graph-phases-missing] GRAPH.md must declare at least one phase",
+            "[F-v3-graph-phases-missing] graph.yaml must declare at least one phase",
         )
     if not body_phase_refs:
         _graph_fatal(
             graph_path,
             1,
-            "[F-v3-graph-phase-id-invalid] GRAPH.md body must declare <phase> tags",
+            "[F-v3-graph-phase-id-invalid] graph.yaml must declare typed phase entries",
         )
     if len(set(phases)) != len(phases):
         _graph_fatal(
             graph_path,
             _frontmatter_key_line(graph_path, "phases"),
-            "[F-v3-graph-phase-id-duplicate] duplicate phase name in frontmatter phases",
+            "[F-v3-graph-phase-id-duplicate] duplicate phase id in graph.yaml phases",
         )
 
     body_names = [ref.name for ref in body_phase_refs]
@@ -1923,7 +2031,7 @@ def _validate_graph_phase_declarations(
         _graph_fatal(
             graph_path,
             1,
-            "[F-v3-graph-phase-id-duplicate] duplicate phase name in body <phase> tags",
+            "[F-v3-graph-phase-id-duplicate] duplicate normalized phase id in graph.yaml",
         )
 
 
@@ -1932,17 +2040,43 @@ def _validate_phase_name_sets(
     phases: list[str],
     body_names: list[str],
     skill_root: Path,
+    diags: list[_Diag],
 ) -> None:
     phase_set = set(phases)
     body_set = set(body_names)
     physical_set = {path.name for path in (skill_root / "phases").iterdir() if path.is_dir()}
 
-    if phase_set != physical_set or body_set != physical_set:
-        _graph_fatal(
-            graph_path,
-            1,
-            "[F-v3-graph-phase-name-mismatch] "
-            "frontmatter phases, body <phase> names, and physical phase dirs must match",
+    missing = sorted(phase_set - physical_set)
+    unregistered = sorted(physical_set - phase_set)
+    for phase_id in missing:
+        diags.append(
+            _Diag(
+                graph_path,
+                _frontmatter_key_line(graph_path, "phases"),
+                "[F-v3-graph-phase-name-mismatch]",
+                f"graph.yaml phase {phase_id!r} has no matching phase directory",
+                field_path="phases",
+            )
+        )
+    for phase_id in unregistered:
+        diags.append(
+            _Diag(
+                skill_root / "phases" / phase_id,
+                1,
+                "[F-v3-graph-phase-name-mismatch]",
+                f"phase directory {phase_id!r} is not registered in graph.yaml",
+                field_path="phases",
+            )
+        )
+    if body_set != phase_set:
+        diags.append(
+            _Diag(
+                graph_path,
+                _frontmatter_key_line(graph_path, "phases"),
+                "[F-v3-graph-phase-name-mismatch]",
+                "normalized graph.yaml phase entries do not match the declared phase ids",
+                field_path="phases",
+            )
         )
 
 
@@ -1964,8 +2098,8 @@ def _collect_graph_dependencies(
     flagged: set[str] = set()
     for ref in body_phase_refs:
         if not ref.depends_on:
-            # `depends_on` is required (skill-spec 00-FORMAT-GROUND-TRUTH: 必填;
-            # first node must declare `depends_on="input"`). A bare <phase> with no
+            # `depends_on` is required (portable gSkill v1 contract §4.2;
+            # first node must declare `depends_on: [input]`). A bare phase with no
             # depends_on is a disconnected node — flag it as an island instead of
             # silently treating it as an implicit input root. field_path carries the
             # node locator so Studio's realtime-lint badges the offending node.
@@ -2071,12 +2205,9 @@ def _validate_no_islands(
         visited.add(node)
         stack.extend(sorted(set(adjacency[node]) - visited))
 
-    # Point the diagnostic at the offending phase's own ``<phase>`` tag and carry a
-    # ``<phase>.depends_on`` field_path so Studio's editor marks the exact GRAPH.md
-    # line and the realtime-lint node projection attributes it to that node's badge
-    # (the node-id-prefix channel the manual Compile path already uses). Use the
-    # FILE-absolute ``diag_line`` (like the sibling cycle / depends-unknown
-    # diagnostics), never the body-relative ``token.line_start``.
+    # Point the diagnostic at the offending graph.yaml phase entry and carry
+    # its depends_on field path so editor projections can mark the same node.
+    # Use the file-absolute diagnostic line shared by sibling topology rules.
     for phase_id in adjacency:
         if phase_id not in visited:
             diags.append(
@@ -2104,29 +2235,6 @@ def _validate_output_phases(
                 graph_path,
                 1,
                 "[F-v3-graph-output-phase-invalid] output phase has downstream edges: " + ", ".join(invalid),
-            )
-        )
-
-
-def _validate_phase_dir(graph_path: Path, phase: str, skill_root: Path, diags: list[_Diag]) -> None:
-    phases_root = str((skill_root / "phases").resolve())
-    candidate_str = os.path.normpath(os.path.join(phases_root, phase))
-    if not candidate_str.startswith(phases_root + os.sep):
-        diags.append(
-            _make_diag(
-                graph_path,
-                _frontmatter_key_line(graph_path, "phases"),
-                f"[F-v3-graph-phase-id-invalid] phase {phase!r} escapes the phases directory",
-            )
-        )
-        return
-    candidate = Path(candidate_str)
-    if not candidate.is_dir() or not any((candidate / name).is_file() for name in _PHASE_FILE_TO_MODE):
-        diags.append(
-            _make_diag(
-                graph_path,
-                1,
-                f"[F-v3-graph-phase-node-missing] phase {phase!r} has no LOGIC.md/SUBGRAPH.md/SKILL.md",
             )
         )
 
@@ -2729,7 +2837,7 @@ def _validate_action_return_keys(
     _ActionReturnKeyVisitor(path, output_schema_keys).visit(tree)
 
 
-def _build_phase_document(
+def build_phase_document(
     phase_name: str,
     path: Path,
     mode: str,
@@ -2747,9 +2855,8 @@ def _build_phase_document(
     blocks = extract_raw_blocks(body, allowed)
     data = dict(frontmatter)
     data["raw_blocks"] = blocks
-    data.setdefault("name", phase_name)
     data["mode"] = mode
-    is_agent = path.name == "SKILL.md"
+    is_agent = path.name == "AGENT.md"
     if is_agent:
         data = _normalize_skill_node_frontmatter(path, data)
 
@@ -2774,23 +2881,7 @@ def _build_phase_document(
         _validate_logic_actions_declared(path, logic_ast, body)
         ast: PhaseAST = logic_ast
     elif mode == "subgraph":
-        subgraph_diags: list[_Diag] = []
-        if "target_skill" in data:
-            target_skill = data.pop("target_skill")
-            subgraph_diags.append(
-                _make_diag(
-                    path,
-                    _frontmatter_key_line(path, "target_skill"),
-                    "[F-v3-subgraph-target-skill-invalid] "
-                    f"SUBGRAPH.md target_skill={target_skill!r} is deprecated; migrate to a path "
-                    "relative to the skill root (e.g. path: subskills/<child>) or an absolute path",
-                )
-            )
-            # Deprecated key already reported above; placeholder keeps the
-            # required `path` field satisfied unless a real one was also
-            # given (setdefault leaves an existing `path` untouched).
-            data.setdefault("path", "(deprecated target_skill)")
-        ast = _validate_phase_ast(SubgraphNodeAST, data, path, mode, frontmatter, subgraph_diags)
+        ast = _validate_phase_ast(SubgraphNodeAST, data, path, mode, frontmatter, [])
     elif is_agent:
         body_fields, body_diags = _parse_agent_body(path, body, blocks)
         data.update(body_fields)
@@ -2880,6 +2971,8 @@ def _phase_validation_diags(
 
         if loc == ("io",):
             code = f"[F-v3-{domain}-io-schema-invalid]"
+        elif mode == "subgraph" and loc == ("name",):
+            code = "[F-v3-subgraph-name-invalid]"
         elif type_ == "missing":
             if loc == ("role",):
                 code = "[F-v3-agent-role-missing]"
@@ -3311,14 +3404,9 @@ def _frontmatter_key_line(path: Path, key: str) -> int:
 
 __all__ = [
     "CompiledSkill",
-    "PhaseAttributeSpan",
     "PhaseDocument",
     "PhaseTokenInfo",
     "SkillLoader",
-    "_discover_phase_files",
-    "_guard_v030_root",
+    "build_phase_document",
     "get_phase_token_info",
-    "_route_document",
-    "_validate_graph_topology",
-    "load_workflow_from_md",
 ]

@@ -14,7 +14,6 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from graph_skill_runtime.core import graph_assembler
 from graph_skill_runtime.core.checkpointer import checkpoint_serde
-from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import (
     NamespaceCheckpointer,
     _run_graph_loop_iterate,
@@ -23,6 +22,7 @@ from graph_skill_runtime.core.graph_assembler import (
 )
 from graph_skill_runtime.core.manifest import IterateAccumulateSpec, IterateSpec
 from graph_skill_runtime.core.state import BusinessData, FrameworkState, StateManager, WorkflowState
+from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:

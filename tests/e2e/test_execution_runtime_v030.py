@@ -39,12 +39,21 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _agent_skill(root: Path) -> None:
+def _agent_skill(parent: Path) -> Path:
+    root = parent / "e2e-agent"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: e2e-agent
+description: Exercise portable agent execution end to end.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise portable agent execution end to end.
 io:
   inputs:
     type: object
@@ -57,14 +66,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -78,7 +88,7 @@ io:
         type: string
 references:
   - id: R1
-    path: refs/r1.md
+    path: references/r1.md
     summary: Runtime reference
 examples:
   - id: E2
@@ -102,17 +112,27 @@ Inline example.
 </example>
 """,
     )
-    _write(root / "refs" / "r1.md", "reference body")
+    _write(root / "references" / "r1.md", "reference body")
     _write(root / "examples" / "e2.md", "document example body")
+    return root
 
 
-def _subgraph_parent(root: Path) -> None:
-    child = root / "child"
+def _subgraph_parent(parent: Path) -> Path:
+    root = parent / "e2e-parent"
+    child = root / "graphs" / "child"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: e2e-parent
+description: Exercise flat-registry subgraph execution end to end.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise flat-registry subgraph execution end to end.
 io:
   inputs:
     type: object
@@ -127,15 +147,16 @@ io:
       saw_parent_secret:
         type: boolean
 phases:
-  - sub
----
-<phase depends_on="input" output>sub</phase>
+  - id: sub
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "sub" / "SUBGRAPH.md",
-        f"""---
-path: {child}
+        """---
+name: sub
+graph: child
 io:
   inputs:
     type: object
@@ -153,10 +174,10 @@ io:
 """,
     )
     _write(
-        child / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: child
+        child / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: child
+description: Inspect isolated child graph inputs.
 io:
   inputs:
     type: object
@@ -171,14 +192,15 @@ io:
       saw_parent_secret:
         type: boolean
 phases:
-  - inspect
----
-<phase depends_on="input" output>inspect</phase>
+  - id: inspect
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         child / "phases" / "inspect" / "LOGIC.md",
         """---
+name: inspect
 io:
   inputs:
     type: object
@@ -204,16 +226,17 @@ io:
         "        'saw_parent_secret': inputs.get('parent_secret') is not None,\n"
         "    }\n",
     )
+    return root
 
 
-def test_minimal_agent_run_uses_v030_cognitive_prompt_and_prefilled_knowledge_base(
+def test_minimal_agent_run_uses_cognitive_prompt_and_prefilled_knowledge_base(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(tmp_path)
+    root = _agent_skill(tmp_path)
     chat = ToolCallingChatModel()
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     assemble_graph(compiled, chat_model=chat, skill_resolver=mock_skill_resolver).graph.invoke(
         {"data": {"inputs": {"topic": "T"}}, "flow": {}, "messages": [], "run_id": "r1"}
     )
@@ -237,7 +260,7 @@ def test_minimal_agent_run_uses_v030_cognitive_prompt_and_prefilled_knowledge_ba
 def test_agent_can_call_read_example_for_declared_document_example(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _agent_skill(tmp_path)
+    root = _agent_skill(tmp_path)
     chat = ToolCallingChatModel(
         [
             [{"name": "read_example", "args": {"example_id": "E2"}, "id": "read-example-1"}],
@@ -245,7 +268,7 @@ def test_agent_can_call_read_example_for_declared_document_example(
         ]
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     assemble_graph(compiled, chat_model=chat, skill_resolver=mock_skill_resolver).graph.invoke(
         {"data": {"inputs": {"topic": "T"}}, "flow": {}, "messages": [], "run_id": "r1"}
     )
@@ -257,9 +280,9 @@ def test_subgraph_path_runs_and_child_data_does_not_inherit_parent(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _subgraph_parent(tmp_path)
+    root = _subgraph_parent(tmp_path)
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     result = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph.invoke(
         {
             "data": {

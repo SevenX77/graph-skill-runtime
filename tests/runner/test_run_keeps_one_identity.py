@@ -26,10 +26,18 @@ def _write(path: Path, text: str) -> None:
 
 def _write_skill(root: Path, *, action_body: str) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
-name: run-identity
+name: skill
+description: Exercise one durable identity per run.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise one durable identity per run.
 io:
   inputs:
     type: object
@@ -43,14 +51,15 @@ io:
       answer:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "draft" / "LOGIC.md",
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -148,8 +157,8 @@ def test_run_that_dies_before_a_trace_exists_reports_no_trace_path(
     tmp_path: Path,
     mock_skill_resolver: Any,
 ) -> None:
-    """A missing GRAPH.md is rejected before any sink opens — say so, do not point at nothing."""
-    skill_root = tmp_path / "not_a_v030_skill"
+    """A missing portable root is rejected before any sink opens."""
+    skill_root = tmp_path / "not-a-portable-skill"
     skill_root.mkdir()
     workspace_dir = tmp_path / "workspace"
 
@@ -220,7 +229,7 @@ def test_failed_resume_points_at_the_trace_it_opened(
     mock_skill_resolver: Any,
 ) -> None:
     """``_resume_failed_result`` shares the disease: the sink is open, the pointer is None."""
-    skill_root = tmp_path / "not_a_v030_skill"
+    skill_root = tmp_path / "not-a-portable-skill"
     skill_root.mkdir()
     workspace_dir = tmp_path / "workspace"
 

@@ -6,9 +6,9 @@ authority: ./INDEX.md
 updated: 2026-08-27
 ---
 
-# Graph Agent MVP1 架构总览
+# Graph Skill Runtime MVP1 架构总览
 
-本文是**当前 Graph Agent MVP1** 的一页摘要，权威模块地图是 [`INDEX.md`](./INDEX.md)。它不定义独立拆仓后的未来包名、文件格式或 executor 契约。
+本文是一页导航摘要，权威模块地图与 Phase 2 状态表是 [`INDEX.md`](./INDEX.md)。独立 runtime 已完成 Phase 1 typed facade 与 Phase 2 portable format；被取代的 Graph Agent 模块文档只作历史证据。完整 v1 设计仍为 `drafted`，因为 Phase 3+ executor、installer 和产品 integration 尚未实现。
 
 Engine MVP1 文档按三层组织：
 
@@ -18,16 +18,16 @@ Engine MVP1 文档按三层组织：
 
 完整模块列表见 [`INDEX.md`](./INDEX.md)。
 
-独立 Python runtime/PyPI 包的未来目标见 [`docs/engine/graph-skill-runtime/v1-alignment.md`](../graph-skill-runtime/v1-alignment.md)。该文档目前为 `drafted`，尚未替代本页描述的当前 MVP1。
+完整 standalone v1 设计见 [`design/v1-alignment.md`](../design/v1-alignment.md)。当前 58-symbol facade 见 [`public-api-contract.md`](../public-api-contract.md)。
 
 ## Format SSOT
 
-`graph_skill` 文件格式模板的唯一真相源是：
+当前 portable gSkill 文件格式与 bundle compile 的唯一契约是：
 
-[`docs/engine/skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md)
+[`skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)
 
-MVP1 alignment 文档只写职责、边界和跨模块关系，不重复模板。
+[`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 v0.3 converter 输入与历史证据。MVP1 alignment 文档不重复 portable 模板；被 Phase 2 反转的模块状态见 [`INDEX.md` §2](./INDEX.md#2-phase-2-已取代的模块文档)。
 
 ## Migration Source
 
-历史迁移目录 `docs/engine/mvp1/_migration-src/` 已删除。正式模块文档是当前阅读入口；历史迁移细节通过 git 历史追溯。
+历史迁移目录 `docs/engine/mvp1/_migration-src/` 已删除。当前 owner 从 [`INDEX.md`](./INDEX.md) 进入；历史迁移细节通过 git 历史和标为 `superseded` 的正文追溯。

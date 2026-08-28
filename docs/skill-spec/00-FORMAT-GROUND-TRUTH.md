@@ -1,12 +1,18 @@
 ---
-status: FROZEN
-ssot: graph_skill_format_templates
-updated: 2026-07-05
+role: contract
+status: superseded
+former_ssot: graph_skill_format_templates
+updated: 2026-08-27
+superseded_by: ./01-PORTABLE-GSKILL-V1.md
 
 supersedes:
   - docs/engine/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md inline templates
   - docs/engine/mvp1/_migration-src/
 ---
+
+# Legacy v0.3 graph_skill 格式（已被取代）
+
+> **Phase 2 cutover 说明（2026-08-27）**：当前 production reader 的唯一格式权威是 [`01-PORTABLE-GSKILL-V1.md`](./01-PORTABLE-GSKILL-V1.md)。本文仅保留为显式 `gskill migrate studio-skill` converter 的输入契约和 pre-cutover 历史证据；runtime core、SDK、CLI 与 MCP 不读取本文格式，也不会在 portable 解析失败后回退。后文所有“当前”“唯一真相源”等现在时陈述都描述 cutover 前的 v0.3 系统，不再是当前实现事实。
 
 ## 2026-06-30 Strict Compile Gate Addendum
 
@@ -29,9 +35,9 @@ supersedes:
 - At run/predict, `runtime_config.inputs.root` is materialized into the initial GRAPH input blackboard, and `runtime_config.inputs.phases.<phase_id>` is injected immediately before that phase executes. Imported file paths never appear in `GRAPH.md` or phase Markdown.
 - A run or predict writes an immutable snapshot at `.workspace/runs/<run_id>/runtime_config.snapshot.json`; replay/debug reads the snapshot, not a moving live config.
 
-# graph_skill 文件格式模板唯一真相源
+# v0.3 graph_skill 文件格式模板（历史正文）
 
-本文是 `graph_skill` 源文件格式的唯一真相源。Studio、copilot、测试 fixture、loader/compiler、mvp1 文档中的示例和模板都必须以本文为准。
+在 Phase 2 cutover 前，本文曾是 `graph_skill` 源文件格式的唯一真相源。以下正文原样保留旧 Studio、copilot、fixture 与 loader/compiler 所消费的 v0.3 契约，供转换和历史核验。
 
 规则很简单：
 

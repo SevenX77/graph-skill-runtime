@@ -18,27 +18,35 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _write_v030_graph(root: Path, *, mode: str = "agent") -> None:
-    phase_file = "SKILL.md" if mode == "agent" else "SUBGRAPH.md"
+def _write_portable_graph(
+    root: Path,
+    *,
+    graph_id: str = "root",
+    business_skill: bool = True,
+) -> None:
+    if business_skill:
+        _write(
+            root / "SKILL.md",
+            f"---\nname: {root.name}\ndescription: Gamma contract fixture.\n---\n",
+        )
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: gamma0-contract
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {graph_id}
+description: Gamma contract graph.
 io:
   inputs:
     type: object
-    properties: {}
+    properties: {{}}
   outputs:
     type: object
-    properties: {}
+    properties: {{}}
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
-    _write(root / "phases" / "main" / phase_file, "")
 
 
 def _write_agent_phase(
@@ -58,8 +66,9 @@ Return via finish_task.
         else ""
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 {validator_line}
 io:
   inputs:
@@ -88,11 +97,11 @@ Follow the instructions.
 
 def _write_subgraph_phase(root: Path, *, validator: bool | None = None) -> None:
     validator_line = "" if validator is None else f"validator: {str(validator).lower()}\n"
-    child = root / "child-skill"
     _write(
         root / "phases" / "main" / "SUBGRAPH.md",
         f"""---
-path: {child}
+name: main
+graph: child
 io:
   inputs:
     type: object
@@ -106,10 +115,11 @@ io:
 
 
 def test_γ0_1_agent_body_without_exit_contract_loads_successfully(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _write_v030_graph(tmp_path)
-    _write_agent_phase(tmp_path, include_exit_contract=False)
+    root = tmp_path / "gamma-contract"
+    _write_portable_graph(root)
+    _write_agent_phase(root, include_exit_contract=False)
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     ast = compiled.nodes[0].ast
     assert isinstance(ast, AgentNodeAST)
@@ -117,17 +127,19 @@ def test_γ0_1_agent_body_without_exit_contract_loads_successfully(tmp_path: Pat
 
 
 def test_γ0_1_legacy_exit_contract_tag_is_rejected_for_v030_agent(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _write_v030_graph(tmp_path)
-    _write_agent_phase(tmp_path, include_exit_contract=True)
+    root = tmp_path / "gamma-contract"
+    _write_portable_graph(root)
+    _write_agent_phase(root, include_exit_contract=True)
 
     with pytest.raises(SkillLoadError, match="exit_contract"):
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
 
 def test_γ0_2_agent_node_validator_defaults_false() -> None:
     ast = AgentNodeAST.model_validate(
         {
             "mode": "agent",
+            "name": "main",
             "role": "Research assistant.",
             "goal": "Return a concise answer.",
             "io": {"inputs": {"type": "object"}, "outputs": {"type": "object"}},
@@ -138,10 +150,11 @@ def test_γ0_2_agent_node_validator_defaults_false() -> None:
 
 
 def test_γ0_2_agent_loader_accepts_validator_true(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _write_v030_graph(tmp_path)
-    _write_agent_phase(tmp_path, validator=True, include_exit_contract=False)
+    root = tmp_path / "gamma-contract"
+    _write_portable_graph(root)
+    _write_agent_phase(root, validator=True, include_exit_contract=False)
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     ast = compiled.nodes[0].ast
     assert isinstance(ast, AgentNodeAST)
@@ -153,6 +166,7 @@ def test_validator_non_bool_fatal() -> None:
         AgentNodeAST.model_validate(
             {
                 "mode": "agent",
+                "name": "main",
                 "role": "Research assistant.",
                 "goal": "Return a concise answer.",
                 "validator": "maybe",
@@ -164,7 +178,8 @@ def test_γ0_2_subgraph_node_validator_defaults_false() -> None:
     ast = SubgraphNodeAST.model_validate(
         {
             "mode": "subgraph",
-            "path": "/workspace/child-skill",
+            "name": "main",
+            "graph": "child",
             "io": {"inputs": {"type": "object"}, "outputs": {"type": "object"}},
         }
     )
@@ -175,13 +190,14 @@ def test_γ0_2_subgraph_node_validator_defaults_false() -> None:
 def test_γ0_2_subgraph_loader_accepts_validator_true(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _write_v030_graph(tmp_path, mode="subgraph")
-    _write_subgraph_phase(tmp_path, validator=True)
-    child = tmp_path / "child-skill"
-    _write_v030_graph(child)
+    root = tmp_path / "gamma-contract"
+    _write_portable_graph(root)
+    _write_subgraph_phase(root, validator=True)
+    child = root / "graphs" / "child"
+    _write_portable_graph(child, graph_id="child", business_skill=False)
     _write_agent_phase(child)
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     ast = compiled.nodes[0].ast
     assert isinstance(ast, SubgraphNodeAST)

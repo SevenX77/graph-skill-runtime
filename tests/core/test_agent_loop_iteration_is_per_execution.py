@@ -36,7 +36,7 @@ from typing import Any
 
 from graph_skill_runtime.callbacks.events import AgentLoopIterationEvent, CallbackEvent, PromptCapturedEvent
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 ITEM_1 = "MARKER_ITEM_1"
 ITEM_2 = "MARKER_ITEM_2"

@@ -1,7 +1,7 @@
 """llm_role layering: graph-level default + per-node use_graph_llm_role switch.
 
-Design source: docs/skill-spec/00-FORMAT-GROUND-TRUTH.md — GRAPH.md
-``llm_role`` is the whole-graph default role; SKILL.md ``llm_role`` overrides
+Design source: docs/skill-spec/01-PORTABLE-GSKILL-V1.md.
+``llm_role`` is the whole-graph default role; AGENT.md ``llm_role`` overrides
 it; ``use_graph_llm_role: true`` inverts the priority so the graph default
 wins while the node's own value stays untouched in the file.
 """
@@ -29,18 +29,27 @@ _MINIMAL_IO = PhaseIOSchema(
 
 
 def _write_minimal_agent_skill(
-    root: Path,
+    parent: Path,
     *,
     graph_extra: str = "",
     skill_extra: str = "",
-) -> None:
+) -> Path:
+    root = parent / "llm-role-layering-test"
     (root / "phases" / "seg").mkdir(parents=True)
     graph_extra_block = f"{graph_extra}\n" if graph_extra else ""
     skill_extra_block = f"{skill_extra}\n" if skill_extra else ""
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
+    (root / "SKILL.md").write_text(
+        """---
 name: llm-role-layering-test
+description: Exercise graph and agent LLM role selection.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise graph and agent LLM role selection.
 {graph_extra_block}io:
   inputs:
     type: object
@@ -51,14 +60,15 @@ name: llm-role-layering-test
       answer:
         type: string
 phases:
-  - seg
----
-<phase depends_on="input" output>seg</phase>
+  - id: seg
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
-    (root / "phases" / "seg" / "SKILL.md").write_text(
+    (root / "phases" / "seg" / "AGENT.md").write_text(
         f"""---
+name: seg
 {skill_extra_block}io:
   inputs:
     type: object
@@ -74,6 +84,7 @@ phases:
 """,
         encoding="utf-8",
     )
+    return root
 
 
 class _RecordingResolver:
@@ -100,28 +111,28 @@ def _agent_ast(compiled_skill: Any, phase_id: str) -> AgentNodeAST:
 def test_graph_manifest_accepts_graph_level_llm_role(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _write_minimal_agent_skill(tmp_path, graph_extra="llm_role: fast")
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    skill_root = _write_minimal_agent_skill(tmp_path, graph_extra="llm_role: fast")
+    compiled = SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)
     assert compiled.manifest.llm_role == "fast"
 
 
 def test_graph_manifest_llm_role_defaults_to_none(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _write_minimal_agent_skill(tmp_path)
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    skill_root = _write_minimal_agent_skill(tmp_path)
+    compiled = SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)
     assert compiled.manifest.llm_role is None
 
 
 def test_agent_node_accepts_use_graph_llm_role(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _write_minimal_agent_skill(
+    skill_root = _write_minimal_agent_skill(
         tmp_path,
         graph_extra="llm_role: fast",
         skill_extra="llm_role: analyst\nuse_graph_llm_role: true",
     )
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)
     ast = _agent_ast(compiled, "seg")
     assert ast.use_graph_llm_role is True
     # The node's own value is preserved untouched next to the switch.
@@ -131,8 +142,8 @@ def test_agent_node_accepts_use_graph_llm_role(
 def test_agent_node_use_graph_llm_role_defaults_to_false(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _write_minimal_agent_skill(tmp_path, skill_extra="llm_role: analyst")
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    skill_root = _write_minimal_agent_skill(tmp_path, skill_extra="llm_role: analyst")
+    compiled = SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)
     assert _agent_ast(compiled, "seg").use_graph_llm_role is False
 
 
@@ -141,30 +152,44 @@ def test_agent_node_use_graph_llm_role_defaults_to_false(
 
 def test_effective_role_switch_on_graph_wins() -> None:
     ast = AgentNodeAST(
-        mode="agent", role="r", goal="g", llm_role="analyst", use_graph_llm_role=True, io=_MINIMAL_IO
+        mode="agent",
+        name="seg",
+        role="r",
+        goal="g",
+        llm_role="analyst",
+        use_graph_llm_role=True,
+        io=_MINIMAL_IO,
     )
     assert effective_llm_role(ast, "fast") == "fast"
 
 
 def test_effective_role_switch_on_without_graph_default_falls_back() -> None:
     ast = AgentNodeAST(
-        mode="agent", role="r", goal="g", llm_role="analyst", use_graph_llm_role=True, io=_MINIMAL_IO
+        mode="agent",
+        name="seg",
+        role="r",
+        goal="g",
+        llm_role="analyst",
+        use_graph_llm_role=True,
+        io=_MINIMAL_IO,
     )
     assert effective_llm_role(ast, None) == "graph_skill_runtime"
 
 
 def test_effective_role_switch_off_node_wins() -> None:
-    ast = AgentNodeAST(mode="agent", role="r", goal="g", llm_role="analyst", io=_MINIMAL_IO)
+    ast = AgentNodeAST(
+        mode="agent", name="seg", role="r", goal="g", llm_role="analyst", io=_MINIMAL_IO
+    )
     assert effective_llm_role(ast, "fast") == "analyst"
 
 
 def test_effective_role_switch_off_without_node_inherits_graph() -> None:
-    ast = AgentNodeAST(mode="agent", role="r", goal="g", io=_MINIMAL_IO)
+    ast = AgentNodeAST(mode="agent", name="seg", role="r", goal="g", io=_MINIMAL_IO)
     assert effective_llm_role(ast, "fast") == "fast"
 
 
 def test_effective_role_both_unset_uses_conventional_default() -> None:
-    ast = AgentNodeAST(mode="agent", role="r", goal="g", io=_MINIMAL_IO)
+    ast = AgentNodeAST(mode="agent", name="seg", role="r", goal="g", io=_MINIMAL_IO)
     assert effective_llm_role(ast, None) == "graph_skill_runtime"
 
 
@@ -198,13 +223,14 @@ def test_graph_manifest_still_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         GraphManifest.model_validate(
             {
-                "schema_version": "v0.3.0",
-                "name": "x",
+                "schema_version": "gskill.graph.v1",
+                "graph_id": "root",
+                "description": "Reject an unknown graph field.",
                 "made_up_field": 1,
                 "io": {
                     "inputs": {"type": "object", "properties": {}},
                     "outputs": {"type": "object", "properties": {}},
                 },
-                "phases": ["seg"],
+                "phases": [{"id": "seg", "depends_on": ["input"], "output": True}],
             }
         )

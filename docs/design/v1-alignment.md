@@ -10,7 +10,7 @@ updated: 2026-08-27
 
 # Graph Skill Runtime v1 目标设计
 
-本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0 与 Phase 1 已实现，但 Phase 2 的 portable 文件格式以及 Phase 3 至 Phase 6 的 executor、installer 和产品 adapter 尚未实现，因此不能把完整 v1 当作当前能力。
+本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1 与 Phase 2 portable 文件格式已经实现；Phase 3 至 Phase 6 的 durable host-native handoff、vendor executor、installer 和产品 adapter 尚未实现，因此不能把完整 v1 当作当前能力。
 
 ## 0. Implementation status（2026-08-27）
 
@@ -19,12 +19,12 @@ updated: 2026-08-27
 | Phase 0：仓库提取与现状冻结 | **已实现** | 独立 GitHub repository 已建立；旧实现与 v0.3 格式已完成提取和 characterization；历史证据保留在 [`baseline.md`](./baseline.md) 与 `docs/mvp0/` |
 | Section 2：产品命名 | **已实现于源码与仓库** | distribution/import/command 是 `graph-skill-runtime` / `graph_skill_runtime` / `gskill`，当前版本 `0.1.0a1`；release workflow 已准备 build、wheel validation 与 OIDC Trusted Publishing，但 PyPI project/publisher 尚未配置，也没有实际发布 |
 | Section 3 与 Section 8 的 Phase 1 子集：typed facade、配置、SDK/CLI/MCP 边界 | **已实现** | 顶层 58-symbol contract、closed/frozen/versioned models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication`、八个 SDK 用例与八个同名 MCP tools 已落地 |
-| Current engine bridge | **已实现于 Phase 1 范围** | `CurrentEngineAdapter` 已用真实 v0.3 `LOGIC` skill 验证 compile/run；只有显式 `embedded` 才进入旧 engine，provider clients 位于 optional `embedded` extra |
-| Section 4 至 Section 5：新 portable 格式与 flat graph registry | **Phase 2 drafted；未实现** | 当前仍只读 root `GRAPH.md` 与 phase `LOGIC.md` / `SUBGRAPH.md` / `SKILL.md`；没有 dual reader |
+| Current engine bridge | **已实现于当前范围** | `CurrentEngineAdapter` 已用真实 portable `LOGIC` skill 验证 compile/run；只有显式 `embedded` 才进入 engine，provider clients 位于 optional `embedded` extra |
+| Section 4 至 Section 5：portable 格式与 flat graph registry | **Phase 2 已实现** | Production compile/run/SDK/CLI/MCP 只接受显式 root `SKILL.md` + `graph.yaml` bundle；内部 agent phase 使用 `AGENT.md`；graph registry 为单层 `graphs/<graph_id>/`；legacy v0.3 读取只存在于显式 converter 边界 |
 | Section 6 至 Section 7：host-native durable handoff | **Phase 3 drafted；未实现** | `host-native` 是配置默认值，但当前 `run` 先保存 request snapshot，再返回 `GSKILL_EXECUTOR_UNAVAILABLE`；`resume` / `submit_agent_result` 返回 `GSKILL_NOT_IMPLEMENTED` |
 | Vendor CLI executors、MoirAI installer、Gateway/Studio adapters | **Phase 4 至 Phase 6 drafted；未实现** | CLI executor 只有 typed config；未实现 vendor process adapter、宿主资产安装或产品集成 |
 
-当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前文件格式的事实源仍是 [`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md)。本设计后文保留完整 v1 目标；凡未被上表标为已实现的内容都不得写成当前能力。
+当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；凡未被上表标为已实现的内容都不得写成当前能力。
 
 ## 1. 目标、术语与不可变约束
 
@@ -116,7 +116,7 @@ Python SDK、`gskill` CLI 与 `gskill` MCP server 均是薄 adapter：
 
 ## 4. Portable gSkill 格式
 
-**实现边界**：本节整体属于 Phase 2 target，当前 reader 不接受这里的 layout。当前唯一可用格式仍以 root `GRAPH.md` 为入口，并按 phase 类型读取 `LOGIC.md`、`SUBGRAPH.md` 或 agent phase `SKILL.md`；新旧格式之间没有 dual reader。
+**当前实现边界**：Phase 2 已把本节设计落实为 production reader。当前 core 只接受显式 skill root 下的根 `SKILL.md`、`graph.yaml`、phase `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 和单层 `graphs/<graph_id>/` registry；没有 dual reader。字段级格式与 converter 的当前权威是 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)，本节说明完整 v1 设计中的职责与动机，不另建平行 schema。
 
 ### 4.1 目录布局
 
@@ -163,7 +163,7 @@ MCP 是结构化首选，因为 request/result schema 可直接校验；CLI 是�
 - `AGENT.md`：需要 agent executor 的 phase；
 - `SUBGRAPH.md`：调用另一个 graph 的 phase。
 
-当前格式中的 agent phase `SKILL.md` 在目标格式中必须改名为 `AGENT.md`。Cursor 等宿主会递归发现 `SKILL.md`；把 phase 文件继续叫 `SKILL.md` 会使宿主把内部节点误认成可独立调用的 Agent Skill。
+Legacy v0.3 的 agent phase `SKILL.md` 在 portable 格式中改名为 `AGENT.md`。Cursor 等宿主会递归发现 `SKILL.md`；把 phase 文件继续叫 `SKILL.md` 会使宿主把内部节点误认成可独立调用的 Agent Skill。
 
 portable declaration 包括根 `SKILL.md`、所有 `graph.yaml` 与 phase 文件，可以提交版本控制。runtime state、credentials、宿主 session 和 UI 扫描投影不属于 portable declaration。
 
@@ -259,7 +259,7 @@ Claude、Codex、Copilot、Gemini、Cursor 与 OpenCode 都提供原生 subagent
 
 ### 6.4 Adapter 3：`embedded`，可选 fallback
 
-现有 engine 路径已经放到显式 `embedded` executor 后面；provider clients 位于 `graph-skill-runtime[embedded]` optional extra，不在 base dependency 中。它不再是默认 executor。Phase 1 已用真实 v0.3 `LOGIC` skill 验证 `CurrentEngineAdapter` 的 compile/run；这份证据不等于所有 provider-backed AGENT 行为已经完成 Port parity。
+现有 engine 路径已经放到显式 `embedded` executor 后面；provider clients 位于 `graph-skill-runtime[embedded]` optional extra，不在 base dependency 中。它不再是默认 executor。当前实现已用真实 portable `LOGIC` skill 验证 `CurrentEngineAdapter` 的 compile/run；这份证据不等于所有 provider-backed AGENT 行为已经完成 Port parity。
 
 保留它有四个实际价值：
 
@@ -344,7 +344,7 @@ Artifact declaration 和 artifact request 是两个不同对象。根 `graph.yam
 
 portable graph 中声明允许的输入输出、可覆盖点和 artifact definitions，不保存某次运行的实际值。`RuntimeProfile` 不接收表格中的业务运行字段；这些字段只在 named `RunPreset` 与最终 `RunRequest` 之间流动。
 
-新仓不实现 dual reader 或 legacy shim。可以提供一次性 `gskill migrate studio-skill <source> <destination>` 转换器：它显式读取旧 Studio skill 与 runtime config，生成新格式目录、project `gskill.toml`、named migration preset 与迁移报告，遇到未知或有冲突字段就失败，且不覆盖源目录。
+新仓不实现 dual reader 或 legacy shim。当前一次性转换入口是 `gskill migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]`：它显式读取旧 Studio skill 与 runtime config，生成 portable 目录、project `gskill.toml`、named migration preset 与确定性迁移报告。它先完成只读 preflight，在 destination 的 sibling temp 目录生成，再以操作系统原生 create-if-absent rename 发布；未知或有冲突字段、无法平铺的 nested subskill、source/destination 冲突或 existing destination 都会在不修改 source、不发布 partial destination的前提下失败。
 
 artifact id 不能使用旧数组位置，因为增删或排序会改变身份。converter 先把 `{stem, fields, mode, format}` 规范化，以合法化后的 `stem` 生成可读候选 ID；若不同定义产生同名候选，则追加规范化定义内容的确定性短 hash。完全相同的重复定义是无法证明意图的重复身份，converter 必须在报告中列出并失败，不能静默合并。迁移报告逐条记录旧数组索引到新 `artifact_id` 的映射。转换完成后，新 runtime 只读新格式，并只按 ID 接受 artifact request。
 
@@ -406,7 +406,7 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ## 13. 分阶段迁移
 
-每个阶段都必须有独立退出判据和失败出口。Phase 0 与 Phase 1 已完成；当前独立 package 与 FROZEN v0.3 格式是运行事实。Phase 2 之后的退出判据未通过前，不能靠 dual reader、未实现 adapter 或文档声明掩盖缺口。
+每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1 与 Phase 2 已实现；当前独立 package 与 portable gSkill v1 格式是运行事实。Phase 3 之后的退出判据未通过前，不能靠未实现 adapter 或文档声明掩盖缺口。Phase 2 的远程 Ubuntu/Windows/macOS CI 结果在本次变更合并前尚未发生，因此当前证据只支持“实现已完成并在 Windows 本地门禁通过”，不支持“三平台远程 CI 已通过”。
 
 ### Phase 0：契约冻结与 characterization
 
@@ -416,13 +416,13 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 **退出判据**：characterization suite 能在当前提交重复运行，并明确区分公开承诺、待收紧的 `Any` 接缝和已知漂移。
 
-**失败出口**：不拆代码；补齐证据后重跑。FROZEN format ground truth 保持不变。
+**失败出口（Phase 0 当时的规则）**：不拆代码；补齐证据后重跑。当时的 v0.3 format ground truth 保持不变。
 
 ### Phase 1：拆出 pure runtime 与 typed facade/config
 
 **当前状态（2026-08-27）**：已实现。distribution/import/command 已切换；58-symbol typed facade、配置 resolver、request snapshot、application/ports/adapters 边界、SDK/CLI/MCP parity 与显式 embedded bridge 已落地。项目尚未发布 PyPI，这不把已完成的源码阶段变成已发布产品。
 
-**工作**：建立独立 repo/package 骨架、domain/application/ports/adapters 边界、版本化 invocation/request/result/event/error，以及将 `RuntimeProfile` 与 named `RunPreset` 分离的四层 config resolver；把 compile/predict/checkpoint 等 pure runtime 能力迁入。现有 embedded executor 只作为显式 optional extra 与 characterization oracle，不成为新包默认 executor。
+**工作**：建立独立 repo/package 骨架、domain/application/ports/adapters 边界、版本化 invocation/request/result/event/error，以及将 `RuntimeProfile` 与 named `RunPreset` 分离的五层 config resolver；把 compile/predict/checkpoint 等 pure runtime 能力迁入。现有 embedded executor 只作为显式 optional extra 与 characterization oracle，不成为新包默认 executor。
 
 **退出判据**：clean Python 3.11+ 环境可从 wheel 安装；顶层 contract 不泄露 `Any` 配置；RuntimeProfile 不含业务运行字段，named RunPreset 能提供持久非秘密默认值，RunRequest 是可回放的本次 immutable snapshot；CLI/MCP/SDK 的相同用例通过同一 application service；安装无宿主或项目写入副作用。
 
@@ -430,9 +430,9 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ### Phase 2：切换新 `SKILL.md` / `graph.yaml` / `AGENT.md` / `graphs/` 格式
 
-**当前状态（2026-08-27）**：未实现，保持 drafted。当前 reader 仍只支持 FROZEN v0.3，且没有 dual reader。
+**当前状态（2026-08-27）**：已实现。Production reader 已原子切换到 portable root `SKILL.md` + `graph.yaml` + phase `AGENT.md` + flat `graphs/`；legacy v0.3 parser 只在显式 converter boundary 中可达。Windows 本地 ruff、mypy strict、1582 passed / 1 skipped、manifest validator、build、isolated-wheel CLI smoke 与第三方依赖 audit 已通过；本 PR 的远程 Ubuntu/Windows/macOS CI 尚未发生。
 
-**工作**：实现新 parser/compiler、扁平 registry、具名 artifact declarations、call graph 校验与一次性 Studio converter；converter 为旧 artifact definitions 生成稳定 ID，并输出 project preset；迁移受控 fixture 和 sample cohort。
+**已落实工作**：新 parser/compiler、扁平 registry、具名 artifact declarations、call graph 校验与一次性 Studio converter；converter 为旧 artifact definitions 生成稳定 ID，并输出 project preset、flat registry 与确定性 migration report；受控 fixtures 已迁移到 portable 格式。
 
 **退出判据**：新格式 compile/predict 与 typed dataflow characterization 通过；unknown/duplicate/cycle 被同轮聚合拒绝；artifact declaration ID 在重排后稳定，request 只按 ID 选择声明；递归宿主 discovery 只发现根 `SKILL.md`；新 runtime 代码只存在一个 reader。
 
@@ -472,11 +472,11 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 **当前状态（2026-08-27）**：未实现，保持 drafted。当前 repository 没有 Gateway 或 Studio adapter。
 
-**工作**：将 credential/role/route 管理留在 Gateway plugin，将 authoring/publish/UI file writing 留在 Studio plugin；更新 Studio adapter 使用新 typed SDK，重钉 contract maps、文档、fixtures 与发布流水线。
+**工作**：将 credential/role/route 管理留在 Gateway plugin，将 authoring/publish/UI file writing 留在 Studio plugin；更新 Studio adapter 使用当前 typed SDK 与 portable format，重钉 Studio 的 contract maps、文档、fixtures 与发布流水线。
 
-**退出判据**：Studio 真机旅程、三平台包、Gateway/Studio owner 边界和数据破坏恢复验证通过；所有活动引用已从旧格式重钉；旧 package/reader/phase `SKILL.md` 在同一 cutover 中删除；新的格式文档经审计后成为 current SSOT。
+**退出判据**：Studio 真机旅程、三平台包、Gateway/Studio owner 边界和数据破坏恢复验证通过；Studio 的所有活动引用已从旧格式重钉；旧 Studio package/reader/phase `SKILL.md` 在同一 integration cutover 中删除；Studio 只消费已经是当前权威的 portable contract。
 
-**失败出口**：不切 Studio production path，继续以当前 package/FROZEN 契约运行；修复新 adapter 后重新执行 cutover rehearsal。不得让两个 runtime 同时接受写入或成为并行真相源。
+**失败出口**：不切 Studio production path，也不宣称 Gateway/Studio integration 已完成；standalone portable runtime 与其当前 contract 保持不变，修复 adapter 后重新执行 integration rehearsal。不得让两个 Studio runtime 同时接受写入或成为并行真相源。
 
 ## 14. v1 总体验收
 
@@ -488,10 +488,10 @@ v1 只有同时满足以下条件才可标记完成：
 4. SDK、CLI、MCP 对同一输入返回同源 diagnostics、result、events 与 error code；公开 config/executor/checkpoint 接缝没有未约束 `Any`。
 5. `host-native` durable handoff 在真实宿主上完成 crash/reopen/submit/resume；CLI adapter 明确证明是 fresh top-level session。
 6. checkpoint、trace、artifact 与 immutable run snapshot 可由因果证据关联到同一 run；重复 result 提交不会重复执行。
-7. config 四层优先级、RuntimeProfile/RunPreset 职责分离、持久非秘密默认值、immutable RunRequest、secret exclusion 与 state-dir 绝对路径在三平台通过测试。
+7. config 五层优先级、RuntimeProfile/RunPreset 职责分离、持久非秘密默认值、immutable RunRequest、secret exclusion 与 state-dir 绝对路径在三平台通过测试。
 8. `gskill integrations install moirai` 的 dry-run、conflict、manifest、idempotency 与 safe uninstall 通过；wheel 携带的 canonical assets 在显式安装前不投影到宿主，安装资产也不包含用户业务 gSkill。
 9. runtime、Gateway plugin、Studio plugin 与 host web capability 的工具 owner 无交叉真相；MoirAI 仍是 optional integration。
-10. 迁移后只有新 reader；旧 FROZEN 契约只在实现、迁移验证和引用重钉完成的 cutover 中才被新的 audited/FROZEN 文档取代。
+10. Production runtime 只有 portable reader；旧 v0.3 契约保持 `superseded`，legacy parser 只服务显式 converter。当前 portable 规范处于 `audited-ready`；只有 owner 盖章并建立 SHA-256 哈希锁后才可标记 `FROZEN`。
 
 ## 15. 尚待实证的裁决
 
@@ -505,6 +505,7 @@ v1 只有同时满足以下条件才可标记完成：
 
 | 日期 | 修订 | 依据与边界 |
 | --- | --- | --- |
-| 2026-08-27 | 增加 implementation-status；把 Section 2 源码命名、Section 3 typed facade/config/SDK-CLI-MCP boundary 标为 Phase 1 已实现；把 Phase 2 至 Phase 6 明确标为未实现 | `pyproject.toml`、`src/graph_skill_runtime/__init__.py`、`domain/models.py`、`application/`、`ports/`、`adapters/`、composition root 与 Phase 1 contract tests；未宣称 PyPI 发布 |
+| 2026-08-27 | 将 Phase 2 portable gSkill reader、flat registry、artifact-by-id 与显式 Studio converter 标为当前已实现；把 v0.3 降为 converter/历史证据 | 当前 compiler/loader/converter、portable fixtures 与 Windows 本地门禁；远程 Ubuntu/Windows/macOS CI 尚未发生，Phase 3+ 仍未实现 |
+| 2026-08-27 | 初次增加 implementation-status，把 Section 2 源码命名与 Section 3 typed facade/config/SDK-CLI-MCP boundary 标为 Phase 1 已实现 | `pyproject.toml`、`src/graph_skill_runtime/__init__.py`、`domain/models.py`、`application/`、`ports/`、`adapters/`、composition root 与 Phase 1 contract tests；当时的后续阶段判断已由本表第一条 cutover 修订取代，仍未宣称 PyPI 发布 |
 | 2026-08-27 | 将配置来源展开为 invocation > project > user > portable > built-in，并澄清 project/portable preset owner、secret reference 与 create-once request snapshot | 当前 `ConfigResolver`、`LocalRunSnapshotStore` 与 immutable contract tests；durable resume 仍留在 Phase 3 |
 | 2026-08-27 | 记录 release workflow 已准备 tag/version check、distribution build、wheel validation 与 OIDC Trusted Publishing | `.github/workflows/release.yml`；PyPI project/trusted publisher 尚未由 owner 配置，也没有实际发布 |

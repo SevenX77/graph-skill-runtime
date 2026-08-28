@@ -1,10 +1,8 @@
 ---
 status: retired
-updated: 2026-06-28
+updated: 2026-08-27
 ---
 
 # GRAPH.md Spec Retired
 
-本页不再承载 `GRAPH.md` 模板或字段规范。
-
-唯一真相源见 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md#2-graphmd)。
+本页是 v0.3 `GRAPH.md` 的退役导航，不承载当前模板。当前机器拓扑由 [`01-PORTABLE-GSKILL-V1.md` §4](./01-PORTABLE-GSKILL-V1.md#4-graphyaml唯一机器拓扑) 的 `graph.yaml` 拥有；旧 `GRAPH.md` 只在显式 converter 输入中使用。

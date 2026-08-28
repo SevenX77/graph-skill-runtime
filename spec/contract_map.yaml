@@ -116,22 +116,26 @@ public_api_symbols:
   submit_agent_result:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
 skill_spec_sections:
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#1. 物理目录:
-    feature_ids: [F-graph-skill-loading]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#2. GRAPH.md:
-    feature_ids: [F-graph-skill-loading, F-graph-assembly]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#3. LOGIC.md:
-    feature_ids: [F-logic-action-execution]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#4. SUBGRAPH.md:
-    feature_ids: [F-subgraph-delegation]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#5. SKILL.md:
-    feature_ids: [F-agent-phase-orchestration]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#6. IO Schema:
-    feature_ids: [F-state-blackboard]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#7. IterateSpec:
-    feature_ids: [F-iterate-runtime]
-  docs/skill-spec/00-FORMAT-GROUND-TRUTH.md#8. Mention 与资源引用:
-    feature_ids: [F-mention-resolution, F-resource-reference-access]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#2. 唯一目录布局":
+    feature_ids: [F-graph-skill-loading, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#3. 根 `SKILL.md`：Agent Skills 入口":
+    feature_ids: [F-graph-skill-loading, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#4. `graph.yaml`：唯一机器拓扑":
+    feature_ids: [F-graph-skill-loading, F-graph-assembly, F-state-blackboard, F-iterate-runtime, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#5.1 `LOGIC.md`":
+    feature_ids: [F-logic-action-execution, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#5.2 `AGENT.md`":
+    feature_ids: [F-agent-phase-orchestration, F-mention-resolution, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#5.3 `SUBGRAPH.md`":
+    feature_ids: [F-subgraph-delegation, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#6. Flat graph registry、调用图与资源":
+    feature_ids: [F-subgraph-delegation, F-mention-resolution, F-resource-reference-access, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#7. Artifact declaration 与 request":
+    feature_ids: [F-storage-io, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#8. Bundle compile":
+    feature_ids: [F-graph-skill-loading, F-graph-assembly, F-portable-gskill-v1]
+  "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#9. 一次性 Studio skill converter":
+    feature_ids: [F-studio-skill-migration]
 consumer_files:
   - kind: stable-export
     path: src/graph_skill_runtime/__init__.py

@@ -1,12 +1,14 @@
 ---
 module: 01-contract/05-invalidation
 doc: baseline
-status: audited-ready（B 成段:对当前 packages/graph-agent grep 核 2026-06-05 + codex 复审修正;live=compile cache(.md mtime/size)+ golden hash 比对 warn(退役标的);diff_skill/ChangeAxis 未实现;编译期 golden 硬错误码从未落地）
+status: superseded（Phase 2 source inventory 已取代本文按 v0.3 文件集描述的失效 baseline）
 binds_alignment: ./mvp1-alignment.md
 binds_code: packages/graph-agent/src/graph_agent/core/cache.py:compute_cache_key · core/compiler.py:compile_skill · core/runner.py:_warn_on_stale_golden_hashes_sdk
 ---
 
 # 05-invalidation — Baseline(当下代码实现逻辑)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 portable source inventory 由 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md) 定义，当前 cache/compiler 行为见 [`cache.py`](../../../../src/graph_skill_runtime/core/cache.py) 与 [`compiler.py`](../../../../src/graph_skill_runtime/core/compiler.py)。后文只保留以 `GRAPH.md` 和旧 phase Markdown 集合为前提的 v0.3 pre-cutover evidence；其中现在时和缺口判断未经 Phase 2 复核，不是当前事实。
 
 > **Scope**: "源变更 → 派生物失效"的**现状代码**:三类派生物(compile cache / golden / checkpoint)各自当前怎么(不)处理失效。alignment 的统一变更轴 `diff_skill(old,new)->set[ChangeAxis]` 是**目标**,当前**未实现**。
 > **现状一句话**:当前只有**两件 live 的失效相关代码**——① **compile cache**:`core/cache.py`(`compute_cache_key`/`load_from_cache`/`save_to_cache`)+ `compiler.py:compile_skill`,key = `GRAPH.md` + `phases/**/*.md` 的 **mtime+size**(非内容 hash);② **golden hash 比对 warn**:`runner.py:_warn_on_stale_golden_hashes_sdk` 比 **`prompt_hash` + `io_outputs_schema_hash` 两个独立哈希**,任一变即 warn(不 block),正是 alignment IV3 的**退役标的**(改 prompt 即误报)。统一 `diff_skill`/`ChangeAxis`、checkpoint 置灰、eval 期 A2a golden 失效**均未实现**;旧 records 说的"编译期硬错误 `[F-v3-golden-stale-fields]`"**从未落地**(`error_registry` 无任何 golden 码)。

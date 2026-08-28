@@ -1,32 +1,78 @@
-"""Pydantic v0.3.0 manifest and phase-node AST contracts."""
+"""Typed contracts for portable graph declarations and phase documents."""
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from graph_skill_runtime.core.skill_resolver_protocol import SKILL_ID_PATTERN
 
+AGENT_SKILL_NAME_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+GRAPH_ID_PATTERN = AGENT_SKILL_NAME_PATTERN
+PHASE_ID_PATTERN = r"^[A-Za-z][A-Za-z0-9_-]*$"
+
+
+class RootSkillManifest(BaseModel):
+    """Agent Skills metadata from the business skill's root ``SKILL.md``."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    name: str = Field(min_length=1, max_length=64, pattern=AGENT_SKILL_NAME_PATTERN)
+    description: str = Field(min_length=1, max_length=1024)
+    license: str | None = Field(default=None, min_length=1)
+    compatibility: str | None = Field(default=None, min_length=1, max_length=500)
+    metadata: dict[str, str] = Field(default_factory=dict)
+    allowed_tools: str | None = Field(default=None, alias="allowed-tools", min_length=1)
+
 
 class GraphPhaseRef(BaseModel):
-    """Legacy topology carrier retained for old imports only."""
+    """One phase and its explicit incoming topology edges in ``graph.yaml``."""
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(min_length=1)
-    src: str = Field(min_length=1)
-    depends_on: list[str] = Field(...)
-    output: bool = False
+    id: str = Field(pattern=PHASE_ID_PATTERN)
+    depends_on: tuple[str, ...] = Field(min_length=1)
+    output: bool
+
+    @model_validator(mode="after")
+    def _dependencies_are_unique(self) -> GraphPhaseRef:
+        if self.id == "input":
+            raise ValueError("phase id 'input' is reserved for the graph input sentinel")
+        if len(set(self.depends_on)) != len(self.depends_on):
+            raise ValueError(f"phase {self.id!r} repeats a depends_on entry")
+        if "input" in self.depends_on and len(self.depends_on) != 1:
+            raise ValueError(f"phase {self.id!r} must use the input sentinel by itself")
+        invalid = [
+            dependency
+            for dependency in self.depends_on
+            if dependency != "input" and re.fullmatch(PHASE_ID_PATTERN, dependency) is None
+        ]
+        if invalid:
+            raise ValueError(f"phase {self.id!r} has invalid dependencies: {', '.join(invalid)}")
+        return self
 
 
-class ContextBridge(BaseModel):
-    """Subgraph boundary mapping placeholder retained for runtime dataclasses."""
+class ArtifactDeclaration(BaseModel):
+    """Portable definition of one artifact a run may request by stable id."""
 
     model_config = ConfigDict(extra="forbid")
 
-    inputs: dict[str, str] = Field(default_factory=dict)
-    outputs: dict[str, str] = Field(default_factory=dict)
+    artifact_id: str = Field(pattern=PHASE_ID_PATTERN)
+    stem: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    fields: tuple[str, ...] = Field(min_length=1)
+    mode: Literal["single", "per-item"]
+    format: Literal["json", "md"]
+
+    @field_validator("fields")
+    @classmethod
+    def _fields_are_nonempty_and_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not field_name.strip() for field_name in value):
+            raise ValueError("artifact fields must not contain blank names")
+        if len(set(value)) != len(value):
+            raise ValueError("artifact fields must be unique")
+        return value
 
 
 class PhaseIOSchema(BaseModel):
@@ -44,7 +90,7 @@ class AgentRegistryItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
-    path: str = Field(min_length=1)
+    graph: str = Field(pattern=GRAPH_ID_PATTERN)
     description: str = Field(min_length=1)
 
     @model_validator(mode="before")
@@ -54,16 +100,16 @@ class AgentRegistryItem(BaseModel):
 
         if not isinstance(data, dict):
             return data
-        allowed = {"name", "path", "description"}
+        allowed = {"name", "graph", "description"}
         for k in data:
             if k not in allowed:
                 raise ValueError(f"[F-v3-agent-subgraph-invalid] Extra field {k!r} not allowed in subgraph spec")
         name = data.get("name")
         if name is None or not isinstance(name, str) or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
             raise ValueError("[F-v3-agent-subgraph-invalid] Subgraph name is missing or invalid")
-        path = data.get("path")
-        if path is None or not isinstance(path, str) or len(path) == 0:
-            raise ValueError("[F-v3-agent-subgraph-invalid] Subgraph path is missing or invalid")
+        graph = data.get("graph")
+        if graph is None or not isinstance(graph, str) or not graph:
+            raise ValueError("[F-v3-agent-subgraph-invalid] Subgraph graph id is missing or invalid")
         description = data.get("description")
         if description is None or not isinstance(description, str) or len(description) == 0:
             raise ValueError("[F-v3-agent-subgraph-invalid] Subgraph description is missing or invalid")
@@ -163,7 +209,7 @@ class AgentProtocol(BaseModel):
 
 
 class SubagentSpec(BaseModel):
-    """Sub-skill declared as a callable tool on a SKILL phase."""
+    """External Agent Skill declared as a callable tool on an AGENT phase."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -195,54 +241,62 @@ class IterateSpec(BaseModel):
     concurrency: int = Field(default=1, ge=1)
     accumulate: IterateAccumulateSpec | None = None
 
+    @model_validator(mode="after")
+    def _mode_contract_is_complete(self) -> IterateSpec:
+        if self.range is not None and self.range[0] > self.range[1]:
+            raise ValueError("iterate range start must not exceed its end")
+        if self.mode == "loop" and self.accumulate is None:
+            raise ValueError("loop iterate requires accumulate")
+        if self.mode == "batch" and self.accumulate is not None:
+            raise ValueError("batch iterate does not accept accumulate")
+        return self
+
 
 class GraphManifest(BaseModel):
-    """Root V0.3.0 graph manifest parsed from ``GRAPH.md``."""
+    """One root or registry graph parsed from ``graph.yaml``."""
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["v0.3.0"]
-    name: str = Field(min_length=1, max_length=128)
-    description: str = ""
-    # Whole-graph default LLM role; agent phases inherit it unless they set
-    # their own llm_role (skill-spec 00-FORMAT-GROUND-TRUTH §2).
-    llm_role: str | None = None
+    schema_version: Literal["gskill.graph.v1"]
+    graph_id: str = Field(min_length=1, max_length=64, pattern=GRAPH_ID_PATTERN)
+    description: str = Field(min_length=1)
+    llm_role: str | None = Field(default=None, min_length=1)
     io: PhaseIOSchema
-    phases: list[str] = Field(default_factory=list)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    phases: tuple[GraphPhaseRef, ...] = Field(min_length=1)
     iterate: IterateSpec | None = None
+    artifacts: tuple[ArtifactDeclaration, ...] = ()
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _validate_name(cls, value: Any) -> Any:
-        if value is not None:
-            val_str = str(value)
-            if len(val_str) == 0 or len(val_str) > 128:
-                raise ValueError("[F-v3-graph-name-invalid] Graph name must be between 1 and 128 characters")
-        return value
-
-
-class BatchSpec(BaseModel):
-    """Declarative batch processing spec for a phase."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    iterator: str = Field(min_length=1)
-    item_var: str = Field(min_length=1)
-    concurrency: int = Field(default=1, ge=1)
+    @model_validator(mode="after")
+    def _local_identifiers_are_unique(self) -> GraphManifest:
+        phase_ids = [phase.id for phase in self.phases]
+        if len(set(phase_ids)) != len(phase_ids):
+            raise ValueError("graph phase ids must be unique")
+        if len({phase_id.casefold() for phase_id in phase_ids}) != len(phase_ids):
+            raise ValueError("graph phase ids must be unique without relying on case")
+        if not any(phase.output for phase in self.phases):
+            raise ValueError("graph must declare at least one output phase")
+        artifact_ids = [artifact.artifact_id for artifact in self.artifacts]
+        if len(set(artifact_ids)) != len(artifact_ids):
+            raise ValueError("artifact ids must be unique")
+        return self
 
 
 class _BaseNodeAST(BaseModel):
-    """Fields shared by all V2.1 phase node AST variants."""
+    """Fields shared by all portable phase node AST variants."""
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str | None = None
+    name: str = Field(min_length=1)
     raw_blocks: dict[str, str] = Field(default_factory=dict)
-    metadata: dict[str, Any] = Field(default_factory=dict)
     allow_sequential_overwrite: list[str] = Field(default_factory=list)
-    batch: BatchSpec | None = None
     iterate: IterateSpec | None = None
+
+    @field_validator("allow_sequential_overwrite")
+    @classmethod
+    def _overwrite_fields_are_unique(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("allow_sequential_overwrite fields must be unique")
+        return value
 
 
 class LogicNodeAST(_BaseNodeAST):
@@ -253,34 +307,26 @@ class LogicNodeAST(_BaseNodeAST):
     actions: list[str] = Field(default_factory=list, min_length=1)
     validator: StrictBool = False
 
+    @field_validator("actions")
+    @classmethod
+    def _actions_are_unique(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("logic actions must be unique")
+        return value
+
 
 class SubgraphNodeAST(_BaseNodeAST):
     """Subgraph delegation phase node parsed from ``SUBGRAPH.md``."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True, serialize_by_alias=True)
-
     mode: Literal["subgraph"]
-    target_skill: str = Field(alias="path", min_length=1)
+    graph: str = Field(pattern=GRAPH_ID_PATTERN)
     io: PhaseIOSchema
-    # V0.3 AST bool flag; not the legacy LLMPhase.validator module path.
+    # Authoring flag; not an executable validator module path.
     validator: StrictBool = False
-
-    @property
-    def path(self) -> str:
-        return self.target_skill
-
-    @field_validator("target_skill")
-    @classmethod
-    def _path_not_blank(cls, value: str) -> str:
-        # Subgraph path may be relative (resolved against the skill root by the
-        # loader) or absolute; the loader enforces that it stays within root.
-        if not value.strip():
-            raise ValueError("subgraph path must not be blank")
-        return value
 
 
 class AgentNodeAST(_BaseNodeAST):
-    """V0.3.0 Agent phase node parsed from ``SKILL.md``."""
+    """Agent phase node parsed from internal ``AGENT.md``."""
 
     mode: Literal["agent"]
     role: str = Field(min_length=1)
@@ -288,7 +334,7 @@ class AgentNodeAST(_BaseNodeAST):
     steps: list[AgentStep] = Field(default_factory=list)
     protocols: list[AgentProtocol] = Field(default_factory=list)
     io: PhaseIOSchema
-    # V0.3 AST bool flag; not the legacy LLMPhase.validator module path.
+    # Authoring flag; not an executable validator module path.
     validator: StrictBool = False
     tools: list[str] = Field(default_factory=list)
     subagents: list[SubagentSpec] = Field(default_factory=list)
@@ -303,6 +349,21 @@ class AgentNodeAST(_BaseNodeAST):
     # "working_memory" mounts query_working_memory, "artifact" mounts
     # read_artifact. The Literal makes any other value a compile diagnostic.
     context_access: list[Literal["working_memory", "artifact"]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _registries_are_unique(self) -> AgentNodeAST:
+        registries: dict[str, list[str]] = {
+            "tools": list(self.tools),
+            "subagents": [item.name for item in self.subagents],
+            "subgraphs": [item.name for item in self.subgraphs],
+            "references": [item.id for item in self.references],
+            "examples": [item.id for item in self.examples],
+            "context_access": list(self.context_access),
+        }
+        for name, values in registries.items():
+            if len(values) != len(set(values)):
+                raise ValueError(f"{name} entries must be unique")
+        return self
 
     @field_validator("max_iterations", mode="before")
     @classmethod
@@ -324,12 +385,12 @@ class AgentNodeAST(_BaseNodeAST):
 
     # Priority switch: true makes the graph-level default llm_role win over
     # this node's own llm_role, WITHOUT rewriting/erasing the node value
-    # (skill-spec 00-FORMAT-GROUND-TRUTH §5).
+    # (portable gSkill v1 contract §5.2).
     use_graph_llm_role: bool = False
     system_prompt: str = ""
 
     @model_validator(mode="after")
-    def _render_legacy_system_prompt(self) -> AgentNodeAST:
+    def _render_system_prompt(self) -> AgentNodeAST:
         if not self.system_prompt:
             step_lines = "\n".join(f"- {step.name}: {step.content}" for step in self.steps)
             protocol_lines = "\n".join(f"- {protocol.id}: {protocol.content}" for protocol in self.protocols)
@@ -343,7 +404,7 @@ class AgentNodeAST(_BaseNodeAST):
 
 
 # Conventional fallback role looked up in the host's role registry when
-# neither the node nor the graph names one (skill-spec 00-FORMAT-GROUND-TRUTH).
+# neither the node nor the graph names one (portable gSkill v1 contract §5.2).
 DEFAULT_LLM_ROLE = "graph_skill_runtime"
 
 
@@ -366,19 +427,13 @@ PhaseAST = Annotated[
 ]
 
 
-# Transitional public name for package imports.  This is not the old
-# schema-2.0 discriminated union; it aliases the V2.1 root manifest only.
-SkillManifest = GraphManifest
-
-
 __all__ = [
-    "BatchSpec",
-    "ContextBridge",
     "AgentNodeAST",
     "AgentExample",
     "AgentProtocol",
     "AgentRegistryItem",
     "AgentStep",
+    "ArtifactDeclaration",
     "ExampleSpec",
     "GraphManifest",
     "GraphPhaseRef",
@@ -388,7 +443,7 @@ __all__ = [
     "PhaseAST",
     "PhaseIOSchema",
     "ReferenceSpec",
-    "SkillManifest",
+    "RootSkillManifest",
     "SubagentSpec",
     "SubgraphNodeAST",
 ]

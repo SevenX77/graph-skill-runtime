@@ -23,9 +23,15 @@ from graph_skill_runtime.core.runner import predict_skill
 from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
 from graph_skill_runtime.runtime.state_mapper import StateMapper
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: predict-stub-validator
+_SKILL_ENTRY = """---
+name: skill
+description: Exercise predict validator downgrade behavior.
+---
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise predict validator downgrade behavior.
 io:
   inputs:
     type: object
@@ -38,12 +44,13 @@ io:
     properties:
       answer: {type: string}
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """
 
-_SKILL_MD = """---
+_AGENT_MD = """---
+name: main
 llm_role: analyst
 validator: true
 io:
@@ -77,8 +84,9 @@ def _write(path: Path, text: str) -> None:
 @pytest.fixture
 def validator_skill(tmp_path: Path) -> Path:
     skill = tmp_path / "skill"
-    _write(skill / "GRAPH.md", _GRAPH_MD)
-    _write(skill / "phases" / "main" / "SKILL.md", _SKILL_MD)
+    _write(skill / "SKILL.md", _SKILL_ENTRY)
+    _write(skill / "graph.yaml", _GRAPH_YAML)
+    _write(skill / "phases" / "main" / "AGENT.md", _AGENT_MD)
     _write(skill / "phases" / "main" / "validator.py", _ALWAYS_REJECTING_VALIDATOR)
     return skill
 

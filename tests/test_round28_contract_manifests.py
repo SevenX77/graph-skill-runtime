@@ -124,6 +124,20 @@ def test_a3_schema_examples_reference_real_skill_spec_paths() -> None:
         _validate_manifest(invalid_feature, "feature")
 
 
+def test_contract_map_skill_spec_sections_name_real_headings(tmp_path: Path) -> None:
+    contract_map = _load_yaml(CONTRACT_MAP_PATH)
+    sections = contract_map["skill_spec_sections"]
+    valid_section = next(iter(sections))
+    sections[valid_section + "-missing"] = sections.pop(valid_section)
+    invalid_path = tmp_path / "contract-map-invalid-anchor.yaml"
+    invalid_path.write_text(yaml.safe_dump(contract_map, sort_keys=False), encoding="utf-8")
+
+    result = _run_validator(FEATURES_PATH, SOURCE_MAP_PATH, invalid_path)
+
+    assert result.returncode != 0
+    assert "R28_SKILL_SPEC_ANCHOR_MISSING" in result.stderr
+
+
 def test_a4_hash_lock_is_single_renamed_contract_test() -> None:
     assert CONTRACT_HASH_LOCK_PATH.exists(), "contract hash lock test is missing"
     assert not OLD_HASH_LOCK_PATH.exists(), "old skill-spec-only hash lock must be removed"

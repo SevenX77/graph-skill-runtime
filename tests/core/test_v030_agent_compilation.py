@@ -16,12 +16,21 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _graph(root: Path) -> None:
+def _graph(parent: Path) -> Path:
+    root = parent / "portable-agent"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
-name: v030-agent
+name: portable-agent
+description: Exercise portable Agent phase compilation.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise portable Agent phase compilation.
 io:
   inputs:
     type: object
@@ -35,18 +44,20 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
+    return root
 
 
 def _agent(root: Path, body_extra: str = "") -> None:
     _write(root / "refs" / "r1.md", "Reference body.")
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 io:
   inputs:
     type: object
@@ -108,15 +119,17 @@ class FakeAgentChatModel:
         )
 
 
-def test_v030_agent_ast_parses_body_xml_and_inline_graph_io(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path)
+def test_portable_agent_ast_parses_body_blocks_and_inline_graph_io(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _graph(tmp_path)
+    _agent(root)
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
     ast = compiled.nodes[0].ast
 
     assert isinstance(ast, AgentNodeAST)
-    assert compiled.manifest.schema_version == "v0.3.0"
+    assert compiled.manifest.schema_version == "gskill.graph.v1"
     assert compiled.raw["io"]["inputs"]["properties"]["topic"]["type"] == "string"
     assert ast.role == "Research assistant."
     assert ast.goal.startswith("Answer @reference:R1")
@@ -125,32 +138,36 @@ def test_v030_agent_ast_parses_body_xml_and_inline_graph_io(tmp_path: Path, mock
     assert "Role: Research assistant." in ast.system_prompt
 
 
-def test_v030_agent_mention_target_must_be_reachable(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path, body_extra="<goal>Broken @reference:MISSING.</goal>")
+def test_portable_agent_mention_target_must_be_reachable(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _graph(tmp_path)
+    _agent(root, body_extra="<goal>Broken @reference:MISSING.</goal>")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
     assert exc_info.value.payload.code == "[F-v3-mention-target-not-found]"
 
 
-def test_v030_agent_broken_mention_syntax_fails(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path, body_extra="<goal>Broken @reference mention.</goal>")
+def test_portable_agent_broken_mention_syntax_fails(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _graph(tmp_path)
+    _agent(root, body_extra="<goal>Broken @reference mention.</goal>")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
     assert exc_info.value.payload.code == "[F-v3-mention-syntax-invalid]"
 
 
-def test_v030_agent_runtime_uses_cognitive_template_and_resource_tools(
+def test_portable_agent_runtime_uses_cognitive_template_and_resource_tools(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _graph(tmp_path)
-    _agent(tmp_path)
+    root = _graph(tmp_path)
+    _agent(root)
     chat = FakeAgentChatModel()
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(compiled, chat_model=chat, skill_resolver=mock_skill_resolver).graph
     result = graph.invoke({"data": {"topic": "T"}, "flow": {}, "messages": [], "run_id": "r1"})
 

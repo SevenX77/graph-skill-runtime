@@ -73,7 +73,7 @@ $defs:
         type: array
         items:
           type: string
-          pattern: "^docs/skill-spec/(00-FORMAT-GROUND-TRUTH|01-physical-layout|02-graph-md-spec|03-logic-md-spec|04-subgraph-md-spec|05-agent-md-spec|06-cognitive-template-spec|07-mention-syntax-spec|08-resource-mechanisms-spec|09-builtin-modules-spec|10-skill-resolver-protocol-spec|11-error-code-spec|12-compile-runtime-flow-spec|README)\\.md#.+$"
+          pattern: "^docs/skill-spec/(00-FORMAT-GROUND-TRUTH|01-PORTABLE-GSKILL-V1|01-physical-layout|02-graph-md-spec|03-logic-md-spec|04-subgraph-md-spec|05-agent-md-spec|06-cognitive-template-spec|07-mention-syntax-spec|08-resource-mechanisms-spec|09-builtin-modules-spec|10-skill-resolver-protocol-spec|11-error-code-spec|12-compile-runtime-flow-spec|README)\\.md#.+$"
       consumer_files:
         type: array
         items:

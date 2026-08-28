@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_skill_runtime.core.runner import predict_skill
+from tests.legacy_fixture_adapter import predict_skill
 
 _AGENT = """---
 llm_role: analyst

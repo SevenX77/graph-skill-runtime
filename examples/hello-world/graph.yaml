@@ -1,0 +1,19 @@
+schema_version: gskill.graph.v1
+graph_id: main
+description: Produce one deterministic greeting.
+io:
+  inputs:
+    type: object
+    properties:
+      name:
+        type: string
+  outputs:
+    type: object
+    required: [greeting]
+    properties:
+      greeting:
+        type: string
+phases:
+  - id: greet
+    depends_on: [input]
+    output: true

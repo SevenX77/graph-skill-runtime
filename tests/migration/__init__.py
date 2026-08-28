@@ -1,0 +1,1 @@
+"""Migration adapter tests."""

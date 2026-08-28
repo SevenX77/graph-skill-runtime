@@ -1,12 +1,12 @@
 # Graph Skill Runtime
 
-Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. Phase 1 is implemented in this repository: the distribution is `graph-skill-runtime` version `0.1.0a1`, the import is `graph_skill_runtime`, and the console command is `gskill`.
+Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. The Phase 1 typed runtime foundation and Phase 2 portable gSkill format are implemented in this repository. The distribution is `graph-skill-runtime` version `0.1.0a1`, the import is `graph_skill_runtime`, and the console command is `gskill`.
 
 This is an alpha source release, not a PyPI release. The repository exists at [SevenX77/graph-skill-runtime](https://github.com/SevenX77/graph-skill-runtime); `main` is pull-request-only and has completed a green six-job CI run. The [release workflow](.github/workflows/release.yml) is prepared to verify a GitHub Release tag `v<pyproject version>`, build and inspect the wheel and source distribution, and publish through PyPI Trusted Publishing with OpenID Connect (OIDC). That workflow is release automation, not publication evidence: the PyPI project and trusted publisher still require owner configuration, and no package has been published.
 
 ## Current capability boundary
 
-Phase 1 provides the typed runtime facade and configuration boundary:
+The current checkout provides the Phase 1 typed runtime facade and configuration boundary together with the Phase 2 format cutover:
 
 - exactly 58 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
 - closed, frozen Pydantic request and result models with `schema_version` and `kind` discriminators;
@@ -17,25 +17,38 @@ Phase 1 provides the typed runtime facade and configuration boundary:
 - explicit dependency composition through `create_application`, with no process-global application singleton;
 - deterministic configuration precedence and provenance-bearing immutable run requests;
 - create-once local request snapshots at `<state_root>/runs/<run_id>/request.json`;
-- the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded `LOGIC` skill.
+- the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded portable `LOGIC` skill;
+- one production reader for the portable root `SKILL.md` plus `graph.yaml` format, with a flat graph registry and no legacy fallback;
+- an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source.
 
-The current skill reader still accepts the FROZEN v0.3 format:
+The current reader accepts one explicit business skill root in the portable format:
 
 ```text
 my-skill/
-├── GRAPH.md
-└── phases/
-    └── <phase_id>/
-        └── LOGIC.md | SUBGRAPH.md | SKILL.md
+├── SKILL.md
+├── graph.yaml
+├── phases/
+│   └── <phase_id>/
+│       └── LOGIC.md | AGENT.md | SUBGRAPH.md
+└── graphs/
+    └── <graph_id>/
+        ├── graph.yaml
+        └── phases/
+            └── <phase_id>/
+                └── LOGIC.md | AGENT.md | SUBGRAPH.md
 ```
 
-In this format, `SKILL.md` is the file for an agent phase. The replacement format with a root Agent Skills `SKILL.md`, `graph.yaml`, phase `AGENT.md`, and flat `graphs/<graph_id>/` registry is a Phase 2 drafted target. There is no dual reader.
+The root `SKILL.md` is the only Agent Skills discovery target. `graph.yaml` uses schema version `gskill.graph.v1`; the root Agent Skill name and root graph id are separate identities. Reusable graphs live directly under the single-level `graphs/<graph_id>/` registry, and graph ids are explicit and unique across the bundle. Only the root graph declares artifacts; presets and requests select them by `artifact_id`.
 
-The default executor selection is `host-native`, but Phase 1 does not include a host-native handoff adapter. A default `run` therefore saves the resolved request snapshot and returns a failed `RunResult` with `GSKILL_EXECUTOR_UNAVAILABLE`. `resume` and `submit_agent_result` return structured `GSKILL_NOT_IMPLEMENTED` failures until Phase 3 supplies durable handoff and resume. Vendor CLI executors, MoirAI installation, and Gateway or Studio adapters are also later-phase work.
+Production compile, predict, run, inspect, SDK, CLI, and MCP paths do not sniff formats or fall back to v0.3. Legacy parsing exists only behind `gskill migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]`. The converter leaves `SOURCE` unchanged, refuses an existing destination, and publishes from a sibling temporary directory through an operating-system-native create-if-absent rename with a deterministic migration report.
+
+The default executor selection is `host-native`, but the current runtime does not include a durable host-native handoff adapter. A default `run` therefore saves the resolved request snapshot and returns a failed `RunResult` with `GSKILL_EXECUTOR_UNAVAILABLE`. `resume` and `submit_agent_result` return structured `GSKILL_NOT_IMPLEMENTED` failures until Phase 3 supplies durable handoff and resume. Vendor CLI executors, MoirAI installation, and Gateway or Studio adapters are also later-phase work.
 
 ## User-owned graph skills
 
 A business graph skill, or gSkill, is project content owned by its user. Every SDK, CLI, or MCP invocation receives the skill path explicitly. Installing or importing the runtime does not register, discover globally, copy, or mutate business gSkills.
+
+The repository-level [`examples/hello-world/`](examples/hello-world/) directory is a portable business gSkill that has been compiled and run with the explicit `embedded` executor in the local Phase 2 evidence. It belongs to the source checkout, not the installed package: wheel verification rejects any `graph_skill_runtime/examples/` package content.
 
 The wheel may contain runtime implementation resources. Those resources are not business gSkills and do not make the wheel a skill registry.
 
@@ -145,6 +158,14 @@ The MCP server exposes exactly `compile`, `resolve_run`, `predict`, `run`, `resu
 
 The CLI includes `resume` and `submit` command shapes so clients can bind the typed contracts now. Their durable behavior remains Phase 3 work and currently returns a structured not-implemented result.
 
+Convert a legacy Studio v0.3 skill only through the explicit migration boundary:
+
+```bash
+uv run gskill migrate studio-skill /absolute/path/to/legacy-skill /absolute/path/to/new-portable-skill
+```
+
+This command is not a second production reader. Compile and execution accept only the portable destination.
+
 ## Development and verification
 
 Run the required local gates from the repository root:
@@ -162,9 +183,10 @@ uv run pip-audit
 
 ## Documentation map
 
-- [Public Phase 1 API contract](docs/public-api-contract.md)
-- [Current FROZEN v0.3 skill-format contract](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md)
-- [Current extracted-engine MVP1 design](docs/mvp1/INDEX.md)
+- [Public typed API contract](docs/public-api-contract.md)
+- [Current portable gSkill v1 format contract](docs/skill-spec/01-PORTABLE-GSKILL-V1.md)
+- [Superseded v0.3 converter and historical evidence](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md)
+- [MVP1 design index and Phase 2 ownership map](docs/mvp1/INDEX.md)
 - [Design authority and implementation-status map](docs/design/README.md)
 - [Drafted standalone v1 target](docs/design/v1-alignment.md)
 - [Historical pre-extraction baseline](docs/design/baseline.md)

@@ -25,5 +25,6 @@ legacy_marker: true
         encoding="utf-8",
     )
 
-    with pytest.raises(SkillLoadError, match="expects a skill root directory"):
+    with pytest.raises(SkillLoadError) as caught:
         compile_skill(host_skill, cache=False, skill_resolver=mock_skill_resolver)
+    assert caught.value.payload.code == "[F-v3-graph-root-missing]"

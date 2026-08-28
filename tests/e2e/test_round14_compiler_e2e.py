@@ -1,124 +1,334 @@
-"""Round-14 skill-compilation compiler end-to-end tests.
+"""Portable multi-graph compiler end-to-end tests.
 
-These tests drive the real public compile entry (``SkillLoader.compile_skill``)
-against real on-disk skill directories — no mocking of the compile core. They
-cover both contract directions of the V0.3.0 compiler:
-
-* happy path: a structurally complete multi-phase skill (agent + logic +
-  subgraph nodes, subagent/subgraph registries, references, examples, body
-  ``@mention`` resolution, child-skill IO alignment) compiles into a
-  ``CompiledSkill`` whose products are asserted field by field.
-* precise-error path: an otherwise-valid skill is corrupted one defect at a
-  time, and each corruption must raise its own dedicated ``[F-v3-*]`` code
-  (no defect code reused across two different defects, and no other defect's
-  code leaking into the message) plus, where the failure originates inside a
-  source file, a ``file:line`` location. Round-14 is a *hard cutover* that
-  rejects the old V2.1 shape, so the error path also covers legacy-metadata
-  rejection and three-way phase-name consistency.
-
-The happy-path fixture lives at ``tests/fixtures/v030_e2e_pipeline`` so the
-artifact can be inspected directly. Every test copies that fixture into a
-``tmp_path`` before compiling, so the committed fixture stays pristine (the
-LOGIC action ``.py`` files are never imported from their committed location,
-so no ``__pycache__`` is written into the fixture). Error variants then mutate
-exactly one file, proving the compiler pinpoints the specific defect.
+The focused compiler suites own individual diagnostic rules. This file proves
+that one real bundle containing agent, logic, subgraph, external-skill,
+reference, example, action, and flat-registry products compiles as a whole.
 """
 
 from __future__ import annotations
 
-import re
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from graph_skill_runtime.core.exceptions import GraphAgentFatalError, SkillLoadError
+from graph_skill_runtime.core.exceptions import SkillLoadError
 from graph_skill_runtime.core.loader import CompiledSkill, SkillLoader
 from graph_skill_runtime.core.manifest import AgentNodeAST, LogicNodeAST, SubgraphNodeAST
 from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
-FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "v030_e2e_pipeline"
-
 
 class DictSkillResolver:
-    """Minimal resolver mapping skill ids to on-disk child roots."""
+    """Minimal resolver mapping Agent Skills names to portable bundle roots."""
 
     def __init__(self, mapping: dict[str, Path]) -> None:
         self.mapping = mapping
 
     def resolve_skill(self, skill_id: str) -> Path:
-        return self.mapping[skill_id]
+        try:
+            return self.mapping[skill_id]
+        except KeyError as exc:
+            raise SkillResolutionError(
+                skill_id,
+                "not registered by the test resolver",
+                code="[F-v3-skill-not-registered]",
+            ) from exc
 
 
-def _resolver_for(root: Path) -> DictSkillResolver:
-    return DictSkillResolver(
-        {
-            "e2e.echo": root / "registry" / "echo",
-            "e2e.expander": root / "registry" / "expander",
-        }
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _external_echo_skill(root: Path) -> None:
+    _write(
+        root / "SKILL.md",
+        """---
+name: e2e-echo
+description: Echo a review note for the caller.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Echo a review note for the caller.
+io:
+  inputs:
+    type: object
+    required: [note]
+    properties:
+      note: {type: string}
+  outputs:
+    type: object
+    required: [echoed]
+    properties:
+      echoed: {type: string}
+phases:
+  - id: echo
+    depends_on: [input]
+    output: true
+""",
+    )
+    _write(
+        root / "phases" / "echo" / "LOGIC.md",
+        """---
+name: echo
+io:
+  inputs:
+    type: object
+    required: [note]
+    properties:
+      note: {type: string}
+  outputs:
+    type: object
+    required: [echoed]
+    properties:
+      echoed: {type: string}
+actions: [echo]
+validator: false
+---
+<action>echo</action>
+""",
+    )
+    _write(
+        root / "phases" / "echo" / "actions" / "echo.py",
+        "def echo(inputs):\n    return {'echoed': inputs['note']}\n",
     )
 
 
-def _copy_pipeline(tmp_path: Path) -> Path:
-    root = tmp_path / "skill"
-    shutil.copytree(FIXTURE, root)
-    _rewrite_copied_subgraph_paths(root)
-    return root
+def _pipeline(root: Path) -> None:
+    _write(
+        root / "SKILL.md",
+        """---
+name: round14-e2e-pipeline
+description: Compile a complete portable agent, logic, and subgraph pipeline.
+---
+Use graph-skill-runtime to compile and run this graph skill.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Full portable compiler pipeline.
+io:
+  inputs:
+    type: object
+    required: [chapter_content]
+    properties:
+      chapter_content: {type: string}
+  outputs:
+    type: object
+    required: [report]
+    properties:
+      report: {type: string}
+phases:
+  - id: segment
+    depends_on: [input]
+    output: false
+  - id: score
+    depends_on: [segment]
+    output: false
+  - id: expand
+    depends_on: [score]
+    output: true
+""",
+    )
+    _write(
+        root / "phases" / "segment" / "AGENT.md",
+        """---
+name: segment
+llm_role: analyst
+io:
+  inputs:
+    type: object
+    required: [chapter_content]
+    properties:
+      chapter_content: {type: string}
+  outputs:
+    type: object
+    required: [segments]
+    properties:
+      segments:
+        type: array
+        items: {type: object}
+subagents:
+  - name: echo_helper
+    target_skill: e2e-echo
+    description: Echo a concise review note for an ambiguous boundary.
+subgraphs:
+  - name: deep_dive
+    graph: e2e-expander
+    description: Delegate deep expansion to the internal graph.
+references:
+  - id: R1
+    path: references/segmentation-guide.md
+    summary: Narrative segmentation decision rules.
+examples:
+  - id: E2
+    path: examples/long-case.md
+    summary: A mixed-timeline segmentation example.
+max_iterations: 8
+---
+<role>
+You are a narrative segmentation editor.
+</role>
 
+<goal>
+Segment chapter_content using @reference:R1, @example:E2, and @example:E1.
+</goal>
 
-def _rewrite_copied_subgraph_paths(root: Path) -> None:
-    expander = root / "registry" / "expander"
-    for path in (
+<step id="S1" name="read_reference">
+Read the segmentation criteria from @reference:R1 and follow @protocol:P1.
+</step>
+
+<step id="S2" name="review_with_subagent">
+Ask @subagent:echo_helper for a review note when a boundary is ambiguous.
+</step>
+
+<step id="S3" name="finish">
+Call @tool:finish_task with structured segment data.
+</step>
+
+<protocol id="P1">
+Keep setting explanation separate from physical events unless they are inseparable.
+</protocol>
+
+<example id="E1">
+Separate a setting explanation from immediate character action.
+</example>
+""",
+    )
+    _write(
+        root / "phases" / "score" / "LOGIC.md",
+        """---
+name: score
+io:
+  inputs:
+    type: object
+    required: [segments]
+    properties:
+      segments:
+        type: array
+        items: {type: object}
+  outputs:
+    type: object
+    required: [brief]
+    properties:
+      brief: {type: string}
+actions: [score]
+validator: false
+---
+<action>score</action>
+""",
+    )
+    _write(
+        root / "phases" / "score" / "actions" / "score.py",
+        "def score(inputs):\n"
+        "    return {'brief': f\"scored {len(inputs['segments'])} segments\"}\n",
+    )
+    _write(
         root / "phases" / "expand" / "SUBGRAPH.md",
-        root / "phases" / "segment" / "SKILL.md",
-    ):
-        text = path.read_text(encoding="utf-8")
-        # Replacement passed as a function so a Windows tmp path (e.g. C:\Users\...)
-        # is inserted literally — a plain repl string would treat its backslashes
-        # (\U, \t, ...) as regex escapes and raise during _compile_template.
-        text = re.sub(r"path: .*/registry/expander", lambda _match: f"path: {expander}", text)
-        path.write_text(text, encoding="utf-8")
+        """---
+name: expand
+graph: e2e-expander
+allow_sequential_overwrite: [report]
+io:
+  inputs:
+    type: object
+    required: [brief]
+    properties:
+      brief: {type: string}
+  outputs:
+    type: object
+    required: [report]
+    properties:
+      report: {type: string}
+validator: false
+---
+""",
+    )
+
+    child = root / "graphs" / "e2e-expander"
+    _write(
+        child / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: e2e-expander
+description: Expand a scored brief into a report.
+io:
+  inputs:
+    type: object
+    required: [brief]
+    properties:
+      brief: {type: string}
+  outputs:
+    type: object
+    required: [report]
+    properties:
+      report: {type: string}
+phases:
+  - id: build
+    depends_on: [input]
+    output: true
+""",
+    )
+    _write(
+        child / "phases" / "build" / "LOGIC.md",
+        """---
+name: build
+io:
+  inputs:
+    type: object
+    required: [brief]
+    properties:
+      brief: {type: string}
+  outputs:
+    type: object
+    required: [report]
+    properties:
+      report: {type: string}
+actions: [build]
+validator: false
+---
+<action>build</action>
+""",
+    )
+    _write(
+        child / "phases" / "build" / "actions" / "build.py",
+        "def build(inputs):\n    return {'report': inputs['brief']}\n",
+    )
+    _write(root / "references" / "segmentation-guide.md", "Segmentation rules.\n")
+    _write(root / "examples" / "long-case.md", "A long mixed-timeline example.\n")
 
 
 @pytest.fixture
 def pipeline_root(tmp_path: Path) -> Path:
-    """A pristine on-disk copy of the full pipeline skill."""
-
-    return _copy_pipeline(tmp_path)
-
-
-@pytest.fixture
-def corrupt_root(tmp_path: Path) -> Path:
-    """A pipeline copy whose pristine form is proven to compile.
-
-    Any failure raised after a mutation below is therefore attributable to that
-    single mutation, not to a pre-existing defect.
-    """
-
-    root = _copy_pipeline(tmp_path)
-    SkillLoader().compile_skill(root, skill_resolver=_resolver_for(root))
+    root = tmp_path / "round14-e2e-pipeline"
+    _pipeline(root)
+    _external_echo_skill(tmp_path / "external" / "e2e-echo")
     return root
 
 
-# --------------------------------------------------------------------------- #
-# Happy path                                                                   #
-# --------------------------------------------------------------------------- #
+def _resolver_for(root: Path) -> DictSkillResolver:
+    return DictSkillResolver({"e2e-echo": root.parent / "external" / "e2e-echo"})
 
 
 def test_full_pipeline_skill_compiles_into_expected_products(pipeline_root: Path) -> None:
     compiled: CompiledSkill = SkillLoader().compile_skill(
-        pipeline_root, skill_resolver=_resolver_for(pipeline_root)
+        pipeline_root,
+        skill_resolver=_resolver_for(pipeline_root),
     )
 
-    # Root manifest: schema pin, name, phase registry, inline IO.
-    assert compiled.manifest.schema_version == "v0.3.0"
-    assert compiled.manifest.name == "round14-e2e-pipeline"
-    assert compiled.manifest.phases == ["segment", "score", "expand"]
+    assert compiled.skill_manifest.name == "round14-e2e-pipeline"
+    assert compiled.manifest.schema_version == "gskill.graph.v1"
+    assert compiled.manifest.graph_id == "root"
+    assert [phase.id for phase in compiled.manifest.phases] == ["segment", "score", "expand"]
     assert sorted(compiled.manifest.io.inputs["properties"]) == ["chapter_content"]
     assert sorted(compiled.manifest.io.outputs["properties"]) == ["report"]
+    assert sorted(compiled.graph_registry) == ["e2e-expander", "root"]
 
-    # DAG topology: body <phase> drives dependency order; expand is terminal.
     topology = compiled.raw["graph_topology"]
     assert topology["order"] == ["segment", "score", "expand"]
     by_name = {entry["name"]: entry for entry in topology["phases"]}
@@ -126,324 +336,122 @@ def test_full_pipeline_skill_compiles_into_expected_products(pipeline_root: Path
     assert by_name["score"]["depends_on"] == ["segment"]
     assert by_name["expand"]["depends_on"] == ["score"]
     assert by_name["expand"]["output"] is True
-    assert by_name["segment"]["output"] is False
 
-    # Each phase resolves to the AST type its file name implies.
     modes = {node.phase_name: node.mode for node in compiled.nodes}
     assert modes == {"segment": "agent", "score": "logic", "expand": "subgraph"}
-    node_types = {node.phase_name: type(node.ast).__name__ for node in compiled.nodes}
-    assert node_types == {
-        "segment": "AgentNodeAST",
-        "score": "LogicNodeAST",
-        "expand": "SubgraphNodeAST",
-    }
 
-    # Agent phase products: role/goal, ordered steps, protocols, references,
-    # document + inline examples, declared tools, and subagent registry.
     segment = next(node.ast for node in compiled.nodes if node.phase_name == "segment")
     assert isinstance(segment, AgentNodeAST)
     assert segment.role == "You are a narrative segmentation editor."
-    assert segment.goal.startswith("Segment chapter_content")
     assert [step.id for step in segment.steps] == ["S1", "S2", "S3"]
-    assert [step.name for step in segment.steps] == [
-        "read_reference",
-        "review_with_subagent",
-        "finish",
-    ]
-    assert [protocol.id for protocol in segment.protocols] == ["P1"]
     assert [reference.id for reference in segment.references] == ["R1"]
     assert [example.id for example in segment.examples] == ["E2"]
     assert [example.id for example in segment.examples_inline] == ["E1"]
-    assert segment.tools == []
-    assert [(s.name, s.target_skill) for s in segment.subagents] == [("echo_helper", "e2e.echo")]
-    assert [(s.name, s.path) for s in segment.subgraphs] == [("deep_dive", "registry/expander")]
+    assert [(item.name, item.target_skill) for item in segment.subagents] == [
+        ("echo_helper", "e2e-echo")
+    ]
+    assert [(item.name, item.graph) for item in segment.subgraphs] == [
+        ("deep_dive", "e2e-expander")
+    ]
     assert segment.max_iterations == 8
 
-    # Logic phase products: phase-level IO + discovered action registry.
     score = next(node.ast for node in compiled.nodes if node.phase_name == "score")
     assert isinstance(score, LogicNodeAST)
     assert score.actions == ["score"]
-    assert score.validator is False
-    assert sorted(score.io.inputs["properties"]) == ["segments"]
-    assert sorted(score.io.outputs["properties"]) == ["brief"]
     assert "score" in compiled.actions.for_phase("score")
 
-    # Subgraph phase products: in-skill relative path + phase IO (which the
-    # compiler has already proven aligns 1:1 with the child GRAPH IO).
     expand = next(node.ast for node in compiled.nodes if node.phase_name == "expand")
     assert isinstance(expand, SubgraphNodeAST)
-    assert expand.path == "registry/expander"
-    assert sorted(expand.io.inputs["properties"]) == ["brief"]
-    assert sorted(expand.io.outputs["properties"]) == ["report"]
+    assert expand.graph == "e2e-expander"
 
-    # Subagent metadata resolved + compiled from the e2e.echo child skill.
     echo = compiled.subagents_by_phase["segment"][0]
-    assert echo.name == "echo_helper"
-    assert echo.target_skill == "e2e.echo"
-    assert echo.root == pipeline_root / "registry" / "echo"
+    assert echo.target_skill == "e2e-echo"
+    assert echo.root == pipeline_root.parent / "external" / "e2e-echo"
     assert sorted(echo.input_schema["properties"]) == ["note"]
 
 
-# --------------------------------------------------------------------------- #
-# Precise-error path                                                           #
-# --------------------------------------------------------------------------- #
+def _schema_version_invalid(root: Path) -> None:
+    graph = root / "graph.yaml"
+    _write(graph, graph.read_text(encoding="utf-8").replace("gskill.graph.v1", "v0.3.0", 1))
 
 
-def _write(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8")
+def _agent_role_missing(root: Path) -> None:
+    agent = root / "phases" / "segment" / "AGENT.md"
+    text = agent.read_text(encoding="utf-8")
+    start = text.index("<role>")
+    end = text.index("</role>") + len("</role>\n\n")
+    _write(agent, text[:start] + text[end:])
 
 
-def _read(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+def _mention_target_missing(root: Path) -> None:
+    agent = root / "phases" / "segment" / "AGENT.md"
+    _write(
+        agent,
+        agent.read_text(encoding="utf-8").replace("@reference:R1", "@reference:UNKNOWN"),
+    )
 
 
-def _prepend_frontmatter_line(path: Path, line: str) -> None:
-    """Insert ``line`` as the first key inside the file's YAML frontmatter."""
-
-    text = _read(path)
-    assert text.startswith("---\n"), path
-    _write(path, "---\n" + line + "\n" + text[len("---\n") :])
-
-
-# -- Legacy / hard-cutover rejection (round-14 core) ------------------------- #
+def _phase_mode_ambiguous(root: Path) -> None:
+    _write(
+        root / "phases" / "score" / "AGENT.md",
+        "---\nname: score\n---\n<role>x</role>\n<goal>y</goal>\n",
+    )
 
 
-def _legacy_mode_on_agent(root: Path) -> None:
-    _prepend_frontmatter_line(root / "phases" / "segment" / "SKILL.md", "mode: agent")
-
-
-def _legacy_schema_version_on_logic(root: Path) -> None:
-    _prepend_frontmatter_line(root / "phases" / "score" / "LOGIC.md", 'schema_version: "v0.3.0"')
-
-
-def _legacy_graph_skill_id_on_subgraph(root: Path) -> None:
-    _prepend_frontmatter_line(root / "phases" / "expand" / "SUBGRAPH.md", "graph_skill_id: polluted")
-
-
-def _legacy_phase_id_on_agent(root: Path) -> None:
-    _prepend_frontmatter_line(root / "phases" / "segment" / "SKILL.md", "phase_id: polluted")
-
-
-# -- Three-way phase-name / topology consistency ----------------------------- #
-
-
-def _rename_body_phase(root: Path) -> None:
-    # body <phase> name diverges from frontmatter `phases` + physical dir.
-    graph = root / "GRAPH.md"
+def _graph_cycle(root: Path) -> None:
+    graph = root / "graph.yaml"
     _write(
         graph,
-        _read(graph).replace(
-            '<phase depends_on="input">segment</phase>',
-            '<phase depends_on="input">segmentx</phase>',
+        graph.read_text(encoding="utf-8").replace(
+            "  - id: segment\n    depends_on: [input]",
+            "  - id: segment\n    depends_on: [expand]",
         ),
     )
 
 
-def _mark_nonterminal_as_output(root: Path) -> None:
-    # segment has downstream edges, so marking it `output` is invalid.
-    graph = root / "GRAPH.md"
-    _write(
-        graph,
-        _read(graph).replace(
-            '<phase depends_on="input">segment</phase>',
-            '<phase depends_on="input" output>segment</phase>',
-        ),
-    )
-
-
-def _duplicate_phase_registration(root: Path) -> None:
-    graph = root / "GRAPH.md"
-    _write(graph, _read(graph).replace("  - segment\n  - score", "  - segment\n  - segment\n  - score"))
-
-
-# -- Per-domain structural / semantic defects -------------------------------- #
-
-
-def _set_schema_version_21(root: Path) -> None:
-    graph = root / "GRAPH.md"
-    _write(graph, _read(graph).replace('"v0.3.0"', '"2.1"', 1))
-
-
-def _introduce_cycle(root: Path) -> None:
-    graph = root / "GRAPH.md"
-    _write(
-        graph,
-        _read(graph).replace(
-            '<phase depends_on="segment">score</phase>',
-            '<phase depends_on="expand">score</phase>',
-        ),
-    )
-
-
-def _introduce_island(root: Path) -> None:
-    # A bare <phase> (no depends_on) is the canonical island; depending on an
-    # unknown phase is attributed to [F-v3-graph-depends-unknown] instead (the
-    # island it causes is a suppressed cascade).
-    graph = root / "GRAPH.md"
-    _write(
-        graph,
-        _read(graph).replace(
-            '<phase depends_on="segment">score</phase>',
-            "<phase>score</phase>",
-        ),
-    )
-
-
-def _add_second_node_file(root: Path) -> None:
-    _write(
-        root / "phases" / "score" / "SKILL.md",
-        "---\n---\n<role>x</role>\n<goal>y</goal>\n",
-    )
-
-
-def _drop_agent_role(root: Path) -> None:
-    skill = root / "phases" / "segment" / "SKILL.md"
-    _write(
-        skill,
-        _read(skill).replace(
-            "<role>\nYou are a narrative segmentation editor.\n</role>\n\n",
-            "",
-        ),
-    )
-
-
-def _add_exit_contract_tag(root: Path) -> None:
-    skill = root / "phases" / "segment" / "SKILL.md"
-    _write(skill, _read(skill) + "\n<exit_contract>forbidden</exit_contract>\n")
-
-
-def _break_mention_target(root: Path) -> None:
-    skill = root / "phases" / "segment" / "SKILL.md"
-    _write(skill, _read(skill).replace("@reference:R1", "@reference:DOES_NOT_EXIST"))
-
-
-def _break_mention_syntax(root: Path) -> None:
-    skill = root / "phases" / "segment" / "SKILL.md"
-    _write(skill, _read(skill).replace("follow @protocol:P1.", "see @reference here."))
-
-
-def _bad_logic_validator_type(root: Path) -> None:
-    logic = root / "phases" / "score" / "LOGIC.md"
-    _write(logic, _read(logic).replace("validator: false", 'validator: "yes"'))
-
-
-def _empty_logic_actions(root: Path) -> None:
-    logic = root / "phases" / "score" / "LOGIC.md"
-    _write(logic, _read(logic).replace("<action>score</action>", ""))
-
-
-def _add_deprecated_physical_io(root: Path) -> None:
-    (root / "io").mkdir()
+def _physical_io(root: Path) -> None:
     _write(root / "io" / "inputs.json", "{}\n")
 
 
-# Mutations whose failure surfaces from inside a source file (path:line carried).
-_LOCATED_ERROR_CASES: list[tuple[str, Callable[[Path], None], str]] = [
-    # legacy-metadata rejection: per-domain unknown-field code (hard cutover)
-    ("legacy-mode-on-agent", _legacy_mode_on_agent, "[F-v3-agent-schema-unknown-field]"),
-    (
-        "legacy-schema-version-on-logic",
-        _legacy_schema_version_on_logic,
-        "[F-v3-logic-schema-unknown-field]",
-    ),
-    (
-        "legacy-graph-skill-id-on-subgraph",
-        _legacy_graph_skill_id_on_subgraph,
-        "[F-v3-subgraph-schema-unknown-field]",
-    ),
-    ("legacy-phase-id-on-agent", _legacy_phase_id_on_agent, "[F-v3-agent-schema-unknown-field]"),
-    # three-way phase-name / topology consistency
-    ("phase-name-mismatch", _rename_body_phase, "[F-v3-graph-phase-name-mismatch]"),
-    ("output-phase-non-terminal", _mark_nonterminal_as_output, "[F-v3-graph-output-phase-invalid]"),
-    ("phase-id-duplicate", _duplicate_phase_registration, "[F-v3-graph-phase-id-duplicate]"),
-    # per-domain structural / semantic defects
-    ("schema-version-mismatch", _set_schema_version_21, "[F-v3-graph-schema-version-mismatch]"),
-    ("phase-cycle", _introduce_cycle, "[F-v3-graph-phase-cycle]"),
-    ("phase-island", _introduce_island, "[F-v3-graph-phase-island]"),
-    ("phase-mode-ambiguous", _add_second_node_file, "[F-v3-graph-phase-mode-ambiguous]"),
-    ("agent-role-missing", _drop_agent_role, "[F-v3-agent-role-missing]"),
-    ("agent-body-tag-unknown", _add_exit_contract_tag, "[F-v3-agent-body-tag-unknown]"),
-    ("mention-target-not-found", _break_mention_target, "[F-v3-mention-target-not-found]"),
-    ("mention-syntax-invalid", _break_mention_syntax, "[F-v3-mention-syntax-invalid]"),
-    ("logic-validator-type-invalid", _bad_logic_validator_type, "[F-v3-logic-validator-type-invalid]"),
-    ("logic-actions-empty", _empty_logic_actions, "[F-v3-logic-actions-empty]"),
-    # subgraph-io-mismatch removed: the parent/child io.outputs 1:1 gate is
-    # relaxed (skill-syntax §2.4 / cutover item ⑦), so mismatched subgraph
-    # outputs now compile (covered by the round14 cutover + ws-e1 "allowed"
-    # tests) rather than raising [F-v3-subgraph-io-mismatch].
-    (
-        "graph-io-physical-file-deprecated",
-        _add_deprecated_physical_io,
-        "[F-v3-graph-io-physical-file-deprecated]",
-    ),
-]
-
-_SOURCE_FILE_MARKERS = ("GRAPH.md", "SKILL.md", "LOGIC.md", "SUBGRAPH.md", ".json")
-
-# Every ``[F-v3-*]`` token a SkillLoadError message can carry.
-_CODE_RE = re.compile(r"\[F-v3-[a-z0-9-]+\]")
-_GENERIC_WRAPPER_CODES = frozenset()
-
-
-def _assert_unique_defect_code(exc: BaseException, expected: str) -> None:
-    """Assert ``exc`` carries ``expected`` and no *other* defect code.
-
-    This is the permanent form of the one-off discrimination check: the only
-    dedicated ``[F-v3-*]`` code in the message (after stripping generic routing
-    wrappers) must be the one defect under test, so no two distinct defects can
-    masquerade behind a shared or leaked error code.
-    """
-
-    payload = getattr(exc, "payload", None)
-    if payload is not None:
-        assert payload.code == expected
-        return
-    message = str(exc)
-    found = set(_CODE_RE.findall(message))
-    defect_codes = found - _GENERIC_WRAPPER_CODES
-    assert expected in message, f"missing expected {expected} in: {message}"
-    assert defect_codes == {expected}, (
-        f"expected only defect code {expected}, found {sorted(defect_codes)} in: {message}"
-    )
-
-
 @pytest.mark.parametrize(
-    ("label", "mutate", "code"),
-    _LOCATED_ERROR_CASES,
-    ids=[case[0] for case in _LOCATED_ERROR_CASES],
+    ("mutate", "expected_code"),
+    [
+        (_schema_version_invalid, "[F-v3-graph-schema-version-mismatch]"),
+        (_agent_role_missing, "[F-v3-agent-role-missing]"),
+        (_mention_target_missing, "[F-v3-mention-target-not-found]"),
+        (_phase_mode_ambiguous, "[F-v3-graph-phase-mode-ambiguous]"),
+        (_graph_cycle, "[F-v3-graph-phase-cycle]"),
+        (_physical_io, "[F-v3-graph-io-physical-file-deprecated]"),
+    ],
 )
-def test_corrupted_skill_raises_dedicated_located_code(
-    corrupt_root: Path,
-    label: str,
+def test_corrupted_pipeline_reports_precise_portable_diagnostic(
+    pipeline_root: Path,
     mutate: Callable[[Path], None],
-    code: str,
+    expected_code: str,
 ) -> None:
-    del label
-    mutate(corrupt_root)
+    mutate(pipeline_root)
 
-    with pytest.raises((SkillLoadError, GraphAgentFatalError)) as exc:
-        SkillLoader().compile_skill(corrupt_root, skill_resolver=_resolver_for(corrupt_root))
+    with pytest.raises(SkillLoadError) as exc_info:
+        SkillLoader().compile_skill(
+            pipeline_root,
+            skill_resolver=_resolver_for(pipeline_root),
+        )
 
-    message = str(exc.value)
-    _assert_unique_defect_code(exc.value, code)
-    assert any(marker in message for marker in _SOURCE_FILE_MARKERS), message
-
-
-def test_unresolvable_subagent_target_raises_skill_not_registered(corrupt_root: Path) -> None:
-    # Subgraphs use absolute path; resolver remains required for subagents.
-    resolver = DictSkillResolver({})
-
-    with pytest.raises(SkillResolutionError) as exc:
-        SkillLoader().compile_skill(corrupt_root, skill_resolver=resolver)
-
-    _assert_unique_defect_code(exc.value, "[F-v3-skill-not-registered]")
+    assert exc_info.value.payload.code == expected_code
+    assert exc_info.value.payload.source_path is not None
 
 
-def test_missing_resolver_uses_default_local_resolver(corrupt_root: Path) -> None:
-    # Omitting the resolver now uses the SDK's local resolver. The fixture's
-    # subagent registry intentionally needs an explicit mapping, so the failure
-    # is target resolution rather than a missing dependency injection seam.
-    with pytest.raises(SkillResolutionError) as exc:
-        SkillLoader().compile_skill(corrupt_root)
+def test_unresolvable_subagent_target_raises_skill_not_registered(
+    pipeline_root: Path,
+) -> None:
+    with pytest.raises(SkillResolutionError) as exc_info:
+        SkillLoader().compile_skill(pipeline_root, skill_resolver=DictSkillResolver({}))
 
-    _assert_unique_defect_code(exc.value, "[F-v3-skill-not-registered]")
+    assert exc_info.value.payload.code == "[F-v3-skill-not-registered]"
+
+
+def test_missing_resolver_uses_default_local_resolver(pipeline_root: Path) -> None:
+    with pytest.raises(SkillResolutionError) as exc_info:
+        SkillLoader().compile_skill(pipeline_root)
+
+    assert exc_info.value.payload.code == "[F-v3-skill-not-registered]"

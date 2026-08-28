@@ -22,10 +22,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ERROR_SPEC = (
     REPO_ROOT
     / "docs"
-    / "mvp1"
-    / "01-contract"
-    / "03-compile-rules"
-    / "mvp1-alignment.md"
+    / "skill-spec"
+    / "11-error-code-spec.md"
 )
 
 
@@ -41,9 +39,7 @@ def _error_registry() -> dict[str, Any]:
 
 def _spec_codes() -> set[str]:
     text = ERROR_SPEC.read_text(encoding="utf-8")
-    match = re.search(r"## 4\. 错误码全表\(88\)(.*?)(?:\n## 5\.|\Z)", text, re.S)
-    assert match is not None, "mvp1 compile-rules must keep a bounded 88-code table section"
-    return set(re.findall(r"\[F-v3-[a-z0-9-]+\]", match.group(1)))
+    return set(re.findall(r"(?m)^\| `(\[F-v3-[a-z0-9-]+\])` \|", text))
 
 
 def test_error_payload_autofills_registry_metadata() -> None:
@@ -111,7 +107,7 @@ def test_error_registry_matches_error_code_spec_key_set() -> None:
     registry = _error_registry()
 
     assert set(registry) == _spec_codes()
-    assert len(registry) == len(_spec_codes()) == 88
+    assert len(registry) == len(_spec_codes()) == 98
 
 
 def test_error_registry_preserves_multi_stage_codes() -> None:
@@ -221,7 +217,11 @@ def test_loader_failure_asserts_payload_code(tmp_path: Path, mock_skill_resolver
     with pytest.raises(SkillLoadError) as exc_info:
         SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
 
-    assert exc_info.value.payload.code == "[F-v3-graph-root-missing]"
+    assert exc_info.value.payload.code == "[F-v3-skill-entry-missing]"
+    assert {issue.rule_id for issue in exc_info.value.compile_result.issues} == {
+        "[F-v3-skill-entry-missing]",
+        "[F-v3-graph-root-missing]",
+    }
 
 
 def test_runtime_failure_asserts_payload_code() -> None:
@@ -244,14 +244,14 @@ def test_builtin_tool_failure_asserts_payload_code(tmp_path: Path, mock_skill_re
 def test_error_registry_entries_have_complete_nonempty_metadata() -> None:
     registry = _error_registry()
 
-    assert len(registry) == len(_spec_codes()) == 88
+    assert len(registry) == len(_spec_codes()) == 98
     for code, metadata in registry.items():
         assert metadata.code == code
         assert metadata.code
         assert metadata.level
         assert metadata.stage
         assert all(stage for stage in metadata.stage)
-        assert metadata.doc_link
+        assert metadata.doc_link == "docs/skill-spec/11-error-code-spec.md"
 
 
 def test_pr4_compile_recursion_error_codes_are_registered() -> None:
@@ -276,7 +276,7 @@ def test_golden_stale_fields_error_code_is_registered_for_eval_phase() -> None:
     assert metadata.code == "[F-v3-golden-stale-fields]"
     assert metadata.level == "FATAL"
     assert metadata.stage == ("eval 期",)
-    assert "golden-eval" in metadata.doc_link
+    assert metadata.doc_link == "docs/skill-spec/11-error-code-spec.md"
 
 
 def test_error_registry_preserves_warn_level_for_reference_reader_fallback() -> None:

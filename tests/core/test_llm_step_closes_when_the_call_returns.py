@@ -25,7 +25,7 @@ from graph_skill_runtime.core.llm_provider import (
     LLMProviderChatModel,
     LLMProviderChunk,
 )
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 
 class Recorder:

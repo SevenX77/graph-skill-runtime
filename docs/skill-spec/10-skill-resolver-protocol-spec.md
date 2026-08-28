@@ -1,10 +1,8 @@
 ---
 status: retired
-updated: 2026-06-28
+updated: 2026-08-27
 ---
 
 # Skill Resolver Protocol Spec Retired
 
-本页不再承载子图路径格式模板。
-
-`SUBGRAPH.md` 和 Agent `subgraphs[]` 的合法字段见 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md)。解析机制见 `docs/engine/mvp1/02-mechanism/02-resolver/`。
+本页是 v0.3 path resolver 的退役导航，不承载当前协议。Portable `SUBGRAPH.md.graph`、`AGENT.md.subgraphs[].graph` 和 flat registry resolution 见 [`01-PORTABLE-GSKILL-V1.md` §5.3、§6](./01-PORTABLE-GSKILL-V1.md#53-subgraphmd)；当前解析实现以 loader 与 local workspace resolver 源码为准。

@@ -49,26 +49,36 @@ def _resume_logic_skill(root: Path) -> None:
         required=["draft", "final"],
     )
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e7-resume-red
+name: {root.name}
+description: Exercise durable resume behavior.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise durable resume behavior.
 io:
   inputs:
     {graph_input}
   outputs:
     {graph_output}
 phases:
-  - prepare
-  - finish
----
-<phase depends_on="input">prepare</phase>
-<phase depends_on="prepare" output>finish</phase>
+  - id: prepare
+    depends_on: [input]
+    output: false
+  - id: finish
+    depends_on: [prepare]
+    output: true
 """,
     )
     _write(
         root / "phases" / "prepare" / "LOGIC.md",
         f"""---
+name: prepare
 io:
   inputs:
     {graph_input}
@@ -92,6 +102,7 @@ validator: false
     _write(
         root / "phases" / "finish" / "LOGIC.md",
         f"""---
+name: finish
 io:
   inputs:
     {_schema({"draft": {"type": "string"}}, required=["draft"])}
@@ -125,23 +136,33 @@ def _abc_resume_logic_skill(root: Path) -> None:
         required=["a", "b", "c"],
     )
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e7-abc-resume-red
+name: {root.name}
+description: Exercise node-selective durable resume behavior.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise node-selective durable resume behavior.
 io:
   inputs:
     {graph_input}
   outputs:
     {graph_output}
 phases:
-  - alpha
-  - beta
-  - gamma
----
-<phase depends_on="input">alpha</phase>
-<phase depends_on="alpha">beta</phase>
-<phase depends_on="beta" output>gamma</phase>
+  - id: alpha
+    depends_on: [input]
+    output: false
+  - id: beta
+    depends_on: [alpha]
+    output: false
+  - id: gamma
+    depends_on: [beta]
+    output: true
 """,
     )
 
@@ -166,6 +187,7 @@ phases:
         _write(
             root / "phases" / phase_name / "LOGIC.md",
             f"""---
+name: {phase_name}
 io:
   inputs:
     {inputs_schema}

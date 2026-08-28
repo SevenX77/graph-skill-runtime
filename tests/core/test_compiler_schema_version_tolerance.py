@@ -1,4 +1,4 @@
-"""V0.3 schema_version rejection tests."""
+"""Portable graph schema-version boundary tests."""
 
 from __future__ import annotations
 
@@ -11,12 +11,17 @@ from graph_skill_runtime.core.exceptions import SkillLoadError
 from graph_skill_runtime.core.loader import SkillLoader
 
 
-def _write_v030_skill(root: Path, schema_version_literal: str) -> None:
-    (root / "phases" / "hello").mkdir(parents=True)
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: {schema_version_literal}
-name: x
+def _write_skill(parent: Path, schema_version_literal: str) -> Path:
+    root = parent / "schema-version-skill"
+    (root / "phases" / "hello" / "actions").mkdir(parents=True)
+    (root / "SKILL.md").write_text(
+        "---\nname: schema-version-skill\ndescription: Schema version fixture.\n---\n",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        f"""schema_version: {schema_version_literal}
+graph_id: root
+description: Schema version graph.
 io:
   inputs:
     type: object
@@ -25,14 +30,15 @@ io:
     type: object
     properties: {{}}
 phases:
-  - hello
----
-<phase depends_on="input" output>hello</phase>
+  - id: hello
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
-    (root / "phases" / "hello" / "SKILL.md").write_text(
+    (root / "phases" / "hello" / "LOGIC.md").write_text(
         """---
+name: hello
 io:
   inputs:
     type: object
@@ -41,30 +47,36 @@ io:
     type: object
     properties: {}
 ---
-<role>
-Say hello.
-</role>
-<goal>
-Call finish_task.
-</goal>
+<action>hello</action>
 """,
         encoding="utf-8",
     )
+    (root / "phases" / "hello" / "actions" / "hello.py").write_text(
+        "def hello(inputs):\n    return {}\n",
+        encoding="utf-8",
+    )
+    return root
 
 
-def test_quoted_v0_3_0_parses_as_valid_v030_root(
-    tmp_path: Path, mock_skill_resolver: object
+@pytest.mark.parametrize("literal", ["gskill.graph.v1", '"gskill.graph.v1"'])
+def test_exact_portable_version_accepts_quoted_or_plain_yaml(
+    tmp_path: Path,
+    literal: str,
 ) -> None:
-    _write_v030_skill(tmp_path, '"v0.3.0"')
+    root = _write_skill(tmp_path, literal)
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False)
 
-    assert compiled.manifest.schema_version == "v0.3.0"
+    assert compiled.manifest.schema_version == "gskill.graph.v1"
 
 
-def test_unquoted_1_5_fatals_cleanly(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _write_v030_skill(tmp_path, "1.5")
+@pytest.mark.parametrize("literal", ["v0.3.0", "1.5"])
+def test_every_non_v1_version_fails_with_the_version_code(
+    tmp_path: Path,
+    literal: str,
+) -> None:
+    root = _write_skill(tmp_path, literal)
 
     with pytest.raises(SkillLoadError) as exc_info:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root)
     assert exc_info.value.payload.code == "[F-v3-graph-schema-version-mismatch]"

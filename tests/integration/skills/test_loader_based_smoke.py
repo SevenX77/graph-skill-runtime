@@ -1,4 +1,4 @@
-"""Loader-based smoke tests for legacy V2.1 corpus-shaped fixtures."""
+"""Loader-based smoke tests for portable corpus-shaped fixtures."""
 
 from __future__ import annotations
 
@@ -10,17 +10,17 @@ from graph_skill_runtime.core.loader import CompiledSkill, SkillLoader
 from graph_skill_runtime.core.manifest import AgentNodeAST, LogicNodeAST
 
 from ...conftest import MockSkillResolver
-from ._fixture_corpus import write_legacy_v21_corpus
+from ._fixture_corpus import write_portable_corpus
 
 
 @pytest.fixture(scope="module")
-def legacy_corpus_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    return write_legacy_v21_corpus(tmp_path_factory.mktemp("legacy-v21-corpus"))
+def corpus_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return write_portable_corpus(tmp_path_factory.mktemp("portable-corpus"))
 
 
 @pytest.fixture(scope="module")
-def compiled_skills(legacy_corpus_root: Path) -> dict[str, CompiledSkill]:
-    resolver = MockSkillResolver(legacy_corpus_root)
+def compiled_skills(corpus_root: Path) -> dict[str, CompiledSkill]:
+    resolver = MockSkillResolver(corpus_root)
     skills: dict[str, CompiledSkill] = {}
     for skill_id in (
         "event-extraction",
@@ -30,13 +30,13 @@ def compiled_skills(legacy_corpus_root: Path) -> dict[str, CompiledSkill]:
         "story-deconstruction",
     ):
         skills[skill_id] = SkillLoader(validate_context_writes=False).compile_skill(
-            legacy_corpus_root / "skills" / skill_id,
+            corpus_root / "skills" / skill_id,
             skill_resolver=resolver,
         )
     return skills
 
 
-def test_all_legacy_fixture_skills_compile_from_v21_roots(
+def test_all_fixture_skills_compile_from_portable_roots(
     compiled_skills: dict[str, CompiledSkill],
 ) -> None:
     assert set(compiled_skills) == {
@@ -47,13 +47,10 @@ def test_all_legacy_fixture_skills_compile_from_v21_roots(
         "story-deconstruction",
     }
     for skill_id, compiled in compiled_skills.items():
-        assert compiled.manifest.schema_version == "v0.3.0"
-        assert compiled.manifest.name
+        assert compiled.manifest.schema_version == "gskill.graph.v1"
+        assert compiled.skill_manifest.name == skill_id
         assert compiled.nodes, skill_id
-        assert all(
-            not node.path.name == "SKILL.md" or "phases" in node.path.parts
-            for node in compiled.nodes
-        )
+        assert all(node.path.name != "SKILL.md" for node in compiled.nodes)
 
 
 @pytest.mark.parametrize(
@@ -69,14 +66,14 @@ def test_all_legacy_fixture_skills_compile_from_v21_roots(
         ("story-deconstruction", ["segmentation", "event_extraction", "batch_loop", "global_synthesis"]),
     ],
 )
-def test_live_skill_topology_matches_graph_md(
+def test_live_skill_topology_matches_graph_yaml(
     compiled_skills: dict[str, CompiledSkill],
     skill_id: str,
     phase_ids: list[str],
 ) -> None:
     compiled = compiled_skills[skill_id]
 
-    assert list(compiled.manifest.phases) == phase_ids
+    assert [phase.id for phase in compiled.manifest.phases] == phase_ids
     assert {node.phase_name for node in compiled.nodes} == set(phase_ids)
 
 
@@ -134,8 +131,8 @@ def test_live_skill_topology_matches_graph_md(
         ),
     ],
 )
-def test_logic_actions_are_discovered_from_v21_phase_dirs(
-    legacy_corpus_root: Path,
+def test_logic_actions_are_discovered_from_portable_phase_dirs(
+    corpus_root: Path,
     compiled_skills: dict[str, CompiledSkill],
     skill_id: str,
     phase_id: str,
@@ -149,7 +146,7 @@ def test_logic_actions_are_discovered_from_v21_phase_dirs(
     assert node.ast.actions == [action_name]
     assert action_name in compiled.actions.for_phase(phase_id)
     assert compiled.actions.for_phase(phase_id)[action_name].path == (
-        legacy_corpus_root / "skills" / skill_id / relative_path
+        corpus_root / "skills" / skill_id / relative_path
     )
 
 

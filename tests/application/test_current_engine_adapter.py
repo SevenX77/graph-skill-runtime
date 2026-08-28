@@ -21,11 +21,20 @@ def _write(path: Path, text: str) -> None:
 
 def _logic_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: adapter-smoke
-phases: [main]
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: Run the adapter smoke graph for embedded engine verification.
+---
+
+Use the installed gskill runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: adapter-smoke
+description: Embedded adapter smoke graph.
 io:
   inputs:
     type: object
@@ -37,13 +46,16 @@ io:
     properties:
       result: {type: string}
     required: [result]
----
-<phase depends_on="input" output>main</phase>
+phases:
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "main" / "LOGIC.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -70,14 +82,14 @@ validator: false
 def test_current_engine_adapter_compiles_and_runs_an_explicit_embedded_logic_skill(
     tmp_path: Path,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "adapter-smoke-skill"
     _logic_skill(skill_root)
     engine = CurrentEngineAdapter()
 
     compile_result = engine.compile(CompileRequest(skill_root=str(skill_root), cache=False))
 
     assert compile_result.status == "passed"
-    assert compile_result.skill_id == "adapter-smoke"
+    assert compile_result.skill_id == "adapter-smoke-skill"
     application = RuntimeApplication(
         config_resolver=ConfigResolver(user_config_path=tmp_path / "missing.toml"),
         engine=engine,

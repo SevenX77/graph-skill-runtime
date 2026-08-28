@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 from graph_skill_runtime.core.llm_provider import FakeLLMProvider, LLMProviderResponse
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"

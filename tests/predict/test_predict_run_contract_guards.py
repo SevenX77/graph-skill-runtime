@@ -10,10 +10,18 @@ from graph_skill_runtime.io.run_layout import runs_root
 
 def _write_logic_skill(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "GRAPH.md").write_text(
+    (root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
-name: contract_guard
+name: skill
+description: Guard run and predict result contracts.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Guard run and predict result contracts.
 io:
   inputs:
     type: object
@@ -25,9 +33,9 @@ io:
       text:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
@@ -36,6 +44,7 @@ phases:
     actions_dir.mkdir(parents=True)
     (phase_dir / "LOGIC.md").write_text(
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -67,7 +76,7 @@ def test_run_path_behavior_unchanged_after_predict_context_param(
 ) -> None:
     skill_root = _write_logic_skill(tmp_path / "skill")
 
-    raw = runner_module._run_v030_skill_dict(
+    raw = runner_module._run_portable_skill_dict(
         skill_root,
         workspace_dir=tmp_path / "workspace-run",
         run_root=runs_root(tmp_path / "workspace-run"),

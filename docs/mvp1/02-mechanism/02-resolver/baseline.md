@@ -1,10 +1,12 @@
 ---
 module: 02-mechanism/02-resolver
 doc: baseline
-status: audited-ready（现状对齐 pinned 代码 7cd4b9c；DI 接缝 = Protocol + LocalWorkspaceResolver,live；⚠️ 现状=registry/id 寻址=被 mvp1 path 反转的旧模型）
+status: superseded（Phase 2 flat graph registry 已取代本文的旧 resolver baseline）
 ---
 
 # 02-resolver — Baseline(当下代码实现逻辑)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 graph id、flat registry 与 call-edge resolution 契约见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前实现见 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py) 与 [`local_workspace_resolver.py`](../../../../src/graph_skill_runtime/core/local_workspace_resolver.py)。后文只保留旧 registry/id 与 pre-portable resolver 的历史证据；其中现在时和 owner 说明不再描述当前 runtime。
 
 > **Scope**: 把 skill 引用(SUBGRAPH `target_skill`、subagent 目标、registry id)解析成本地 skill root 的 DI 接缝:`skill_resolver_protocol.py`(协议+校验+缺失防护)、`local_workspace_resolver.py`(本地实现)。
 > **现状一句话**:接口是 `SkillResolverProtocol`(`skill_resolver_protocol.py:33`),引擎只认协议、Studio 等宿主可注入实现;公共入口省略 resolver 时使用引擎自带 `LocalWorkspaceResolver`(`local_workspace_resolver.py:15`)按 skill/cwd 周边搜索路径解析。内部 helper 仍保留 `require_skill_resolver` 缺失防护(`[F-v3-resolver-missing]`)。

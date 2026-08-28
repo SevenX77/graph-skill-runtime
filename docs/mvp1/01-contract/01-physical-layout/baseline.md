@@ -1,12 +1,14 @@
 ---
 module: 01-contract/01-physical-layout
 doc: baseline
-status: audited-ready（现状对齐 WS-E7:skill 树按 loader 校验；run/predict 写 runs/<run_id>；evaluate_golden_baseline 读写 workspace_dir/golden；import_files engine SDK CRUD 尚未落地）
+status: superseded（Phase 2 portable layout 已取代本文的 v0.3 现状）
 binds_alignment: ./mvp1-alignment.md
 binds_code: packages/graph-agent/src/graph_agent/core/loader.py:SkillLoader.compile_skill · packages/graph-agent/src/graph_agent/core/loader.py:_PHASE_FILE_TO_MODE · packages/graph-agent/src/graph_agent/core/runner.py:run_skill · packages/graph-agent/src/graph_agent/core/runner.py:predict_skill · packages/graph-agent/src/graph_agent/core/runner.py:_validate_workspace_dir · packages/graph-agent/src/graph_agent/core/runner.py:_write_workflow_result_artifacts · packages/graph-agent/src/graph_agent/callbacks/emit.py:_TraceJsonlSink · packages/graph-agent/src/graph_agent/core/result.py:RunResult
 ---
 
 # 01-physical-layout — Baseline(当下代码实现逻辑)
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 portable 物理布局由 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md) 拥有，可执行 inventory/loader 行为见当前 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py)。后文仅保留为 v0.3 pre-cutover evidence；其中所有“当前”“现状”和源码路径都描述旧 `graph-agent` 截面，不得作为本 checkout 的当前事实。
 
 > **Scope**: 磁盘文件结构的**现状代码**:skill 源码树校验(loader 从根向下)+ Engine SDK 在 `workspace_dir` 下写出的 run-scoped 产物。Studio root 选择、HTTP CRUD、helper/router 不作为本 baseline 代码证据。
 > **现状一句话**:skill 源码树由 loader 校验(`loader.py:SkillLoader.compile_skill` / `_guard_v030_root` / `_PHASE_FILE_TO_MODE`)。workspace 侧,`run_skill` / `predict_skill` / `evaluate_golden_baseline` 都要求 keyword-only `workspace_dir` 并经 `_validate_workspace_dir` 拒绝相对路径;run / predict 产物写入 `<workspace_dir>/runs/<run_id>/`,其中 `trace.jsonl` 由 event sink 创建,`result.json` / `final_state.json` / `metrics.json` 由 `_write_workflow_result_artifacts` 固定写出。WS-E7 后,`evaluate_golden_baseline` 读 `<workspace_dir>/golden/<baseline_id>/{baseline.json,cases/*.json}` 并写 `report.json`;`.workspace/import_files/` 的 Engine SDK CRUD 仍未落地。

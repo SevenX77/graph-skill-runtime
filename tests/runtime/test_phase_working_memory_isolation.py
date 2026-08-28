@@ -54,7 +54,6 @@ from typing import Any
 
 from graph_skill_runtime.callbacks.events import CallbackEvent
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from graph_skill_runtime.core.runner import run_skill
 from graph_skill_runtime.core.state import (
     BusinessData,
     FrameworkState,
@@ -63,6 +62,7 @@ from graph_skill_runtime.core.state import (
 )
 from graph_skill_runtime.middleware.nudge_policy import PLANNING_NUDGE
 from graph_skill_runtime.runtime.state_mapper import PhaseWrapper, StateMapper
+from tests.legacy_fixture_adapter import run_skill
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"

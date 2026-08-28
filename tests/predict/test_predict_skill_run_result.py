@@ -15,10 +15,17 @@ def test_predict_skill_returns_run_result_with_predict_source(tmp_path: Path, mo
 
     skill_dir = tmp_path / "skill"
     skill_dir.mkdir()
-    (skill_dir / "GRAPH.md").write_text(
+    (skill_dir / "SKILL.md").write_text(
         "---\n"
-        "name: test_skill\n"
-        "schema_version: \"v0.3.0\"\n"
+        "name: skill\n"
+        "description: Exercise the predict RunResult boundary.\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    (skill_dir / "graph.yaml").write_text(
+        "schema_version: gskill.graph.v1\n"
+        "graph_id: root\n"
+        "description: Exercise the predict RunResult boundary.\n"
         "io:\n"
         "  inputs:\n"
         "    type: object\n"
@@ -29,9 +36,9 @@ def test_predict_skill_returns_run_result_with_predict_source(tmp_path: Path, mo
         "      text:\n"
         "        type: string\n"
         "phases:\n"
-        "  - draft\n"
-        "---\n\n"
-        "<phase depends_on=\"input\" output>draft</phase>\n",
+        "  - id: draft\n"
+        "    depends_on: [input]\n"
+        "    output: true\n",
         encoding="utf-8",
     )
 
@@ -40,6 +47,7 @@ def test_predict_skill_returns_run_result_with_predict_source(tmp_path: Path, mo
     actions_dir.mkdir(parents=True)
     (phases_dir / "LOGIC.md").write_text(
         "---\n"
+        "name: draft\n"
         "io:\n"
         "  inputs:\n"
         "    type: object\n"

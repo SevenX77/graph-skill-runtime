@@ -1,6 +1,6 @@
 # Public API Contract
 
-This document records the implemented Phase 1 top-level Python contract for `graph-skill-runtime` `0.1.0a1`. The executable symbol source is [`graph_skill_runtime.__all__`](../src/graph_skill_runtime/__init__.py); this document must contain exactly one strict `## <symbol>` heading for each of those 58 names. The distribution has not been published to PyPI.
+This document records the implemented top-level Python contract for `graph-skill-runtime` `0.1.0a1`. Phase 2 changed the accepted business-skill format without changing the 58-symbol Phase 1 facade. The executable symbol source is [`graph_skill_runtime.__all__`](../src/graph_skill_runtime/__init__.py); this document must contain exactly one strict `## <symbol>` heading for each of those 58 names. The distribution has not been published to PyPI.
 
 ## 1. Contract-wide rules
 
@@ -14,7 +14,7 @@ The eight SDK functions in [`sdk.py`](../src/graph_skill_runtime/sdk.py), the `g
 
 ## 2. Phase boundary
 
-The current engine adapter accepts the FROZEN v0.3 `GRAPH.md` format. The Phase 2 root `SKILL.md` plus `graph.yaml` format is not implemented. The default executor is `host-native`, but its adapter is not implemented in Phase 1: `run` persists the resolved request and returns `GSKILL_EXECUTOR_UNAVAILABLE`. Only explicit `embedded` execution reaches the extracted engine. Durable `resume` and `submit_agent_result` return `GSKILL_NOT_IMPLEMENTED` until Phase 3.
+The current engine adapter accepts only an explicit business-skill root defined by the [portable format contract](skill-spec/01-PORTABLE-GSKILL-V1.md): root `SKILL.md`, `graph.yaml`, phase `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md`, and an optional flat `graphs/<graph_id>/` registry. Production SDK, CLI, MCP, compile, inspect, predict, and run paths do not fall back to v0.3. Legacy parsing is confined to the explicit `gskill migrate studio-skill` converter. The default executor is `host-native`, but its durable adapter is not implemented: `run` persists the resolved request and returns `GSKILL_EXECUTOR_UNAVAILABLE`. Only explicit `embedded` execution reaches the engine. Durable `resume` and `submit_agent_result` return `GSKILL_NOT_IMPLEMENTED` until Phase 3.
 
 The Port types below define provider-neutral boundaries. Their presence does not imply that Phase 1 ships a default adapter for every Port.
 
@@ -119,7 +119,7 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: explicitly select the extracted embedded engine path.
 - **Fields**: `kind="embedded"`, optional identifier-shaped `provider`, optional `model`, and optional `credential: SecretReference`.
-- **Failure semantics**: invalid provider identifiers or inline credential shapes fail validation. Provider clients live in the optional `embedded` extra; Phase 1 proves a real `LOGIC` path, not general provider-backed AGENT parity.
+- **Failure semantics**: invalid provider identifiers or inline credential shapes fail validation. Provider clients live in the optional `embedded` extra; current evidence proves a real portable `LOGIC` path, not general provider-backed AGENT parity.
 
 ## EventSink
 
@@ -155,13 +155,13 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: request compiled topology information for an explicit skill root.
 - **Fields**: non-empty `skill_root` and `include_call_graph`, defaulting to `False`.
-- **Failure semantics**: a blank root fails validation. The current adapter returns compile diagnostics instead of raising normal compile failures; the Phase 2 flat-registry call graph is not implemented.
+- **Failure semantics**: a blank root fails validation. The current adapter returns compile diagnostics instead of raising normal compile failures; when requested, inspection projects the flat-registry call graph from the same explicit graph references used by compilation.
 
 ## InspectResult
 
 - **Responsibility**: return inspected skill identity, graph identifiers, call edges, and compile diagnostics.
 - **Fields**: optional `skill_id`, immutable `graphs`, immutable `(caller, callee)` `call_edges`, and immutable diagnostics.
-- **Failure semantics**: malformed tuples or diagnostics fail validation. In Phase 1, `CurrentEngineAdapter` reports the current root graph and compile diagnostics; full Phase 2 call-graph projection remains drafted.
+- **Failure semantics**: malformed tuples or diagnostics fail validation. `CurrentEngineAdapter` reports the root and registry graph ids, explicit call edges, and compile diagnostics from the portable bundle; it does not maintain a second topology source.
 
 ## MemoryCheckpointStoreConfig
 
@@ -249,7 +249,7 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: provider-neutral Port behind `RuntimeApplication` for current engine capabilities.
 - **Interface**: `compile(CompileRequest)`, `predict(RunRequest)`, `run(RunRequest)`, `resume(ResumeRequest)`, `evaluate_golden(GoldenEvaluationRequest)`, and `inspect(InspectRequest)`, each returning its typed result.
-- **Failure semantics**: adapters should project expected domain failures into typed results. Phase 1's `CurrentEngineAdapter` implements compile/predict/run/golden/inspect and a structured not-implemented resume.
+- **Failure semantics**: adapters should project expected domain failures into typed results. The current `CurrentEngineAdapter` implements portable compile/predict/run/golden/inspect and a structured not-implemented resume.
 
 ## RuntimeErrorCode
 
@@ -340,7 +340,7 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 - **Responsibility**: thin Python facade for compiled topology inspection.
 - **Signature**: `inspect(request: InspectRequest, *, application: RuntimeApplication | None = None) -> InspectResult`.
-- **Failure semantics**: the default adapter projects compile failures into `InspectResult.diagnostics`. Phase 1 does not claim the drafted Phase 2 flat-registry call graph.
+- **Failure semantics**: the default adapter projects compile failures into `InspectResult.diagnostics` and, when requested, projects call edges from the compiled portable bundle.
 
 ## predict
 

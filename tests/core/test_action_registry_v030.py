@@ -15,12 +15,17 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _logic_skill(root: Path, action_name: str, action_body: str) -> None:
+def _logic_skill(root: Path, action_name: str, action_body: str) -> Path:
+    root = root / "action-registry"
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: action-registry
+        root / "SKILL.md",
+        "---\nname: action-registry\ndescription: Action registry fixture.\n---\n",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: action-registry
+description: Action registry fixture.
 io:
   inputs:
     type: object
@@ -33,14 +38,15 @@ io:
       foo:
         type: integer
 phases:
-  - logic
----
-<phase depends_on="input" output>logic</phase>
+  - id: logic
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "logic" / "LOGIC.md",
         f"""---
+name: logic
 io:
   inputs:
     type: object
@@ -57,6 +63,7 @@ io:
 """,
     )
     _write(root / "phases" / "logic" / "actions" / "write_value.py", action_body)
+    return root
 
 
 @pytest.mark.parametrize(
@@ -74,12 +81,12 @@ def test_action_registry_rejects_non_primary_action_names(name: str) -> None:
 def test_runtime_dynamic_return_key_must_use_v030_output_field_error(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         "write_value",
         "def write_value(inputs):\n    key = 'missing'\n    return {key: 1}\n",
     )
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
@@ -91,12 +98,12 @@ def test_runtime_dynamic_return_key_must_use_v030_output_field_error(
 def test_action_returning_non_dict_is_runtime_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         "write_value",
         "def write_value(inputs):\n    return ['not', 'a', 'dict']\n",
     )
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
@@ -107,13 +114,13 @@ def test_action_returning_non_dict_is_runtime_fatal(
 def test_inputs_mutation_is_compile_fatal(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _logic_skill(
+    root = _logic_skill(
         tmp_path,
         "write_value",
         "def write_value(inputs):\n    inputs['foo'] = 99\n    return {}\n",
     )
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-logic-action-purity-violation]"

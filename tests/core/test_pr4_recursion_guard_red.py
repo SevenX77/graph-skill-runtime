@@ -8,9 +8,8 @@ from pydantic import BaseModel
 import graph_skill_runtime.core.graph_assembler as graph_assembler_module
 from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import SkillLoadError
-from graph_skill_runtime.core.graph_assembler import _build_subgraph_node, assemble_graph
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 from graph_skill_runtime.core.loader import CompiledSubagent, SkillLoader
-from graph_skill_runtime.core.manifest import PhaseIOSchema, SubgraphNodeAST
 from graph_skill_runtime.core.skill_resolver_protocol import SkillResolutionError
 
 
@@ -41,18 +40,32 @@ def _schema_yaml(field_name: str = "text") -> str:
         type: string"""
 
 
-def _write_graph(root: Path, *, name: str, phases: list[str]) -> None:
-    phase_yaml = "\n".join(f"  - {phase}" for phase in phases)
-    body = "\n".join(
-        f'<phase depends_on="{"input" if index == 0 else phases[index - 1]}"'
-        f'{" output" if index == len(phases) - 1 else ""}>{phase}</phase>'
+def _write_graph(
+    root: Path,
+    *,
+    name: str,
+    phases: list[str],
+    graph_id: str = "root",
+    skill_entry: bool = True,
+) -> None:
+    phase_yaml = "\n".join(
+        (
+            f"  - id: {phase}\n"
+            f"    depends_on: [{'input' if index == 0 else phases[index - 1]}]\n"
+            f"    output: {str(index == len(phases) - 1).lower()}"
+        )
         for index, phase in enumerate(phases)
     )
+    if skill_entry:
+        _write(
+            root / "SKILL.md",
+            f"---\nname: {name}\ndescription: Exercise recursive compilation guards.\n---\n",
+        )
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {graph_id}
+description: Exercise recursive compilation guards.
 io:
   inputs:
     {_schema_yaml()}
@@ -61,8 +74,6 @@ io:
     properties: {{}}
 phases:
 {phase_yaml}
----
-{body}
 """,
     )
 
@@ -77,8 +88,9 @@ subagents:
     description: Shared child.
 """
     _write(
-        root / "phases" / phase / "SKILL.md",
+        root / "phases" / phase / "AGENT.md",
         f"""---
+name: {phase}
 {subagents}io:
   inputs:
     {_schema_yaml()}
@@ -92,11 +104,12 @@ subagents:
     )
 
 
-def _write_subgraph_phase(root: Path, phase: str, *, child_path: Path) -> None:
+def _write_subgraph_phase(root: Path, phase: str, *, graph_id: str) -> None:
     _write(
         root / "phases" / phase / "SUBGRAPH.md",
         f"""---
-path: {child_path}
+name: {phase}
+graph: {graph_id}
 io:
   inputs:
     {_schema_yaml()}
@@ -118,11 +131,6 @@ def _write_leaf_agent_skill(root: Path, *, name: str = "leaf") -> None:
     _write_agent_phase(root, "main")
 
 
-def _write_subgraph_skill(root: Path, *, name: str, child_path: Path) -> None:
-    _write_graph(root, name=name, phases=["sub"])
-    _write_subgraph_phase(root, "sub", child_path=child_path)
-
-
 def _expect_payload_code(exc_info: pytest.ExceptionInfo[SkillLoadError], code: str) -> None:
     assert exc_info.value.payload is not None
     assert exc_info.value.payload.code == code
@@ -131,9 +139,9 @@ def _expect_payload_code(exc_info: pytest.ExceptionInfo[SkillLoadError], code: s
 def test_pr4_loader_rejects_recursive_subagent_cycle_with_v3_payload(tmp_path: Path) -> None:
     skill_a = tmp_path / "skill-a"
     skill_b = tmp_path / "skill-b"
-    _write_recursive_agent_skill(skill_a, name="skill-a", target_skill="demo.b")
-    _write_recursive_agent_skill(skill_b, name="skill-b", target_skill="demo.a")
-    resolver = DictSkillResolver({"demo.a": skill_a, "demo.b": skill_b})
+    _write_recursive_agent_skill(skill_a, name="skill-a", target_skill="demo-b")
+    _write_recursive_agent_skill(skill_b, name="skill-b", target_skill="demo-a")
+    resolver = DictSkillResolver({"demo-a": skill_a, "demo-b": skill_b})
 
     with pytest.raises(SkillLoadError) as exc_info:
         SkillLoader().compile_skill(skill_a, skill_resolver=resolver)
@@ -145,7 +153,7 @@ def test_pr4_loader_rejects_compile_depth_over_twenty_with_v3_payload(tmp_path: 
     roots = [tmp_path / f"skill-{index}" for index in range(22)]
     registry: dict[str, Path] = {}
     for index, root in enumerate(roots):
-        skill_id = f"demo.skill_{index}"
+        skill_id = f"demo-skill-{index}"
         registry[skill_id] = root
         if index == len(roots) - 1:
             _write_leaf_agent_skill(root, name=f"skill-{index}")
@@ -153,7 +161,7 @@ def test_pr4_loader_rejects_compile_depth_over_twenty_with_v3_payload(tmp_path: 
             _write_recursive_agent_skill(
                 root,
                 name=f"skill-{index}",
-                target_skill=f"demo.skill_{index + 1}",
+                target_skill=f"demo-skill-{index + 1}",
             )
     resolver = DictSkillResolver(registry)
 
@@ -163,33 +171,24 @@ def test_pr4_loader_rejects_compile_depth_over_twenty_with_v3_payload(tmp_path: 
     _expect_payload_code(exc_info, "[F-v3-compile-depth-exceeded]")
 
 
-def test_pr4_assemble_subgraph_cycle_uses_v3_payload_not_recursionerror(tmp_path: Path) -> None:
+def test_portable_loader_rejects_subgraph_cycle_before_assembly(tmp_path: Path) -> None:
     skill_a = tmp_path / "skill-a"
-    _write_subgraph_skill(skill_a, name="skill-a", child_path=skill_a)
-    resolver = DictSkillResolver({"demo.a": skill_a})
-    subgraph_ast = SubgraphNodeAST(
-        mode="subgraph",
-        path=str(skill_a),
-        io=PhaseIOSchema(
-            inputs={"type": "object", "properties": {"text": {"type": "string"}}},
-            outputs={"type": "object", "properties": {}},
-        ),
+    _write_graph(skill_a, name="skill-a", phases=["to-loop"])
+    _write_subgraph_phase(skill_a, "to-loop", graph_id="loop")
+    loop = skill_a / "graphs" / "loop"
+    _write_graph(
+        loop,
+        name="loop",
+        phases=["again"],
+        graph_id="loop",
+        skill_entry=False,
     )
+    _write_subgraph_phase(loop, "again", graph_id="loop")
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _build_subgraph_node(
-            type(
-                "PhaseDoc",
-                (),
-                {"path": skill_a / "phases" / "sub" / "SUBGRAPH.md"},
-            )(),
-            subgraph_ast,
-            None,
-            1,
-            resolver,
-        )
+        SkillLoader().compile_skill(skill_a)
 
-    _expect_payload_code(exc_info, "[F-v3-compile-recursion-cycle]")
+    _expect_payload_code(exc_info, "[F-v3-graph-call-cycle]")
 
 
 def test_pr4_assemble_subagent_runtime_cycle_uses_v3_payload_not_recursionerror(
@@ -197,13 +196,13 @@ def test_pr4_assemble_subagent_runtime_cycle_uses_v3_payload_not_recursionerror(
 ) -> None:
     skill_a = tmp_path / "skill-a"
     skill_b = tmp_path / "skill-b"
-    _write_recursive_agent_skill(skill_a, name="skill-a", target_skill="demo.b")
-    _write_recursive_agent_skill(skill_b, name="skill-b", target_skill="demo.a")
-    resolver = DictSkillResolver({"demo.a": skill_a, "demo.b": skill_b})
+    _write_recursive_agent_skill(skill_a, name="skill-a", target_skill="demo-b")
+    _write_recursive_agent_skill(skill_b, name="skill-b", target_skill="demo-a")
+    resolver = DictSkillResolver({"demo-a": skill_a, "demo-b": skill_b})
     subagent = CompiledSubagent(
         parent_phase_id="main",
         name="child",
-        target_skill="demo.b",
+        target_skill="demo-b",
         description="Recursive child.",
         root=skill_b,
         input_schema={"type": "object", "properties": {"text": {"type": "string"}}},
@@ -233,9 +232,9 @@ def test_pr4_assemble_reuses_same_child_root_once_per_lifecycle(
     child = tmp_path / "child"
     _write_graph(parent, name="parent", phases=["main_a", "main_b", "main_c"])
     for phase in ("main_a", "main_b", "main_c"):
-        _write_agent_phase(parent, phase, target_skill="demo.child")
+        _write_agent_phase(parent, phase, target_skill="demo-child")
     _write_leaf_agent_skill(child, name="child")
-    resolver = DictSkillResolver({"demo.child": child})
+    resolver = DictSkillResolver({"demo-child": child})
     compiled = compile_skill(parent, cache=False, skill_resolver=resolver)
 
     original_compile_skill = SkillLoader.compile_skill

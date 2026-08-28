@@ -22,12 +22,21 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _skill(root: Path, *, tools: list[str]) -> None:
+def _skill(parent: Path, *, tools: list[str]) -> Path:
+    root = parent / "reserved-tool-probe"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: reserved-tool-probe
+description: Exercise reserved framework tool diagnostics.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise reserved framework tool diagnostics.
 io:
   inputs:
     type: object
@@ -42,15 +51,16 @@ io:
         type: string
     required: [answer]
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     tools_block = "tools:\n" + "".join(f"  - {name}\n" for name in tools) if tools else ""
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 io:
   inputs:
     type: object
@@ -73,6 +83,7 @@ Produce the declared output.
 </goal>
 """,
     )
+    return root
 
 
 @pytest.mark.parametrize(
@@ -96,10 +107,10 @@ Produce the declared output.
 def test_declaring_a_builtin_tool_is_a_compile_diagnostic(
     tmp_path: Path, mock_skill_resolver: object, builtin: str
 ) -> None:
-    _skill(tmp_path, tools=[builtin])
+    skill_root = _skill(tmp_path, tools=[builtin])
 
     with pytest.raises(SkillLoadError) as exc_info:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-agent-tool-reserved]"
     assert builtin in str(exc_info.value)
@@ -108,6 +119,6 @@ def test_declaring_a_builtin_tool_is_a_compile_diagnostic(
 def test_a_skill_without_builtin_declarations_compiles_clean(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _skill(tmp_path, tools=[])
+    skill_root = _skill(tmp_path, tools=[])
 
-    SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)

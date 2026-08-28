@@ -9,7 +9,7 @@ while ``result.metrics`` reports ``0/0/0``.
 Why. ``run_skill``'s ``except GraphAgentError`` branch built a fresh
 ``WorkflowMetrics(wall_time_sec=...)`` because it had nothing else to build one
 from: the run's spend ledger was created deeper in, inside
-``_run_v030_skill_dict``, and an exception unwinds past it. So the exit that
+``_run_portable_skill_dict``, and an exception unwinds past it. So the exit that
 reports a failure could not see what the failure cost, and every failed run
 looked free.
 
@@ -39,9 +39,8 @@ INPUT_TOKENS_PER_CALL = 11
 OUTPUT_TOKENS_PER_CALL = 7
 MAX_ITERATIONS = 3
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: failed-run-token-accounting
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: root
 description: One agent phase that can never satisfy its own output schema.
 llm_role: analyst
 io:
@@ -57,12 +56,14 @@ io:
     properties:
       summary:
         type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-_SKILL_MD = f"""---
+_AGENT_MD = f"""---
+name: work
 llm_role: analyst
 validator: false
 io:
@@ -123,8 +124,12 @@ class _NeverSatisfiesTheSchema:
 def _skill(tmp_path: Path) -> Path:
     skill = tmp_path / "failing-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(
+        "---\nname: failing-fixture\ndescription: Failed run token fixture.\n---\n",
+        encoding="utf-8",
+    )
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(_AGENT_MD, encoding="utf-8")
     return skill
 
 

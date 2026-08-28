@@ -10,7 +10,9 @@ updated: 2026-08-27
 
 # Graph Skill Runtime 独立化基线
 
-本文记录独立 runtime 设计所依赖的当前事实。核验截面是 `origin/main@3564b49e`（2026-08-27）。目标契约见双向绑定的 [`v1-alignment.md`](./v1-alignment.md)；本文不把目标决定写成已实现能力。
+> **历史截面，不是当前 checkout 的 baseline。** 本文保留 `origin/main@3564b49e` 的 pre-extraction 证据；后文所有“当前 v0.3”“当前 engine”等现在时都只描述该固定截面。当前 standalone runtime 事实见 [设计入口](./README.md)、[portable 格式契约](../skill-spec/01-PORTABLE-GSKILL-V1.md)和[公共 API 契约](../public-api-contract.md)。
+
+本文记录独立 runtime 设计所依赖的历史事实。核验截面是 `origin/main@3564b49e`（2026-08-27）。完整目标契约见双向绑定的 [`v1-alignment.md`](./v1-alignment.md)；本文不把目标决定或固定截面的事实写成当前 checkout 能力。
 
 ## 1. 当前产品与分发形态
 
@@ -57,16 +59,16 @@ updated: 2026-08-27
 
 旧 [`packages/graph-agent/README.md`](https://github.com/SevenX77/agent-harness/blob/3564b49e/packages/graph-agent/README.md) 还曾把不存在的 `GraphAgentHarness` 写成公共外层、混写 24/21 个导出、把根入口描述成 `SKILL.md`，并遗漏必填的绝对 `workspace_dir`。这些是文档漂移，不是活代码的新契约。
 
-## 4. 当前文件格式契约
+## 4. 固定截面的文件格式契约
 
-[FROZEN format ground truth](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 是当前实现格式的唯一真相源，并仍被代码与 contract maps 消费。当前事实是：
+在 `origin/main@3564b49e` 截面，[v0.3 format ground truth](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 是当时实现格式的唯一真相源，并被当时的代码与 contract maps 消费。该截面的事实是：
 
 - skill 根入口是 `GRAPH.md`；
 - phase 文件名按类型使用 `LOGIC.md`、`SUBGRAPH.md`、`SKILL.md`；
 - 子图位于根 `subgraph/` 并按调用结构递归嵌套；
 - Studio runtime 配置位于 `.workspace/runtime_config.json`。
 
-未来改用 Agent Skills 入口、`graph.yaml`、`AGENT.md` 和扁平 graph registry 的决定只是 drafted。切换前不能修改或 supersede 现有 FROZEN 文档；切换时也不能让 runtime 长期双读两套布局。
+在该历史截面，改用 Agent Skills 入口、`graph.yaml`、`AGENT.md` 和扁平 graph registry 的决定仍是 drafted。当前 checkout 已完成这项 Phase 2 cutover，权威见 [`01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；旧 v0.3 文档现仅服务 converter 与历史核验。两个时间截面都遵守同一约束：production runtime 不长期双读两套布局。
 
 ## 5. 当前 Studio runtime config
 
@@ -120,4 +122,4 @@ checkpoint 当前保存的是业务图执行事实；Studio/copilot 进程与 ag
 
 ## 8. 基线结论
 
-从当前证据可得出的结论是：独立化主要不是重新发明图执行器，而是收紧公共契约、拆开配置生命周期、建立可替换 executor、定义 portable skill 入口，并把 Studio/MoirAI 集成按 owner 重组。目标完成之前，`graph-agent` 0.3.1、FROZEN 当前格式与 Studio adapter 仍是运行事实；任何未来名称或命令都不能写成已发布能力。
+从该固定截面证据可得出的结论是：独立化主要不是重新发明图执行器，而是收紧公共契约、拆开配置生命周期、建立可替换 executor、定义 portable skill 入口，并把 Studio/MoirAI 集成按 owner 重组。在当时，`graph-agent` 0.3.1、v0.3 格式与 Studio adapter 仍是运行事实；这句话不描述当前 checkout。当前源码已完成 Phase 1 typed facade 和 Phase 2 portable format，但仍未发布 PyPI，Phase 3+ executor/installer/integration 也未完成。

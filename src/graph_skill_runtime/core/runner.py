@@ -1,26 +1,8 @@
-"""Generic Skill Runner — pure document-driven execution of SKILL.md.
+"""Portable graph execution primitives behind the embedded runtime adapter.
 
-Reads SKILL.md's io declarations, loads inputs via IOManager, executes via
-GraphAgentHarness, and saves outputs.
-
-No per-skill __init__.py needed. SKILL.md is the single source of truth.
-
-Usage (Python API)::
-
-    from graph_skill_runtime import run_skill
-
-    result = run_skill(
-        "path/to/my_skill/SKILL.md",
-        workspace_dir=Path("/path/to/workspace"),
-        input_text="...",
-    )
-
-Usage (CLI)::
-
-    python -m graph_skill_runtime.runner \\
-        --skill path/to/my_skill/SKILL.md \\
-        --inputs '{"key": "value"}' \\
-        --output /path/to/workspace
+These functions consume an explicit business-skill root containing ``SKILL.md``
+and ``graph.yaml``. Public callers use the typed SDK, the installed ``gskill``
+console command, or the MCP adapter rather than invoking this module directly.
 """
 
 from __future__ import annotations
@@ -67,7 +49,6 @@ from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import (
     GraphAgentError,
     GraphAgentFatalError,
-    LoaderError,
     SkillLoadError,
     make_error_payload,
 )
@@ -91,6 +72,24 @@ logger = logging.getLogger(__name__)
 _NO_MOCK_LLM = object()
 _RUNTIME_PHASE_FAILED_CODE = "[F-v3-runtime-phase-failed]"
 _SKILL_ENTRYPOINT_FILENAME = "SKILL.md"
+
+
+def _portable_skill_root(value: str | Path) -> Path:
+    path = Path(value)
+    if path.is_dir() and (path / _SKILL_ENTRYPOINT_FILENAME).is_file() and (path / "graph.yaml").is_file():
+        return path
+    detail = (
+        "[F-v3-graph-root-missing] expected a portable gSkill directory containing "
+        f"SKILL.md and graph.yaml; got {path}"
+    )
+    raise SkillLoadError(
+        detail,
+        payload=make_error_payload(
+            "[F-v3-graph-root-missing]",
+            detail,
+            source_path=path,
+        ),
+    )
 _HITL_TOOL_NAMES = {"ask_clarification"}
 
 
@@ -314,16 +313,12 @@ def predict_skill(  # noqa: C901
     from graph_skill_runtime.core.compiler import compile_skill
     from graph_skill_runtime.core.result import PathDiff
 
-    resolver = skill_resolver or default_local_resolver_for_skill(skill_path)
+    skill_path_obj = _portable_skill_root(skill_path)
+    resolver = skill_resolver or default_local_resolver_for_skill(skill_path_obj)
     workspace_root = _validate_workspace_dir(workspace_dir)
     started_at = datetime.now(UTC)
     started_monotonic = time.monotonic()
-    skill_path_obj = Path(skill_path)
-    skill_id = (
-        skill_path_obj.parent.name
-        if skill_path_obj.name == _SKILL_ENTRYPOINT_FILENAME
-        else skill_path_obj.stem
-    )
+    skill_id = skill_path_obj.name
 
     mock_llm = inputs.pop("mock_llm", None)
     current_hashes = inputs.pop("current_hashes", None) or {}
@@ -358,7 +353,7 @@ def predict_skill(  # noqa: C901
     run_root = predicts_root(workspace_root)
     trace_output = run_root / run_id
 
-    raw = _run_v030_skill_dict(
+    raw = _run_portable_skill_dict(
         skill_path_obj,
         workspace_dir=workspace_root,
         run_root=run_root,
@@ -469,23 +464,19 @@ def run_skill(
     runtime_config: dict[str, Any] | None = None,
     **inputs: Any,
 ) -> RunResult:
-    """Execute a SKILL.md and return a typed workflow result."""
+    """Execute a portable gSkill and return a typed workflow result."""
     mock_llm = inputs.pop("mock_llm", _NO_MOCK_LLM)
-    resolver = skill_resolver or default_local_resolver_for_skill(skill_path)
+    requested_path = Path(skill_path)
+    requested_root = requested_path
     workspace_root = _validate_workspace_dir(workspace_dir)
     started_at = datetime.now(UTC)
     started_monotonic = time.monotonic()
-    skill_path_obj = Path(skill_path)
-    skill_id = (
-        skill_path_obj.parent.name
-        if skill_path_obj.name == _SKILL_ENTRYPOINT_FILENAME
-        else skill_path_obj.stem
-    )
+    skill_id = requested_root.name
 
     # A run's identity and its home directory are decided once, here, before
     # anything can fail — every exit below reports the same two values. They
     # used to be decided twice: once in the ``except`` branch and once again,
-    # independently, inside ``_run_v030_skill_dict``. The success path hid that
+    # independently, inside ``_run_portable_skill_dict``. The success path hid that
     # by reading the inner id back out of the returned dict, but the failure
     # path never sees a returned dict, so a run that died without a caller
     # ``thread_id`` filed its result under a second uuid while the trace it had
@@ -507,8 +498,10 @@ def run_skill(
     spend = _RunSpendLedger()
 
     try:
+        skill_path_obj = _portable_skill_root(skill_path)
+        resolver = skill_resolver or default_local_resolver_for_skill(skill_path_obj)
         raw = _run_skill_dict(
-            skill_path,
+            skill_path_obj,
             workspace_dir=workspace_root,
             run_root=run_root,
             mock_llm=mock_llm,
@@ -597,14 +590,10 @@ def resume_skill(
     _validate_resume_node_selector(resume_from_node_id, "resume_from_node_id")
     _validate_resume_node_selector(resume_to_node_id, "resume_to_node_id")
 
-    resolver = skill_resolver or default_local_resolver_for_skill(skill_path)
+    requested_path = Path(skill_path)
+    requested_root = requested_path
     started_at = datetime.now(UTC)
-    skill_path_obj = Path(skill_path)
-    skill_id = (
-        skill_path_obj.parent.name
-        if skill_path_obj.name == _SKILL_ENTRYPOINT_FILENAME
-        else skill_path_obj.stem
-    )
+    skill_id = requested_root.name
 
     trace_output = runs_root(workspace_root) / run_id
     # Continuing a run, not starting one: the ledger opens with what the run has
@@ -619,7 +608,7 @@ def resume_skill(
     # is the run's total at every ending below, including inside the helper
     # that reports a crash, so no exit can be the one that forgot to add it.
     clock_origin = time.monotonic() - elapsed_before(trace_output / TRACE_FILENAME)
-    event_sink = _prepare_v030_event_sink(
+    event_sink = _prepare_event_sink(
         trace_output=trace_output,
         event_subscriber=event_subscriber,
         spend=spend,
@@ -636,8 +625,10 @@ def resume_skill(
     active_checkpointer = checkpointer if checkpointer is not None else _resolve_resume_checkpointer()
 
     try:
+        skill_path_obj = _portable_skill_root(skill_path)
+        resolver = skill_resolver or default_local_resolver_for_skill(skill_path_obj)
         compiled = compile_skill(
-            skill_path,
+            skill_path_obj,
             skill_resolver=resolver,
             runtime_input_fields=_runtime_input_fields_from_config(runtime_config),
         )
@@ -651,7 +642,7 @@ def resume_skill(
         )
         selected_checkpoint_id = _checkpoint_id_from_config(invoke_config)
         selected_checkpoint_ns = _checkpoint_ns_from_config(invoke_config)
-        _emit_v030_event(
+        _emit_event(
             event_sink,
             RunStartedEvent(
                 run_id=run_id,
@@ -698,7 +689,7 @@ def resume_skill(
             or resume_from_node_id
             or _phase_name_from_checkpoint_ns(selected_checkpoint_ns)
         )
-        _emit_v030_event(
+        _emit_event(
             event_sink,
             ResumedEvent(
                 thread_id=run_id,
@@ -730,7 +721,7 @@ def resume_skill(
             trace_output,
             failed_result,
         )
-        _emit_v030_event(
+        _emit_event(
             event_sink,
             RunEndedEvent(
                 run_id=run_id,
@@ -752,7 +743,7 @@ def resume_skill(
     if paused_at is not None:
         wall_time = round(time.monotonic() - clock_origin, 3)
         final_context = _business_context_from_graph_result(result)
-        _emit_v030_paused_run(
+        _emit_paused_run(
             event_sink,
             run_id=run_id,
             paused_at=paused_at,
@@ -778,7 +769,7 @@ def resume_skill(
 
     # Step 7: Successful path execution metrics & context extraction
     wall_time = round(time.monotonic() - clock_origin, 3)
-    final_context = _finalize_successful_v030_run(
+    final_context = _finalize_successful_run(
         result,
         compiled=compiled,
         event_sink=event_sink,
@@ -891,10 +882,10 @@ def _run_skill_dict(
             totals on a path this function does not return through.
     """
     resolver = require_skill_resolver(skill_resolver, caller="_run_skill_dict")
-    skill_path = Path(skill_path)
-    if skill_path.is_dir() and (skill_path / "GRAPH.md").is_file():
-        return _run_v030_skill_dict(
-            skill_path,
+    skill_root = _portable_skill_root(skill_path)
+    if skill_root.is_dir():
+        return _run_portable_skill_dict(
+            skill_root,
             workspace_dir=workspace_dir,
             run_root=run_root,
             mock_llm=mock_llm,
@@ -910,18 +901,7 @@ def _run_skill_dict(
             **inputs,
         )
 
-    detail = (
-        "[F-v3-graph-root-missing] run_skill expects a V0.3.0 skill root "
-        f"directory containing GRAPH.md; got {skill_path}"
-    )
-    raise SkillLoadError(
-        detail,
-        payload=make_error_payload(
-            "[F-v3-graph-root-missing]",
-            detail,
-            source_path=skill_path,
-        ),
-    )
+    raise AssertionError("portable skill root validation returned a non-directory")
 
 
 _LLM_PROVIDER_UNSET = object()
@@ -981,7 +961,7 @@ def _resolve_artifact_root(request: RunArtifactRequest | PredictArtifactRequest)
     explicit = request.execution_context.get("artifact_root")
     if isinstance(explicit, str) and explicit:
         path = Path(explicit)
-        if (path / "GRAPH.md").is_file():
+        if (path / "SKILL.md").is_file() and (path / "graph.yaml").is_file():
             return path
 
     sha256_val = _artifact_hash_hex(request)
@@ -995,7 +975,7 @@ def _resolve_artifact_root(request: RunArtifactRequest | PredictArtifactRequest)
         workspace_dir.parent / "ephemeral_run_skills" / sha256_val,
     )
     for candidate in candidates:
-        if (candidate / "GRAPH.md").is_file():
+        if (candidate / "SKILL.md").is_file() and (candidate / "graph.yaml").is_file():
             return candidate
     return None
 
@@ -1063,7 +1043,7 @@ def _run_compiled_artifact_graph(
     run_dir = runs_root(workspace_dir) / run_id
     spend = _RunSpendLedger()
     try:
-        raw = _run_v030_skill_dict(
+        raw = _run_portable_skill_dict(
             artifact_root,
             workspace_dir=workspace_dir,
             run_root=runs_root(workspace_dir),
@@ -2042,7 +2022,7 @@ def _breakpoint_pause_point(
     )
 
 
-def _emit_v030_paused_run(
+def _emit_paused_run(
     event_sink: Any,
     *,
     run_id: str,
@@ -2051,7 +2031,7 @@ def _emit_v030_paused_run(
     wall_time: float,
 ) -> None:
     """Report a run that stopped at a breakpoint: same ending as a question, no question."""
-    _emit_v030_event(
+    _emit_event(
         event_sink,
         InterruptedEvent(
             phase_name=paused_at.phase_name,
@@ -2063,19 +2043,19 @@ def _emit_v030_paused_run(
             ns=paused_at.checkpoint_ns,
         ),
     )
-    _emit_v030_event(
+    _emit_event(
         event_sink,
         RunEndedEvent(
             run_id=run_id,
             thread_id=run_id,
             status="interrupted",
-            final_context=_v030_phase_context(final_context),
+            final_context=_phase_context(final_context),
             wall_time_seconds=wall_time,
         ),
     )
 
 
-def _emit_v030_interrupted_run(
+def _emit_interrupted_run(
     event_sink: Any,
     *,
     run_id: str,
@@ -2083,7 +2063,7 @@ def _emit_v030_interrupted_run(
     final_context: dict[str, Any],
     wall_time: float,
 ) -> None:
-    _emit_v030_event(
+    _emit_event(
         event_sink,
         InterruptedEvent(
             phase_name=hitl.phase_name,
@@ -2098,19 +2078,19 @@ def _emit_v030_interrupted_run(
             options=list(hitl.options or []),
         ),
     )
-    _emit_v030_event(
+    _emit_event(
         event_sink,
         RunEndedEvent(
             run_id=run_id,
             thread_id=run_id,
             status="interrupted",
-            final_context=_v030_phase_context(final_context),
+            final_context=_phase_context(final_context),
             wall_time_seconds=wall_time,
         ),
     )
 
 
-def _finalize_successful_v030_run(
+def _finalize_successful_run(
     result: Any,
     *,
     compiled: Any,
@@ -2127,9 +2107,9 @@ def _finalize_successful_v030_run(
     output_schema = (
         compiled_raw.get("io", {}).get("outputs") if isinstance(compiled_raw, dict) else None
     )
-    _validate_v030_root_outputs(output_schema, final_context)
+    _validate_root_outputs(output_schema, final_context)
     if persist_declared_outputs:
-        _save_v030_declared_file_outputs(
+        _save_declared_file_outputs(
             output_schema,
             output_context,
             default_output_dir=trace_output / "artifacts",
@@ -2141,20 +2121,20 @@ def _finalize_successful_v030_run(
                 output_context,
                 trace_output / "artifacts",
             )
-    _emit_v030_event(
+    _emit_event(
         event_sink,
         RunEndedEvent(
             run_id=run_id,
             thread_id=run_id,
             status="completed",
-            final_context=_v030_phase_context(final_context),
+            final_context=_phase_context(final_context),
             wall_time_seconds=wall_time,
         ),
     )
     return cast(dict[str, Any], final_context)
 
 
-def _validate_v030_root_outputs(output_schema: Any, final_context: dict[str, Any]) -> None:
+def _validate_root_outputs(output_schema: Any, final_context: dict[str, Any]) -> None:
     if not isinstance(output_schema, dict) or not output_schema:
         return
     try:
@@ -2229,7 +2209,7 @@ def _write_workflow_result_artifacts(run_dir: Path, result: WorkflowResult | Run
     _write_json(run_dir / "metrics.json", result.metrics.model_dump(mode="json"))
 
 
-def _prepare_v030_event_sink(
+def _prepare_event_sink(
     *,
     trace_output: Path,
     event_subscriber: Callable[[CallbackEvent], None] | None = None,
@@ -2251,11 +2231,11 @@ def _prepare_v030_event_sink(
     return _CompositeEventSink(sinks)
 
 
-def _emit_v030_event(event_sink: Any, event: CallbackEvent) -> None:
+def _emit_event(event_sink: Any, event: CallbackEvent) -> None:
     _safe_emit_event(event_sink, event)
 
 
-def _v030_phase_context(data: dict[str, Any] | None) -> dict[str, Any]:
+def _phase_context(data: dict[str, Any] | None) -> dict[str, Any]:
     if data is None:
         return {"inputs": {}, "phase_outputs": {}, "scratch": {}}
     if "inputs" in data or "phase_outputs" in data or "scratch" in data:
@@ -2278,7 +2258,7 @@ def _v030_phase_context(data: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def _save_v030_declared_file_outputs(
+def _save_declared_file_outputs(
     output_schema: Any,
     context: dict[str, Any],
     *,
@@ -2337,7 +2317,7 @@ def _context_with_framework_output_sources(
     return output_context
 
 
-def _run_v030_skill_dict(
+def _run_portable_skill_dict(
     skill_root: Path,
     *,
     mock_llm: Any = _NO_MOCK_LLM,
@@ -2358,7 +2338,7 @@ def _run_v030_skill_dict(
     pause_before: frozenset[str] = frozenset(),
     **inputs: Any,
 ) -> dict[str, Any]:
-    """Execute a V0.3.0 skill root through compile_skill + assemble_graph.
+    """Execute a portable skill root through compile and graph assembly.
 
     ``spend`` is the run's token ledger. A caller that has to report on a run
     it may not get a return value from — ``run_skill``, whose ``except`` branch
@@ -2371,7 +2351,7 @@ def _run_v030_skill_dict(
     from graph_skill_runtime.core.graph_assembler import assemble_graph
     from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
 
-    resolver = require_skill_resolver(skill_resolver, caller="_run_v030_skill_dict")
+    resolver = require_skill_resolver(skill_resolver, caller="_run_portable_skill_dict")
     t0 = time.time()
     run_id = thread_id or str(uuid.uuid4())
     trace_output = run_root / run_id
@@ -2379,13 +2359,13 @@ def _run_v030_skill_dict(
     if root_runtime_inputs:
         inputs = {**inputs, **root_runtime_inputs}
     spend = spend if spend is not None else _RunSpendLedger()
-    event_sink = _prepare_v030_event_sink(
+    event_sink = _prepare_event_sink(
         trace_output=trace_output,
         event_subscriber=event_subscriber,
         callbacks=callbacks,
         spend=spend,
     )
-    _emit_v030_event(
+    _emit_event(
         event_sink,
         RunStartedEvent(
             run_id=run_id,
@@ -2462,7 +2442,7 @@ def _run_v030_skill_dict(
             wall_time = round(time.time() - t0, 3)
             final_context = _business_context_from_graph_result(result)
             if hitl_interrupt is not None:
-                _emit_v030_interrupted_run(
+                _emit_interrupted_run(
                     event_sink,
                     run_id=run_id,
                     hitl=hitl_interrupt,
@@ -2470,7 +2450,7 @@ def _run_v030_skill_dict(
                     wall_time=wall_time,
                 )
             else:
-                _emit_v030_paused_run(
+                _emit_paused_run(
                     event_sink,
                     run_id=run_id,
                     paused_at=paused_at,
@@ -2492,7 +2472,7 @@ def _run_v030_skill_dict(
             }
     except Exception:
         wall_time = round(time.time() - t0, 3)
-        _emit_v030_event(
+        _emit_event(
             event_sink,
             RunEndedEvent(
                 run_id=run_id,
@@ -2506,7 +2486,7 @@ def _run_v030_skill_dict(
     wall_time = round(time.time() - t0, 3)
 
     # Step 4.4: Extract flat business output data directly from model_dump
-    final_context = _finalize_successful_v030_run(
+    final_context = _finalize_successful_run(
         result,
         compiled=compiled,
         event_sink=event_sink,
@@ -2525,116 +2505,3 @@ def _run_v030_skill_dict(
         "run_dir": str(trace_output),
         "wall_time_sec": wall_time,
     }
-
-
-# ---------------------------------------------------------------------------
-# CLI entry point
-# ---------------------------------------------------------------------------
-
-
-def main() -> None:
-    """CLI entry point for running a SKILL.md."""
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description=(
-            f"Run a {_SKILL_ENTRYPOINT_FILENAME} workflow "
-            "(document-driven, no per-skill Python code needed)"
-        )
-    )
-    parser.add_argument("--skill", required=True, help=f"Path to {_SKILL_ENTRYPOINT_FILENAME}")
-    parser.add_argument("--inputs", type=str, default=None, help="JSON string of runtime inputs")
-    parser.add_argument("--inputs-file", type=str, default=None, help="JSON file of runtime inputs")
-    parser.add_argument("--output", type=str, default=None, help="Output directory")
-    parser.add_argument(
-        "--thread-id", type=str, default=None, help="Thread ID for checkpoint resume"
-    )
-    parser.add_argument(
-        "--unattended",
-        action="store_true",
-        help=(
-            "Run without human intervention. ask_clarification tool calls "
-            "are auto-answered with a best-effort instruction instead of "
-            "interrupting the run."
-        ),
-    )
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
-
-    # MVP-3 T10: route framework startup through ``Bootstrap`` instead of
-    # leaking ``load_dotenv`` and reasoning_patch side effects across
-    # ``runner.main``. ``Bootstrap.apply_patches`` is the single
-    # documented entry point for monkey-patches; ``load_settings``
-    # produces an explicit ``Settings`` snapshot so downstream
-    # consumers can migrate off ``os.environ.get`` reads incrementally.
-    # ``load_dotenv`` is kept as a transitional sibling step — it lives
-    # outside ``Bootstrap`` because the ``.env`` file is a CLI/runtime
-    # convention, not a framework patch. Once every consumer reads from
-    # ``Settings``, the dotenv call moves into ``Bootstrap`` and exits
-    # ``runner.main`` entirely (deferred to MVP-5 工程门禁).
-    from graph_skill_runtime.bootstrap import Bootstrap
-
-    bootstrap = Bootstrap()
-    bootstrap.apply_patches()
-
-    # Load .env (transitional; reads cli-side .env so Settings.from_env
-    # sees user-supplied API keys).
-    try:
-        from dotenv import load_dotenv
-
-        load_dotenv()
-    except ImportError as exc:
-        raise LoaderError(
-            f"required import failed: {exc}",
-            context={"module": "dotenv"},
-        ) from exc
-
-    bootstrap.load_settings()
-
-    # Parse inputs
-    inputs: dict[str, Any] = {}
-    if args.inputs:
-        inputs = json.loads(args.inputs)
-    elif args.inputs_file:
-        inputs = json.loads(Path(args.inputs_file).read_text(encoding="utf-8"))
-
-    workspace_dir = Path(args.output).resolve() if args.output else (Path.cwd() / ".workspace")
-
-    skill_path = Path(args.skill)
-    resolver_roots = [Path.cwd(), Path.cwd() / "skills"]
-    if skill_path.is_dir():
-        resolver_roots.extend([skill_path, skill_path / "registry", skill_path.parent])
-    else:
-        resolver_roots.extend([skill_path.parent, skill_path.parent / "registry"])
-
-    result = run_skill(
-        args.skill,
-        workspace_dir=workspace_dir,
-        skill_resolver=LocalWorkspaceResolver(search_paths=resolver_roots),
-        thread_id=args.thread_id,
-        unattended=args.unattended,
-        **inputs,
-    )
-
-    logger.info(
-        "[Runner] Result: %s",
-        json.dumps(
-            {
-                "wall_time_sec": result.wall_time_sec,
-                "metrics": result.metrics,
-                "trace_path": result.trace_path,
-            },
-            indent=2,
-            default=str,
-        ),
-    )
-
-
-if __name__ == "__main__":
-    main()

@@ -17,9 +17,15 @@ from pathlib import Path
 
 from graph_skill_runtime.core.runner import predict_skill
 
-_CHILD_GRAPH = """---
-schema_version: "v0.3.0"
-name: nested-child
+_SKILL_ENTRY = """---
+name: parent
+description: Exercise predict schemas inside flat-registry subgraphs.
+---
+"""
+
+_CHILD_GRAPH = """schema_version: gskill.graph.v1
+graph_id: child
+description: Produce a headline inside an internal graph.
 io:
   inputs:
     type: object
@@ -32,12 +38,13 @@ io:
     properties:
       headline: {type: string}
 phases:
-  - write
----
-<phase depends_on="input" output>write</phase>
+  - id: write
+    depends_on: [input]
+    output: true
 """
 
 _CHILD_AGENT = """---
+name: write
 llm_role: analyst
 io:
   inputs:
@@ -55,9 +62,9 @@ io:
 <goal>Write one headline for the topic, then finish the task.</goal>
 """
 
-_PARENT_GRAPH = """---
-schema_version: "v0.3.0"
-name: nested-parent
+_PARENT_GRAPH = """schema_version: gskill.graph.v1
+graph_id: root
+description: Delegate prediction to one internal graph.
 io:
   inputs:
     type: object
@@ -70,14 +77,14 @@ io:
     properties:
       headline: {type: string}
 phases:
-  - delegate
----
-<phase depends_on="input" output>delegate</phase>
+  - id: delegate
+    depends_on: [input]
+    output: true
 """
 
 _PARENT_SUBGRAPH = """---
 name: delegate
-path: ./child
+graph: child
 io:
   inputs:
     type: object
@@ -100,11 +107,12 @@ def _write(path: Path, text: str) -> None:
 
 def _nested_skill(root: Path) -> Path:
     parent = root / "parent"
-    _write(parent / "GRAPH.md", _PARENT_GRAPH)
+    _write(parent / "SKILL.md", _SKILL_ENTRY)
+    _write(parent / "graph.yaml", _PARENT_GRAPH)
     _write(parent / "phases" / "delegate" / "SUBGRAPH.md", _PARENT_SUBGRAPH)
-    child = parent / "child"
-    _write(child / "GRAPH.md", _CHILD_GRAPH)
-    _write(child / "phases" / "write" / "SKILL.md", _CHILD_AGENT)
+    child = parent / "graphs" / "child"
+    _write(child / "graph.yaml", _CHILD_GRAPH)
+    _write(child / "phases" / "write" / "AGENT.md", _CHILD_AGENT)
     return parent
 
 
@@ -130,14 +138,14 @@ def test_predict_gives_the_stub_the_schema_of_a_phase_inside_a_subgraph(
     )
 
 
-_SECOND_CHILD_GRAPH = _CHILD_GRAPH.replace("nested-child", "nested-other").replace(
+_SECOND_CHILD_GRAPH = _CHILD_GRAPH.replace("graph_id: child", "graph_id: child-b").replace(
     "headline", "verdict"
 )
 _SECOND_CHILD_AGENT = _CHILD_AGENT.replace("headline", "verdict")
 
-_TWO_CHILD_PARENT_GRAPH = """---
-schema_version: "v0.3.0"
-name: nested-parent-two
+_TWO_CHILD_PARENT_GRAPH = """schema_version: gskill.graph.v1
+graph_id: root
+description: Delegate prediction to two internal graphs with same-named phases.
 io:
   inputs:
     type: object
@@ -151,18 +159,19 @@ io:
       headline: {type: string}
       verdict: {type: string}
 phases:
-  - first
-  - second
----
-<phase depends_on="input">first</phase>
-<phase depends_on="first" output>second</phase>
+  - id: first
+    depends_on: [input]
+    output: false
+  - id: second
+    depends_on: [first]
+    output: true
 """
 
 
-def _subgraph_md(name: str, path: str, field: str) -> str:
+def _subgraph_md(name: str, graph_id: str, field: str) -> str:
     return f"""---
 name: {name}
-path: {path}
+graph: {graph_id}
 io:
   inputs:
     type: object
@@ -183,13 +192,23 @@ def test_same_phase_name_in_two_subgraphs_each_gets_its_own_schema(tmp_path: Pat
     their phase `write`; each must be stubbed against its own declared output,
     not whichever one happened to register that name last."""
     parent = tmp_path / "parent"
-    _write(parent / "GRAPH.md", _TWO_CHILD_PARENT_GRAPH)
-    _write(parent / "phases" / "first" / "SUBGRAPH.md", _subgraph_md("first", "./child_a", "headline"))
-    _write(parent / "phases" / "second" / "SUBGRAPH.md", _subgraph_md("second", "./child_b", "verdict"))
-    _write(parent / "child_a" / "GRAPH.md", _CHILD_GRAPH)
-    _write(parent / "child_a" / "phases" / "write" / "SKILL.md", _CHILD_AGENT)
-    _write(parent / "child_b" / "GRAPH.md", _SECOND_CHILD_GRAPH)
-    _write(parent / "child_b" / "phases" / "write" / "SKILL.md", _SECOND_CHILD_AGENT)
+    _write(parent / "SKILL.md", _SKILL_ENTRY)
+    _write(parent / "graph.yaml", _TWO_CHILD_PARENT_GRAPH)
+    _write(
+        parent / "phases" / "first" / "SUBGRAPH.md",
+        _subgraph_md("first", "child", "headline"),
+    )
+    _write(
+        parent / "phases" / "second" / "SUBGRAPH.md",
+        _subgraph_md("second", "child-b", "verdict"),
+    )
+    _write(parent / "graphs" / "child" / "graph.yaml", _CHILD_GRAPH)
+    _write(parent / "graphs" / "child" / "phases" / "write" / "AGENT.md", _CHILD_AGENT)
+    _write(parent / "graphs" / "child-b" / "graph.yaml", _SECOND_CHILD_GRAPH)
+    _write(
+        parent / "graphs" / "child-b" / "phases" / "write" / "AGENT.md",
+        _SECOND_CHILD_AGENT,
+    )
 
     result = predict_skill(parent, workspace_dir=tmp_path / "ws", topic="mirrors")
 

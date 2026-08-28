@@ -12,7 +12,7 @@ from graph_skill_runtime.callbacks.events import (
     BuiltinSubagentFallbackEvent,
 )
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
-from graph_skill_runtime.core.loader import load_workflow_from_md
+from tests.legacy_fixture_adapter import load_workflow_from_md
 
 
 class CollectorCallback(Callback):

@@ -68,10 +68,14 @@ def _write(path: Path, text: str) -> None:
 
 def _hitl_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: hitl-event-test
+        root / "SKILL.md",
+        f"---\nname: {root.name}\ndescription: HITL event fixture.\n---\n",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: HITL event graph.
 io:
   inputs:
     type: object
@@ -84,9 +88,9 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     # ask_clarification is a framework tool mounted unconditionally since the
@@ -94,8 +98,9 @@ phases:
     # [F-v3-agent-tool-reserved] compile diagnostic, so the fixture exercises
     # the real default-mount path with no local shim.
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -269,6 +274,7 @@ def test_resume_skill_emits_resumed_event_before_continuing_from_checkpoint(
         "assemble_graph",
         lambda *_args, **_kwargs: SimpleNamespace(graph=_FakeGraph()),
     )
+    _hitl_skill(tmp_path / "skill")
 
     resume_skill(
         tmp_path / "skill",

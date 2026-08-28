@@ -29,12 +29,20 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _base(root: Path, *, name: str = "resolver-test", phase: str = "main") -> None:
+def _base(root: Path, *, phase: str = "main") -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: {name}
+name: {root.name}
+description: Exercise the portable skill resolver protocol.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise the portable skill resolver protocol.
 io:
   inputs:
     type: object
@@ -45,18 +53,19 @@ io:
     type: object
     properties: {{}}
 phases:
-  - {phase}
----
-<phase depends_on="input" output>{phase}</phase>
+  - id: {phase}
+    depends_on: [input]
+    output: true
 """,
     )
 
 
 def _child_skill(root: Path) -> None:
-    _base(root, name="child", phase="child")
+    _base(root, phase="child")
     _write(
-        root / "phases" / "child" / "SKILL.md",
+        root / "phases" / "child" / "AGENT.md",
         """---
+name: child
 io:
   inputs:
     type: object
@@ -75,10 +84,11 @@ io:
 
 
 def _logic_skill(root: Path) -> None:
-    _base(root, name="logic-only", phase="done")
+    _base(root, phase="done")
     _write(
         root / "phases" / "done" / "LOGIC.md",
         """---
+name: done
 io:
   inputs:
     type: object
@@ -99,8 +109,9 @@ io:
 def _parent_skill(root: Path, target_skill: str) -> None:
     _base(root)
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 subagents:
   - name: child_expert
     target_skill: {target_skill}
@@ -122,39 +133,39 @@ io:
 def test_target_skill_subagent_resolves_through_protocol(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
     child = tmp_path / "registered-child"
-    _parent_skill(parent, "demo.child")
+    _parent_skill(parent, "demo-child")
     _child_skill(child)
-    resolver = DictSkillResolver({"demo.child": child})
+    resolver = DictSkillResolver({"demo-child": child})
 
     compiled = SkillLoader().compile_skill(parent, skill_resolver=resolver)
     subagent = compiled.subagents_by_phase["main"][0]
     tools = {tool.name: tool for tool in compiled.tools.for_phase("main")}
 
-    assert subagent.target_skill == "demo.child"
+    assert subagent.target_skill == "demo-child"
     assert subagent.root == child
     assert subagent.input_model.model_validate({"text": "hello"}).text == "hello"
-    assert tools["call_subagent_child_expert"].metadata["target_skill"] == "demo.child"
+    assert tools["call_subagent_child_expert"].metadata["target_skill"] == "demo-child"
 
 
 def test_compile_skill_facade_passes_skill_resolver(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
     child = tmp_path / "registered-child"
-    _parent_skill(parent, "demo.child")
+    _parent_skill(parent, "demo-child")
     _child_skill(child)
 
     compiled = compile_skill(
         parent,
         cache=False,
-        skill_resolver=DictSkillResolver({"demo.child": child}),
+        skill_resolver=DictSkillResolver({"demo-child": child}),
     )
 
-    assert compiled.subagents_by_phase["main"][0].target_skill == "demo.child"
+    assert compiled.subagents_by_phase["main"][0].target_skill == "demo-child"
 
 
 def test_target_skill_uses_default_local_resolver(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
-    child = tmp_path / "demo" / "child"
-    _parent_skill(parent, "demo.child")
+    child = tmp_path / "demo-child"
+    _parent_skill(parent, "demo-child")
     _child_skill(child)
 
     compiled = SkillLoader().compile_skill(parent)
@@ -164,8 +175,8 @@ def test_target_skill_uses_default_local_resolver(tmp_path: Path) -> None:
 
 def test_compile_skill_facade_uses_default_local_resolver(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
-    child = tmp_path / "demo" / "child"
-    _parent_skill(parent, "demo.child")
+    child = tmp_path / "demo-child"
+    _parent_skill(parent, "demo-child")
     _child_skill(child)
 
     compiled = compile_skill(parent, cache=False)
@@ -191,19 +202,19 @@ def test_invalid_skill_id_raises_v3_code() -> None:
 def test_resolver_returning_invalid_path_raises_v3_code(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
     missing_root = tmp_path / "missing-child"
-    _parent_skill(parent, "demo.child")
+    _parent_skill(parent, "demo-child")
 
     with pytest.raises(SkillResolutionError) as exc_info:
         SkillLoader().compile_skill(
             parent,
-            skill_resolver=DictSkillResolver({"demo.child": missing_root}),
+            skill_resolver=DictSkillResolver({"demo-child": missing_root}),
         )
     assert exc_info.value.payload.code == "[F-v3-resolver-path-invalid]"
 
 
 def test_unregistered_skill_id_raises_v3_code(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
-    _parent_skill(parent, "demo.missing")
+    _parent_skill(parent, "demo-missing")
 
     with pytest.raises(SkillResolutionError) as exc_info:
         SkillLoader().compile_skill(parent, skill_resolver=DictSkillResolver({}))

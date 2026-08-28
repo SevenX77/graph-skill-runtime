@@ -60,17 +60,6 @@ class EmptyResolver:
         raise KeyError(skill_id)
 
 
-class FixtureResolver:
-    def __init__(self, root: Path) -> None:
-        self.root = root
-
-    def resolve_skill(self, skill_id: str) -> Path:
-        return {
-            "e2e.echo": self.root / "registry" / "echo",
-            "e2e.expander": self.root / "registry" / "expander",
-        }[skill_id]
-
-
 def _iter_text_files() -> list[Path]:
     files: list[Path] = []
     self_path = Path(__file__).resolve()
@@ -148,12 +137,21 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _write_minimal_v030_logic_skill(root: Path) -> None:
+def _write_minimal_portable_logic_skill(parent: Path) -> Path:
+    root = parent / "round18-smoke"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: round18-smoke
+description: Exercise the portable compiler and runtime path.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise the portable compiler and runtime path.
 io:
   inputs:
     type: object
@@ -167,14 +165,16 @@ io:
     properties:
       answer:
         type: string
-phases: [main]
----
-<phase depends_on="input" output>main</phase>
+phases:
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "main" / "LOGIC.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -198,6 +198,7 @@ validator: false
         root / "phases" / "main" / "actions" / "echo.py",
         "def echo(inputs):\n    return {'answer': inputs.get('text')}\n",
     )
+    return root
 
 
 def test_round18_semantic_grep_gate_has_no_real_legacy_usage() -> None:
@@ -248,16 +249,13 @@ def test_round18_collect_ignore_glob_does_not_hide_broken_tests() -> None:
     assert getattr(module, "collect_ignore_glob", []) == []
 
 
-def test_round18_v030_compile_and_runtime_path_still_work(tmp_path: Path) -> None:
+def test_round18_portable_compile_and_runtime_path_work(tmp_path: Path) -> None:
     resolver = EmptyResolver()
-
-    fixture = GRAPH_SKILL_RUNTIME_ROOT / "tests" / "fixtures" / "v030_e2e_pipeline"
-    compiled_fixture = compile_skill(fixture, skill_resolver=FixtureResolver(fixture), cache=False)
-    assert compiled_fixture.manifest.schema_version == "v0.3.0"
-
-    _write_minimal_v030_logic_skill(tmp_path)
+    skill_root = _write_minimal_portable_logic_skill(tmp_path)
+    compiled = compile_skill(skill_root, skill_resolver=resolver, cache=False)
+    assert compiled.manifest.schema_version == "gskill.graph.v1"
     graph = assemble_graph(
-        compile_skill(tmp_path, skill_resolver=resolver, cache=False),
+        compiled,
         skill_resolver=resolver,
     ).graph
     result: dict[str, Any] = graph.invoke(

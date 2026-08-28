@@ -40,16 +40,25 @@ def _write(path: Path, text: str) -> None:
 
 
 def _resource_skill(
-    root: Path,
+    parent: Path,
     *,
     reference_path: str = "references/r1.md",
     example_path: str = "examples/e2.md",
-) -> None:
+) -> Path:
+    root = parent / "resource-tools"
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: resource-tools
+description: Exercise declared reference and example resources.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise declared reference and example resources.
 io:
   inputs:
     type: object
@@ -62,14 +71,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 io:
   inputs:
     type: object
@@ -101,6 +111,7 @@ Inline example.
 </example>
 """,
     )
+    return root
 
 
 def _bound_tools(root: Path, skill_resolver: object) -> dict[str, Any]:
@@ -114,11 +125,11 @@ def _bound_tools(root: Path, skill_resolver: object) -> dict[str, Any]:
 def test_read_reference_returns_declared_current_phase_markdown(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _resource_skill(tmp_path)
-    _write(tmp_path / "references" / "r1.md", "# Reference\n\nAllowed content.")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n\nAllowed example.")
+    root = _resource_skill(tmp_path)
+    _write(root / "references" / "r1.md", "# Reference\n\nAllowed content.")
+    _write(root / "examples" / "e2.md", "# Example\n\nAllowed example.")
 
-    tools = _bound_tools(tmp_path, mock_skill_resolver)
+    tools = _bound_tools(root, mock_skill_resolver)
 
     assert tools["read_reference"].invoke({"reference_id": "R1"}) == "# Reference\n\nAllowed content."
 
@@ -126,11 +137,11 @@ def test_read_reference_returns_declared_current_phase_markdown(
 def test_read_example_returns_declared_document_example_markdown(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _resource_skill(tmp_path)
-    _write(tmp_path / "references" / "r1.md", "# Reference\n")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n\nAllowed example.")
+    root = _resource_skill(tmp_path)
+    _write(root / "references" / "r1.md", "# Reference\n")
+    _write(root / "examples" / "e2.md", "# Example\n\nAllowed example.")
 
-    tools = _bound_tools(tmp_path, mock_skill_resolver)
+    tools = _bound_tools(root, mock_skill_resolver)
 
     assert tools["read_example"].invoke({"example_id": "E2"}) == "# Example\n\nAllowed example."
 
@@ -138,10 +149,10 @@ def test_read_example_returns_declared_document_example_markdown(
 def test_read_reference_unknown_id_uses_runtime_not_found_code(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _resource_skill(tmp_path)
-    _write(tmp_path / "references" / "r1.md", "# Reference\n")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n")
-    tools = _bound_tools(tmp_path, mock_skill_resolver)
+    root = _resource_skill(tmp_path)
+    _write(root / "references" / "r1.md", "# Reference\n")
+    _write(root / "examples" / "e2.md", "# Example\n")
+    tools = _bound_tools(root, mock_skill_resolver)
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
         tools["read_reference"].invoke({"reference_id": "missing"})
@@ -153,10 +164,10 @@ def test_read_reference_unknown_id_does_not_touch_matching_external_file(
 ) -> None:
     outside = tmp_path.parent / "missing"
     outside.write_text("SHOULD_NOT_LEAK", encoding="utf-8")
-    _resource_skill(tmp_path)
-    _write(tmp_path / "references" / "r1.md", "# Reference\n")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n")
-    tools = _bound_tools(tmp_path, mock_skill_resolver)
+    root = _resource_skill(tmp_path)
+    _write(root / "references" / "r1.md", "# Reference\n")
+    _write(root / "examples" / "e2.md", "# Example\n")
+    tools = _bound_tools(root, mock_skill_resolver)
 
     with pytest.raises(GraphAgentFatalError) as exc:
         tools["read_reference"].invoke({"reference_id": "missing"})
@@ -168,10 +179,10 @@ def test_read_reference_unknown_id_does_not_touch_matching_external_file(
 def test_read_example_unknown_id_uses_runtime_not_found_code(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _resource_skill(tmp_path)
-    _write(tmp_path / "references" / "r1.md", "# Reference\n")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n")
-    tools = _bound_tools(tmp_path, mock_skill_resolver)
+    root = _resource_skill(tmp_path)
+    _write(root / "references" / "r1.md", "# Reference\n")
+    _write(root / "examples" / "e2.md", "# Example\n")
+    tools = _bound_tools(root, mock_skill_resolver)
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
         tools["read_example"].invoke({"example_id": "missing"})
@@ -183,11 +194,11 @@ def test_read_reference_path_escape_is_blocked_without_leaking_external_file(
 ) -> None:
     outside = tmp_path.parent / "secret-reference.md"
     outside.write_text("SHOULD_NOT_LEAK", encoding="utf-8")
-    _resource_skill(tmp_path, reference_path="../secret-reference.md")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n")
+    root = _resource_skill(tmp_path, reference_path="../secret-reference.md")
+    _write(root / "examples" / "e2.md", "# Example\n")
 
     with pytest.raises(SkillLoadError) as exc:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     assert exc.value.payload.code == "[F-v3-resource-reference-path-invalid]"
 
     assert "SHOULD_NOT_LEAK" not in str(exc.value)
@@ -196,10 +207,10 @@ def test_read_reference_path_escape_is_blocked_without_leaking_external_file(
 def test_read_reference_invalid_arguments_use_tool_argument_code(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _resource_skill(tmp_path)
-    _write(tmp_path / "references" / "r1.md", "# Reference\n")
-    _write(tmp_path / "examples" / "e2.md", "# Example\n")
-    tools = _bound_tools(tmp_path, mock_skill_resolver)
+    root = _resource_skill(tmp_path)
+    _write(root / "references" / "r1.md", "# Reference\n")
+    _write(root / "examples" / "e2.md", "# Example\n")
+    tools = _bound_tools(root, mock_skill_resolver)
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
         tools["read_reference"].invoke({"reference_id": 123})
@@ -211,11 +222,11 @@ def test_example_path_escape_is_blocked_without_leaking_external_file(
 ) -> None:
     outside = tmp_path.parent / "secret-example.md"
     outside.write_text("SHOULD_NOT_LEAK", encoding="utf-8")
-    _resource_skill(tmp_path, example_path="../secret-example.md")
-    _write(tmp_path / "references" / "r1.md", "# Reference\n")
+    root = _resource_skill(tmp_path, example_path="../secret-example.md")
+    _write(root / "references" / "r1.md", "# Reference\n")
 
     with pytest.raises(SkillLoadError) as exc:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     assert exc.value.payload.code == "[F-v3-resource-example-path-invalid]"
 
     assert "SHOULD_NOT_LEAK" not in str(exc.value)

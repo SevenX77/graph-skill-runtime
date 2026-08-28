@@ -28,10 +28,18 @@ def _write(path: Path, text: str) -> None:
 
 def _write_two_phase_linear_logic_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
-name: ws-e8-per-node
+name: skill
+description: Exercise persisted per-node phase outputs.
+---
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise persisted per-node phase outputs.
 io:
   inputs:
     type: object
@@ -46,16 +54,18 @@ io:
       report:
         type: string
 phases:
-  - segment
-  - expand
----
-<phase depends_on="input">segment</phase>
-<phase depends_on="segment" output>expand</phase>
+  - id: segment
+    depends_on: [input]
+    output: false
+  - id: expand
+    depends_on: [segment]
+    output: true
 """,
     )
     _write(
         root / "phases" / "segment" / "LOGIC.md",
         """---
+name: segment
 io:
   inputs:
     type: object
@@ -85,6 +95,7 @@ validator: false
     _write(
         root / "phases" / "expand" / "LOGIC.md",
         """---
+name: expand
 io:
   inputs:
     type: object
@@ -142,16 +153,25 @@ def test_simple_linear_skill_writes_real_per_node_phase_outputs(
     assert phase_outputs["expand"]["report"] == "alpha::seg::report"
 
 
-def _write_batch_open_output_schema_skill(root: Path) -> None:
+def _write_batch_open_output_schema_skill(parent: Path) -> Path:
     """A batch (iterate) phase whose output schema has NO `properties` key — the
     'open schema' branch where a phase payload is computed via a raw dict-delta.
     The reserved phase_outputs meta-key must NOT leak into this node's golden entry.
     """
-    root.joinpath("GRAPH.md").parent.mkdir(parents=True, exist_ok=True)
-    (root / "GRAPH.md").write_text(
+    root = parent / "batch-open"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
-name: ws-e8-batch-open
+name: batch-open
+description: Exercise open-schema batch phase output isolation.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise open-schema batch phase output isolation.
 io:
   inputs:
     type: object
@@ -167,9 +187,9 @@ io:
       seen:
         type: array
 phases:
-  - worker
----
-<phase depends_on="input" output>worker</phase>
+  - id: worker
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
@@ -179,6 +199,7 @@ phases:
     # must not leak reserved metadata into that value.
     (logic_dir / "LOGIC.md").write_text(
         """---
+name: worker
 io:
   inputs:
     type: object
@@ -196,8 +217,9 @@ io:
         type: string
 actions: [worker]
 validator: false
-batch:
-  iterator: items
+iterate:
+  mode: batch
+  over: items
   item_var: item
   concurrency: 2
 ---
@@ -215,14 +237,15 @@ batch:
         ).lstrip(),
         encoding="utf-8",
     )
+    return root
 
 
 def test_batch_open_schema_phase_outputs_has_no_nested_phase_outputs_leak(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_batch_open_output_schema_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    root = _write_batch_open_output_schema_skill(tmp_path)
+    compiled = compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph
 
     result: dict[str, Any] = graph.invoke(

@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import pytest
 
 import graph_skill_runtime.core.graph_assembler as graph_assembler_module
-from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 from graph_skill_runtime.core.graph_assembler import (
     _build_subgraph_node,
@@ -18,6 +17,7 @@ from graph_skill_runtime.core.graph_assembler import (
 from graph_skill_runtime.core.loader import PhaseDocument
 from graph_skill_runtime.core.manifest import PhaseIOSchema, SubgraphNodeAST
 from graph_skill_runtime.runtime.state_mapper import PhaseWrapper, StateMapper
+from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -25,7 +25,13 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _base(root: Path, phases: str, outputs: dict[str, object] | None = None) -> None:
+def _base(
+    root: Path,
+    phases: str,
+    outputs: dict[str, object] | None = None,
+    *,
+    graph_name: str = "gamma2-child",
+) -> None:
     phase_entries = []
     for match in re.finditer(r'<phase id="([^"]+)" src="([^"]+)" depends_on="([^"]*)"', phases):
         deps = [dep for dep in re.split(r"[\s,]+", match.group(3).strip()) if dep]
@@ -53,7 +59,7 @@ def _base(root: Path, phases: str, outputs: dict[str, object] | None = None) -> 
         root / "GRAPH.md",
         f"""---
 schema_version: "v0.3.0"
-name: gamma2-child
+name: {graph_name}
 io:
   inputs:
     type: object
@@ -133,7 +139,11 @@ def test_subgraph_child_starts_from_explicit_inputs_only(
     _base(tmp_path, '<phase id="sub" src="phases/sub" depends_on="" />\n')
     _subgraph(tmp_path, "sub")
     child = tmp_path / "phases" / "sub" / "child"
-    _base(child, '<phase id="inspect" src="phases/inspect" depends_on="" />\n')
+    _base(
+        child,
+        '<phase id="inspect" src="phases/inspect" depends_on="" />\n',
+        graph_name="gamma2-inspect",
+    )
     _logic_action(
         child,
         "inspect",
@@ -177,6 +187,7 @@ def test_subgraph_child_outputs_are_deterministic_across_child_phases(
         child,
         '<phase id="first" src="phases/first" depends_on="" />\n'
         '<phase id="second" src="phases/second" depends_on="first" />\n',
+        graph_name="gamma2-sequence",
     )
     _logic_action(child, "first", "first", "def first(inputs):\n    return {'seen_public': 'a'}\n", outputs=["seen_public"])
     _logic_action(
@@ -279,20 +290,6 @@ def test_subgraph_child_flow_is_deep_copied_and_depth_increments(
                 messages=[],
             )
 
-    class FakeSkillLoader:
-        def __init__(self, *args, **kwargs):
-            del args, kwargs
-
-        def compile_skill(self, *args, **kwargs):
-            del args, kwargs
-            return SimpleNamespace(manifest=SimpleNamespace(phases=[]))
-
-    monkeypatch.setattr(
-        graph_assembler_module,
-        "_resolve_subgraph_path_root_for_assembly",
-        lambda source, value: tmp_path,
-    )
-    monkeypatch.setattr(graph_assembler_module, "SkillLoader", FakeSkillLoader)
     monkeypatch.setattr(
         graph_assembler_module,
         "assemble_graph",
@@ -300,7 +297,8 @@ def test_subgraph_child_flow_is_deep_copied_and_depth_increments(
     )
     phase_ast = SubgraphNodeAST(
         mode="subgraph",
-        path=str(tmp_path),
+        name="sub",
+        graph="child",
         io=PhaseIOSchema(
             inputs={"type": "object", "properties": {"public": {"type": "string"}}},
             outputs={"type": "object", "properties": {}},
@@ -322,6 +320,7 @@ def test_subgraph_child_flow_is_deep_copied_and_depth_increments(
     node = _build_subgraph_node(
         phase_doc,
         phase_ast,
+        SimpleNamespace(graph_registry={"child": object()}),
         chat_model=None,
         max_patch_attempts=1,
         skill_resolver=SimpleNamespace(resolve_skill=lambda skill_id: tmp_path),

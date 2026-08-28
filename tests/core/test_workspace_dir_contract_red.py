@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from graph_skill_runtime.core import runner as engine_runner
-from graph_skill_runtime.core.runner import run_skill
+from tests.legacy_fixture_adapter import run_skill
 
 
 def _write(path: Path, text: str) -> None:

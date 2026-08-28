@@ -4,34 +4,24 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import TypeAdapter, ValidationError
 
 from graph_skill_runtime.core.exceptions import SkillLoadError
 from graph_skill_runtime.core.graph_serializer import serialize_graph
 from graph_skill_runtime.core.loader import SkillLoader
-from graph_skill_runtime.core.manifest import GraphManifest, LogicNodeAST, PhaseAST, PhaseIOSchema
-
-
-class DictSkillResolver:
-    def __init__(self, roots: dict[str, Path]) -> None:
-        self.roots = roots
-
-    def resolve_skill(self, skill_id: str) -> Path:
-        return self.roots[skill_id]
+from graph_skill_runtime.core.manifest import (
+    GraphManifest,
+    GraphPhaseRef,
+    LogicNodeAST,
+    PhaseAST,
+    PhaseIOSchema,
+)
 
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-
-
-def _schema_yaml(field: str = "text") -> str:
-    return f"""type: object
-    properties:
-      {field}:
-        type: string
-    required:
-      - {field}"""
+    path.write_text(text, encoding="utf-8", newline="\n")
 
 
 def _object_schema(*properties: str) -> dict[str, Any]:
@@ -42,69 +32,90 @@ def _object_schema(*properties: str) -> dict[str, Any]:
     }
 
 
+def _new_skill(parent: Path, name: str = "round14") -> Path:
+    root = parent / name
+    _write(
+        root / "SKILL.md",
+        f"---\nname: {name}\ndescription: Exercise the portable compiler contract.\n---\n",
+    )
+    return root
+
+
+def _phase(
+    phase_id: str,
+    *,
+    depends_on: list[str] | None = None,
+    output: bool = True,
+) -> dict[str, Any]:
+    return {
+        "id": phase_id,
+        "depends_on": ["input"] if depends_on is None else depends_on,
+        "output": output,
+    }
+
+
 def _graph(
     root: Path,
     *,
-    schema_version: str = "v0.3.0",
-    phases: list[str] | None = None,
-    body: str | None = None,
+    schema_version: str = "gskill.graph.v1",
+    graph_id: str = "root",
+    phases: list[dict[str, Any]] | None = None,
+    omit_phases: bool = False,
     inputs_field: str = "text",
     outputs_field: str = "result",
-    extra_frontmatter: str = "",
+    extra: dict[str, Any] | None = None,
 ) -> None:
-    phase_names = phases if phases is not None else ["main"]
-    phase_list = ", ".join(phase_names)
-    phase_body = body if body is not None else '<phase depends_on="input" output>main</phase>'
-    _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "{schema_version}"
-name: round14
-phases: [{phase_list}]
-io:
-  inputs:
-    {_schema_yaml(inputs_field)}
-  outputs:
-    {_schema_yaml(outputs_field)}
-{extra_frontmatter}---
-{phase_body}
-""",
-    )
+    document: dict[str, Any] = {
+        "schema_version": schema_version,
+        "graph_id": graph_id,
+        "description": "Exercise the portable compiler contract.",
+        "io": {
+            "inputs": _object_schema(inputs_field),
+            "outputs": _object_schema(outputs_field),
+        },
+    }
+    if not omit_phases:
+        document["phases"] = phases if phases is not None else [_phase("main")]
+    if extra:
+        document.update(extra)
+    _write(root / "graph.yaml", yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+
+
+def _markdown(frontmatter: dict[str, Any], body: str = "") -> str:
+    rendered = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True)
+    return f"---\n{rendered}---\n{body}"
 
 
 def _agent_phase(
     root: Path,
     phase_id: str = "main",
     *,
-    frontmatter: str = "",
+    extra: dict[str, Any] | None = None,
     body: str | None = None,
 ) -> None:
-    phase_body = (
-        body
-        or """<role>Tester</role>
-<goal>Exercise the round-14 compiler contract.</goal>
+    phase_body = body or """<role>Tester</role>
+<goal>Exercise the portable compiler contract.</goal>
 <step id="S1" name="check">Use @protocol:P1 and @example:E1.</step>
 <protocol id="P1">Return a precise result.</protocol>
 <example id="E1">Input text becomes a result string.</example>
 """
-    )
-    _write(
-        root / "phases" / phase_id / "SKILL.md",
-        f"""---
-validator: false
-io:
-  inputs:
-    {_schema_yaml("text")}
-  outputs:
-    {_schema_yaml("result")}
-references:
-  - {{id: R1, path: references/r1.md, summary: "Reference"}}
-examples:
-  - {{id: E2, path: examples/e2.md, summary: "Document example"}}
-{frontmatter}---
-{phase_body}
-""",
-    )
+    frontmatter: dict[str, Any] = {
+        "name": phase_id,
+        "validator": False,
+        "io": {
+            "inputs": _object_schema("text"),
+            "outputs": _object_schema("result"),
+        },
+        "references": [
+            {"id": "R1", "path": "references/r1.md", "summary": "Reference"}
+        ],
+        "examples": [
+            {"id": "E2", "path": "examples/e2.md", "summary": "Document example"}
+        ],
+    }
+    if extra:
+        frontmatter.update(extra)
+    _write(root / "phases" / phase_id / "AGENT.md", _markdown(frontmatter, phase_body))
     _write(root / "references" / "r1.md", "reference\n")
     _write(root / "examples" / "e2.md", "example\n")
 
@@ -115,21 +126,20 @@ def _logic_phase(
     *,
     input_field: str = "text",
     output_field: str = "result",
-    validator: str = "false",
+    validator: object = False,
 ) -> None:
+    frontmatter = {
+        "name": phase_id,
+        "io": {
+            "inputs": _object_schema(input_field),
+            "outputs": _object_schema(output_field),
+        },
+        "actions": ["run"],
+        "validator": validator,
+    }
     _write(
         root / "phases" / phase_id / "LOGIC.md",
-        f"""---
-io:
-  inputs:
-    {_schema_yaml(input_field)}
-  outputs:
-    {_schema_yaml(output_field)}
-actions: [run]
-validator: {validator}
----
-<action>run</action>
-""",
+        _markdown(frontmatter, "<action>run</action>\n"),
     )
     _write(
         root / "phases" / phase_id / "actions" / "run.py",
@@ -141,24 +151,20 @@ def _subgraph_phase(
     root: Path,
     phase_id: str = "main",
     *,
-    child_path: Path | None = None,
+    graph_id: str = "child",
     input_field: str = "text",
     output_field: str = "result",
 ) -> None:
-    child_path = child_path or root / "subgraphs" / "child"
-    _write(
-        root / "phases" / phase_id / "SUBGRAPH.md",
-        f"""---
-path: {child_path}
-io:
-  inputs:
-    {_schema_yaml(input_field)}
-  outputs:
-    {_schema_yaml(output_field)}
-validator: false
----
-""",
-    )
+    frontmatter = {
+        "name": phase_id,
+        "graph": graph_id,
+        "io": {
+            "inputs": _object_schema(input_field),
+            "outputs": _object_schema(output_field),
+        },
+        "validator": False,
+    }
+    _write(root / "phases" / phase_id / "SUBGRAPH.md", _markdown(frontmatter))
 
 
 def _expect_code(exc: pytest.ExceptionInfo[SkillLoadError], code: str) -> None:
@@ -166,67 +172,85 @@ def _expect_code(exc: pytest.ExceptionInfo[SkillLoadError], code: str) -> None:
     assert exc.value.payload.code == code
 
 
-def test_valid_v030_graph_uses_frontmatter_phase_registry_and_body_phase_dag(
+def test_valid_portable_graph_uses_graph_yaml_as_the_only_phase_registry(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _graph(tmp_path)
-    _agent_phase(tmp_path)
+    root = _new_skill(tmp_path)
+    _graph(root)
+    _agent_phase(root)
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
-    assert compiled.manifest.schema_version == "v0.3.0"
-    assert compiled.manifest.phases == ["main"]
+    assert compiled.manifest.schema_version == "gskill.graph.v1"
+    assert compiled.manifest.phases == (
+        GraphPhaseRef(id="main", depends_on=("input",), output=True),
+    )
     assert compiled.nodes[0].ast.mode == "agent"
 
 
-def test_schema_version_without_v_is_rejected(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path, schema_version="0." + "3.0")
-    _agent_phase(tmp_path)
+def test_schema_version_without_namespace_is_rejected(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, schema_version="graph.v1")
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-schema-version-mismatch]")
 
 
-def test_schema_version_21_is_rejected_with_otherwise_v030_shape(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path, schema_version="2.1")
-    _agent_phase(tmp_path)
+def test_legacy_schema_version_is_rejected_with_otherwise_portable_shape(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, schema_version="v0.3.0")
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-schema-version-mismatch]")
 
 
 @pytest.mark.parametrize("mode", ["skill", "agent", "logic", "subgraph"])
-def test_phase_frontmatter_mode_is_forbidden_metadata(tmp_path: Path, mode: str, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent_phase(tmp_path, frontmatter=f"mode: {mode}\n")
+def test_phase_frontmatter_mode_is_forbidden_metadata(
+    tmp_path: Path, mode: str, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
+    _agent_phase(root, extra={"mode": mode})
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
-    assert exc.value.payload.code == "[F-v3-agent-schema-unknown-field]"
+    _expect_code(exc, "[F-v3-agent-schema-unknown-field]")
 
 
 @pytest.mark.parametrize("field", ["schema_version", "graph_skill_id", "phase_id"])
-def test_phase_frontmatter_rejects_root_only_metadata(tmp_path: Path, field: str, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent_phase(tmp_path, frontmatter=f'{field}: "polluted"\n')
+def test_phase_frontmatter_rejects_root_only_metadata(
+    tmp_path: Path, field: str, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
+    _agent_phase(root, extra={field: "polluted"})
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
-    assert exc.value.payload.code == "[F-v3-agent-schema-unknown-field]"
+    _expect_code(exc, "[F-v3-agent-schema-unknown-field]")
 
 
 def test_phase_ast_rejects_legacy_skill_mode_at_pydantic_layer() -> None:
     payload = {
         "mode": "skill",
-        "system_prompt": "old prompt",
-        "exit_contract": "old contract",
+        "name": "main",
+        "io": {
+            "inputs": _object_schema("text"),
+            "outputs": _object_schema("result"),
+        },
     }
 
     with pytest.raises(ValidationError):
@@ -237,6 +261,7 @@ def test_logic_node_ast_accepts_validator_boolean_and_defaults_false() -> None:
     ast = LogicNodeAST.model_validate(
         {
             "mode": "logic",
+            "name": "main",
             "io": {
                 "inputs": _object_schema("text"),
                 "outputs": _object_schema("result"),
@@ -248,225 +273,209 @@ def test_logic_node_ast_accepts_validator_boolean_and_defaults_false() -> None:
     assert ast.validator is False
 
 
-def test_logic_validator_must_be_boolean(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _logic_phase(tmp_path, validator='"yes"')
+def test_logic_validator_must_be_boolean(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
+    _logic_phase(root, validator="yes")
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-logic-validator-type-invalid]")
 
 
-def test_phase_directory_with_multiple_node_files_uses_ambiguous_code(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent_phase(tmp_path)
-    _logic_phase(tmp_path)
+def test_phase_directory_with_multiple_node_files_uses_ambiguous_code(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
+    _agent_phase(root)
+    _logic_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-phase-mode-ambiguous]")
 
 
-def test_declared_phase_without_node_file_uses_node_missing_code(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    (tmp_path / "phases" / "main").mkdir(parents=True)
+def test_declared_phase_without_node_file_uses_node_missing_code(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
+    (root / "phases" / "main").mkdir(parents=True)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-phase-node-missing]")
 
 
-def test_graph_without_frontmatter_phases_is_rejected(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _write(
-        tmp_path / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: round14
-io:
-  inputs:
-    type: object
-    properties: {}
-  outputs:
-    type: object
-    properties: {}
----
-<phase depends_on="input" output>main</phase>
-""",
-    )
-    _agent_phase(tmp_path)
+def test_graph_without_phases_is_rejected(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, omit_phases=True)
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-phases-missing]")
 
 
-def test_graph_without_body_phase_is_rejected(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path, body="")
-    _agent_phase(tmp_path)
+def test_graph_phase_without_depends_on_is_rejected(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, phases=[{"id": "main", "output": True}])
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
-    _expect_code(exc, "[F-v3-graph-phase-id-invalid]")
+    _expect_code(exc, "[F-v3-graph-depends-unknown]")
 
 
-def test_body_phase_name_must_match_physical_directory(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path, phases=["main"], body='<phase depends_on="input" output>other</phase>')
-    _agent_phase(tmp_path, "main")
+def test_graph_phase_id_must_match_physical_directory(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, phases=[_phase("other")])
+    _agent_phase(root, "main")
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-phase-name-mismatch]")
 
 
-def test_duplicate_phase_registration_uses_dedicated_code(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(
-        tmp_path,
-        phases=["main", "main"],
-        body='<phase depends_on="input" output>main</phase>',
-    )
-    _agent_phase(tmp_path)
+def test_duplicate_phase_registration_uses_dedicated_code(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, phases=[_phase("main"), _phase("main")])
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-phase-id-duplicate]")
 
 
-def test_unknown_depends_on_uses_dedicated_code(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path, body='<phase depends_on="missing" output>main</phase>')
-    _agent_phase(tmp_path)
+def test_unknown_depends_on_uses_dedicated_code(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, phases=[_phase("main", depends_on=["missing"])])
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-depends-unknown]")
 
 
-def test_graph_cycle_uses_dedicated_code(tmp_path: Path, mock_skill_resolver: object) -> None:
+def test_graph_cycle_uses_dedicated_code(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
     _graph(
-        tmp_path,
-        phases=["first", "second"],
-        body="""<phase depends_on="second">first</phase>
-<phase depends_on="first" output>second</phase>""",
+        root,
+        phases=[
+            _phase("first", depends_on=["second"], output=False),
+            _phase("second", depends_on=["first"]),
+        ],
     )
-    _agent_phase(tmp_path, "first")
-    _agent_phase(tmp_path, "second")
+    _agent_phase(root, "first")
+    _agent_phase(root, "second")
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-phase-cycle]")
 
 
-def test_unreachable_phase_uses_island_code(tmp_path: Path, mock_skill_resolver: object) -> None:
-    # A bare <phase> (no depends_on) is the canonical island. (Depending on an
-    # unknown phase is attributed to [F-v3-graph-depends-unknown] instead; the
-    # island it causes is a suppressed cascade.)
-    _graph(
-        tmp_path,
-        phases=["first", "orphan"],
-        body="""<phase depends_on="input" output>first</phase>
-<phase>orphan</phase>""",
-    )
-    _agent_phase(tmp_path, "first")
-    _agent_phase(tmp_path, "orphan")
-
-    with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    _expect_code(exc, "[F-v3-graph-phase-island]")
-    # Node-scoped topology diagnostics carry a `<phase>.<x>` field_path locator so
-    # Studio's realtime-lint node projection can attribute them to the offending
-    # node badge (the same node-id-prefix channel the manual Compile path uses).
-    assert exc.value.payload is not None
-    assert exc.value.payload.field_path == "orphan.depends_on"
-
-
-def test_unknown_dep_attributed_to_depends_unknown_not_island(
+def test_empty_depends_on_is_rejected_at_the_typed_boundary(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    # depends_on an unknown phase: the root defect is the unknown dependency;
-    # the resulting unreachability must NOT add a cascade island diagnostic.
-    _graph(
-        tmp_path,
-        phases=["first", "orphan"],
-        body="""<phase depends_on="input" output>first</phase>
-<phase depends_on="missing">orphan</phase>""",
-    )
-    _agent_phase(tmp_path, "first")
-    _agent_phase(tmp_path, "orphan")
+    root = _new_skill(tmp_path)
+    _graph(root, phases=[_phase("main", depends_on=[])])
+    _agent_phase(root)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-graph-depends-unknown]")
     assert exc.value.payload is not None
-    assert exc.value.payload.field_path == "orphan.depends_on"
-    issues = getattr(getattr(exc.value, "compile_result", None), "issues", None) or []
-    island_issues = [
-        issue for issue in issues if getattr(issue, "rule_id", "") == "[F-v3-graph-phase-island]"
-    ]
-    assert not island_issues, f"cascade island must be suppressed, got: {island_issues}"
+    assert exc.value.payload.field_path == "phases.0.depends_on"
 
 
-def test_missing_output_phase_is_compile_fatal(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path, body='<phase depends_on="input">main</phase>')
-    _agent_phase(tmp_path)
-
-    with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
-
-    _expect_code(exc, "[F-v3-graph-dataflow-source-missing]")
-
-
-def test_bare_body_phase_missing_depends_on_is_rejected(
-    tmp_path: Path,
-    mock_skill_resolver: object,
+def test_unknown_dep_does_not_add_a_cascade_island_diagnostic(
+    tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    # skill-spec 00-FORMAT-GROUND-TRUTH (body <phase> rules): `depends_on` is 必填
-    # ("first node: depends_on=\"input\""). A bare <phase> with no depends_on is a
-    # disconnected node and MUST be flagged, not silently treated as an input root.
-    _graph(tmp_path, body="<phase>main</phase>")
-    _agent_phase(tmp_path)
+    root = _new_skill(tmp_path)
+    _graph(
+        root,
+        phases=[
+            _phase("first", output=True),
+            _phase("orphan", depends_on=["missing"], output=False),
+        ],
+    )
+    _agent_phase(root, "first")
+    _agent_phase(root, "orphan")
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
-    _expect_code(exc, "[F-v3-graph-phase-island]")
-    # carries the node locator so Studio's realtime-lint badges the offending node
-    assert exc.value.payload.field_path == "main.depends_on"
+    _expect_code(exc, "[F-v3-graph-depends-unknown]")
+    issues = exc.value.compile_result.issues
+    assert not [
+        issue for issue in issues if issue.rule_id == "[F-v3-graph-phase-island]"
+    ]
+
+
+def test_missing_output_phase_is_compile_fatal(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root, phases=[_phase("main", output=False)])
+    _agent_phase(root)
+
+    with pytest.raises(SkillLoadError) as exc:
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
+
+    _expect_code(exc, "[F-v3-graph-output-phase-invalid]")
 
 
 @pytest.mark.parametrize(
-    ("frontmatter", "path"),
+    ("extra", "relative_path", "expected_code"),
     [
-        ("io_inputs_ref: io/inputs.json\n", None),
-        ("io_outputs_ref: io/outputs.json\n", None),
-        ("", "io/inputs.json"),
-        ("", "io/outputs.json"),
+        ({"io_inputs_ref": "io/inputs.json"}, None, "[F-v3-graph-schema-unknown-field]"),
+        ({"io_outputs_ref": "io/outputs.json"}, None, "[F-v3-graph-schema-unknown-field]"),
+        ({}, "io/inputs.json", "[F-v3-graph-io-physical-file-deprecated]"),
+        ({}, "io/outputs.json", "[F-v3-graph-io-physical-file-deprecated]"),
     ],
 )
-def test_physical_root_io_is_deprecated(
+def test_physical_or_reference_based_root_io_is_rejected(
     tmp_path: Path,
-    frontmatter: str,
-    path: str | None,
+    extra: dict[str, Any],
+    relative_path: str | None,
+    expected_code: str,
     mock_skill_resolver: object,
 ) -> None:
-    _graph(tmp_path, extra_frontmatter=frontmatter)
-    _agent_phase(tmp_path)
-    if path is not None:
-        _write(tmp_path / path, "{}\n")
+    root = _new_skill(tmp_path)
+    _graph(root, extra=extra)
+    _agent_phase(root)
+    if relative_path is not None:
+        _write(root / relative_path, "{}\n")
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
-    _expect_code(exc, "[F-v3-graph-io-physical-file-deprecated]")
+    _expect_code(exc, expected_code)
 
 
 @pytest.mark.parametrize(
@@ -476,90 +485,112 @@ def test_physical_root_io_is_deprecated(
         "<role>Tester</role><goal>Goal</goal><exit_contract>bad</exit_contract>",
     ],
 )
-def test_agent_body_rejects_non_whitelisted_top_level_tags(tmp_path: Path, body: str, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
-    _agent_phase(tmp_path, body=body)
+def test_agent_body_rejects_non_whitelisted_top_level_tags(
+    tmp_path: Path, body: str, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
+    _agent_phase(root, body=body)
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-agent-body-tag-unknown]")
 
 
-def test_agent_body_extracts_inline_examples_for_mentions(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
+def test_agent_body_extracts_inline_examples_for_mentions(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
     _agent_phase(
-        tmp_path,
+        root,
         body="""<role>Tester</role>
 <goal>Use @example:E1.</goal>
 <example id="E1">Inline body example.</example>
 """,
     )
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     assert compiled.nodes[0].ast.examples_inline[0].id == "E1"
 
 
-def test_missing_mention_target_is_rejected(tmp_path: Path, mock_skill_resolver: object) -> None:
-    _graph(tmp_path)
+def test_missing_mention_target_is_rejected(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    root = _new_skill(tmp_path)
+    _graph(root)
     _agent_phase(
-        tmp_path,
+        root,
         body="""<role>Tester</role>
 <goal>Use @reference:MISSING.</goal>
 """,
     )
 
     with pytest.raises(SkillLoadError) as exc:
-        SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+        SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     _expect_code(exc, "[F-v3-mention-target-not-found]")
 
 
-def test_subgraph_io_input_mismatch_is_allowed_at_compile_time(tmp_path: Path, mock_skill_resolver: object) -> None:
-    parent = tmp_path / "parent"
-    child = parent / "subgraphs" / "child"
+def test_subgraph_io_input_mismatch_is_allowed_at_compile_time(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    parent = _new_skill(tmp_path, "parent")
+    child = parent / "graphs" / "child"
     _graph(parent, inputs_field="parent_input")
-    _subgraph_phase(parent, child_path=child, input_field="parent_input", output_field="result")
-    _graph(child, inputs_field="child_input", outputs_field="result")
+    _subgraph_phase(parent, input_field="parent_input", output_field="result")
+    _graph(
+        child,
+        graph_id="child",
+        inputs_field="child_input",
+        outputs_field="result",
+    )
     _logic_phase(child, input_field="child_input")
 
-    compiled = SkillLoader().compile_skill(parent, skill_resolver=DictSkillResolver({"child": child}))
+    compiled = SkillLoader().compile_skill(parent, skill_resolver=mock_skill_resolver)
 
     assert compiled.nodes[0].phase_name == "main"
 
 
-def test_subgraph_io_output_mismatch_is_allowed_at_compile_time(tmp_path: Path, mock_skill_resolver: object) -> None:
-    # §2.4 / cutover item ⑦: the parent/child io.outputs 1:1 equality gate is
-    # relaxed. A subgraph whose declared outputs differ from the child's now
-    # compiles — StateMapper merges by the parent's declared outputs at runtime;
-    # no [F-v3-subgraph-io-mismatch] at compile time.
-    parent = tmp_path / "parent"
-    child = parent / "subgraphs" / "child"
+def test_subgraph_io_output_mismatch_is_allowed_at_compile_time(
+    tmp_path: Path, mock_skill_resolver: object
+) -> None:
+    parent = _new_skill(tmp_path, "parent")
+    child = parent / "graphs" / "child"
     _graph(parent, outputs_field="parent_output")
-    _subgraph_phase(parent, child_path=child, input_field="text", output_field="parent_output")
-    _graph(child, inputs_field="text", outputs_field="child_output")
+    _subgraph_phase(parent, output_field="parent_output")
+    _graph(
+        child,
+        graph_id="child",
+        inputs_field="text",
+        outputs_field="child_output",
+    )
     _logic_phase(child, output_field="child_output")
 
-    compiled = SkillLoader().compile_skill(parent, skill_resolver=DictSkillResolver({"child": child}))
+    compiled = SkillLoader().compile_skill(parent, skill_resolver=mock_skill_resolver)
 
     assert compiled.nodes[0].phase_name == "main"
 
 
-def test_graph_serializer_fresh_render_does_not_synthesize_graph_boundaries() -> None:
+def test_graph_serializer_fresh_render_emits_only_portable_yaml() -> None:
     manifest = GraphManifest(
-        schema_version="v0.3.0",
-        name="serializer",
-        io=PhaseIOSchema(inputs=_object_schema("text"), outputs=_object_schema("result")),
-        phases=["main"],
+        schema_version="gskill.graph.v1",
+        graph_id="serializer",
+        description="Serializer fixture.",
+        io=PhaseIOSchema(
+            inputs=_object_schema("text"), outputs=_object_schema("result")
+        ),
+        phases=(GraphPhaseRef(id="main", depends_on=("input",), output=True),),
     )
 
     rendered = serialize_graph(manifest)
 
-    assert 'schema_version: "v0.3.0"' in rendered
-    assert "phases:" in rendered
-    assert "<phase>main</phase>" in rendered
-    assert 'depends_on="input"' not in rendered
-    assert "<phase output" not in rendered
-    assert "<input" not in rendered
-    assert "<output" not in rendered
+    assert "schema_version: gskill.graph.v1" in rendered
+    assert "graph_id: serializer" in rendered
+    assert "- id: main" in rendered
+    assert "depends_on:" in rendered
+    assert "- input" in rendered
+    assert "output: true" in rendered
+    assert "<phase" not in rendered

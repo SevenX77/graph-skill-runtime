@@ -20,12 +20,20 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _write_phase_config_agent_skill(root: Path) -> None:
+def _write_entry(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: strict-phase-config
+        root / "SKILL.md",
+        f"---\nname: {root.name}\ndescription: Strict runtime fixture.\n---\n",
+    )
+
+
+def _write_phase_config_agent_skill(root: Path) -> None:
+    _write_entry(root)
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Strict phase config graph.
 io:
   inputs:
     type: object
@@ -38,14 +46,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 phase_config:
   io:
     inputs:
@@ -69,10 +78,11 @@ def test_agent_skill_phase_config_is_compile_fatal(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_phase_config_agent_skill(tmp_path)
+    skill_root = tmp_path / "strict-phase-config"
+    _write_phase_config_agent_skill(skill_root)
 
     with pytest.raises(SkillLoadError) as exc_info:
-        compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+        compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-agent-schema-unknown-field]"
     assert exc_info.value.payload.field_path == "phase_config"
@@ -84,6 +94,7 @@ def _write_validator_logic_skill(
     validator_source: str,
     output_properties: dict[str, Any] | None = None,
 ) -> None:
+    _write_entry(root)
     properties = output_properties or {"answer": {"type": "string"}}
     output_schema = json.dumps(
         {
@@ -95,10 +106,10 @@ def _write_validator_logic_skill(
         indent=4,
     ).replace("\n", "\n    ")
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: strict-validator
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Strict validator graph.
 io:
   inputs:
     type: object
@@ -108,14 +119,15 @@ io:
   outputs:
     {output_schema}
 phases:
-  - score
----
-<phase depends_on="input" output>score</phase>
+  - id: score
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "score" / "LOGIC.md",
         f"""---
+name: score
 io:
   inputs:
     type: object
@@ -150,8 +162,9 @@ def test_phase_validator_py_dict_return_enriches_output(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
+    skill_root = tmp_path / "strict-validator"
     _write_validator_logic_skill(
-        tmp_path,
+        skill_root,
         validator_source="""
             def validate(output, state_slice, **kwargs):
                 assert state_slice == {"topic": " alpha "}
@@ -159,7 +172,7 @@ def test_phase_validator_py_dict_return_enriches_output(
         """,
     )
 
-    result = _invoke_logic(tmp_path, mock_skill_resolver)
+    result = _invoke_logic(skill_root, mock_skill_resolver)
 
     assert result["data"].model_dump()["answer"] == "ALPHA"
     assert result["data"]["phase_outputs"]["score"] == {"answer": "ALPHA"}
@@ -169,8 +182,9 @@ def test_phase_validator_py_extra_key_uses_phase_kind_error(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
+    skill_root = tmp_path / "strict-validator"
     _write_validator_logic_skill(
-        tmp_path,
+        skill_root,
         validator_source="""
             def validate(output, state_slice, **kwargs):
                 return {"answer": output["answer"], "extra": "nope"}
@@ -178,7 +192,7 @@ def test_phase_validator_py_extra_key_uses_phase_kind_error(
     )
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
-        _invoke_logic(tmp_path, mock_skill_resolver)
+        _invoke_logic(skill_root, mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-logic-validator-failed]"
     assert "extra" in str(exc_info.value)
@@ -188,8 +202,9 @@ def test_phase_validator_py_exception_uses_phase_kind_error(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
+    skill_root = tmp_path / "strict-validator"
     _write_validator_logic_skill(
-        tmp_path,
+        skill_root,
         validator_source="""
             def validate(output, state_slice, **kwargs):
                 raise ValueError("bad answer")
@@ -197,7 +212,7 @@ def test_phase_validator_py_exception_uses_phase_kind_error(
     )
 
     with pytest.raises(GraphAgentFatalError) as exc_info:
-        _invoke_logic(tmp_path, mock_skill_resolver)
+        _invoke_logic(skill_root, mock_skill_resolver)
 
     assert exc_info.value.payload.code == "[F-v3-logic-validator-failed]"
     assert "bad answer" in str(exc_info.value)
@@ -300,11 +315,12 @@ class _SegmentReviewChatModel:
 
 
 def _write_text_segmentation_like_skill(root: Path) -> None:
+    _write_entry(root)
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: strict-text-segmentation-like
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Strict text segmentation graph.
 io:
   inputs:
     type: object
@@ -331,18 +347,21 @@ io:
                 text:
                   type: string
 phases:
-  - setup
-  - segment
-  - review
----
-<phase depends_on="input">setup</phase>
-<phase depends_on="setup">segment</phase>
-<phase depends_on="segment" output>review</phase>
+  - id: setup
+    depends_on: [input]
+    output: false
+  - id: segment
+    depends_on: [setup]
+    output: false
+  - id: review
+    depends_on: [segment]
+    output: true
 """,
     )
     _write(
         root / "phases" / "setup" / "LOGIC.md",
         """---
+name: setup
 io:
   inputs:
     type: object
@@ -368,8 +387,9 @@ validator: false
         "def normalize(inputs):\n    return {'normalized_text': inputs['raw_text'].strip()}\n",
     )
     _write(
-        root / "phases" / "segment" / "SKILL.md",
+        root / "phases" / "segment" / "AGENT.md",
         """---
+name: segment
 max_iterations: 2
 io:
   inputs:
@@ -402,8 +422,9 @@ io:
 """,
     )
     _write(
-        root / "phases" / "review" / "SKILL.md",
+        root / "phases" / "review" / "AGENT.md",
         """---
+name: review
 max_iterations: 2
 io:
   inputs:

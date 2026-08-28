@@ -14,12 +14,21 @@ from graph_skill_runtime.core.loader import SkillLoader
 PURITY_CODE = "[F-v3-logic-action-purity-violation]"
 
 
-def _write_minimal_logic_skill(root: Path, action_body: str) -> None:
+def _write_minimal_logic_skill(parent: Path, action_body: str) -> Path:
+    root = parent / "purity-le2-test"
     (root / "phases" / "prepare" / "actions").mkdir(parents=True)
-    (root / "GRAPH.md").write_text(
+    (root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
 name: purity-le2-test
+description: Exercise compile-time logic action purity checks.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise compile-time logic action purity checks.
 io:
   inputs:
     type: object
@@ -28,14 +37,15 @@ io:
     type: object
     properties: {}
 phases:
-  - prepare
----
-<phase depends_on="input" output>prepare</phase>
+  - id: prepare
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
     (root / "phases" / "prepare" / "LOGIC.md").write_text(
         """---
+name: prepare
 io:
   inputs:
     type: object
@@ -52,6 +62,7 @@ io:
         dedent(action_body).lstrip(),
         encoding="utf-8",
     )
+    return root
 
 
 def _compile(root: Path, mock_skill_resolver: object) -> None:
@@ -64,10 +75,10 @@ def _assert_compile_purity_fatal(
     action_body: str,
     *message_fragments: str,
 ) -> None:
-    _write_minimal_logic_skill(tmp_path, action_body)
+    root = _write_minimal_logic_skill(tmp_path, action_body)
 
     with pytest.raises(SkillLoadError) as exc_info:
-        _compile(tmp_path, mock_skill_resolver)
+        _compile(root, mock_skill_resolver)
 
     payload = exc_info.value.payload
     assert payload is not None
@@ -189,7 +200,7 @@ def test_pure_action_still_compiles_under_le2_purity(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_minimal_logic_skill(
+    root = _write_minimal_logic_skill(
         tmp_path,
         """
         import json
@@ -201,7 +212,7 @@ def test_pure_action_still_compiles_under_le2_purity(
         """,
     )
 
-    compiled = SkillLoader().compile_skill(tmp_path, skill_resolver=mock_skill_resolver)
+    compiled = SkillLoader().compile_skill(root, skill_resolver=mock_skill_resolver)
 
     assert "prepare" in compiled.actions.for_phase("prepare")
 

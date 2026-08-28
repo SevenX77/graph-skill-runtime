@@ -1,16 +1,18 @@
-"""Static metadata for V0.3.0 framework error codes."""
+"""Static metadata for graph-skill-runtime framework error codes."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, NamedTuple
 
-ERROR_CATALOG_VERSION = "engine-mvp1.error-catalog.v1"
-ERROR_METADATA_SCHEMA_VERSION = "engine-mvp1.error-metadata.v1"
+ERROR_CATALOG_VERSION = "gskill.error-catalog.v1"
+ERROR_METADATA_SCHEMA_VERSION = "gskill.error-metadata.v1"
 _PUBLIC_DOC_BASE_URL = "https://docs.graph-skill-runtime.dev/errors"
+_DOC_ERROR_CATALOG = "docs/skill-spec/11-error-code-spec.md"
 _DOC_SUBGRAPH_PATH_CONTRACT = (
     "docs/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md#21-子图-path-引用契约mvp1-权威"
 )
+_DOC_PORTABLE_GSKILL_V1 = "docs/skill-spec/01-PORTABLE-GSKILL-V1.md"
 _DEFAULT_DETAILS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": True,
@@ -43,6 +45,16 @@ class ErrorCodeMetadata(NamedTuple):
 
 
 ERROR_REGISTRY: dict[str, ErrorCodeMetadata] = {
+    '[F-v3-skill-entry-missing]': ErrorCodeMetadata('[F-v3-skill-entry-missing]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-skill-entry-nested]': ErrorCodeMetadata('[F-v3-skill-entry-nested]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-skill-metadata-invalid]': ErrorCodeMetadata('[F-v3-skill-metadata-invalid]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-skill-name-directory-mismatch]': ErrorCodeMetadata('[F-v3-skill-name-directory-mismatch]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-graph-registry-invalid]': ErrorCodeMetadata('[F-v3-graph-registry-invalid]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-graph-id-duplicate]': ErrorCodeMetadata('[F-v3-graph-id-duplicate]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-graph-id-directory-mismatch]': ErrorCodeMetadata('[F-v3-graph-id-directory-mismatch]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-artifact-declaration-invalid]': ErrorCodeMetadata('[F-v3-artifact-declaration-invalid]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-graph-reference-unknown]': ErrorCodeMetadata('[F-v3-graph-reference-unknown]', 'FATAL', ('编译期', '装配期'), _DOC_PORTABLE_GSKILL_V1),
+    '[F-v3-graph-call-cycle]': ErrorCodeMetadata('[F-v3-graph-call-cycle]', 'FATAL', ('编译期',), _DOC_PORTABLE_GSKILL_V1),
     '[F-v3-graph-schema-unknown-field]': ErrorCodeMetadata('[F-v3-graph-schema-unknown-field]', 'FATAL', ('编译期',), 'docs/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md#2-语法部件清单--mvp1-写入状态'),
     '[F-v3-graph-name-invalid]': ErrorCodeMetadata('[F-v3-graph-name-invalid]', 'FATAL', ('编译期',), 'docs/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md#2-语法部件清单--mvp1-写入状态'),
     '[F-v3-graph-schema-version-mismatch]': ErrorCodeMetadata('[F-v3-graph-schema-version-mismatch]', 'FATAL', ('编译期',), 'docs/mvp1/01-contract/02-skill-syntax/mvp1-alignment.md#2-语法部件清单--mvp1-写入状态'),
@@ -138,22 +150,32 @@ ERROR_REGISTRY: dict[str, ErrorCodeMetadata] = {
 
 
 _CATALOG_METADATA_ROWS: tuple[tuple[str, str], ...] = (
+    (_DOMAIN_COMPILE, '在业务 skill 根目录创建 `SKILL.md` 与 `graph.yaml`'),
+    (_DOMAIN_COMPILE, '删除嵌套 `SKILL.md`，内部 Agent phase 使用 `AGENT.md`'),
+    (_DOMAIN_COMPILE, '按 Agent Skills 规范修正根 `SKILL.md` frontmatter'),
+    (_DOMAIN_COMPILE, '让 `SKILL.md` name 与业务 skill 目录名一致'),
+    (_DOMAIN_GRAPH, '仅在 `graphs/<graph_id>/` 放置一层扁平注册图'),
+    (_DOMAIN_GRAPH, '确保业务 skill 内所有 graph_id 唯一'),
+    (_DOMAIN_GRAPH, '让 `graphs/` 子目录名与 graph_id 一致'),
+    (_DOMAIN_GRAPH, '仅在根图声明 artifact，并引用根输出字段'),
+    (_DOMAIN_GRAPH, '把 graph 引用改为已注册的扁平 graph_id'),
+    (_DOMAIN_GRAPH, '打断 graph 之间的调用循环'),
     (_DOMAIN_GRAPH, '删除字段或纳入 spec'),
-    (_DOMAIN_GRAPH, '改为小写开头标识'),
-    (_DOMAIN_GRAPH, '升级/降级 spec 或 engine'),
-    (_DOMAIN_GRAPH, '使用 `llm_roles.yaml` 中角色'),
-    (_DOMAIN_GRAPH, '创建精确命名的 `GRAPH.md`'),
+    (_DOMAIN_GRAPH, '把 graph_id 改为小写 kebab-case'),
+    (_DOMAIN_GRAPH, '把 schema_version 改为 `gskill.graph.v1`'),
+    (_DOMAIN_GRAPH, '改用已注册 role，或在宿主的权威 role truth 中配置它'),
+    (_DOMAIN_GRAPH, '在 graph directory 创建精确命名的 `graph.yaml`'),
     (_DOMAIN_GRAPH, '创建 phases 目录'),
-    (_DOMAIN_GRAPH, '添加 `phases: [...]` 名字注册'),
+    (_DOMAIN_GRAPH, '在 `graph.yaml.phases` 添加非空 phase 对象列表'),
     (_DOMAIN_GRAPH, '修正 phase name 为合法标识'),
-    (_DOMAIN_GRAPH, '对齐 body、frontmatter 和目录名'),
+    (_DOMAIN_GRAPH, '对齐 `graph.yaml.phases[].id` 与 phase 目录名'),
     (_DOMAIN_GRAPH, '去重'),
     (_DOMAIN_GRAPH, '修正依赖名'),
-    (_DOMAIN_GRAPH, '修正 `<phase ... output>` 标记'),
+    (_DOMAIN_GRAPH, '把至少一个 terminal phase 的 `output` 设为 true'),
     (_DOMAIN_GRAPH, '打断循环依赖'),
     (_DOMAIN_GRAPH, '增加依赖连接或删除孤岛'),
-    (_DOMAIN_GRAPH, '保留 `LOGIC.md`/`SUBGRAPH.md`/`SKILL.md` 之一'),
-    (_DOMAIN_GRAPH, '添加 `LOGIC.md`/`SUBGRAPH.md`/`SKILL.md` 之一'),
+    (_DOMAIN_GRAPH, '保留 `LOGIC.md`/`SUBGRAPH.md`/`AGENT.md` 之一'),
+    (_DOMAIN_GRAPH, '添加 `LOGIC.md`/`SUBGRAPH.md`/`AGENT.md` 之一'),
     (_DOMAIN_GRAPH, '设置 `type: object`'),
     (_DOMAIN_GRAPH, '修正 schema'),
     (_DOMAIN_GRAPH, '改为 inline `io.inputs` / `io.outputs`'),
@@ -164,9 +186,9 @@ _CATALOG_METADATA_ROWS: tuple[tuple[str, str], ...] = (
     (_DOMAIN_LOGIC, '修正 object schema'),
     (_DOMAIN_LOGIC, '声明至少一个 action'),
     (_DOMAIN_LOGIC, '使用一级合法函数名'),
-    (_DOMAIN_LOGIC, '创建目录或注册通用 action'),
-    (_DOMAIN_LOGIC, '增加 `<name>.py` 或注册通用 action'),
-    (_DOMAIN_LOGIC, '导出 `run`'),
+    (_DOMAIN_LOGIC, '在所属 LOGIC phase 创建 `actions/`，或通过契约允许的 registry 注册实现'),
+    (_DOMAIN_LOGIC, '添加正确模块/函数，或删除、改正无实现的 action 声明'),
+    (_DOMAIN_LOGIC, '导出 `def <action_name>(inputs) -> dict`，并消除模块加载错误'),
     (_DOMAIN_LOGIC, "移除 `open('w')` 等非纯操作"),
     (_DOMAIN_LOGIC, '返回 dict'),
     (_DOMAIN_LOGIC, '更新 `io.outputs` 或删字段'),
@@ -180,18 +202,18 @@ _CATALOG_METADATA_ROWS: tuple[tuple[str, str], ...] = (
     (_DOMAIN_LOGIC, '检查子图业务规则'),
     (_DOMAIN_SUBGRAPH, _REMEDIATE_DELETE_FIELD),
     (_DOMAIN_SUBGRAPH, _REMEDIATE_FIX_NAME),
-    (_DOMAIN_SUBGRAPH, '使用绝对 path 指向工作目录内子图'),
+    (_DOMAIN_SUBGRAPH, '把 `graph` 改为 flat registry 中已注册的 graph_id'),
     (_DOMAIN_SUBGRAPH, '修正 object schema'),
     (_DOMAIN_GOLDEN, '重新生成或补齐该节点 golden'),
     (_DOMAIN_AGENT, _REMEDIATE_DELETE_FIELD),
-    (_DOMAIN_AGENT, '使用已注册角色'),
+    (_DOMAIN_AGENT, '使用已注册 role，或在宿主权威配置中注册它'),
     (_DOMAIN_AGENT, '修正 schema'),
     (_DOMAIN_AGENT, '触发 LLM 重试反馈'),
     (_DOMAIN_AGENT, '修正 AST / pipeline'),
     (_DOMAIN_AGENT, '注册 tool 或删引用'),
     (_DOMAIN_AGENT, '内置框架工具始终可用：从 tools 列表删除该行。'),
     (_DOMAIN_AGENT, '补 name/target_skill/description'),
-    (_DOMAIN_AGENT, '补 name/target_skill/description'),
+    (_DOMAIN_AGENT, '补 name/graph/description'),
     (_DOMAIN_AGENT, '设为 1..50'),
     (_DOMAIN_AGENT, '仅保留 5 类白名单标签'),
     (_DOMAIN_AGENT, '添加 role'),
@@ -215,7 +237,7 @@ _CATALOG_METADATA_ROWS: tuple[tuple[str, str], ...] = (
     (_DOMAIN_RESOURCE, '查看 trace; 可依赖降级内容继续跑'),
     (_DOMAIN_RESOLVER, '修正 target_skill'),
     (_DOMAIN_RESOLVER, '收窄 search paths 或移除重复注册'),
-    (_DOMAIN_RESOLVER, '在 Studio 导入或注册 skill'),
+    (_DOMAIN_RESOLVER, '通过宿主 resolver 注册 portable skill root'),
     (_DOMAIN_RESOLVER, '修正 registry 记录'),
     (_DOMAIN_RESOLVER, '实现单方法 `resolve_skill`'),
     (_DOMAIN_RESOLVER, '调用入口传入 resolver'),
@@ -223,7 +245,7 @@ _CATALOG_METADATA_ROWS: tuple[tuple[str, str], ...] = (
     (_DOMAIN_COGNITIVE_RUNTIME, '修正 tool 调用参数'),
     (_DOMAIN_COGNITIVE_RUNTIME, '检查 phase IO 和上游输出'),
     (_DOMAIN_COGNITIVE_RUNTIME, '查看 trace 原始异常'),
-    (_DOMAIN_GRAPH, '在 Frontmatter 中声明 allow_sequential_overwrite 允许覆盖'),
+    (_DOMAIN_GRAPH, '在 phase frontmatter 声明 allow_sequential_overwrite 允许覆盖'),
     (_DOMAIN_GRAPH, '让该字段只有一个 owner，或用 depends_on 排出先后次序'),
     (_DOMAIN_AGENT, '让模型调用 finish_task 并提交通过 schema 的业务输出'),
 )
@@ -251,6 +273,7 @@ def _with_catalog_metadata(metadata: ErrorCodeMetadata) -> ErrorCodeMetadata:
     _domain, remediation = domain_and_remediation
     return metadata._replace(
         remediation=remediation,
+        doc_link=_DOC_ERROR_CATALOG,
         doc_ref=_metadata_doc_ref(metadata.code),
         doc_url=_metadata_doc_url(metadata.code),
         details_schema=deepcopy(_DEFAULT_DETAILS_SCHEMA),

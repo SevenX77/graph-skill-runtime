@@ -27,4 +27,4 @@ non_functional_contracts:
     description: Runtime must not leak child graph state into parent blackboard.
     evidence: tests/runtime/test_state_mapper.py::test_reader_sandbox_state_does_not_inherit_parent_blackboard
 targeted_tests:
-  - tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_v030_root_error
+  - tests/core/test_run_skill_entrypoint_root_shape.py::test_run_skill_single_markdown_file_returns_portable_root_error

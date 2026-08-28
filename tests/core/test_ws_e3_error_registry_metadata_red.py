@@ -16,10 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ERROR_SPEC = (
     REPO_ROOT
     / "docs"
-    / "mvp1"
-    / "01-contract"
-    / "03-compile-rules"
-    / "mvp1-alignment.md"
+    / "skill-spec"
+    / "11-error-code-spec.md"
 )
 
 P0_2_METADATA_FIELDS = {
@@ -49,13 +47,21 @@ def _registry_module() -> Any:
     return importlib.import_module("graph_skill_runtime.core.error_registry")
 
 
-def _spec_codes() -> set[str]:
+def _spec_catalog() -> dict[str, tuple[str, tuple[str, ...]]]:
     text = ERROR_SPEC.read_text(encoding="utf-8")
-    section_start = "## 4. 错误码全表(88)"
-    section_end = "\n## 5."
-    assert section_start in text, "mvp1 compile-rules must keep a bounded 88-code table section"
-    section = text.split(section_start, 1)[1].split(section_end, 1)[0]
-    return set(re.findall(r"\[F-v3-[a-z0-9-]+\]", section))
+    catalog: dict[str, tuple[str, tuple[str, ...]]] = {}
+    for line in text.splitlines():
+        if re.match(r"^\| `\[F-v3-[a-z0-9-]+\]` \|", line) is None:
+            continue
+        columns = [column.strip() for column in line.strip().strip("|").split("|")]
+        code = columns[0].strip("`")
+        assert code not in catalog, f"duplicate error catalog row: {code}"
+        catalog[code] = (columns[1], tuple(columns[2].split(" / ")))
+    return catalog
+
+
+def _spec_codes() -> set[str]:
+    return set(_spec_catalog())
 
 
 def _assert_https_url(value: str) -> None:
@@ -69,9 +75,10 @@ def test_error_registry_metadata_exposes_p0_2_fields_for_every_existing_code() -
     registry = registry_module.ERROR_REGISTRY
 
     assert set(registry) == _spec_codes()
-    assert len(registry) == 88
+    assert len(registry) == 98
 
     for code, metadata in registry.items():
+        assert (metadata.level, metadata.stage) == _spec_catalog()[code]
         missing_fields = sorted(field for field in P0_2_METADATA_FIELDS if not hasattr(metadata, field))
         assert missing_fields == [], f"{code} missing P0-2 metadata fields: {missing_fields}"
 
@@ -111,13 +118,13 @@ def test_error_catalog_export_envelope_is_json_safe_versioned_and_stably_sorted(
     catalog = registry_module.export_error_catalog()
 
     dumped = json.loads(json.dumps(catalog, sort_keys=True))
-    assert isinstance(dumped["registry_version"], str) and dumped["registry_version"]
-    assert isinstance(dumped["schema_version"], str) and dumped["schema_version"]
+    assert dumped["registry_version"] == "gskill.error-catalog.v1"
+    assert dumped["schema_version"] == "gskill.error-metadata.v1"
     assert isinstance(dumped["items"], list)
 
     items = dumped["items"]
     assert [item["code"] for item in items] == sorted(_spec_codes())
-    assert len(items) == 88
+    assert len(items) == 98
 
     for item in items:
         assert CATALOG_ITEM_FIELDS <= set(item)

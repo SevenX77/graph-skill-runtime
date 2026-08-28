@@ -1,9 +1,9 @@
-"""Pure parsing utilities for V2.1 Markdown/YAML documents.
+"""Pure parsing utilities for portable phase Markdown documents.
 
 Parser helpers that matter to callers:
 
 - ``parse_markdown_parts(path)`` — read+decode entry. Returns
-  frontmatter, body, and line metadata for V2.1 markdown documents.
+  frontmatter, body, and line metadata for portable phase documents.
 - ``parse_markdown_parts_best_effort(path)`` — tolerant sibling for
   repair-view consumers (topology_projection) that must survive an
   unrelated duplicate-key defect elsewhere in the frontmatter; never use
@@ -249,8 +249,8 @@ def _fatal(path: Path, line: int, message: str) -> NoReturn:
 
 def _relative_source_path(path: Path) -> str:
     parts = path.parts
-    if path.name == "GRAPH.md":
-        return "GRAPH.md"
+    if path.name == "graph.yaml":
+        return "graph.yaml"
     for anchor in ("phases", "io"):
         if anchor in parts:
             index = len(parts) - 1 - parts[::-1].index(anchor)
@@ -263,7 +263,7 @@ def _parse_error_code(path: Path) -> str:
         return "[F-v3-logic-schema-unknown-field]"
     if path.name == "SUBGRAPH.md":
         return "[F-v3-subgraph-schema-unknown-field]"
-    if path.name == "SKILL.md":
+    if path.name == "AGENT.md":
         return "[F-v3-agent-schema-unknown-field]"
     return "[F-v3-graph-schema-unknown-field]"
 
@@ -416,7 +416,7 @@ def scan_forbidden_topology_tags(path: Path, body: str) -> None:
     _fatal(
         path,
         line,
-        f"topology tag '{tag}' is forbidden in phase body (整图拓扑只能在 GRAPH.md)",
+        f"topology tag '{tag}' is forbidden in phase body (graph topology belongs in graph.yaml)",
     )
 
 

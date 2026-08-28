@@ -1,4 +1,4 @@
-"""Runtime schema smoke tests for the V2.1 event-extraction skill."""
+"""Runtime schema smoke tests for the event-extraction skill."""
 
 from __future__ import annotations
 

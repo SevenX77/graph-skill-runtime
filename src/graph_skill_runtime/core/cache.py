@@ -1,4 +1,4 @@
-"""AST cache for V0.3.0 skill compilation."""
+"""Compiled bundle cache for portable gSkill v1."""
 
 from __future__ import annotations
 
@@ -15,19 +15,19 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from graph_skill_runtime.core.loader import CompiledSkill, PhaseDocument
-from graph_skill_runtime.core.manifest import GraphManifest, PhaseAST
+from graph_skill_runtime.core.manifest import GraphManifest, PhaseAST, RootSkillManifest
 
 logger = logging.getLogger(__name__)
 
 
 def get_cache_dir() -> Path:
-    return Path.home() / ".cache" / "graph-skill-runtime-v030"
+    return Path.home() / ".cache" / "graph-skill-runtime-portable-v1"
 
 
 def compute_cache_key(root: Path) -> str:
     root = root.resolve()
     payload = {
-        "format": "v2",
+        "format": "portable-v1",
         "root": str(root),
         "python": list(sys.version_info[:3]),
         "package": _get_graph_skill_runtime_version(),
@@ -79,7 +79,7 @@ def save_to_cache(key: str, compiled: CompiledSkill) -> None:
 
 #: File types a compile reads: the markdown documents it parses and the Python
 #: modules it imports (validators, logic actions, tools).
-_COMPILE_INPUT_SUFFIXES = frozenset({".md", ".py"})
+_COMPILE_INPUT_SUFFIXES = frozenset({".md", ".py", ".yaml"})
 
 
 def _is_skipped_dir(name: str) -> bool:
@@ -106,8 +106,8 @@ def _collect_skill_files(root: Path) -> list[Path]:
     Known remaining hole: a subgraph resolved OUTSIDE this root (a linked skill)
     is still not covered, because the resolved set is only known after compiling.
     Closing that needs the loader to report its read-set and the cache snapshot to
-    carry it — a separate change. This one shrinks the hole from "everything below
-    the root except GRAPH.md and phases/" to "only out-of-root links".
+    carry it — a separate change. The remaining gap is limited to out-of-root
+    external skill links.
     """
     files: list[Path] = []
     for directory, subdirectories, filenames in os.walk(root):
@@ -137,9 +137,22 @@ def _get_graph_skill_runtime_version() -> str:
 
 
 def _dehydrate_compiled_skill(compiled: CompiledSkill) -> dict[str, Any]:
+    registry = compiled.graph_registry or {compiled.manifest.graph_id: compiled}
+    if compiled.skill_manifest is None:
+        raise ValueError("portable compiled skill has no root Agent Skills manifest")
+    return {
+        "format": "portable-v1",
+        "root_graph_id": compiled.manifest.graph_id,
+        "skill_manifest": compiled.skill_manifest.model_dump(mode="json", by_alias=True),
+        "graphs": {graph_id: _dehydrate_graph(graph) for graph_id, graph in registry.items()},
+    }
+
+
+def _dehydrate_graph(compiled: CompiledSkill) -> dict[str, Any]:
     return {
         "raw": compiled.raw,
         "manifest": compiled.manifest.model_dump(mode="json"),
+        "graph_root": compiled.graph_root.relative_to(compiled.skill_root).as_posix() or ".",
         "nodes": [
             {
                 "phase_name": node.phase_name,
@@ -170,25 +183,9 @@ def _dehydrate_compiled_skill(compiled: CompiledSkill) -> dict[str, Any]:
             phase_id: {
                 "phase_id": token.phase_id,
                 "raw_text": token.raw_text,
-                "start_offset": token.start_offset,
-                "end_offset": token.end_offset,
                 "line_start": token.line_start,
                 "line_end": token.line_end,
                 "attrs": token.attrs,
-                "attr_spans": {
-                    attr_name: {
-                        "name": span.name,
-                        "value": span.value,
-                        "quote": span.quote,
-                        "attr_start": span.attr_start,
-                        "attr_end": span.attr_end,
-                        "value_start": span.value_start,
-                        "value_end": span.value_end,
-                        "line_start": span.line_start,
-                        "line_end": span.line_end,
-                    }
-                    for attr_name, span in token.attr_spans.items()
-                },
             }
             for phase_id, token in compiled.phase_tokens.items()
         },
@@ -196,9 +193,30 @@ def _dehydrate_compiled_skill(compiled: CompiledSkill) -> dict[str, Any]:
 
 
 def _rehydrate_compiled_skill(snapshot: dict[str, Any], root: Path) -> CompiledSkill:
+    if snapshot.get("format") != "portable-v1":
+        raise ValueError("unsupported cache snapshot format")
+    skill_manifest = RootSkillManifest.model_validate(snapshot["skill_manifest"])
+    graph_registry: dict[str, CompiledSkill] = {}
+    graph_snapshots = dict(snapshot["graphs"])
+    for graph_id, graph_snapshot in graph_snapshots.items():
+        graph_registry[str(graph_id)] = _rehydrate_graph(
+            dict(graph_snapshot),
+            root.resolve(),
+            graph_registry,
+            skill_manifest,
+        )
+    root_graph_id = str(snapshot["root_graph_id"])
+    return graph_registry[root_graph_id]
+
+
+def _rehydrate_graph(
+    snapshot: dict[str, Any],
+    root: Path,
+    graph_registry: dict[str, CompiledSkill],
+    skill_manifest: RootSkillManifest,
+) -> CompiledSkill:
     from graph_skill_runtime.core.loader import (
         CompiledSubagent,
-        PhaseAttributeSpan,
         PhaseTokenInfo,
         _discover_actions_and_tools,
         _inject_subagent_tools,
@@ -244,19 +262,12 @@ def _rehydrate_compiled_skill(snapshot: dict[str, Any], root: Path) -> CompiledS
         subagents_by_phase[str(phase_id)] = hydrated_subagents
     phase_tokens: dict[str, PhaseTokenInfo] = {}
     for phase_id, token in dict(snapshot["phase_tokens"]).items():
-        attr_spans = {
-            str(attr_name): PhaseAttributeSpan(**span)
-            for attr_name, span in dict(token["attr_spans"]).items()
-        }
         phase_tokens[str(phase_id)] = PhaseTokenInfo(
             phase_id=str(token["phase_id"]),
             raw_text=str(token["raw_text"]),
-            start_offset=int(token["start_offset"]),
-            end_offset=int(token["end_offset"]),
             line_start=int(token["line_start"]),
             line_end=int(token["line_end"]),
             attrs=dict(token["attrs"]),
-            attr_spans=attr_spans,
         )
     tools = _inject_subagent_tools(tools, subagents_by_phase)
     return CompiledSkill(
@@ -267,6 +278,10 @@ def _rehydrate_compiled_skill(snapshot: dict[str, Any], root: Path) -> CompiledS
         tools=tools,
         subagents_by_phase=subagents_by_phase,
         phase_tokens=phase_tokens,
+        skill_manifest=skill_manifest,
+        skill_root=root,
+        graph_root=(root / str(snapshot["graph_root"])).resolve(),
+        graph_registry=graph_registry,
     )
 
 

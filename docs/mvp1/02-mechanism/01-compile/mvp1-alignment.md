@@ -1,11 +1,13 @@
 ---
 module: 02-mechanism/01-compile
 doc: mvp1-alignment
-status: audited-ready（**U12 单元锁定 2026-06-05**;§2 编译流水线机制已成段、现状/目标 demarcate;死簇清理 + purity LE2 扩展归 kiro;文件未 FROZEN）
+status: superseded（Phase 2 bundle compile pipeline 已取代本文的 v0.3 alignment）
 aligns_with: ../../00-architecture-overview.md（§3 机制层 B·编译）
 ---
 
 # 01-compile — 机制 B · 编译机制
+
+> **已被 Phase 2 取代（2026-08-27）**：当前 compile contract 见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，错误目录见 [`skill-spec/11-error-code-spec.md`](../../../skill-spec/11-error-code-spec.md)，当前 pipeline 见 [`parser.py`](../../../../src/graph_skill_runtime/core/parser.py)、[`loader.py`](../../../../src/graph_skill_runtime/core/loader.py) 与 [`compiler.py`](../../../../src/graph_skill_runtime/core/compiler.py)。后文保留为 v0.3 pre-cutover evidence，所有现在时和旧路径引用均不再是当前事实。
 
 > **Tier**: 机制层 B · 编译期 | **Owns**: loader · parser · 校验器实现(DAG/IO/mention/**purity 扫描器**)· `module_sandbox`(导入隔离)· cache · serializer | **现状**: ⏳ | **Related**: `compile-rules`(它实现的规则)· `02-resolver`(子图解析)· `03-assemble`(下游)· `data-contracts`(产出 AST)
 

@@ -4,7 +4,7 @@ This file is the canonical project-rule entry for contributors and coding agents
 
 ## 1. Current implementation and sources of truth
 
-The repository is on the Phase 1 implementation line.
+The current checkout contains the implemented Phase 1 typed runtime foundation and the Phase 2 portable gSkill format cutover.
 
 - The distribution is `graph-skill-runtime` version `0.1.0a1`.
 - The Python import is `graph_skill_runtime`.
@@ -13,9 +13,9 @@ The repository is on the Phase 1 implementation line.
 - SDK, CLI, and MCP calls converge on [`RuntimeApplication`](src/graph_skill_runtime/application/service.py). [`create_application`](src/graph_skill_runtime/composition.py) is the explicit composition root; there is no global application singleton.
 - [`spec/features.yaml`](spec/features.yaml), [`spec/source_file_map.yaml`](spec/source_file_map.yaml), and [`spec/contract_map.yaml`](spec/contract_map.yaml) own feature, source, event, error-code, and public-contract traceability.
 
-The current skill-file contract is still v0.3. A skill root contains `GRAPH.md`; a phase contains `LOGIC.md`, `SUBGRAPH.md`, or, for an agent phase, `SKILL.md`. [`docs/skill-spec/00-FORMAT-GROUND-TRUTH.md`](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md) is the FROZEN current format source of truth. [`docs/mvp1/INDEX.md`](docs/mvp1/INDEX.md) routes the extracted engine's current design contracts.
+The current skill-file contract is the portable format in [`docs/skill-spec/01-PORTABLE-GSKILL-V1.md`](docs/skill-spec/01-PORTABLE-GSKILL-V1.md). Callers provide one explicit business skill root containing the Agent Skills discovery entry `SKILL.md`, the machine topology `graph.yaml`, and phase directories whose type file is exactly one of `LOGIC.md`, `AGENT.md`, or `SUBGRAPH.md`. Reusable graphs form one flat `graphs/<graph_id>/graph.yaml` registry; graph ids are explicit and bundle-wide unique. Only the root `SKILL.md` is an Agent Skills discovery target. The former v0.3 contract in [`docs/skill-spec/00-FORMAT-GROUND-TRUTH.md`](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md) is `superseded` and remains only as converter input and historical evidence.
 
-[`docs/design/v1-alignment.md`](docs/design/v1-alignment.md) remains `drafted` because the complete v1 design is not implemented. Its Section 2 naming and the Phase 1 typed facade, configuration, and SDK/CLI/MCP boundary are implemented. Its root `SKILL.md` plus `graph.yaml`, phase `AGENT.md`, flat graph registry, durable host-native handoff, vendor CLI executors, MoirAI installer, and Gateway/Studio integrations remain later-phase targets. [`docs/design/README.md`](docs/design/README.md) routes current facts versus drafted targets. [`docs/design/baseline.md`](docs/design/baseline.md) is historical pre-extraction evidence, not a current path map.
+[`docs/design/v1-alignment.md`](docs/design/v1-alignment.md) remains `drafted` because the complete v1 design is not implemented. Its Section 2 naming, Phase 1 typed facade/configuration/SDK-CLI-MCP boundary, and Phase 2 portable format are implemented. Durable host-native handoff, vendor CLI executors, the MoirAI installer, and Gateway/Studio integrations remain Phase 3 through Phase 6 targets. [`docs/design/README.md`](docs/design/README.md) routes current facts versus drafted targets. [`docs/design/baseline.md`](docs/design/baseline.md) is historical pre-extraction evidence, not a current path map.
 
 The project is not published on PyPI. [`.github/workflows/release.yml`](.github/workflows/release.yml) defines separate build and publish jobs for a published GitHub Release whose tag equals `v<pyproject version>`; it validates the built wheel and uses PyPI Trusted Publishing through OpenID Connect (OIDC). The workflow is only prepared automation. The owner must configure the PyPI project and trusted publisher before the first release, and repository metadata, workflow presence, or a successful local build does not prove registry publication.
 
@@ -46,7 +46,7 @@ Resolved requests contain absolute skill and state roots plus field-level proven
 
 The default executor is `host-native`. Phase 1 has no host-native handoff implementation, so `run` must first persist the request snapshot and then return `GSKILL_EXECUTOR_UNAVAILABLE`. The local snapshot owner writes `<state_root>/runs/<run_id>/request.json` with create-if-absent semantics: identical content is idempotent and different content must never overwrite the existing run id.
 
-The extracted engine runs only when the resolved primary executor is explicitly `embedded`. Provider clients remain isolated in the optional `embedded` dependency extra. The current adapter has verified a real current-format `LOGIC` skill compile/run path. Do not describe agent-provider execution as generally complete from that logic-only evidence.
+The extracted engine runs only when the resolved primary executor is explicitly `embedded`. Provider clients remain isolated in the optional `embedded` dependency extra. The current adapter has verified a real portable-format `LOGIC` skill compile/run path. Do not describe agent-provider execution as generally complete from that logic-only evidence.
 
 Typed `resume` and `submit_agent_result` request/result contracts exist, but durable handoff is Phase 3. Their current implementation returns `GSKILL_NOT_IMPLEMENTED`. Fallback executor declarations are preserved in the snapshot; Phase 1 does not silently select them. Host-native, vendor CLI, MoirAI, Gateway, and Studio adapters must not be described as implemented until their own causal tests exist.
 
@@ -54,7 +54,7 @@ Typed `resume` and `submit_agent_result` request/result contracts exist, but dur
 
 This project is pre-release and has no external compatibility commitment. A contract change replaces the previous design once implementation, regeneration or conversion, tests, cross-platform evidence, contract maps, examples, and documentation are ready together.
 
-Do not add permanent compatibility shims, dual-format readers, legacy aliases, deprecated fields, or version-sniffing branches. Phase 2 will replace the current v0.3 reader with the root `SKILL.md` plus `graph.yaml` format in one explicit cutover. Until then, preserve the FROZEN v0.3 format and do not write the Phase 2 layout as a current capability.
+Do not add permanent compatibility shims, dual-format readers, legacy aliases, deprecated fields, or version-sniffing branches. Phase 2 replaced the v0.3 production reader with the root `SKILL.md` plus `graph.yaml` format in one explicit cutover. Production compile, predict, run, inspect, SDK, CLI, and MCP paths accept only the portable format. Legacy v0.3 parsing is confined to the explicit `gskill migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]` converter boundary; it must never become a fallback after a portable-format failure.
 
 The historical files under [`docs/mvp0`](docs/mvp0) are a frozen archive. Do not update them to describe current behavior. Update the active root documents and manifests instead.
 

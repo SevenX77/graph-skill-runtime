@@ -15,10 +15,18 @@ def _local_workspace_resolver_class():
 
 def _write_graph(root: Path) -> Path:
     root.mkdir(parents=True)
-    (root / "GRAPH.md").write_text(
-        """---
-schema_version: "v0.3.0"
-name: resolver-target
+    (root / "SKILL.md").write_text(
+        f"""---
+name: {root.name.replace(".", "-")}
+description: Resolver target fixture.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: root
+description: Resolver target fixture.
 io:
   inputs:
     type: object
@@ -27,9 +35,9 @@ io:
     type: object
     properties: {}
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
@@ -54,13 +62,14 @@ def test_local_workspace_resolver_resolves_skills_child(tmp_path: Path) -> None:
     assert resolver.resolve_skill("child-skill") == skill_root
 
 
-def test_local_workspace_resolver_resolves_dotted_id(tmp_path: Path) -> None:
+def test_local_workspace_resolver_rejects_dotted_id(tmp_path: Path) -> None:
     LocalWorkspaceResolver = _local_workspace_resolver_class()
-    skill_root = _write_graph(tmp_path / "acme" / "echo")
-
     resolver = LocalWorkspaceResolver(search_paths=[tmp_path])
 
-    assert resolver.resolve_skill("acme.echo") == skill_root
+    with pytest.raises(SkillResolutionError) as exc_info:
+        resolver.resolve_skill("acme.echo")
+
+    assert exc_info.value.payload.code == "[F-v3-resolver-skill-id-invalid]"
 
 
 def test_local_workspace_resolver_canonicalizes_search_paths(tmp_path: Path) -> None:
@@ -79,7 +88,7 @@ def test_default_local_resolver_canonicalizes_skill_entrypoint(tmp_path: Path) -
 
     parent = _write_graph(tmp_path / "workspace" / "parent")
 
-    resolver = default_local_resolver_for_skill(parent / ".." / "parent" / "GRAPH.md")
+    resolver = default_local_resolver_for_skill(parent / ".." / "parent" / "graph.yaml")
 
     assert all(path == path.resolve() for path in resolver.search_paths)
     assert parent.resolve() in resolver.search_paths
@@ -87,18 +96,18 @@ def test_default_local_resolver_canonicalizes_skill_entrypoint(tmp_path: Path) -
 
 def test_local_workspace_resolver_fails_loud_on_ambiguous_skill_id(tmp_path: Path) -> None:
     LocalWorkspaceResolver = _local_workspace_resolver_class()
-    literal_root = _write_graph(tmp_path / "acme.echo")
-    dotted_root = _write_graph(tmp_path / "acme" / "echo")
+    first_root = _write_graph(tmp_path / "first" / "echo")
+    second_root = _write_graph(tmp_path / "second" / "echo")
 
-    resolver = LocalWorkspaceResolver(search_paths=[tmp_path])
+    resolver = LocalWorkspaceResolver(search_paths=[tmp_path / "first", tmp_path / "second"])
 
     with pytest.raises(SkillResolutionError) as exc_info:
-        resolver.resolve_skill("acme.echo")
+        resolver.resolve_skill("echo")
 
     assert exc_info.value.payload.code == "[F-v3-skill-id-ambiguous]"
     message = str(exc_info.value)
-    assert str(literal_root.resolve()) in message
-    assert str(dotted_root.resolve()) in message
+    assert str(first_root.resolve()) in message
+    assert str(second_root.resolve()) in message
 
 
 def test_local_workspace_resolver_rejects_invalid_skill_id(tmp_path: Path) -> None:
@@ -116,6 +125,6 @@ def test_local_workspace_resolver_reports_unregistered_skill(tmp_path: Path) -> 
     resolver = LocalWorkspaceResolver(search_paths=[tmp_path])
 
     with pytest.raises(SkillResolutionError) as exc_info:
-        resolver.resolve_skill("missing.skill")
+        resolver.resolve_skill("missing-skill")
 
     assert exc_info.value.payload.code == "[F-v3-skill-not-registered]"

@@ -25,10 +25,18 @@ def test_dual_run_shadow_logic_skill_idempotency(tmp_path: Path) -> None:
     tool = _load_tool()
     skill_root = tmp_path / "skill"
     (skill_root / "phases" / "main" / "actions").mkdir(parents=True)
-    (skill_root / "GRAPH.md").write_text(
+    (skill_root / "SKILL.md").write_text(
         """---
-schema_version: "v0.3.0"
-name: shadow-smoke
+name: skill
+description: Verify repeatable execution through the portable runtime.
+---
+""",
+        encoding="utf-8",
+    )
+    (skill_root / "graph.yaml").write_text(
+        """schema_version: gskill.graph.v1
+graph_id: shadow-smoke
+description: Deterministic shadow comparison graph.
 io:
   inputs:
     type: object
@@ -40,14 +48,16 @@ io:
     required: [answer]
     properties:
       answer: {type: string}
-phases: [main]
----
-<phase depends_on="input" output>main</phase>
+phases:
+  - id: main
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
     (skill_root / "phases" / "main" / "LOGIC.md").write_text(
         """---
+name: main
 io:
   inputs:
     type: object
@@ -85,7 +95,7 @@ validator: false
     report = json.loads(output_path.read_text(encoding="utf-8"))
     assert exit_code == 0
     assert report["mode"] == "idempotency"
-    assert report["shadow_reference"] == "v21_repeat_run"
+    assert report["shadow_reference"] == "portable_repeat_run"
     assert report["match"] is True
     assert report["diff"] == {"missing": [], "extra": [], "mismatch": []}
     assert report["outputs"]["run_a"]["data"]["phase_outputs"]["main"] == {"answer": "Ada"}
@@ -113,7 +123,7 @@ def test_dual_run_shadow_passes_explicit_resolver_to_compile_and_assemble(
     monkeypatch.setattr(tool, "compile_skill", fake_compile_skill)
     monkeypatch.setattr(tool, "assemble_graph", fake_assemble_graph)
 
-    tool._run_v21(tmp_path, {}, run_id="red-test", chat_fixture="none")
+    tool._run_portable(tmp_path, {}, run_id="red-test", chat_fixture="none")
 
     compile_resolver = compile_kwargs.get("skill_resolver")
     assemble_resolver = assemble_kwargs.get("skill_resolver")

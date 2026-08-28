@@ -1,6 +1,6 @@
 """RED tests for J-04.B: two engine compile-diagnostic defects on ONE file.
 
-Defect 1 (loader.py ``_build_phase_document``, agent branch): body-structure
+Defect 1 (loader.py ``build_phase_document``, agent branch): body-structure
 diagnostics (missing ``<goal>``) and frontmatter schema diagnostics
 (``max_iterations`` out of range) come from two sequential steps inside the
 SAME call — ``_parse_agent_body(...)`` runs first and raises before
@@ -42,16 +42,32 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _write_solo_agent_skill(root: Path, *, agent_frontmatter: str, agent_body: str) -> None:
+def _write_graph_root(root: Path, *, name: str) -> None:
     _write(
-        root / "GRAPH.md",
-        f'---\nschema_version: "v0.3.0"\nname: j04b\n{_EMPTY_IO}\n'
-        'phases:\n  - main\n---\n<phase depends_on="input" output>main</phase>\n',
+        root / "SKILL.md",
+        f"---\nname: {name}\ndescription: Exercise aggregated phase diagnostics.\n---\n",
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
-        f"---\n{agent_frontmatter}\n{_EMPTY_IO}\n---\n{agent_body}",
+        root / "graph.yaml",
+        f"schema_version: gskill.graph.v1\ngraph_id: root\n"
+        f"description: Exercise aggregated phase diagnostics.\n{_EMPTY_IO}\n"
+        "phases:\n"
+        "  - id: main\n"
+        "    depends_on: [input]\n"
+        "    output: true\n",
     )
+
+
+def _write_solo_agent_skill(
+    parent: Path, *, agent_frontmatter: str, agent_body: str
+) -> Path:
+    root = parent / "j04b"
+    _write_graph_root(root, name="j04b")
+    _write(
+        root / "phases" / "main" / "AGENT.md",
+        f"---\nname: main\n{agent_frontmatter}\n{_EMPTY_IO}\n---\n{agent_body}",
+    )
+    return root
 
 
 def _raises(root: Path, resolver: SkillResolverProtocol) -> SkillLoadError:
@@ -79,15 +95,15 @@ def _messages(exc: SkillLoadError) -> str:
 def test_agent_body_defect_and_frontmatter_defect_report_together(
     tmp_path: Path, mock_skill_resolver: SkillResolverProtocol
 ) -> None:
-    """One compile of a SKILL.md missing <goal> AND max_iterations: -1 must
+    """One compile of an AGENT.md missing <goal> AND max_iterations: -1 must
     surface BOTH defects in the same pass, not just the body one first."""
-    _write_solo_agent_skill(
+    skill_root = _write_solo_agent_skill(
         tmp_path,
         agent_frontmatter="max_iterations: -1",
         agent_body="<role>R</role>\n",  # <goal> deliberately missing
     )
 
-    codes = _codes(_raises(tmp_path, mock_skill_resolver))
+    codes = _codes(_raises(skill_root, mock_skill_resolver))
     assert "[F-v3-agent-goal-missing]" in codes, codes
     assert "[F-v3-agent-max-iterations-invalid]" in codes, codes
 
@@ -97,17 +113,14 @@ def test_logic_body_defect_and_frontmatter_defect_report_together(
 ) -> None:
     """Same disease, logic phase: an empty <action> body tag must not mask an
     independent frontmatter schema defect (unknown field) in the same file."""
+    skill_root = tmp_path / "j04b-logic"
+    _write_graph_root(skill_root, name="j04b-logic")
     _write(
-        tmp_path / "GRAPH.md",
-        f'---\nschema_version: "v0.3.0"\nname: j04b-logic\n{_EMPTY_IO}\n'
-        'phases:\n  - main\n---\n<phase depends_on="input" output>main</phase>\n',
-    )
-    _write(
-        tmp_path / "phases" / "main" / "LOGIC.md",
-        f"---\ntotally_unknown_field: 1\n{_EMPTY_IO}\n---\n<action></action>\n",
+        skill_root / "phases" / "main" / "LOGIC.md",
+        f"---\nname: main\ntotally_unknown_field: 1\n{_EMPTY_IO}\n---\n<action></action>\n",
     )
 
-    codes = _codes(_raises(tmp_path, mock_skill_resolver))
+    codes = _codes(_raises(skill_root, mock_skill_resolver))
     assert "[F-v3-logic-actions-empty]" in codes, codes
     assert "[F-v3-logic-schema-unknown-field]" in codes, codes
 
@@ -117,13 +130,13 @@ def test_max_iterations_out_of_range_message_names_the_range(
 ) -> None:
     """-1 is a valid integer, just out of range: the message must say so
     instead of claiming it is not an integer at all."""
-    _write_solo_agent_skill(
+    skill_root = _write_solo_agent_skill(
         tmp_path,
         agent_frontmatter="max_iterations: -1",
         agent_body="<role>R</role>\n<goal>G</goal>\n",
     )
 
-    exc = _raises(tmp_path, mock_skill_resolver)
+    exc = _raises(skill_root, mock_skill_resolver)
     assert "[F-v3-agent-max-iterations-invalid]" in _codes(exc), _codes(exc)
     messages = _messages(exc)
     assert "between 1 and 50" in messages, messages

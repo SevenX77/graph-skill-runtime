@@ -13,10 +13,18 @@ from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 def _write_artifact_skill(root: Path, *, required_missing: bool = False) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     required = "[missing]" if required_missing else "[report]"
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
-name: artifact_suppression
+    (root / "SKILL.md").write_text(
+        """---
+name: skill
+description: Exercise predict artifact suppression.
+---
+""",
+        encoding="utf-8",
+    )
+    (root / "graph.yaml").write_text(
+        f"""schema_version: gskill.graph.v1
+graph_id: root
+description: Exercise predict artifact suppression.
 io:
   inputs:
     type: object
@@ -34,9 +42,9 @@ io:
       missing:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
         encoding="utf-8",
     )
@@ -45,6 +53,7 @@ phases:
     actions_dir.mkdir(parents=True)
     (phase_dir / "LOGIC.md").write_text(
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -104,13 +113,13 @@ def test_predict_suppresses_declared_file_output_writes(
     skill_root = _write_artifact_skill(tmp_path / "skill")
     workspace_dir = tmp_path / "workspace"
     calls: list[dict[str, Any]] = []
-    original_save = runner_module._save_v030_declared_file_outputs
+    original_save = runner_module._save_declared_file_outputs
 
     def recording_save(*args: Any, **kwargs: Any) -> Any:
         calls.append({"args": args, "kwargs": kwargs})
         return original_save(*args, **kwargs)
 
-    monkeypatch.setattr(runner_module, "_save_v030_declared_file_outputs", recording_save)
+    monkeypatch.setattr(runner_module, "_save_declared_file_outputs", recording_save)
 
     result = _run_predict(skill_root, workspace_dir, mock_skill_resolver)
 
