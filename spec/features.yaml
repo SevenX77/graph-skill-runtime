@@ -182,6 +182,60 @@ features:
   - tests/application/test_host_native_handoff.py::test_agent_result_cannot_persist_secret_shaped_output_or_provenance
   - tests/application/test_host_native_handoff.py::test_cli_treats_agent_required_as_a_successful_two_step_protocol
   - tests/application/test_host_native_handoff.py::test_mcp_projects_the_same_host_native_submit_protocol
+- id: F-agent-cli-executors
+  description: Execute supported root-DAG Agent phases through capability-probed
+    vendor CLI processes, validate the same provider-neutral AgentTask and AgentResult
+    contracts, and resume the durable graph run only after schema-valid output.
+  feature_boundary:
+    kind: lifecycle-behavior
+    evidence: vendor adapter contracts, process-tree tests, and durable CLI retry integration
+  sources:
+  - public-api
+  - source-file-map
+  core_paths:
+  - path: src/graph_skill_runtime/adapters/cli.py
+  - path: src/graph_skill_runtime/adapters/engine.py
+  - path: src/graph_skill_runtime/adapters/host_native.py
+  - path: src/graph_skill_runtime/adapters/host_native_runtime.py
+  - path: src/graph_skill_runtime/adapters/process.py
+  - path: src/graph_skill_runtime/adapters/vendor_cli/executor.py
+  - path: src/graph_skill_runtime/adapters/vendor_cli/runtime.py
+  - path: src/graph_skill_runtime/adapters/vendor_cli/vendors.py
+  - path: src/graph_skill_runtime/adapters/windows_job.py
+  - path: src/graph_skill_runtime/callbacks/events.py
+  - path: src/graph_skill_runtime/domain/models.py
+  - path: src/graph_skill_runtime/ports/process.py
+  error_codes_primary: []
+  error_codes_secondary: []
+  events_primary:
+  - AgentDispatchedEvent
+  - AgentStartedEvent
+  events_secondary:
+  - AgentCompletedEvent
+  - AgentFailedEvent
+  - AgentRequiredEvent
+  non_functional_contracts:
+  - id: NFC-cli-fresh-session-capability-probe
+    type: state-isolation
+    description: Every Agent attempt uses one fresh top-level vendor process only after
+      its executable, required flags, and exposed authentication status pass preflight.
+    evidence: tests/adapters/test_vendor_cli_executor.py::test_each_vendor_probes_builds_a_fresh_session_and_parses_one_agent_result
+  - id: NFC-cli-failed-attempt-keeps-handoff
+    type: determinism
+    description: A failed CLI attempt returns structured retry evidence without consuming
+      the durable AgentTask, so the same run and task can be retried.
+    evidence: tests/application/test_cli_runtime.py::test_cli_failure_preserves_same_durable_task_for_retry
+  - id: NFC-cli-process-tree-cleanup
+    type: compatibility
+    description: Timeout and cancellation terminate the entire supervised process tree
+      on Windows and POSIX instead of leaving vendor descendants alive.
+    evidence: tests/adapters/test_process_runner.py::test_timeout_terminates_the_whole_process_tree
+  targeted_tests:
+  - tests/adapters/test_vendor_cli_executor.py::test_each_vendor_probes_builds_a_fresh_session_and_parses_one_agent_result
+  - tests/adapters/test_process_runner.py::test_timeout_terminates_the_whole_process_tree
+  - tests/application/test_cli_runtime.py::test_cli_runtime_closes_one_agent_wait_with_causal_events
+  - tests/application/test_cli_runtime.py::test_cli_runtime_rejects_unbridged_agent_capabilities_before_handoff
+  - tests/application/test_cli_runtime.py::test_cli_failure_preserves_same_durable_task_for_retry
 - id: F-md-frontmatter-parsing
   description: Parse markdown frontmatter and body into stable skill metadata and
     diagnostics.
@@ -572,6 +626,7 @@ features:
   core_paths:
   - path: src/graph_skill_runtime/callbacks/base.py
   - path: src/graph_skill_runtime/callbacks/emit.py
+  - path: src/graph_skill_runtime/callbacks/events.py
   - path: src/graph_skill_runtime/core/event_contracts.py
   error_codes_primary: []
   error_codes_secondary: []

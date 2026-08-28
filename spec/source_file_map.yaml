@@ -22,25 +22,33 @@ files:
 - path: src/graph_skill_runtime/adapters/cli.py
   classification: feature
   feature_ids:
+  - F-agent-cli-executors
   - F-runtime-cli-adapter
   - F-studio-skill-migration
 - path: src/graph_skill_runtime/adapters/engine.py
   classification: feature
   feature_ids:
+  - F-agent-cli-executors
   - F-current-engine-adapter
   - F-host-native-agent-handoff
 - path: src/graph_skill_runtime/adapters/host_native.py
   classification: feature
   feature_ids:
+  - F-agent-cli-executors
   - F-host-native-agent-handoff
 - path: src/graph_skill_runtime/adapters/host_native_runtime.py
   classification: feature
   feature_ids:
+  - F-agent-cli-executors
   - F-host-native-agent-handoff
 - path: src/graph_skill_runtime/adapters/mcp.py
   classification: feature
   feature_ids:
   - F-runtime-mcp-adapter
+- path: src/graph_skill_runtime/adapters/process.py
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
 - path: src/graph_skill_runtime/adapters/snapshots.py
   classification: feature
   feature_ids:
@@ -48,6 +56,25 @@ files:
 - path: src/graph_skill_runtime/adapters/result_mapping.py
   classification: detail
   feature_id: F-current-engine-adapter
+- path: src/graph_skill_runtime/adapters/vendor_cli/__init__.py
+  classification: detail
+  feature_id: F-agent-cli-executors
+- path: src/graph_skill_runtime/adapters/vendor_cli/executor.py
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
+- path: src/graph_skill_runtime/adapters/vendor_cli/runtime.py
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
+- path: src/graph_skill_runtime/adapters/vendor_cli/vendors.py
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
+- path: src/graph_skill_runtime/adapters/windows_job.py
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
 - path: src/graph_skill_runtime/application/__init__.py
   classification: detail
   feature_id: F-runtime-application-service
@@ -75,8 +102,10 @@ files:
   feature_ids:
   - F-callback-event-stream
 - path: src/graph_skill_runtime/callbacks/events.py
-  classification: detail
-  feature_id: F-callback-event-stream
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
+  - F-callback-event-stream
 - path: src/graph_skill_runtime/callbacks/logging_cb.py
   classification: feature
   feature_ids:
@@ -140,6 +169,7 @@ files:
 - path: src/graph_skill_runtime/domain/models.py
   classification: feature
   feature_ids:
+  - F-agent-cli-executors
   - F-typed-runtime-facade
 - path: src/graph_skill_runtime/core/__init__.py
   classification: detail
@@ -433,6 +463,10 @@ files:
 - path: src/graph_skill_runtime/ports/__init__.py
   classification: detail
   feature_id: F-runtime-application-service
+- path: src/graph_skill_runtime/ports/process.py
+  classification: feature
+  feature_ids:
+  - F-agent-cli-executors
 - path: src/graph_skill_runtime/ports/runtime.py
   classification: feature
   feature_ids:

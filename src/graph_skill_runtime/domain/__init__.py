@@ -2,6 +2,7 @@
 
 from graph_skill_runtime.domain.models import (
     AgentRequired,
+    AgentResource,
     AgentResult,
     AgentTask,
     ArtifactRequest,
@@ -44,6 +45,7 @@ from graph_skill_runtime.domain.models import (
 
 __all__ = [
     "AgentRequired",
+    "AgentResource",
     "AgentResult",
     "AgentTask",
     "ArtifactRequest",

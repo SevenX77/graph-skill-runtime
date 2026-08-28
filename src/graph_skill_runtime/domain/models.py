@@ -12,11 +12,13 @@ JsonObject: TypeAlias = dict[str, JsonValue]
 Identifier: TypeAlias = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")]
 CallbackEventType: TypeAlias = Literal[
     "agent_completed",
+    "agent_dispatched",
     "agent_exit_decision",
     "agent_failed",
     "agent_loop_iteration",
     "agent_required",
     "agent_result_rejected",
+    "agent_started",
     "ambiguity_logged",
     "artifact_saved",
     "blackboard_reduce",
@@ -252,8 +254,34 @@ class CliExecutorConfig(ContractModel):
     schema_version: Literal["gskill.executor.v1"] = "gskill.executor.v1"
     kind: Literal["cli"] = "cli"
     vendor: Literal["claude", "codex", "copilot", "cursor", "gemini", "opencode"]
-    agent_profile: str | None = None
+    agent_profile: Identifier | None = Field(
+        default=None,
+        description="Vendor-native agent selector for Copilot, Gemini, or OpenCode.",
+    )
     model_override: str | None = None
+    executable: str | None = None
+    timeout_seconds: float = Field(default=600.0, gt=0, le=86_400)
+
+    @field_validator("agent_profile", "model_override", "executable")
+    @classmethod
+    def _optional_text_is_not_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("CLI executor text fields cannot be blank")
+        if value is not None and any(character in value for character in "\0\r\n"):
+            raise ValueError("CLI executor text fields cannot contain control lines")
+        return value
+
+    @model_validator(mode="after")
+    def _agent_profile_requires_vendor_native_dispatch(self) -> CliExecutorConfig:
+        if self.agent_profile is not None and self.vendor not in {
+            "copilot",
+            "gemini",
+            "opencode",
+        }:
+            raise ValueError(
+                "agent_profile is supported only for Copilot, Gemini, or OpenCode"
+            )
+        return self
 
 
 class EmbeddedExecutorConfig(ContractModel):
@@ -517,6 +545,16 @@ class PredictRequest(ContractModel):
     strategy: Literal["heuristic"] = "heuristic"
 
 
+class AgentResource(ContractModel):
+    """One declared file resource required by an Agent phase."""
+
+    schema_version: Literal["gskill.agent-resource.v1"] = "gskill.agent-resource.v1"
+    kind: Literal["reference", "example"]
+    resource_id: Identifier
+    path: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+
+
 class AgentTask(ContractModel):
     schema_version: Literal["gskill.agent-task.v1"] = "gskill.agent-task.v1"
     kind: Literal["agent_task"] = "agent_task"
@@ -528,6 +566,7 @@ class AgentTask(ContractModel):
     output_schema: JsonObject
     allowed_tools: tuple[Identifier, ...] = ()
     allowed_paths: tuple[str, ...] = ()
+    resources: tuple[AgentResource, ...] = ()
     network: Literal["deny", "host-policy", "allow"] = "host-policy"
     deadline: str | None = None
     required_capabilities: tuple[Identifier, ...] = ()

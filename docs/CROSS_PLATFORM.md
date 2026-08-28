@@ -1,6 +1,6 @@
 # Cross-Platform Policy
 
-This document is the authoritative Windows, macOS, and Linux policy for the standalone Python runtime. It applies to `src/graph_agent`, repository scripts and tools, tests, package builds, and runtime-owned files. It does not define behavior for Studio, a web frontend, Rust, Tauri, or Gateway; those components are outside this repository.
+This document is the authoritative Windows, macOS, and Linux policy for the standalone Python runtime. It applies to `src/graph_skill_runtime`, repository scripts and tools, tests, package builds, and runtime-owned files. It does not define behavior for Studio, a web frontend, Rust, Tauri, or Gateway; those components are outside this repository.
 
 ## Platform contract
 
@@ -14,12 +14,13 @@ Repository text and text exchanged by the runtime use UTF-8. Repository line end
 | --- | --- |
 | Git text normalization | [`.gitattributes`](../.gitattributes) pins Markdown, Python, TOML, YAML, JSON, and shell scripts to LF |
 | Explicit Python encodings | [`pyproject.toml`](../pyproject.toml) enables Ruff `PLW1514`, which rejects text `open()` calls without an encoding in linted code |
-| Human-authored input boundary | [`read_authored_text`](../src/graph_agent/core/authored_text.py) decodes external authored files with `utf-8-sig` |
+| Human-authored input boundary | [`read_authored_text`](../src/graph_skill_runtime/core/authored_text.py) decodes external authored files with `utf-8-sig` |
 | Python child-process default | Tests set `PYTHONUTF8=1` for child Python processes; CI sets it for jobs |
-| Atomic cache publication | [`save_to_cache`](../src/graph_agent/core/cache.py) writes a unique sibling temporary file and publishes with `os.replace` |
+| Atomic cache publication | [`save_to_cache`](../src/graph_skill_runtime/core/cache.py) writes a unique sibling temporary file and publishes with `os.replace` |
+| Vendor process-tree ownership | [`SubprocessProcessRunner`](../src/graph_skill_runtime/adapters/process.py) uses a Win32 Job Object on Windows and a new process group on POSIX; a denied POSIX group signal falls back only to bounded exact-PGID/effective-UID member signaling |
 | Platform CI configuration | [CI](../.github/workflows/ci.yml) defines Linux gates and tests, plus Python 3.12 smoke jobs on `windows-latest` and `macos-latest` |
 
-These controls are configured in the checkout. Phase 0 has not yet supplied a remote workflow run, so the CI file is not evidence that a platform job has passed.
+These controls are configured in the checkout. CI configuration is not evidence that a particular workflow, platform, vendor CLI, or version has passed; support statements require the recorded result of an affected-platform run.
 
 ## Text and encoding boundaries
 
@@ -28,7 +29,7 @@ These controls are configured in the checkout. Phase 0 has not yet supplied a re
 Skill Markdown, validator source, and declared runtime input can be written by editors that add a leading UTF-8 byte-order mark (BOM). Read such files through:
 
 ```python
-from graph_agent.core.authored_text import read_authored_text
+from graph_skill_runtime.core.authored_text import read_authored_text
 
 text = read_authored_text(path)
 ```
@@ -53,9 +54,25 @@ Every text subprocess call must define both sides of the encoding contract:
 - set `PYTHONUTF8=1` in the child environment when launching Python so the producer and consumer agree on UTF-8;
 - preserve structured failures such as executable-not-found, timeout, cancellation, and nonzero exit instead of collapsing them into an empty result.
 
-The current contract-manifest validator follows the explicit UTF-8 decoding pattern. New vendor or host process adapters must implement the same boundary in one adapter instead of scattering process calls through domain code.
+The current contract-manifest validator and direct vendor CLI process adapter follow the explicit UTF-8 decoding pattern. New vendor or host process adapters must implement the same boundary in one adapter instead of scattering process calls through domain code.
 
-Windows and POSIX process trees differ. Code that starts long-lived or child-spawning processes must define whether cancellation stops only the direct child or the owned process tree, then test that behavior on each supported platform. Do not call Unix-only signals or process-group APIs from shared code without an explicit platform adapter and equivalent Windows semantics.
+Windows and POSIX process trees differ. Code that starts long-lived or child-spawning processes must own and stop the complete process tree, then test that behavior on each supported platform. Do not call Unix-only signals or process-group APIs from shared code without an explicit platform adapter and equivalent Windows semantics.
+
+## Direct CLI process-tree ownership
+
+Each Phase 4 Agent attempt runs through the provider-neutral process Port in [`ports/process.py`](../src/graph_skill_runtime/ports/process.py). The request contains an argv tuple, existing absolute working directory, explicit environment, optional UTF-8 stdin, positive timeout, and combined output limit. The adapter always uses `shell=False`, captures stdout and stderr in bounded temporary files, polls cancellation and the monotonic deadline, decodes with UTF-8 replacement behavior, and removes its temporary task directory after the attempt. The complete business prompt travels by stdin for Claude, Codex, Cursor, and Gemini or by a UTF-8 attachment file for Copilot and OpenCode; it never enters argv.
+
+On Windows, starting a vendor process directly and assigning it to a Job Object afterward creates a race: the vendor can spawn an unowned descendant before assignment. The runtime therefore starts a Python supervisor that blocks while reading its vendor request from stdin, creates a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, immediately assigns the supervisor, and only then sends the vendor argv. The assigned supervisor becomes the process-tree root and launches the vendor with `shell=False`. `AgentStartedEvent.process_id` is this owned supervisor PID; consumers must not assume it is the vendor's direct PID. If Job Object creation, configuration, process opening, or `AssignProcessToJobObject` fails, startup fails closed and kills the supervisor. It does not degrade to “kill only the direct child.”
+
+Timeout or cancellation calls `TerminateJobObject`; closing the Job handle after normal parent completion also terminates lingering descendants because `KILL_ON_JOB_CLOSE` is active. A bounded `taskkill /T /F` attempt exists only as cleanup after an unexpected Job termination failure, not as the ownership mechanism. This design borrows the operating-system ownership primitive and failure bias documented by [Microsoft Win32 Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects): `AssignProcessToJobObject` establishes membership, `TerminateJobObject` stops the group, and kill-on-close makes parent lifetime observable. It deliberately does not invent a PID-file protocol, because PID existence cannot prove process-tree membership or generation.
+
+On POSIX, `subprocess.Popen(..., start_new_session=True)` creates a new session whose process group id is the child PID. Timeout, cancellation, and successful-parent cleanup first use group-wide signaling: `SIGTERM`, a fixed one-second grace period, then `SIGKILL` for remaining members. This borrows the mature session/process-group mechanism exposed by [Python's subprocess API](https://docs.python.org/3/library/subprocess.html#popen-constructor) and [`os.killpg`](https://docs.python.org/3/library/os.html#os.killpg). It does not use shell job control, a daemon, or detached PID discovery.
+
+Hosted Darwin demonstrated a narrower failure mode: group-wide `killpg` may return `EPERM` when the group contains a process the caller is not permitted to signal. That behavior follows Apple's documented [`killpg(2)` permission semantics](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/killpg.2.html). A denied group operation therefore does not prove that the runtime-owned members are unsignalable.
+
+On `PermissionError` only, the adapter checks `/bin/ps` and then `/usr/bin/ps`, runs the first available executable with `-axo pid=,pgid=,uid=`, and bounds that inspection to two seconds and 1 MiB of output. It accepts only well-formed integer rows whose PGID exactly equals the attempt's process-group id and whose UID equals the runtime's effective UID; it excludes the runtime process itself, deduplicates the PIDs, and signals those members individually. A missing `ps`, nonzero result, oversized output, malformed row, or invalid UTF-8 fails inspection rather than broadening the target. The same narrow fallback applies to the grace-period `SIGKILL` pass. It is not recursive process discovery and never targets a different PGID or UID.
+
+These controls define process ownership and cleanup, not one uniform vendor security sandbox. The CLI adapter also uses a fresh temporary cwd, a minimal allowlisted environment, vendor-exposed customization switches, and a prompt that forbids extra filesystem, shell, network, MCP, skill, and subagent tools. Vendor-managed authentication and configuration can still apply, and individual CLI tool/sandbox behavior differs. `AgentTask.allowed_paths` authorizes the runtime to materialize declared resources; it does not prove that a vendor process can read only those paths. Do not describe this boundary as a blank configuration, hard sandbox, or universal filesystem isolation.
 
 ## Paths and filenames
 
@@ -111,6 +128,12 @@ The configured CI topology is:
 
 A configuration entry or successful Linux run does not prove Windows or macOS behavior. A change to paths, encodings, subprocesses, atomic writes, locks, SQLite storage, or cleanup must have an OS-independent unit test where possible and a real affected-platform run where platform semantics matter. Record the command, operating system, Python version, and observed result before claiming support.
 
+The current Phase 4 real-machine record is Microsoft Windows `10.0.26200` x64 with Python `3.11.15`. Codex CLI `0.144.1` completed a real `gskill run`; its trace progressed `agent_required` → `agent_dispatched` → `agent_started` → `agent_completed`, and the last three events shared one attempt id. Claude Code `2.1.222` passed executable, version, and required-flag probes on the same host but its exposed authentication probe failed, so the runtime returned structured `GSKILL_EXECUTOR_UNAVAILABLE` before creating the handoff database. A deliberately missing Copilot executable likewise returned `executable-not-found` before handoff creation. Copilot, Cursor, Gemini, and OpenCode were not installed, Claude was not authenticated, and no macOS or Linux direct-vendor run was performed.
+
+Remote source-checkout evidence now exists on the same implementation commit [`8928d13`](https://github.com/SevenX77/graph-skill-runtime/commit/8928d13b32c800a2ad303d02e1bd96551f969ab5). [Workflow run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333) passed `quality-gates`, `runtime-tests` for Python 3.11/3.12/3.13, `cross-platform-smoke (windows-latest)`, and `cross-platform-smoke (macos-latest)`. The CodeQL check also passed, including `Analyze Python`. The real macOS process test starts a descendant that ignores `SIGTERM` and verifies that the subsequent `SIGKILL` cleanup prevents it from surviving.
+
+Fake-process adapter tests prove command construction, parsing, limits, lifecycle mapping, and failure behavior independent of an installed vendor. The remote Windows/macOS jobs prove the tested source-checkout process semantics on those runners, including the Darwin permission fallback; CodeQL proves only that its configured analysis completed successfully. None of these signals turn an uninstalled vendor into a supported operational combination, prove real vendor execution on macOS/Linux, install the built distribution across the release matrix, or constitute Phase 6 packaging/release acceptance. Dynamic executable/version/help/auth probes decide whether one local attempt can proceed; they are not a release-wide promise for every CLI version or operating system.
+
 Run the local baseline gates from the repository root:
 
 ```bash
@@ -130,6 +153,10 @@ Before merging a cross-platform-sensitive change, verify that:
 - repository files remain UTF-8 with LF and no case-only path pair was introduced;
 - paths are resolved at a named boundary and cannot escape an allowed root;
 - subprocess argv, environment, working directory, decoding, timeout, cancellation, and failure mapping are explicit;
+- Windows starts the stdin-blocked supervisor, assigns its Job Object before releasing vendor argv, fails closed on assignment failure, and documents the supervisor PID semantics;
+- POSIX uses one owned session/process group and cleans it after success as well as timeout or cancellation;
+- a POSIX `killpg` permission fallback is bounded, selects exact-PGID/effective-UID members only, and fails rather than widening its target when inspection is unavailable or malformed;
+- resource materialization and process-tree ownership are not described as a cross-vendor hard sandbox;
 - replacement or locking behavior has one owner and the same observable contract on Windows and POSIX;
 - tests prove the resulting state or failure, not merely that a function or command returned;
 - actual platform results are distinguished from configured but unrun CI.

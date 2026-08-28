@@ -1,12 +1,14 @@
 public_api_symbols:
   AgentExecutor:
-    feature_ids: [F-runtime-application-service]
+    feature_ids: [F-agent-cli-executors, F-runtime-application-service]
+  AgentResource:
+    feature_ids: [F-agent-cli-executors, F-typed-runtime-facade]
   AgentRequired:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
   AgentResult:
-    feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
+    feature_ids: [F-agent-cli-executors, F-typed-runtime-facade, F-runtime-application-service]
   AgentTask:
-    feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
+    feature_ids: [F-agent-cli-executors, F-typed-runtime-facade, F-runtime-application-service]
   ArtifactRequest:
     feature_ids: [F-typed-runtime-facade]
   ArtifactStore:
@@ -14,7 +16,7 @@ public_api_symbols:
   CheckpointStore:
     feature_ids: [F-runtime-application-service]
   CliExecutorConfig:
-    feature_ids: [F-runtime-config-resolution]
+    feature_ids: [F-agent-cli-executors, F-runtime-config-resolution]
   CompareCandidate:
     feature_ids: [F-typed-runtime-facade]
   CompileDiagnostic:
@@ -112,7 +114,7 @@ public_api_symbols:
   resume:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
   run:
-    feature_ids: [F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
+    feature_ids: [F-agent-cli-executors, F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
   submit_agent_result:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
 skill_spec_sections:
@@ -145,7 +147,7 @@ consumer_files:
     feature_ids: [F-typed-runtime-facade]
   - kind: live-consumer
     path: src/graph_skill_runtime/adapters/cli.py
-    feature_ids: [F-runtime-cli-adapter]
+    feature_ids: [F-agent-cli-executors, F-runtime-cli-adapter]
   - kind: live-consumer
     path: src/graph_skill_runtime/adapters/mcp.py
     feature_ids: [F-runtime-mcp-adapter]

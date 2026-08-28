@@ -9,6 +9,7 @@ from pydantic import JsonValue
 
 from graph_skill_runtime.adapters.host_native_runtime import HostNativeRuntimeAdapter
 from graph_skill_runtime.adapters.result_mapping import failed_run, json_object, run_result
+from graph_skill_runtime.adapters.vendor_cli.runtime import CliRuntimeAdapter
 from graph_skill_runtime.core.compiler import CompileIssue as CoreCompileIssue
 from graph_skill_runtime.core.compiler import CompileResult as CoreCompileResult
 from graph_skill_runtime.core.compiler import compile_skill
@@ -169,6 +170,9 @@ def _compiled_for_run(request: RunRequest) -> CompiledSkill | RunResult:
 class CurrentEngineAdapter:
     """Keep the characterized engine behind the new stable application Port."""
 
+    def __init__(self, *, cli_runtime: CliRuntimeAdapter | None = None) -> None:
+        self._cli_runtime = cli_runtime or CliRuntimeAdapter()
+
     def compile(self, request: CompileRequest) -> CompileResult:
         try:
             compiled = compile_skill(request.skill_root, cache=request.cache)
@@ -209,13 +213,7 @@ class CurrentEngineAdapter:
             return checked
         executor_kind = request.profile.profile.executor.kind
         if executor_kind == "cli":
-            return failed_run(
-                request,
-                mode="run",
-                code=RuntimeErrorCode.EXECUTOR_UNAVAILABLE,
-                message="vendor CLI execution is not implemented yet",
-                details={"executor_kind": executor_kind},
-            )
+            return self._cli_runtime.run(request, checked)
         if executor_kind == "host-native":
             return HostNativeRuntimeAdapter().run(request, checked)
         run_call = cast(_RunCallable, run_skill)

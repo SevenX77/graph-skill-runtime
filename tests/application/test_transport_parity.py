@@ -160,3 +160,107 @@ def test_cli_rejects_vendor_without_cli_executor(
     assert exit_code == 2
     assert payload["code"] == "GSKILL_INVALID_REQUEST"
     assert payload["message"] == "--vendor requires --executor=cli"
+
+
+def test_cli_projects_all_vendor_runtime_options_into_the_resolved_snapshot(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    skill_root = tmp_path / "skill"
+    skill_root.mkdir()
+    executable = tmp_path / "vendor-cli"
+    application, _, _ = _application(tmp_path)
+
+    exit_code = cli_main(
+        [
+            "config",
+            "resolve",
+            str(skill_root),
+            "--run-id",
+            "cli-options",
+            "--executor",
+            "cli",
+            "--vendor",
+            "copilot",
+            "--agent-profile",
+            "reviewer",
+            "--model",
+            "model-x",
+            "--executable",
+            str(executable),
+            "--timeout-seconds",
+            "37.5",
+        ],
+        application=application,
+    )
+    payload = json.loads(capsys.readouterr().out)
+    executor = payload["profile"]["profile"]["executor"]
+
+    assert exit_code == 0
+    assert executor == {
+        "schema_version": "gskill.executor.v1",
+        "kind": "cli",
+        "vendor": "copilot",
+        "agent_profile": "reviewer",
+        "model_override": "model-x",
+        "executable": str(executable),
+        "timeout_seconds": 37.5,
+    }
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("--agent-profile", "reviewer"),
+        ("--model", "model-x"),
+        ("--executable", "codex-custom"),
+        ("--timeout-seconds", "30"),
+    ],
+)
+def test_cli_rejects_each_vendor_option_without_cli_executor(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    option: str,
+    value: str,
+) -> None:
+    skill_root = tmp_path / "skill"
+    skill_root.mkdir()
+    application, _, _ = _application(tmp_path)
+
+    exit_code = cli_main(
+        ["run", str(skill_root), option, value],
+        application=application,
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert payload["code"] == "GSKILL_INVALID_REQUEST"
+    assert payload["message"] == f"{option} requires --executor=cli"
+
+
+def test_cli_rejects_non_positive_vendor_timeout(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    skill_root = tmp_path / "skill"
+    skill_root.mkdir()
+    application, _, _ = _application(tmp_path)
+
+    exit_code = cli_main(
+        [
+            "run",
+            str(skill_root),
+            "--executor",
+            "cli",
+            "--vendor",
+            "codex",
+            "--timeout-seconds",
+            "0",
+        ],
+        application=application,
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert payload["code"] == "GSKILL_INVALID_REQUEST"
+    assert "timeout_seconds" in payload["message"]
