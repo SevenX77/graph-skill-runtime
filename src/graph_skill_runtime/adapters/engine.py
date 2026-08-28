@@ -79,6 +79,24 @@ def _core_compile_result(value: object) -> CoreCompileResult | None:
     return value if isinstance(value, CoreCompileResult) else None
 
 
+def _golden_evaluation_passed(details: dict[str, JsonValue]) -> bool:
+    summary = details.get("summary")
+    if not isinstance(summary, dict):
+        raise ValueError("engine golden evaluation report is missing a summary object")
+
+    counts: dict[str, int] = {}
+    for field in ("total_cases", "passed", "failed", "stale"):
+        value = summary.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                f"engine golden evaluation summary field {field!r} must be a non-negative integer"
+            )
+        counts[field] = value
+    if counts["total_cases"] != counts["passed"] + counts["failed"] + counts["stale"]:
+        raise ValueError("engine golden evaluation summary counts are inconsistent")
+    return counts["failed"] == 0 and counts["stale"] == 0
+
+
 def _compile_failure(exc: Exception) -> CompileResult:
     core_result = _core_compile_result(getattr(exc, "compile_result", None))
     if core_result is not None:
@@ -252,6 +270,7 @@ class CurrentEngineAdapter:
                 baseline_id=request.baseline_id,
             )
             details = json_object(result)
+            passed = _golden_evaluation_passed(details)
         except Exception as exc:
             return GoldenEvaluationResult(
                 status="failed",
@@ -261,8 +280,6 @@ class CurrentEngineAdapter:
                     message=str(exc),
                 ),
             )
-        passed_value: JsonValue | None = details.get("passed")
-        passed = bool(passed_value) if passed_value is not None else True
         return GoldenEvaluationResult(
             status="passed" if passed else "failed",
             baseline_id=request.baseline_id,

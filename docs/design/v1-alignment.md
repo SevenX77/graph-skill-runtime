@@ -10,7 +10,7 @@ updated: 2026-08-27
 
 # Graph Skill Runtime v1 目标设计
 
-本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1、Phase 2 portable 文件格式、Phase 3 中 root DAG 串行可定位 Agent wait point 的 durable host-native handoff，以及 Phase 4 direct vendor CLI executor 已经实现；Phase 3b 的 host-native 扩展、Phase 5 installer 和 Phase 6 跨平台发布验收尚未实现，因此不能把完整 v1 当作当前能力。Gateway 与 Studio plugin 不属于本轮 release 交付；本文只保留其未来 Port/Adapter 所有权边界。
+本文定义把提取后的 engine 建成独立 Python runtime、SDK 与 CLI 的完整 v1 目标。它与 [`baseline.md`](./baseline.md) 双向绑定。本文整体状态保持 `drafted`：Phase 0、Phase 1、Phase 2 portable 文件格式、Phase 3 中 root DAG 串行可定位 Agent wait point 的 durable host-native handoff、Phase 4 direct vendor CLI executor，以及 Phase 5 的 canonical MoirAI assets、六宿主 renderer、显式 installer 与 scoped discovery 已经按各自边界验收；Phase 3b 的 host-native 扩展和 Phase 6 packaged cross-platform/release acceptance 尚未实现。因此不能把完整 v1 当作当前能力。Gateway 与 Studio plugin 不属于本轮 release 交付；本文只保留其未来外部 Port/Adapter 所有权边界。
 
 ## 0. Implementation status（2026-08-27）
 
@@ -18,22 +18,23 @@ updated: 2026-08-27
 | --- | --- | --- |
 | Phase 0：仓库提取与现状冻结 | **已实现** | 独立 GitHub repository 已建立；旧实现与 v0.3 格式已完成提取和 characterization；历史证据保留在 [`baseline.md`](./baseline.md) 与 `docs/mvp0/` |
 | Section 2：产品命名 | **已实现于源码与仓库** | distribution/import/command 是 `graph-skill-runtime` / `graph_skill_runtime` / `gskill`，当前版本 `0.1.0a1`；release workflow 已准备 build、wheel validation 与 OIDC Trusted Publishing，但 PyPI project/publisher 尚未配置，也没有实际发布 |
-| Section 3 与 Section 8 的 Phase 1 子集：typed facade、配置、SDK/CLI/MCP 边界 | **已实现** | 顶层 59-symbol contract、closed/frozen/versioned models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication`、八个 SDK 用例与八个同名 MCP tools 已落地；Phase 4 新增的唯一顶层 symbol 是 `AgentResource` |
+| Section 3 与 Section 8 的 typed facade、配置、SDK/CLI/MCP 边界 | **已实现并由 Phase 4/5 扩展** | 顶层 77-symbol contract、closed/frozen/versioned runtime 与 integration models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication` 已落地；SDK 现有八个 runtime functions 与五个 integration functions，MCP 仍只有八个 runtime tools；Phase 4 增加 `AgentResource`，Phase 5 增加 18 个 integration exports |
 | Current engine bridge | **已实现于当前范围** | `CurrentEngineAdapter` 已用真实 portable `LOGIC` skill 验证显式 embedded compile/run，并把 bounded host-native run/resume/submit 接入同一 core；provider clients 仍只位于 optional `embedded` extra |
 | Section 4 至 Section 5：portable 格式与 flat graph registry | **Phase 2 已实现** | Production compile/run/SDK/CLI/MCP 只接受显式 root `SKILL.md` + `graph.yaml` bundle；内部 agent phase 使用 `AGENT.md`；graph registry 为单层 `graphs/<graph_id>/`；legacy v0.3 读取只存在于显式 converter 边界 |
 | Section 6 至 Section 7：host-native durable handoff | **Phase 3 当前范围已实现** | 支持 root DAG 内串行可定位的 Agent wait point：图 checkpoint 与 `AgentTask` 先后持久化后返回 `agent_required`；SDK/MCP/CLI submit 校验结果并继续同一 run；跨进程、非法输出纠正、精确重试、checkpoint-to-task 与 graph-commit-to-response 两个 crash window 均有因果测试 |
 | Phase 3b：host-native 扩展 | **drafted；未实现** | registry subgraph、graph/phase iterate、不可比较并行 wait point、普通 human/breakpoint typed resume，以及宿主 dispatched/started acknowledgment 与 capability negotiation 尚未完成 |
 | Phase 4：direct vendor CLI executors | **已实现于当前受限范围** | Claude、Codex、Copilot、Cursor、Gemini、OpenCode 的 capability-probed adapter、fresh top-level process、资源 materialization、schema validation、attempt lifecycle 与全进程树清理已落地；仅 Codex CLI `0.144.1` / Windows `10.0.26200` x64 有成功实机 smoke，其他组合不能由 fake tests 或动态 probe 推导为支持 |
-| MoirAI installer、跨平台 package/release acceptance | **Phase 5 至 Phase 6 drafted；未实现** | 尚未实现宿主资产安装，也未完成三平台 package/release 验收 |
+| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply 已落地；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
+| Phase 6：跨平台 package/release acceptance | **drafted；未实现** | 尚未完成三平台 built-artifact install、CLI/MCP smoke、发布因果链与待声明 vendor/OS 组合实测 |
 | Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
-当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；凡未被上表标为已实现的内容都不得写成当前能力。
+当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前 MoirAI inventory 的精确事实源是 `src/graph_skill_runtime/integrations/assets/moirai/integration.json`；renderer 与 installer 行为分别由 `integrations/renderers.py` 与 `integrations/installer.py` 拥有。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；实现存在、验收通过、未来边界与未支持声明必须分开，不能互相替代。
 
-Phase 4 当前本地自动化证据已经在最终代码上完整重跑：全仓 Ruff green；strict mypy 覆盖 142 个 source files green；adapter/runtime/process focused suite 为 `43 passed in 4.70s`；完整 pytest 为 `1661 passed / 1 skipped in 116.69s`；contract manifest validator green。`uv build` 生成 `dist/graph_skill_runtime-0.1.0a1.tar.gz` 与 `dist/graph_skill_runtime-0.1.0a1-py3-none-any.whl`。`pip-audit` 对 resolved third-party dependencies 报告无已知漏洞，并明确跳过尚未发布的本地 distribution；这不是本仓源码安全审计，也不证明 PyPI 已发布。
+当前 Phase 5 候选已完整重跑本地 required gates：全仓 Ruff green；strict mypy 覆盖 149 个 source files green；contract manifest validator green；完整 pytest 为 `1715 passed, 1 skipped in 83.51s`。`uv build` 成功生成 `0.1.0a1` source distribution 与 wheel，wheel smoke green。`pip-audit` 报告 `No known vulnerabilities found`，同时明确跳过尚未发布的本地 `graph-skill-runtime`；这只说明被解析 distributions 的已知漏洞检查结果，不是本仓源码安全审计、PyPI publication evidence 或 Phase 6 三平台发布验收。
 
 同一 commit `8928d13b32c800a2ad303d02e1bd96551f969ab5` 的 [GitHub Actions run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333) 已通过 `quality-gates`、Python 3.11/3.12/3.13 的 `runtime-tests`、`cross-platform-smoke (windows-latest)` 与 `cross-platform-smoke (macos-latest)`；CodeQL check 与其中的 `Analyze Python` 也通过。这是同一 source checkout 的远程平台与静态分析证据，不是三平台 packaged install/release acceptance，也没有在 macOS/Linux 执行真实 vendor CLI。
 
-实机证据来自 Microsoft Windows `10.0.26200` x64、Python `3.11.15`。唯一成功 operational smoke 是 Codex CLI `0.144.1`：`run_id=codex-post-hardening-smoke`、`task_id=68c178f2-f453-510e-b80c-490ee366caab`、`attempt_id=9c8257a3-2e2a-4d16-aa83-7e141b47692e`、vendor `session_id=01a0465f-7593-78e3-acb4-88b3a0a11100`，输出 `echoed_note="post hardening verified"`，trace 顺序为 `agent_required` → `agent_dispatched` → `agent_started` → `agent_completed`，后三者共享同一 attempt id。Claude Code `2.1.222` 的 executable/version/help probe 通过，但 `auth status` exit 1；`gskill` 返回 `GSKILL_EXECUTOR_UNAVAILABLE`、`category=authentication-missing`、process exit 2，且未创建 handoff database。指定不存在的 Copilot executable 时，`gskill` 返回同一 error code、`category=executable-not-found`、process exit 2；immutable request snapshot 已存在，handoff database 不存在。这两条都是 fail-before-handoff 证据，不是成功支持证据。Copilot、Cursor、Gemini 与 OpenCode 未安装，Claude 未登录，macOS/Linux Phase 4 实机仍未验证。
+Phase 4 direct vendor CLI 的实机证据来自 Microsoft Windows `10.0.26200` x64、Python `3.11.15`。唯一成功 operational smoke 是 Codex CLI `0.144.1`：`run_id=codex-post-hardening-smoke`、`task_id=68c178f2-f453-510e-b80c-490ee366caab`、`attempt_id=9c8257a3-2e2a-4d16-aa83-7e141b47692e`、vendor `session_id=01a0465f-7593-78e3-acb4-88b3a0a11100`，输出 `echoed_note="post hardening verified"`，trace 顺序为 `agent_required` → `agent_dispatched` → `agent_started` → `agent_completed`，后三者共享同一 attempt id。Claude Code `2.1.222` 的 executable/version/help probe 通过，但 `auth status` exit 1；`gskill` 返回 `GSKILL_EXECUTOR_UNAVAILABLE`、`category=authentication-missing`、process exit 2，且未创建 handoff database。指定不存在的 Copilot executable 时，`gskill` 返回同一 error code、`category=executable-not-found`、process exit 2；immutable request snapshot 已存在，handoff database 不存在。这两条都是 fail-before-handoff 证据，不是成功支持证据。Copilot、Cursor、Gemini 与 OpenCode 未安装，Claude 未登录，macOS/Linux Phase 4 实机仍未验证。Phase 5 的 host projection discovery 是另一条验收边界，详见 Section 13；它不扩大 Phase 4 direct executor 的 operational support matrix。
 
 ## 1. 目标、术语与不可变约束
 
@@ -89,7 +90,7 @@ PyPI、`pip` 和 `uv` 是 Python 软件的分发与安装方式；SDK 是调用�
 | application | `compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden` 用例 | domain Port 与强类型请求/结果 |
 | ports | `AgentExecutor`、checkpoint store、artifact store、event sink、skill source 等稳定协议 | 只包含宿主无关类型 |
 | adapters | 本地文件、host-native、vendor CLI、embedded、MCP、console、Python facade | 依赖 ports；可以依赖具体平台或厂商 |
-| integrations | MoirAI 与宿主安装 renderer | 通过 SDK/CLI/MCP 契约调用 application，不进入 core |
+| integrations | MoirAI canonical assets、宿主 renderer 与显式 installer | installer 只拥有 host projection；资产指令通过公开 SDK/CLI/MCP runtime 契约工作，不进入 core |
 
 核心包不提供 HTTP API，也不持有 Studio 文件扫描、Gateway credential truth 或某个宿主的全局配置。Gateway 与 Studio plugin 不属于本轮 release；未来外部集成只能通过公开 SDK/CLI/MCP 与显式 Port/Adapter 边界接入，不能把产品状态或依赖放进 core。本轮 optional distribution extra 只服务已经列入阶段计划且通过验收的能力。
 
@@ -119,7 +120,7 @@ Python SDK、`gskill` CLI 与 `gskill` MCP server 均是薄 adapter：
 
 因此，`gskill compile`、MCP `compile` 和 `graph_skill_runtime.compile(...)` 必须返回同源诊断；`run`、`resume` 与 `submit_agent_result` 也不得各自实现状态转换。
 
-**Phase 1/4 实现说明**：上述 domain/application/ports/adapters 分层、五十九个顶层 typed symbols、八个 Python use-case functions、`gskill` CLI 与八个同名 MCP tools 已实现，并共享同一个 `RuntimeApplication`。Phase 4 新增且只新增一个顶层模型 `AgentResource`。所有公共 Pydantic contracts 都是 closed、frozen、带 `schema_version` 与 `kind` 的对象，构造后的嵌套 JSON collection 也不可变。`create_application` 是显式 composition root，每次调用构造独立 application，不持有全局 singleton。
+**Phase 1/4/5 实现说明**：上述 domain/application/ports/adapters/integrations 分层与七十七个顶层 typed symbols 已实现。八个 runtime SDK functions、`gskill` 的 runtime CLI commands 与八个 MCP runtime tools 共享同一个 `RuntimeApplication`；五个 integration SDK functions 与 `gskill integrations` CLI 共享显式 `IntegrationInstaller`，没有 installer MCP tool。Phase 4 增加公共 `AgentResource`；Phase 5 增加十三个 integration model/installer names 与五个 integration SDK functions，合计 18 个新增顶层 names。Runtime 公共 Pydantic contracts 位于 `domain/models.py`，integration 公共 Pydantic contracts 位于 `integrations/models.py`；两者都是 closed、frozen、带 `schema_version` 与 `kind` 的对象，构造后的嵌套 JSON collection 也不可变。`create_application` 是显式 composition root，每次调用构造独立 application，不持有全局 singleton。
 
 这一实现状态不表示所有目标用例已经具备完整执行语义。Phase 3 已让 `submit_agent_result` 在受支持的 host-native wait point 上完成 durable state transition；`resume(checkpoint_ref)` 只读取当前 durable wait 或 terminal response，普通 human/breakpoint typed resume 仍返回结构化 `GSKILL_NOT_IMPLEMENTED`。`RuntimeEvent.event_type` 已收紧为封闭的四十四值 Literal，并由 contract test 保证与当前全部 concrete `CallbackEvent` discriminator 精确相等。Host-native 有因果发出的 handoff lifecycle 是 `agent_required`、`agent_completed`、task-terminal `agent_failed` 与 `agent_result_rejected`；它仍没有 dispatched/started 宿主 acknowledgment。Phase 4 的 runtime-owned CLI attempt 则可以在 immutable attempt 建成后发 `agent_dispatched`，在 OS process-tree owner 建成后发 `agent_started`，并让成功 `agent_completed` 共享两者的 `attempt_id`。公共预测结果当前统一使用 `RunResult(mode="predict")`；是否另立 `PredictResult` 仍属于完整 v1 设计收敛事项，不能凭本文的目标清单虚构一个当前 export。
 
@@ -395,35 +396,56 @@ artifact id 不能使用旧数组位置，因为增删或排序会改变身份�
 
 ## 10. MoirAI 随包集成
 
-**实现边界**：本节属于 Phase 5 target。当前 wheel/repository 没有 MoirAI canonical asset installer，也没有任何隐式或显式宿主投影行为；下面定义的是未来 installer 必须满足的 ownership 与安全契约。
+**实现边界**：Phase 5 已在 canonical bundle、六宿主 renderer、显式 installer 与 scoped discovery 的定义范围内验收。`src/graph_skill_runtime/integrations/assets/moirai/` 只有一份 manifest-closed canonical bundle；`catalog.py` 负责 package-resource 读取与 inventory/UTF-8/LF/frontmatter 校验，`renderers.py` 负责六宿主 native format，`installer.py` 负责 preflight、ownership、apply、因果安全 rollback 与 uninstall。Renderer snapshot、built wheel 与真实宿主证据在 Section 13 分开记录；这些证据不把“六个 renderer 可生成”扩大成“六个宿主产品均 operational”。
 
 ### 10.1 资产边界与安装模型
 
-MoirAI 是可选 agentic front door：它用 4 个 role、8 个 skill 和知识库帮助用户设计、修复、评估与运行 gSkill。它的 canonical integration assets 以 integration id `moirai` 随 runtime wheel/repo 携带，但只是包内只读资源；只有用户显式执行安装命令后，renderer 才会把它们投影到具体宿主。MoirAI 不是 core runtime 的必需依赖。
+MoirAI 是可选 agentic front door：它帮助当前宿主设计、修复、执行与评估一个**由用户显式提供路径**的业务 gSkill。业务 gSkill 的 root 仍是根 `SKILL.md` + `graph.yaml`，每个 phase 恰有 `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 之一；reusable graph 平铺在 `graphs/<graph_id>/`。MoirAI bundle 不含 `graph.yaml`，不安装业务 workflow，不注册全局业务 skill，也不是 core runtime 的必需依赖。
 
-安装 `graph-skill-runtime` 不得静默修改 Claude、Codex、Copilot、Gemini、Cursor、OpenCode 或用户项目配置。唯一安装入口是用户显式执行的命令，例如：
+精确 inventory 与 reference subset 的唯一事实源是 `integration.json`，asset version 为 `1.0.0`：
+
+- 四个 role body：`moirai` → host name `moirai`，`clotho` → `moirai-clotho`，`lachesis` → `moirai-lachesis`，`atropos` → `moirai-atropos`；
+- 八个 Agent Skills：`moirai`、`moirai-brainstorming`、`moirai-domain-analysis`、`moirai-graph-design`、`moirai-agent-prompt-design`、`moirai-compile-repair`、`moirai-eval-judgement`、`moirai-web-research`；
+- 十五个 knowledge files：`KB-00-hub.md` 与 `KB-01..14` 的 manifest-listed exact filenames。每个 renderer 只把 manifest 分配给某个 skill 的 reference subset 复制到该 skill，不创建额外引用。
+
+上述 canonical 与 provider-neutral specialist names 始终使用连字符。Codex adapter 为满足该宿主的 safe identifier surface，单独把 agent projection 正规化为下划线，例如 `.codex/agents/moirai_clotho.toml` 内 `name = "moirai_clotho"`；其他宿主仍投影 manifest 中的连字符名称。该 adapter 变换不改变 canonical inventory 或 delegation 名称。
+
+Canonical skill 的 YAML frontmatter 只含 `name` 与 `description`，其余正文按 progressive disclosure 链接普通相对 Markdown references。Role source 只含 provider-neutral body；renderer 再生成宿主 metadata。Canonical prompt 只调用属于 `gskill` MCP server 的公开 runtime tools，或在 MCP 不可用时调用 installed `gskill` command；不得调用内部 Python module。
+
+安装 distribution、`import graph_skill_runtime`、构造 installer、启动 MCP 与 PATH detection 都不修改宿主或项目。唯一写入授权是显式 `gskill integrations install moirai ...` 或等价 SDK `install_integration(IntegrationRequest(...))`。`detected` 只是 PATH read evidence；只有把它放入显式 install command 后才成为目标选择。Installed-user 流程先 detect、再 dry-run、再 apply：
 
 ```text
-gskill integrations install moirai --targets detected --scope user --dry-run
-gskill integrations install moirai --targets claude,codex,cursor --scope project
+gskill integrations detect
+gskill integrations install moirai --targets codex --scope user --dry-run
+gskill integrations install moirai --targets codex --scope user
+gskill integrations uninstall moirai --targets codex --scope user --dry-run
+gskill integrations uninstall moirai --targets codex --scope user
 ```
 
-installer 必须先输出计划，进行冲突检测，并生成含 integration id、目标、scope、源 asset version、目标路径、内容 hash 和 ownership 的 install manifest。默认不覆盖非本工具拥有的文件；`gskill integrations uninstall moirai ...` 只删除 manifest 证明由本次安装拥有且 hash 未被用户修改的文件。冲突必须报告并要求显式处理。
+Project scope 要显式给出或由 CLI 从当前目录确定现存 project root；SDK request 必须显式携带该路径。Project manifest 位于 `<project>/.gskill/integrations/moirai/<target>/install-manifest.json`；user scope manifest 位于 runtime user-state root 的同构 `integrations/moirai/<target>/` 下。
 
-canonical assets 只维护一份。每个 host renderer 将其投影为相应的 skill、custom-agent、plugin 与 MCP 配置。安装的是 MoirAI runtime integration，包括 4 roles、8 skills、`KB-00` hub 与 `KB-01..14`、host adapters/MCP；安装的不是用户业务 gSkill。
+Installer 在任何写入前 preflight 全部 requested targets；一个 conflict 阻止全部目标。它不 adopt 或 overwrite unmanaged file/config entry；managed resource 被用户修改后会被保留，并阻止 update/uninstall。Shared JSON 只合并 owned selector；Codex TOML 只维护 marker-delimited owned block。Apply 中途失败后，rollback 只在路径当前内容仍精确等于本次 operation after-image 时恢复 before-image；若另一个进程已改动该路径，installer 保留新内容、报告 incomplete rollback 并抛错，绝不覆盖。Uninstall 只移除 manifest 中 hash 精确匹配的 owned content，并保留 unrelated config。`.opencode/opencode.json` 是 shared config；OpenCode renderer 只 merge/own V2 selector `mcp.servers.gskill` 以及 manifest-owned projected files，不拥有整个 JSON 文件。若 sibling `opencode.jsonc` 已存在，installer fail closed，不 rewrite 或 shadow JSONC。
 
-`gskill init` 与 `gskill link` 可以在用户明确请求时 scaffold 或链接一个业务 gSkill。`pip install`、import package、启动 MCP server 和 capability detection 都不得调用这两个有写入副作用的动作。
+六个 renderer 按当前 official format references 实现：Codex [skills](https://developers.openai.com/codex/skills)、[subagents](https://developers.openai.com/codex/subagents) 与 [MCP](https://developers.openai.com/codex/mcp)；Claude [skills](https://docs.anthropic.com/en/docs/claude-code/skills) 与 [sub-agents](https://docs.anthropic.com/en/docs/claude-code/sub-agents)；Copilot [custom agents](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/invoke-custom-agents) 与 [MCP](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers)；Gemini [subagents](https://geminicli.com/docs/core/subagents/)；Cursor [skills](https://prod.cursor.com/docs/skills) 与 [subagents](https://prod.cursor.com/docs/subagents)；OpenCode V2 [skills](https://opencode.ai/v2/docs/skills/)、[agents](https://opencode.ai/v2/docs/agents)、[config](https://opencode.ai/v2/docs/config) 与 [MCP servers](https://opencode.ai/v2/docs/mcp-servers/)。`tests/integrations/snapshots/moirai_renderers.json` 锁定六者在 project/user scope 的 native paths、profile metadata 与 MCP shape。Official references 证明 format 依据，snapshot 证明 deterministic projection；二者都不单独证明真实产品 discovery 或 operational execution。
 
 ### 10.2 Tool ownership
 
 | Tool family | 目标 owner | 原因 |
 | --- | --- | --- |
-| compile、predict、run、resume/submit、trace、artifacts、golden、inspect、portable skill reads | portable runtime MCP | 只依赖业务 skill 与 runtime application service |
+| `compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden` | `gskill` portable runtime MCP | 当前 MCP 精确八个 tools；都到达同一 `RuntimeApplication`，没有独立 `trace`、`artifacts`、golden create/promote 或 installer MCP tool |
 | LLM credential、role、route、endpoint registry 与 provider probe | future external Gateway adapter | Gateway 是配置真相 owner；秘密与 route 不属于 portable skill。本轮不交付该 adapter |
 | create/fork/publish、Studio UI file writing、workspace mirror | future external Studio adapter | 需要 Studio native-fs、router 与产品工作流。本轮不交付该 adapter |
 | web fetch/search | 当前宿主能力 | 网络权限、登录和安全策略由宿主拥有，runtime 不重复内置 |
 
-同一用例的 MCP、CLI 与 SDK 入口必须调用同一 application service。MoirAI prompt 或 renderer 不允许直接调用 runtime 内部模块，也不允许复制 compile/run 判断。
+Runtime workflow 先 `compile`。`inspect` 只投影 compiled topology；`predict` 是 deterministic/heuristic stub，不调用真实 model、不持久化 declared artifact outputs，也不证明 quality/golden fitness；`run` 才执行。Golden 只评估现存 `<state_root>/golden/<baseline_id>/baseline.json` 与 cases，没有 public create/promote 操作；`stale` 不算 pass。Artifact 由 root `graph.yaml` 以 stable `artifact_id` 声明，由本次 request 选择；`run` 可以物化选择项，`predict` 不会。
+
+CLI fallback 只使用 installed `gskill` command：`gskill compile SKILL_ROOT`、`gskill predict SKILL_ROOT [--inputs-json JSON]`、`gskill run SKILL_ROOT [--inputs-json JSON]`、`gskill inspect SKILL_ROOT --call-graph`、`gskill golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT`、`gskill resume SKILL_ROOT RUN_ID --state-root STATE_ROOT --checkpoint-ref REF`、`gskill submit RUN_ID --state-root STATE_ROOT --checkpoint-ref REF --result-json JSON`。Canonical assets 不使用 `uv run`、`python -m` 或 source checkout，也不复制 compile/run 判据。
+
+### 10.3 Specialist 与当前宿主所有权
+
+`moirai` 协调 understand → research → plan → execute → dispatch → close。`moirai-clotho` 负责 domain model、graph topology/dataflow 与 Agent prompt design；`moirai-lachesis` 负责完整 diagnostics、root cause 与最小 authoritative repair；`moirai-atropos` 负责 predict/run/trace/artifact/golden evidence 与 pass/rework verdict。它们是宿主原生 specialist profiles，不替代当前宿主，也不是 runtime executor。
+
+当前宿主始终保留授权、最终裁决与 user-facing response。每次 specialist handoff 必须自包含 objective、scope、paths/typed inputs、已核验 facts、constraints、requested output 与 acceptance evidence。若 runtime 返回 `agent_required`，当前宿主必须创建 fresh native clean-context subagent、交付完整 `AgentTask`、接收一个满足 `output_schema` 的 JSON、封装 `AgentResult` 并调用 `submit_agent_result`；`resume` 只观察 durable wait/terminal state。无法强制 required capabilities 时必须停止并报告，不能伪造输出或通过 shell vendor CLI 冒充当前宿主的 native child。显式 `executor=cli` 是另一条 fresh vendor-native top-level process 路径；它不进入当前 host conversation。Phase 4 direct executor 的真实 operational support 仍只证明 Codex CLI `0.144.1` / Windows `10.0.26200` x64 / Python `3.11.15`；Phase 5 host projection discovery 不改变这条执行矩阵。
 
 ## 11. 同类型方案比较
 
@@ -447,12 +469,12 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 - 外部 agent 返回值必须先做 Draft 2020-12 schema、task id、checkpoint generation、secret-shaped payload 与大小限制校验；坏输出只持久化 SHA-256，不持久化原文；
 - Windows Job Object 与 POSIX process group 负责全 process-tree cleanup，但这不是统一 OS sandbox；vendor auth/config、tools 和 sandbox 强度仍由各 CLI 决定，`allowed_paths` 不得被写成普遍 filesystem confinement；
 - MCP 与 installer 遵守宿主权限与信任模型；被动 capability detection 不等于安装授权，只有用户显式执行 `integrations install` 才能写入，即使目标值是 `detected`；
-- install/uninstall 以 manifest 和 content hash 证明 ownership，冲突时保留用户文件并失败；
+- install/uninstall 以 manifest 和 content hash 证明 ownership，冲突时保留用户文件并失败；apply failure 后也只对仍等于本次 after-image 的路径 rollback，任何并发改动都被保留并作为 incomplete rollback 报错；
 - checkpoint 写入、agent result 提交与 resume 必须幂等，重复/过期提交返回结构化错误而不是再次执行 phase。
 
 ## 13. 分阶段迁移
 
-每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1、Phase 2、下述受限 Phase 3 与 Phase 4 已实现；当前独立 distribution、portable gSkill v1 格式、bounded host-native protocol 和 direct vendor CLI protocol 是运行事实。Phase 3b、Phase 5 与 Phase 6 的退出判据未通过前，不能靠未实现 adapter 或文档声明掩盖缺口。最终本地 required gates 已完整通过，完整 pytest 为 `1661 passed / 1 skipped in 116.69s`；同一 commit 的远程 quality/runtime/Windows/macOS source-checkout matrix 也已通过。该远程矩阵尚未完成 Phase 6 的 packaged install/release 验收，也没有扩大真实 vendor CLI 支持矩阵。
+每个阶段都必须有独立退出判据和失败出口。Phase 0、Phase 1、Phase 2、下述受限 Phase 3、Phase 4 与定义范围内的 Phase 5 已验收；当前独立 distribution、portable gSkill v1 格式、bounded host-native protocol、direct vendor CLI protocol 与 optional MoirAI projection 是运行事实。Phase 3b 与 Phase 6 仍未实现。不能用 source presence、fake tests 或文档声明替代各阶段要求的验收证据。Phase 5 候选的本地 required gates 为 Ruff green、149-source strict mypy green、manifest validator green 与 `1715 passed, 1 skipped in 83.51s`；built artifact 和真实宿主 discovery 证据见本节 Phase 5。既有远程 quality/runtime/Windows/macOS source-checkout matrix 与本次 Windows host observation 都尚未完成 Phase 6 的三平台 packaged install/release 验收，也不能扩大 direct vendor CLI 或六宿主 operational support matrix。
 
 ### Phase 0：契约冻结与 characterization
 
@@ -466,7 +488,7 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 ### Phase 1：拆出 pure runtime 与 typed facade/config
 
-**当前状态（2026-08-27）**：已实现。distribution/import/command 已切换；Phase 1 的 typed facade、配置 resolver、request snapshot、application/ports/adapters 边界、SDK/CLI/MCP parity 与显式 embedded bridge 已落地。Phase 4 在该 facade 上新增 `AgentResource` 后，当前顶层总数为 59。项目尚未发布 PyPI，这不把已完成的源码阶段变成已发布产品。
+**当前状态（2026-08-27）**：已实现。distribution/import/command 已切换；Phase 1 的 typed facade、配置 resolver、request snapshot、application/ports/adapters 边界、SDK/CLI/MCP parity 与显式 embedded bridge 已落地。Phase 4 增加 `AgentResource`，Phase 5 再增加 18 个 integration names 后，当前顶层总数为 77。项目尚未发布 PyPI，这不把已完成的源码阶段变成已发布产品。
 
 **工作**：建立独立 repo/package 骨架、domain/application/ports/adapters 边界、版本化 invocation/request/result/event/error，以及将 `RuntimeProfile` 与 named `RunPreset` 分离的五层 config resolver；把 compile/predict/checkpoint 等 pure runtime 能力迁入。现有 embedded executor 只作为显式 optional extra 与 characterization oracle，不成为新包默认 executor。
 
@@ -537,15 +559,29 @@ Windows `10.0.26200` x64 / Python `3.11.15` 上，Codex CLI `0.144.1` 的真实 
 
 **失败出口**：缺 executable/version/flag/auth/capability 返回可修复环境对应的 structured `GSKILL_EXECUTOR_UNAVAILABLE`；invalid config/task/schema/resource 与未桥接 capability 不可重试；timeout/cancel/output limit/nonzero/invalid output 返回 structured failure，dispatch 后保留 durable task 供同一 run/task 重试。支持矩阵移除没有实机证据的组合；不伪装成当前宿主 child，不声称 blank config 或 hard sandbox，也不回退到未授权 `embedded`。
 
-### Phase 5：MoirAI canonical assets、installer 与 portable MCP
+### Phase 5：MoirAI canonical assets、installer 与 `gskill` MCP registration
 
-**当前状态（2026-08-27）**：未实现，保持 drafted。当前 MCP 暴露八个 runtime use-case tools，不包含 installer。
+**当前状态（2026-08-27）**：已在 canonical assets、六 renderer、explicit installer 与 scoped host discovery 的定义范围内验收。当前 MCP 仍精确暴露八个 runtime tools：`compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden`；installer 只通过 CLI/SDK 暴露。
 
-**工作**：以 integration id `moirai` 整理一份 canonical roles/skills/KB，完成六宿主 renderer、显式 `gskill integrations install moirai`、dry-run、manifest/uninstall 与 portable runtime MCP tool set。
+**已落实工作**：
 
-**退出判据**：wheel 内能读取 canonical assets，但未执行显式命令时六宿主目录零变化；重复安装幂等；冲突不覆盖；修改后的用户文件不会被 uninstall 删除；六 renderer snapshot 和真实宿主 discovery smoke 通过。
+- `integration.json` 以 integration id `moirai` 和 asset version `1.0.0` 封闭登记 4 roles、8 Agent Skills、15 KB filenames 与每个 skill 的 reference subset；canonical assets 不含 `graph.yaml`；
+- 四个 provider-neutral specialist role body、八份仅含 `name` / `description` frontmatter 的 progressive-disclosure `SKILL.md`、`KB-00` routing hub 与 subject-owned `KB-01..14` 已落地；
+- Claude、Codex、Copilot、Cursor、Gemini、OpenCode 六个 renderer 把同一份 assets 投影到 native skill/agent directories，并注册现有 `gskill` MCP server；Codex 把 projected agent filename/name 中的 canonical 连字符正规化为下划线，其他宿主保留连字符；OpenCode 只 merge/own shared `.opencode/opencode.json` 中的 V2 selector `mcp.servers.gskill`，遇到 sibling JSONC 时 fail closed；
+- `IntegrationInstaller` 与五个 SDK functions、`gskill integrations detect/install/uninstall` 已落地；construction、import、MCP startup 与 detection 零写入，只有 explicit install request 授权 host/project mutation；
+- preflight 覆盖全部 requested targets；unmanaged/modified resource 形成全局 conflict；owned JSON selector 与 Codex marker block 独立 merge；apply failure 后只对仍等于本次 after-image 的路径做因果安全 rollback，并对并发改动报告 incomplete rollback；manifest/hash-safe idempotent uninstall 已在实现中闭合；
+- Gateway/Studio plugin、dedicated Claude plugin bundle 与 global business-skill registry 均不是本阶段产物，只保留未来 external Port/Adapter owner 边界。
 
-**失败出口**：MoirAI extra 不发布或缩小已验证 target 列表；core runtime release 不依赖它。
+**验收证据（已满足）**：
+
+- **Source candidate**：Ruff green；strict mypy 覆盖 149 个 source files green；contract manifest validator green；完整 pytest 为 `1715 passed, 1 skipped in 83.51s`。`tests/integrations/snapshots/moirai_renderers.json` 锁定 Claude、Codex、Copilot、Cursor、Gemini、OpenCode 六个 renderer 在 project/user 两种 scope 的 native paths、profile metadata 与 MCP shape。Snapshot 是六 renderer 的格式回归证据，不是六个真实产品均 operational 的证据。
+- **Built artifact**：`uv build` 成功生成 `0.1.0a1` sdist/wheel，wheel smoke green。Wheel 内 MoirAI closed inventory 精确为 28 members：1 个 `integration.json`、4 个 role bodies、8 个 skills、15 个 KB files；没有 `graph.yaml`，也没有额外 member。Clean Python 3.11 environment 从该 wheel 安装后，`PackagedMoiraiAssets` 读取到 `4/8/15`，并由该 wheel 安装的 `gskill` 完成 temporary project projection。`pip-audit` 报告 `No known vulnerabilities found`，但跳过未发布的本地 `graph-skill-runtime`；这不是源码安全审计或发布证据。
+- **Real host observation**：在 Windows `10.0.26200` x64 上，Claude Code `2.1.222` 使用隔离的 `CLAUDE_CONFIG_DIR` 与 temporary project-scope projection。Debug 明确报告 `Loaded 8 unique skills (... project: 8)`；不存在的 `--agent` 对照在认证前列出的 available agents 明确包含 `moirai`、`moirai-atropos`、`moirai-clotho`、`moirai-lachesis`；有效 `--agent moirai-clotho` 越过 profile discovery/selection，只在未登录处失败。`claude mcp get gskill` 发现 project `.mcp.json` entry，debug 随后实际启动并连接 `gskill` stdio MCP，capabilities 为 `hasTools/hasPrompts/hasResources=true`。这些事实证明 skill/agent/MCP discovery 与 MCP startup，不证明 authenticated Claude model execution。
+- **Cross-host check and limit**：同一平台的 Codex CLI `0.144.1` 在隔离 temporary project 中供应 project skill `$moirai`，并通过 project MCP 的 `gskill.inspect` 对 `hello-world` 返回 `skill_id=hello-world`。该 tool-backed session 的 spawn tool surface 没有 `agent_type`；生成 child metadata 为 `agent_role=null`，且没有加载 custom `developer_instructions`。因此 Codex custom-agent invocation 尚未验证；这是宿主观察到的限制，不否定 official standalone TOML format。Phase 5 acceptance 依据 Claude 三类 discovery 加 Codex skill/MCP 交叉证据，不把 custom-agent runtime invocation 或其余四宿主扩大为 operational support。
+
+**退出判据（已满足）**：同一候选的 renderer snapshots、built-wheel closed inventory/install projection，以及至少一个真实宿主的 projected skill、agent、`gskill` MCP discovery/startup 均已有 action 与 observed evidence；Codex 再独立交叉验证 skill/MCP。Source、artifact 与 host 三层证据彼此不替代，但已共同闭合本阶段定义范围。
+
+**失败出口**：保留 core runtime 与用户业务 gSkill 的显式路径契约，不让其依赖 MoirAI。未来改动若破坏 snapshot、wheel inventory 或真实 discovery，撤回相应验证声明，修正 canonical asset/renderer/installer 后从同一候选重新验收；不以隐式 projection、覆盖用户文件或新增 core dependency 绕过缺口。
 
 ### Phase 6：跨平台 packaging 与 release acceptance
 
@@ -568,7 +604,7 @@ v1 只有同时满足以下条件才可标记完成：
 5. `host-native` durable handoff 在真实宿主上完成 crash/reopen/submit/resume；每个声明支持的 CLI vendor/version/OS 组合都有真实 smoke，并明确证明是 fresh top-level session。
 6. checkpoint、trace、artifact 与 immutable run snapshot 可由因果证据关联到同一 run；重复 result 提交不会重复执行。
 7. config 五层优先级、RuntimeProfile/RunPreset 职责分离、持久非秘密默认值、immutable RunRequest、secret exclusion 与 state-dir 绝对路径在三平台通过测试。
-8. `gskill integrations install moirai` 的 dry-run、conflict、manifest、idempotency 与 safe uninstall 通过；wheel 携带的 canonical assets 在显式安装前不投影到宿主，安装资产也不包含用户业务 gSkill。
+8. `gskill integrations install moirai` 的 dry-run、all-target conflict、manifest、因果安全 rollback、idempotency 与 safe uninstall 通过；六 renderer snapshots、built-wheel canonical inventory 与真实宿主 skill/agent/MCP discovery smoke 均有证据；显式安装前不投影宿主，安装资产也不包含用户业务 gSkill。Phase 5 已在当前定义范围满足本项，完整 v1 仍受其余未满足项约束。
 9. wheel/sdist、clean install、CLI/MCP smoke、SQLite reopen 与受支持 handoff 在 Ubuntu、Windows、macOS 的同一候选提交上通过；Gateway/Studio plugins 不是本轮验收依赖，未来只能消费公开 Port/Adapter 边界。
 10. Production runtime 只有 portable reader；旧 v0.3 契约保持 `superseded`，legacy parser 只服务显式 converter。当前 portable 规范处于 `audited-ready`；只有 owner 盖章并建立 SHA-256 哈希锁后才可标记 `FROZEN`。
 
@@ -584,7 +620,8 @@ v1 只有同时满足以下条件才可标记完成：
 
 | 日期 | 修订 | 依据与边界 |
 | --- | --- | --- |
-| 2026-08-27 | 将 Phase 4 direct vendor CLI executor 标为当前受限能力，新增 `AgentResource`、六 vendor protocol、attempt lifecycle 与跨平台 process-tree owner，并保持全文 `drafted` | 当前 source/manifest、43 条 Phase 4 focused tests、142-source strict mypy、Ruff、manifest validator 与完整 suite `1661 passed / 1 skipped in 116.69s`；build 同时产出 wheel/sdist，dependency audit 无已知 resolved-dependency 漏洞但跳过未发布的本地 distribution。同一 commit 的 Linux/Windows/macOS source-checkout matrix 与 CodeQL/Analyze Python 已通过，并包含 Darwin `killpg(EPERM)` 后 exact-PGID/effective-UID fallback 的 real macOS SIGKILL cleanup evidence。Windows/Codex `0.144.1` 仍是唯一成功 operational vendor smoke；Phase 3b、Phase 5、Phase 6 仍未完成，Gateway/Studio plugin 仍不在本 release |
+| 2026-08-27 | 将 Phase 5 在 canonical assets、六 renderer、explicit installer 与 scoped discovery 范围标为 accepted；收紧 causal rollback、OpenCode shared-config ownership 与 Codex identifier 边界 | Source candidate 通过 Ruff、149-source strict mypy、manifest validator 与 `1715 passed, 1 skipped in 83.51s`，六 renderer 的 project/user snapshot 已锁定；`0.1.0a1` wheel 精确含 28 个 MoirAI members，clean Python 3.11 wheel install/projection smoke 通过；Windows 上 Claude Code `2.1.222` 实证 skill/agent/MCP discovery 与 stdio startup，Codex CLI `0.144.1` 交叉实证 skill/MCP。Claude authenticated model execution 与 Codex custom-agent invocation 均未证明，六宿主 operational claim 不成立；全文仍因 Phase 3b/6 为 `drafted` |
+| 2026-08-27 | 将 Phase 4 direct vendor CLI executor 标为当前受限能力，新增 `AgentResource`、六 vendor protocol、attempt lifecycle 与跨平台 process-tree owner，并保持全文 `drafted` | 当前 source/manifest、43 条 Phase 4 focused tests、142-source strict mypy、Ruff、manifest validator 与完整 suite `1661 passed / 1 skipped in 116.69s`；build 同时产出 wheel/sdist，dependency audit 无已知 resolved-dependency 漏洞但跳过未发布的本地 distribution。同一 commit 的 Linux/Windows/macOS source-checkout matrix 与 CodeQL/Analyze Python 已通过，并包含 Darwin `killpg(EPERM)` 后 exact-PGID/effective-UID fallback 的 real macOS SIGKILL cleanup evidence。Windows/Codex `0.144.1` 仍是唯一成功 operational vendor smoke；该行当时的 Phase 5 状态已由上一行验收记录取代，Phase 3b/6 仍未完成，Gateway/Studio plugin 仍不在本 release |
 | 2026-08-27 | 将 Phase 6 裁决为跨平台 packaging/release acceptance；Gateway/Studio plugins 移出本轮 release，只保留未来 Port/Adapter owner 边界 | 本轮后续交付顺序固定为 vendor CLI、MoirAI、三平台发布验收；当前无 Gateway/Studio adapter，也不得把产品 plugin 当作 v1 release gate |
 | 2026-08-27 | 将 root DAG 串行可定位 wait point 的 durable host-native handoff 标为 Phase 3 当前能力，并把 richer address、普通 typed resume 与 host acknowledgment 留在 Phase 3b | `agent_handoffs.py`、`host_native.py`、`host_native_runtime.py`、`result_mapping.py`、`recover_paused_skill`、external phase completion 与 `agent_result_hashes`；12 条 feature-targeted tests 覆盖跨进程/纠错/cancelled failure/两个 crash window/CLI/MCP，Ruff、135-source strict mypy、manifest validator 与完整 suite `1604 passed / 1 skipped in 83.88s` 通过，并有一次 Codex native clean-context 人工闭环。远程三平台门禁未列为已通过 |
 | 2026-08-27 | 将 Phase 2 portable gSkill reader、flat registry、artifact-by-id 与显式 Studio converter 标为当前已实现；把 v0.3 降为 converter/历史证据 | 当前 compiler/loader/converter、portable fixtures 与 Windows 本地门禁；该行只记录 Phase 2 cutover，当时的 Phase 3 判断已由本表上一条修订取代 |

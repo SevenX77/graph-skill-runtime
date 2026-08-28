@@ -7,17 +7,19 @@ updated: 2026-08-27
 
 # Public API Contract
 
-This document records the implemented top-level Python contract for `graph-skill-runtime` `0.1.0a1`. Phase 2 changed the accepted business-skill format, Phase 3 added bounded durable host-native execution semantics, and Phase 4 added direct vendor CLI execution plus the public `AgentResource` model. The executable symbol source is [`graph_skill_runtime.__all__`](../src/graph_skill_runtime/__init__.py); this document must contain exactly one strict `## <symbol>` heading for each of those 59 names. The distribution has not been published to PyPI.
+This document records the implemented top-level Python contract for `graph-skill-runtime` `0.1.0a1`. Phase 2 changed the accepted business-skill format, Phase 3 added bounded durable host-native execution semantics, Phase 4 added direct vendor CLI execution plus the public `AgentResource` model, and accepted Phase 5 added explicit optional-integration planning and installation contracts. The executable symbol source is [`graph_skill_runtime.__all__`](../src/graph_skill_runtime/__init__.py); this document must contain exactly one strict `## <symbol>` heading for each of those 77 names. The distribution has not been published to PyPI. Phase 3b and Phase 6 remain outside the implemented contract.
 
 ## 1. Contract-wide rules
 
-Every public Pydantic model is defined in [`domain/models.py`](../src/graph_skill_runtime/domain/models.py), forbids unknown fields, is frozen after construction, and carries a literal `schema_version` plus a literal `kind`. Nested JSON dictionaries and lists are also frozen, so a caller cannot mutate a validated request through a child collection. Invalid fields, values, discriminators, or cross-field combinations fail model construction with Pydantic validation errors.
+Public runtime Pydantic models are defined in [`domain/models.py`](../src/graph_skill_runtime/domain/models.py); public integration Pydantic models are defined in [`integrations/models.py`](../src/graph_skill_runtime/integrations/models.py). Both families forbid unknown fields, are frozen after construction, and carry a literal `schema_version` plus a literal `kind`. Nested JSON dictionaries and lists are also frozen, so a caller cannot mutate a validated request through a child collection. Invalid fields, values, discriminators, or cross-field combinations fail model construction with Pydantic validation errors.
 
 The public facade uses JSON-compatible typed contracts instead of unbounded `Any` configuration. Executor and checkpoint-store unions discriminate on `kind`. Identifiers use `^[A-Za-z][A-Za-z0-9_.-]*$` where the model declares an identifier field.
 
 Literal values stored under structurally secret-shaped keys are rejected from persistent input and override objects. Secret values are represented by `SecretReference` and `SecretBinding`; the runtime cannot determine whether every arbitrary business string is confidential.
 
-The eight SDK functions in [`sdk.py`](../src/graph_skill_runtime/sdk.py), the `gskill` CLI, and the eight same-named MCP tools delegate to one [`RuntimeApplication`](../src/graph_skill_runtime/application/service.py). Each SDK call accepts an optional `application=` dependency. If omitted, it calls `create_application()`; no global application singleton is used.
+[`sdk.py`](../src/graph_skill_runtime/sdk.py) exposes thirteen functions. Eight runtime functions—`compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`—delegate to one [`RuntimeApplication`](../src/graph_skill_runtime/application/service.py), accept an optional `application=`, and otherwise call `create_application()` without a global singleton. Five integration functions—`detect_integration_hosts`, `plan_integration_install`, `install_integration`, `plan_integration_uninstall`, and `uninstall_integration`—accept an optional `installer=` and otherwise construct an isolated `IntegrationInstaller`.
+
+The MCP server still exposes exactly the eight runtime tools `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`. Integration detection and mutation are SDK/CLI boundaries, not MCP tools.
 
 ## 2. Phase boundary
 
@@ -36,6 +38,10 @@ Each CLI attempt has one `attempt_id`. Building its immutable invocation emits `
 The CLI path passes the complete business prompt through UTF-8 stdin or a temporary UTF-8 file, never argv. It materializes a declared resource only when its resolved file falls within `AgentTask.allowed_paths`; the prompt receives the resource handle, summary, and content, not the original path. Aggregate resource input is limited to 1 MiB, the final prompt to 2 MiB, the output schema to 1 MiB, combined stdout and stderr to 4 MiB, and the Codex final-response file to 4 MiB. Every output is validated with Draft 2020-12 JSON Schema. Literal secret-shaped output or provenance is rejected, and invalid-output/nonzero-exit details retain only an output SHA-256 rather than the rejected text.
 
 The Port types below define provider-neutral boundaries. Their presence does not imply that the current composition ships a default adapter for every Port.
+
+The optional MoirAI integration is not a user business gSkill. Its manifest owns one canonical inventory of four host-role instructions, eight Agent Skills, and fifteen knowledge files with no `graph.yaml`. Package install, import, installer construction, MCP startup, and host detection do not project those assets. An explicit integration install request is the authorization boundary for host/project writes.
+
+Phase 5 acceptance covers the canonical bundle, six deterministic project/user renderers, explicit installer safety, built-wheel contents and projection, and bounded real-host discovery. Renderer snapshots fix native paths, profile metadata, and MCP shapes for all six targets. The `0.1.0a1` wheel was verified to contain exactly 28 MoirAI members—one manifest, four roles, eight skills, and fifteen knowledge files—with no `graph.yaml` or extra member; a clean Python 3.11 install read the `4/8/15` inventory and projected a temporary project through the wheel's `gskill`. On Windows `10.0.26200` x64, Claude Code `2.1.222` discovered the eight skills, four agents, and `gskill` MCP entry and connected the stdio server; Codex CLI `0.144.1` independently supplied `$moirai` and successfully called `gskill.inspect`. These observations do not prove authenticated Claude model execution, Codex custom-agent invocation, or operational support for all six products. Phase 6 still owns packaged cross-platform and release acceptance; Studio and Gateway plugins remain future external Port/Adapter concerns.
 
 ## AgentExecutor
 
@@ -165,9 +171,10 @@ The Port types below define provider-neutral boundaries. Their presence does not
 
 ## GoldenEvaluationResult
 
-- **Responsibility**: structured golden-evaluation outcome.
+- **Responsibility**: structured evaluation outcome for an existing golden baseline; it does not create or promote a baseline.
 - **Fields**: status (`passed` or `failed`), `baseline_id`, JSON `details`, and optional `RuntimeErrorPayload`.
-- **Failure semantics**: the current adapter returns `GSKILL_RUN_FAILED` when evaluation raises or reports failure. This model does not require every failed result to carry an error, so producers remain responsible for a complete diagnostic.
+- **Current pass rule**: the engine report must contain `details.summary.total_cases`, `passed`, `failed`, and `stale` as non-negative integers; `total_cases` must equal their three outcome counts. Status is `passed` only when that summary is internally consistent and both `failed` and `stale` are zero.
+- **Failure semantics**: a valid report with any failed or stale case returns `failed` with `GSKILL_RUN_FAILED`. A malformed summary or evaluation exception also returns `failed` with a `RuntimeErrorPayload`. A stale case is never a pass.
 
 ## HostNativeExecutorConfig
 
@@ -175,11 +182,95 @@ The Port types below define provider-neutral boundaries. Their presence does not
 - **Fields**: only `schema_version` and `kind="host-native"`.
 - **Failure semantics**: a root graph without Agent phases executes directly. A supported root-DAG Agent wait returns a durable `AgentRequired`; unsupported nested, iterated, or parallel wait-point shapes and non-SQLite Agent handoff return `GSKILL_INVALID_REQUEST`. The adapter never silently falls back.
 
+## HostDetection
+
+- **Responsibility**: one read-only PATH discovery observation for a supported integration renderer target.
+- **Fields**: target, `detected: bool`, optional non-empty executable path, and non-empty human-readable evidence, plus `schema_version="gskill.host-detection.v1"` and `kind="host_detection"`.
+- **Failure semantics**: `detected` must be true exactly when `executable` is present. Detection does not invoke the executable and does not authorize or perform an installation.
+
+## HostDetectionResult
+
+- **Responsibility**: one complete read-only host-detection report.
+- **Fields**: immutable `detections: tuple[HostDetection, ...]`, plus `schema_version="gskill.host-detection-result.v1"` and `kind="host_detection_result"`.
+- **Failure semantics**: the tuple must contain every `IntegrationTarget` exactly once. Missing, duplicate, or unknown target evidence fails validation.
+
 ## InputBinding
 
 - **Responsibility**: bind a JSON value to one named input on a `PhaseAddress`.
 - **Fields**: address, identifier-shaped field name, and JSON `value`.
 - **Failure semantics**: invalid addresses/identifiers/non-JSON values fail validation; structurally secret-shaped literal keys inside the value are rejected and must be represented with secret-reference contracts.
+
+## IntegrationAction
+
+- **Responsibility**: classify one planned integration resource transition.
+- **Values**: `create`, `update`, `remove`, and `unchanged`.
+- **Failure semantics**: unknown values fail enum or enclosing-model validation. `unchanged` is a verified no-op, not evidence that a write occurred.
+
+## IntegrationChange
+
+- **Responsibility**: expose one planned host projection mutation or verified no-op.
+- **Fields**: target, non-empty `resource_id`, `IntegrationResourceKind`, `IntegrationAction`, non-empty resolved path, optional selector tuple, and optional lowercase 64-character SHA-256, plus `schema_version="gskill.integration-change.v1"` and `kind="integration_change"`.
+- **Failure semantics**: invalid enum values, blank required strings, or a malformed hash fail validation. The change is planning data; only an apply operation can write it.
+
+## IntegrationConflict
+
+- **Responsibility**: explain one safety refusal that blocks every target in the requested operation.
+- **Fields**: target, non-empty resource id, non-empty path, and non-empty reason, plus `schema_version="gskill.integration-conflict.v1"` and `kind="integration_conflict"`.
+- **Failure semantics**: malformed fields fail validation. A plan containing any conflict must set `can_apply=false`, and install/uninstall must perform no requested-target mutations.
+
+## IntegrationInstaller
+
+- **Responsibility**: read canonical MoirAI assets, render selected host projections, preflight the complete multi-target operation, and apply only manifest-owned changes.
+- **Construction**: keyword-only optional asset source, host home, user-state root, Python executable, and PATH lookup function. Construction and `detect_hosts()` are read-only. The default asset source is `PackagedMoiraiAssets`; the default executable recorded for MCP launch is the current Python interpreter.
+- **Interface**: `detect_hosts()`, `detected_targets()`, `plan_install(request)`, `install(request)`, `plan_uninstall(request)`, and `uninstall(request)`.
+- **Safety semantics**: all requested targets are preflighted before apply. The installer never adopts or overwrites unmanaged files/config entries, updates only unmodified manifest-owned resources, merges only its owned JSON selector or marker-delimited Codex TOML block, and uninstalls only exact unmodified owned hashes. After an apply failure it restores a touched path only while the current bytes still equal that operation's after-image. A concurrently changed path is preserved and reported as an incomplete rollback rather than overwritten. `.opencode/opencode.json` is shared configuration: the installer owns only selector `mcp.servers.gskill`, plus manifest-owned projected files, and rejects a sibling `opencode.jsonc`.
+- **Failure semantics**: safety conflicts are returned in a non-applicable `IntegrationPlan` or `IntegrationResult(status="conflict")` with zero applied changes. Invalid roots or renderer/config state raise `ValueError`; apply or rollback I/O failures can raise `OSError`. If a touched path no longer matches the operation's after-image during rollback, the installer preserves it and raises `RuntimeError` reporting the incomplete rollback. The CLI translates these boundary failures to structured runtime error payloads.
+
+## IntegrationOperation
+
+- **Responsibility**: identify which integration plan is being computed or applied.
+- **Values**: `install` and `uninstall`.
+- **Failure semantics**: unknown values fail enum or enclosing-model validation.
+
+## IntegrationPlan
+
+- **Responsibility**: represent the complete preflight result for one multi-host install or uninstall.
+- **Fields**: operation, fixed `integration_id="moirai"`, non-empty asset version, scope, unique non-empty targets, immutable changes and conflicts, and `can_apply`, plus `schema_version="gskill.integration-plan.v1"` and `kind="integration_plan"`.
+- **Consistency rules**: `can_apply` is true exactly when conflicts are empty. Every change and conflict must belong to a requested target.
+- **Failure semantics**: duplicate targets, contradictory applicability, or out-of-scope changes/conflicts fail validation. Planning inspects current filesystem/config state but performs no writes.
+
+## IntegrationRequest
+
+- **Responsibility**: explicit authorization boundary for one MoirAI operation over selected host targets and one scope.
+- **Fields**: fixed `integration_id="moirai"`, unique non-empty targets, `IntegrationScope`, and optional non-empty project root, plus `schema_version="gskill.integration-request.v1"` and `kind="integration_request"`.
+- **Failure semantics**: project scope requires `project_root`; user scope forbids it; targets must be unique. The installer additionally requires a project root to resolve to an existing directory.
+
+## IntegrationResourceKind
+
+- **Responsibility**: identify how one host projection is owned inside its destination.
+- **Values**: `file`, `json_entry`, and `text_block`.
+- **Failure semantics**: unknown values fail enum or enclosing-model validation. A JSON entry owns one selector; a text block owns one marker-delimited block rather than the whole shared config file.
+
+## IntegrationResult
+
+- **Responsibility**: return one planning or apply outcome together with the exact plan that governed it.
+- **Fields**: status (`planned`, `installed`, `uninstalled`, `unchanged`, or `conflict`), `IntegrationPlan`, and non-negative `applied_changes`, plus `schema_version="gskill.integration-result.v1"` and `kind="integration_result"`.
+- **Consistency rules**: planned and conflict results have zero applied changes; conflict requires a non-applicable plan and every other status requires an applicable plan. Installed status requires an install plan, and uninstalled status requires an uninstall plan.
+- **Failure semantics**: contradictory combinations fail validation. `applied_changes` counts changed projected resources, not an assertion about external host discovery.
+
+## IntegrationScope
+
+- **Responsibility**: select whether a host projection belongs to one project or the current user.
+- **Values**: `project` and `user`.
+- **Current ownership**: project manifests live under `<project>/.gskill/integrations/moirai/<target>/`; user manifests live under the runtime user-state root.
+- **Failure semantics**: unknown values fail enum or enclosing-model validation; `IntegrationRequest` enforces the matching project-root rule.
+
+## IntegrationTarget
+
+- **Responsibility**: enumerate host ecosystems with implemented first-party projection renderers.
+- **Values**: `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`.
+- **Renderer naming**: canonical role identities remain hyphenated. The Codex renderer alone normalizes projected agent filenames and `name` values to underscore-safe identifiers, for example `.codex/agents/moirai_clotho.toml` with `name="moirai_clotho"`; other targets retain the canonical hyphenated host names.
+- **Failure semantics**: unknown targets fail validation. Renderer availability is not a claim that the corresponding real product has discovered or operationally accepted the projection.
 
 ## InspectRequest
 
@@ -367,6 +458,13 @@ The Port types below define provider-neutral boundaries. Their presence does not
 - **Output**: a new application using `ConfigResolver`, `CurrentEngineAdapter`, and `LocalRunSnapshotStore` for omitted dependencies.
 - **Failure semantics**: it creates no global singleton and writes no host or project configuration. Dependency-construction errors propagate to the caller.
 
+## detect_integration_hosts
+
+- **Responsibility**: expose complete read-only PATH evidence for every implemented integration renderer target.
+- **Signature**: `detect_integration_hosts(*, installer: IntegrationInstaller | None = None) -> HostDetectionResult`.
+- **Current behavior**: use the injected installer or construct a new one, call `detect_hosts()`, and wrap all six observations. It does not invoke a host executable or write host, project, or manifest state.
+- **Failure semantics**: constructor or PATH lookup boundary failures propagate at the Python API. Detection is evidence only; callers must construct an explicit `IntegrationRequest` before installation.
+
 ## evaluate_golden
 
 - **Responsibility**: thin Python facade for one golden-baseline evaluation.
@@ -379,11 +477,32 @@ The Port types below define provider-neutral boundaries. Their presence does not
 - **Signature**: `inspect(request: InspectRequest, *, application: RuntimeApplication | None = None) -> InspectResult`.
 - **Failure semantics**: the default adapter projects compile failures into `InspectResult.diagnostics` and, when requested, projects call edges from the compiled portable bundle.
 
+## install_integration
+
+- **Responsibility**: explicitly authorize and apply one preflighted MoirAI projection operation.
+- **Signature**: `install_integration(request: IntegrationRequest, *, installer: IntegrationInstaller | None = None) -> IntegrationResult`.
+- **Current behavior**: preflight every requested target; return `conflict` with zero writes if any conflict exists, `unchanged` for an idempotent install, or `installed` with the count of changed projected resources after apply.
+- **Failure semantics**: safety conflicts are typed results. Invalid filesystem/config state and apply or rollback failures propagate as the installer's `ValueError`, `OSError`, or `RuntimeError`; no fallback target or unmanaged adoption occurs. An incomplete rollback means a concurrently changed path was preserved and the operation raised rather than overwriting it.
+
 ## predict
 
 - **Responsibility**: resolve and snapshot a `PredictRequest.invocation`, then delegate the immutable request to the engine predictor.
 - **Signature**: `predict(request: PredictRequest, *, application: RuntimeApplication | None = None) -> RunResult`.
 - **Failure semantics**: configuration, snapshot-collision, and unexpected engine exceptions propagate at the Python boundary; successful engine projection uses `RunResult(mode="predict")`.
+
+## plan_integration_install
+
+- **Responsibility**: compute the complete MoirAI install plan without applying it.
+- **Signature**: `plan_integration_install(request: IntegrationRequest, *, installer: IntegrationInstaller | None = None) -> IntegrationPlan`.
+- **Current behavior**: inspect all selected host resources, shared config entries, and existing ownership manifests; return changes, conflicts, and `can_apply`. Planning writes nothing.
+- **Failure semantics**: detected conflicts remain structured in the plan. Invalid roots, unreadable/oversized/malformed shared configuration, or invalid renderer state can raise `ValueError` or `OSError`.
+
+## plan_integration_uninstall
+
+- **Responsibility**: compute the exact manifest-owned MoirAI removal plan without applying it.
+- **Signature**: `plan_integration_uninstall(request: IntegrationRequest, *, installer: IntegrationInstaller | None = None) -> IntegrationPlan`.
+- **Current behavior**: validate the manifest against the current renderer inventory and compare every owned resource with its recorded hash. A missing manifest produces an applicable no-op plan.
+- **Failure semantics**: a tampered manifest or modified managed resource becomes a conflict and blocks every requested target. Other invalid filesystem/config state can raise at the installer boundary.
 
 ## resolve_run
 
@@ -411,3 +530,10 @@ The Port types below define provider-neutral boundaries. Their presence does not
 - **Signature**: `submit_agent_result(request: SubmitAgentResultRequest, *, application: RuntimeApplication | None = None) -> RunResult`.
 - **Current behavior**: reload the immutable request, validate and serialize one host-native submission, and return a result for the same run. A completed result applies one external phase completion and continues to the next wait or terminal success. A failed or cancelled result skips phase execution, produces terminal failure, and emits `agent_failed`; an exact retry returns the cached same failure without a second phase transition and reuses the event's deterministic handoff identity. Another process can perform the submission. Exact retries of completed results likewise return the cached same `RunResult`. Trace delivery remains consumer-deduplicable causal at-least-once, not global exactly-once.
 - **Failure semantics**: a non-host-native run, tampered snapshot, unknown or conflicting identity, invalid output schema, or different second result returns a failed resume-mode result with `GSKILL_INVALID_REQUEST`. A schema-invalid result leaves the task available for correction.
+
+## uninstall_integration
+
+- **Responsibility**: explicitly authorize removal of one manifest-owned MoirAI projection.
+- **Signature**: `uninstall_integration(request: IntegrationRequest, *, installer: IntegrationInstaller | None = None) -> IntegrationResult`.
+- **Current behavior**: preflight every requested target, preserve unrelated shared configuration, remove only exact unmodified owned hashes, and remove the corresponding manifest. A missing manifest returns `unchanged`; a present applicable manifest returns `uninstalled` even when an already-missing resource requires no mutation.
+- **Failure semantics**: modified resources, invalid or mismatched manifests, and unsafe shared-config state return a typed conflict with zero requested-target mutations. Apply and rollback failures propagate from the installer; a touched path that no longer equals the operation's after-image is preserved and produces an incomplete-rollback error.

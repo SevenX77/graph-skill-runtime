@@ -7,6 +7,7 @@ files:
 - path: src/graph_skill_runtime/__init__.py
   classification: feature
   feature_ids:
+  - F-moirai-integration-installer
   - F-typed-runtime-facade
 - path: src/graph_skill_runtime/__main__.py
   classification: feature
@@ -23,6 +24,7 @@ files:
   classification: feature
   feature_ids:
   - F-agent-cli-executors
+  - F-moirai-integration-installer
   - F-runtime-cli-adapter
   - F-studio-skill-migration
 - path: src/graph_skill_runtime/adapters/engine.py
@@ -171,6 +173,28 @@ files:
   feature_ids:
   - F-agent-cli-executors
   - F-typed-runtime-facade
+- path: src/graph_skill_runtime/integrations/__init__.py
+  classification: detail
+  feature_id: F-moirai-integration-installer
+- path: src/graph_skill_runtime/integrations/assets/__init__.py
+  classification: detail
+  feature_id: F-moirai-integration-installer
+- path: src/graph_skill_runtime/integrations/catalog.py
+  classification: feature
+  feature_ids:
+  - F-moirai-integration-installer
+- path: src/graph_skill_runtime/integrations/installer.py
+  classification: feature
+  feature_ids:
+  - F-moirai-integration-installer
+- path: src/graph_skill_runtime/integrations/models.py
+  classification: feature
+  feature_ids:
+  - F-moirai-integration-installer
+- path: src/graph_skill_runtime/integrations/renderers.py
+  classification: feature
+  feature_ids:
+  - F-moirai-integration-installer
 - path: src/graph_skill_runtime/core/__init__.py
   classification: detail
   feature_id: F-current-engine-adapter
@@ -463,6 +487,10 @@ files:
 - path: src/graph_skill_runtime/ports/__init__.py
   classification: detail
   feature_id: F-runtime-application-service
+- path: src/graph_skill_runtime/ports/integrations.py
+  classification: feature
+  feature_ids:
+  - F-moirai-integration-installer
 - path: src/graph_skill_runtime/ports/process.py
   classification: feature
   feature_ids:
@@ -483,6 +511,7 @@ files:
 - path: src/graph_skill_runtime/sdk.py
   classification: feature
   feature_ids:
+  - F-moirai-integration-installer
   - F-typed-runtime-facade
 - path: src/graph_skill_runtime/settings.py
   classification: detail

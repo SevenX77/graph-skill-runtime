@@ -1,0 +1,472 @@
+{
+  "claude": {
+    "project": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<project>/.claude/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<project>/.claude/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<project>/.claude/agents/moirai.md",
+        "content_sha256": "bf48ec64add8949ad1587887007f475bdb150d7cadabbab012a4c144d4976e74"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<project>/.mcp.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ],
+    "user": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<home>/.claude/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<home>/.claude/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<home>/.claude/agents/moirai.md",
+        "content_sha256": "bf48ec64add8949ad1587887007f475bdb150d7cadabbab012a4c144d4976e74"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<home>/.claude.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ]
+  },
+  "codex": {
+    "project": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<project>/.agents/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<project>/.agents/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<project>/.codex/agents/moirai.toml",
+        "content_sha256": "550e1fc91cf091054a81c759bc903b0bc773fa0e81de5fcda626a89255d56d0d"
+      },
+      {
+        "kind": "text_block",
+        "resource_id": "mcp:gskill",
+        "path": "<project>/.codex/config.toml",
+        "marker": "graph-skill-runtime:moirai:gskill-mcp",
+        "document": {
+          "mcp_servers": {
+            "gskill": {
+              "command": "<python>",
+              "args": [
+                "-m",
+                "graph_skill_runtime",
+                "mcp"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "user": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<home>/.agents/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<home>/.agents/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<home>/.codex/agents/moirai.toml",
+        "content_sha256": "550e1fc91cf091054a81c759bc903b0bc773fa0e81de5fcda626a89255d56d0d"
+      },
+      {
+        "kind": "text_block",
+        "resource_id": "mcp:gskill",
+        "path": "<home>/.codex/config.toml",
+        "marker": "graph-skill-runtime:moirai:gskill-mcp",
+        "document": {
+          "mcp_servers": {
+            "gskill": {
+              "command": "<python>",
+              "args": [
+                "-m",
+                "graph_skill_runtime",
+                "mcp"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "copilot": {
+    "project": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<project>/.github/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<project>/.github/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<project>/.github/agents/moirai.md",
+        "content_sha256": "f31f7919a330c20acc43ca33b55a46dfe6d03a723b41602df8a9709711a6b7af"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<project>/.github/mcp.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "type": "local",
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ],
+          "tools": [
+            "*"
+          ]
+        }
+      }
+    ],
+    "user": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<home>/.copilot/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<home>/.copilot/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<home>/.copilot/agents/moirai.md",
+        "content_sha256": "f31f7919a330c20acc43ca33b55a46dfe6d03a723b41602df8a9709711a6b7af"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<home>/.copilot/mcp-config.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "type": "local",
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ],
+          "tools": [
+            "*"
+          ]
+        }
+      }
+    ]
+  },
+  "cursor": {
+    "project": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<project>/.cursor/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<project>/.cursor/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<project>/.cursor/agents/moirai.md",
+        "content_sha256": "f31f7919a330c20acc43ca33b55a46dfe6d03a723b41602df8a9709711a6b7af"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<project>/.cursor/mcp.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ],
+    "user": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<home>/.cursor/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<home>/.cursor/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<home>/.cursor/agents/moirai.md",
+        "content_sha256": "f31f7919a330c20acc43ca33b55a46dfe6d03a723b41602df8a9709711a6b7af"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<home>/.cursor/mcp.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ]
+  },
+  "gemini": {
+    "project": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<project>/.gemini/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<project>/.gemini/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<project>/.gemini/agents/moirai.md",
+        "content_sha256": "6f5aed571b3bdd3d427abb4976d13e9cb9c036a4e69bfc2ac25e5cdc33ae5e0d"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<project>/.gemini/settings.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ],
+    "user": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<home>/.gemini/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<home>/.gemini/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<home>/.gemini/agents/moirai.md",
+        "content_sha256": "6f5aed571b3bdd3d427abb4976d13e9cb9c036a4e69bfc2ac25e5cdc33ae5e0d"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<home>/.gemini/settings.json",
+        "selector": [
+          "mcpServers",
+          "gskill"
+        ],
+        "value": {
+          "command": "<python>",
+          "args": [
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ]
+  },
+  "opencode": {
+    "project": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<project>/.opencode/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<project>/.opencode/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<project>/.opencode/agents/moirai.md",
+        "content_sha256": "cdf061c8240b07ea25fe95db088bcb419e9e7e5e3d92c99660891e9eb718af38"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<project>/.opencode/opencode.json",
+        "selector": [
+          "mcp",
+          "servers",
+          "gskill"
+        ],
+        "value": {
+          "type": "local",
+          "command": [
+            "<python>",
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ],
+    "user": [
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:SKILL.md",
+        "path": "<home>/.config/opencode/skills/moirai/SKILL.md",
+        "content_sha256": "c8450a46f68dc4f6cced50a7e67ea6d38de9f06c31bfd9a88c085d16ae396ba9"
+      },
+      {
+        "kind": "file",
+        "resource_id": "skill:moirai:reference:KB-00-hub.md",
+        "path": "<home>/.config/opencode/skills/moirai/references/KB-00-hub.md",
+        "content_sha256": "f2eec40541e8f5768a32cbfdf5a4c0710f87b34c3dec706b3c596d8d551aae9a"
+      },
+      {
+        "kind": "file",
+        "resource_id": "role:moirai",
+        "path": "<home>/.config/opencode/agents/moirai.md",
+        "content_sha256": "cdf061c8240b07ea25fe95db088bcb419e9e7e5e3d92c99660891e9eb718af38"
+      },
+      {
+        "kind": "json_entry",
+        "resource_id": "mcp:gskill",
+        "path": "<home>/.config/opencode/opencode.json",
+        "selector": [
+          "mcp",
+          "servers",
+          "gskill"
+        ],
+        "value": {
+          "type": "local",
+          "command": [
+            "<python>",
+            "-m",
+            "graph_skill_runtime",
+            "mcp"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+# Public runtime tools
+
+Prefer the structured tools belonging to the MCP server named `gskill`. A host may display a prefix, so select the tool by server ownership and final tool name rather than assuming an unprefixed label.
+
+The server exposes exactly eight tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `compile` | Compile one explicit business gSkill and return all diagnostics from one pass. |
+| `resolve_run` | Resolve configuration into the immutable runtime profile and run request. |
+| `predict` | Produce a deterministic or heuristic prediction without a real model call. |
+| `run` | Execute with the explicitly resolved executor. |
+| `resume` | Observe a durable host-native wait or terminal response. |
+| `submit_agent_result` | Submit one typed host-native `AgentResult` and continue the same run. |
+| `inspect` | Inspect compiled graph inventory and optional call edges. |
+| `evaluate_golden` | Evaluate an existing golden baseline. |
+
+When MCP is unavailable, use the installed `gskill` command, never an internal Python module, `python -m`, `uv run`, or a source checkout:
+
+```text
+gskill compile SKILL_ROOT
+gskill predict SKILL_ROOT
+gskill predict SKILL_ROOT --inputs-json JSON
+gskill run SKILL_ROOT
+gskill run SKILL_ROOT --inputs-json JSON
+gskill inspect SKILL_ROOT --call-graph
+gskill golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT
+gskill resume SKILL_ROOT RUN_ID --state-root STATE_ROOT --checkpoint-ref REF
+gskill submit RUN_ID --state-root STATE_ROOT --checkpoint-ref REF --result-json JSON
+```
+
+Compile before execution. Preserve structured results and error codes instead of parsing human wording. `resume` does not submit Agent output; `submit` does. There are no public MCP tools named `trace`, `artifacts`, `create_golden`, or `promote_golden`. Integration installation is an explicit CLI/SDK operation, not an MCP runtime tool.

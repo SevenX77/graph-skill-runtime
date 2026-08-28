@@ -102,6 +102,32 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
   - `tests/application/test_cli_runtime.py::test_cli_failure_preserves_same_durable_task_for_retry`
 - `[Covered By: tests/adapters/test_vendor_cli_executor.py::test_each_vendor_probes_builds_a_fresh_session_and_parses_one_agent_result]`
 
+### F-moirai-integration-installer: Ship one canonical MoirAI role, skill, and knowledge bundle and project it into six supported agent hosts only through an explicit, manifest-owned, conflict-safe install or uninstall operation.
+
+- **Boundary**: externally-observable-behavior - packaged asset, renderer, SDK/CLI, ownership, rollback, and uninstall tests
+- **Sources**: `public-api`, `source-file-map`
+- **Core paths**: `src/graph_skill_runtime/__init__.py`, `src/graph_skill_runtime/adapters/cli.py`, `src/graph_skill_runtime/integrations/catalog.py`, `src/graph_skill_runtime/integrations/installer.py`, `src/graph_skill_runtime/integrations/models.py`, `src/graph_skill_runtime/integrations/renderers.py`, `src/graph_skill_runtime/ports/integrations.py`, `src/graph_skill_runtime/sdk.py`
+- **Primary contracts**: 0 error codes, 0 events
+- **Targeted tests**:
+  - `tests/integrations/test_packaged_assets.py::test_packaged_moirai_bundle_is_closed_utf8_and_complete`
+  - `tests/integrations/test_renderers.py::test_six_host_renderers_match_the_reviewed_project_and_user_snapshot`
+  - `tests/integrations/test_renderers.py::test_each_host_agent_profile_uses_only_its_native_metadata_shape`
+  - `tests/integrations/test_renderers.py::test_every_canonical_asset_is_projected_for_every_renderer`
+  - `tests/integrations/test_installer.py::test_dry_plan_for_all_renderers_has_no_filesystem_side_effect`
+  - `tests/integrations/test_installer.py::test_each_renderer_installs_idempotently_and_uninstalls_its_owned_projection`
+  - `tests/integrations/test_installer.py::test_unmanaged_file_conflict_blocks_every_target_without_overwrite`
+  - `tests/integrations/test_installer.py::test_unmanaged_shared_json_entry_is_never_adopted_or_overwritten`
+  - `tests/integrations/test_installer.py::test_opencode_jsonc_config_is_preserved_as_an_explicit_conflict`
+  - `tests/integrations/test_installer.py::test_modified_owned_file_blocks_uninstall_and_preserves_whole_install`
+  - `tests/integrations/test_installer.py::test_tampered_manifest_cannot_redirect_uninstall_to_an_arbitrary_file`
+  - `tests/integrations/test_installer.py::test_manifest_with_duplicate_json_keys_is_a_conflict_and_cannot_authorize_deletion`
+  - `tests/integrations/test_installer.py::test_apply_failure_rolls_back_created_files_and_directories`
+  - `tests/integrations/test_installer.py::test_apply_race_preserves_a_concurrent_user_file`
+  - `tests/integrations/test_cli_sdk.py::test_cli_detected_install_reinstall_and_uninstall_share_one_contract`
+  - `tests/integrations/test_cli_sdk.py::test_cli_returns_a_structured_internal_error_for_an_apply_failure`
+  - `tests/integrations/test_cli_sdk.py::test_sdk_facade_projects_the_same_plan_and_result_models`
+- `[Covered By: tests/integrations/test_packaged_assets.py::test_packaged_moirai_bundle_is_closed_utf8_and_complete]`
+
 ### F-md-frontmatter-parsing: Parse markdown frontmatter and body into stable skill metadata and diagnostics.
 
 - **Boundary**: lifecycle-behavior - skill parser contract

@@ -7,6 +7,7 @@ import json
 import sys
 from collections.abc import Sequence
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
@@ -30,6 +31,14 @@ from graph_skill_runtime.domain.models import (
     RuntimeErrorPayload,
     RuntimeProfileOverlay,
     SubmitAgentResultRequest,
+)
+from graph_skill_runtime.integrations.installer import IntegrationInstaller
+from graph_skill_runtime.integrations.models import (
+    HostDetectionResult,
+    IntegrationRequest,
+    IntegrationResult,
+    IntegrationScope,
+    IntegrationTarget,
 )
 from graph_skill_runtime.migration import MigrationFailure
 
@@ -104,7 +113,7 @@ def _write_model(model: BaseModel) -> None:
 
 def _exit_code(model: BaseModel) -> int:
     status = getattr(model, "status", None)
-    if status == "failed":
+    if status in {"failed", "conflict"}:
         return 2
     passed = getattr(model, "passed", None)
     if passed is False:
@@ -194,6 +203,41 @@ def build_parser() -> argparse.ArgumentParser:
     studio_parser.add_argument("--runtime-config")
     studio_parser.add_argument("--preset-id", default="migrated")
 
+    integrations_parser = commands.add_parser(
+        "integrations", help="Project optional assets into supported agent hosts"
+    )
+    integration_commands = integrations_parser.add_subparsers(
+        dest="integrations_command", required=True
+    )
+    integration_commands.add_parser(
+        "detect", help="Report supported host executables found on PATH"
+    )
+    for operation in ("install", "uninstall"):
+        operation_parser = integration_commands.add_parser(
+            operation,
+            help=f"{operation.capitalize()} one manifest-owned host projection",
+        )
+        operation_parser.add_argument("integration_id", choices=("moirai",))
+        operation_parser.add_argument(
+            "--targets",
+            required=True,
+            help="Comma-separated host names or the single value 'detected'",
+        )
+        operation_parser.add_argument(
+            "--scope",
+            choices=("user", "project"),
+            required=True,
+        )
+        operation_parser.add_argument(
+            "--project-root",
+            help="Project root; defaults to the current directory for project scope",
+        )
+        operation_parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Plan and detect conflicts without writing host state",
+        )
+
     commands.add_parser("mcp", help="Serve gskill tools over MCP stdio")
     return parser
 
@@ -252,15 +296,108 @@ def _dispatch(args: argparse.Namespace, application: RuntimeApplication) -> Base
     raise ValueError(f"unknown command: {args.command}")
 
 
+def _integration_targets(
+    raw: str,
+    *,
+    installer: IntegrationInstaller,
+) -> tuple[IntegrationTarget, ...]:
+    values = tuple(part.strip() for part in raw.split(",") if part.strip())
+    if values == ("detected",):
+        targets = installer.detected_targets()
+        if not targets:
+            raise ValueError(
+                "no supported host executables were detected; pass explicit --targets"
+            )
+        return targets
+    if "detected" in values:
+        raise ValueError("'detected' cannot be mixed with explicit target names")
+    if not values:
+        raise ValueError("--targets must contain at least one host")
+    try:
+        return tuple(IntegrationTarget(value) for value in values)
+    except ValueError as exc:
+        supported = ", ".join(target.value for target in IntegrationTarget)
+        raise ValueError(f"unsupported integration target; choose one of: {supported}") from exc
+
+
+def _integration_request(
+    args: argparse.Namespace,
+    *,
+    installer: IntegrationInstaller,
+) -> IntegrationRequest:
+    scope = IntegrationScope(args.scope)
+    project_root = args.project_root
+    if scope is IntegrationScope.PROJECT and project_root is None:
+        project_root = str(Path.cwd())
+    return IntegrationRequest(
+        integration_id=args.integration_id,
+        targets=_integration_targets(args.targets, installer=installer),
+        scope=scope,
+        project_root=project_root,
+    )
+
+
+def _run_integration_command(
+    args: argparse.Namespace,
+    *,
+    installer: IntegrationInstaller,
+) -> BaseModel:
+    if args.integrations_command == "detect":
+        return HostDetectionResult(detections=installer.detect_hosts())
+    request = _integration_request(args, installer=installer)
+    if args.integrations_command == "install":
+        if args.dry_run:
+            plan = installer.plan_install(request)
+            return IntegrationResult(
+                status="planned" if plan.can_apply else "conflict",
+                plan=plan,
+                applied_changes=0,
+            )
+        return installer.install(request)
+    if args.dry_run:
+        plan = installer.plan_uninstall(request)
+        return IntegrationResult(
+            status="planned" if plan.can_apply else "conflict",
+            plan=plan,
+            applied_changes=0,
+        )
+    return installer.uninstall(request)
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     application: RuntimeApplication | None = None,
+    integration_installer: IntegrationInstaller | None = None,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    active_application = application or create_application()
+    if args.command == "integrations":
+        try:
+            result = _run_integration_command(
+                args,
+                installer=integration_installer or IntegrationInstaller(),
+            )
+        except (ValueError, ValidationError) as exc:
+            _write_model(
+                RuntimeErrorPayload(
+                    code=RuntimeErrorCode.INVALID_REQUEST,
+                    message=str(exc),
+                )
+            )
+            return 2
+        except (OSError, RuntimeError) as exc:
+            _write_model(
+                RuntimeErrorPayload(
+                    code=RuntimeErrorCode.INTERNAL_ERROR,
+                    message=str(exc),
+                )
+            )
+            return 2
+        _write_model(result)
+        return _exit_code(result)
     if args.command == "mcp":
+        active_application = application or create_application()
         from graph_skill_runtime.adapters.mcp import create_server
 
         create_server(active_application).run("stdio")
@@ -280,6 +417,7 @@ def main(
             return 2
         _write_model(migration)
         return 0
+    active_application = application or create_application()
     try:
         result = _dispatch(args, active_application)
     except MigrationFailure as exc:

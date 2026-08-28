@@ -1,19 +1,19 @@
 # Graph Skill Runtime
 
-Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. The Phase 1 typed runtime foundation, Phase 2 portable gSkill format, bounded Phase 3 durable host-native handoff, and Phase 4 direct vendor CLI executor are implemented in this repository. `graph-skill-runtime` version `0.1.0a1` is one Python distribution installable with `pip` or `uv`; it provides both the importable `graph_skill_runtime` SDK and the `gskill` console command, including its MCP transport.
+Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. The Phase 1 typed runtime foundation, Phase 2 portable gSkill format, bounded Phase 3 durable host-native handoff, Phase 4 direct vendor CLI executor, and Phase 5 MoirAI host integration are accepted in their documented scopes. `graph-skill-runtime` version `0.1.0a1` is one Python distribution installable with `pip` or `uv`; it provides the importable `graph_skill_runtime` SDK, the `gskill` console command, and the `gskill` MCP transport. Phase 3b host-native expansion and Phase 6 cross-platform package/release acceptance remain incomplete.
 
 This is an alpha source release, not a PyPI release. The repository exists at [SevenX77/graph-skill-runtime](https://github.com/SevenX77/graph-skill-runtime); `main` is pull-request-only and has completed a green six-job CI run. The [release workflow](.github/workflows/release.yml) is prepared to verify a GitHub Release tag `v<pyproject version>`, build and inspect the wheel and source distribution, and publish through PyPI Trusted Publishing with OpenID Connect (OIDC). That workflow is release automation, not publication evidence: the PyPI project and trusted publisher still require owner configuration, and no package has been published.
 
 ## Current capability boundary
 
-The current checkout provides the typed runtime facade and configuration boundary, the portable format cutover, the supported Phase 3 host-native handoff, and the bounded Phase 4 direct CLI executor:
+The current checkout provides the typed runtime facade and configuration boundary, the portable format cutover, the supported Phase 3 host-native handoff, the bounded Phase 4 direct CLI executor, and the accepted Phase 5 host integration:
 
-- exactly 59 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
+- exactly 77 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
 - closed, frozen Pydantic request and result models with `schema_version` and `kind` discriminators;
 - immutable nested JSON collections after model construction;
 - a closed 44-value `RuntimeEvent.event_type` catalog kept exactly equal to every concrete internal `CallbackEvent` variant by contract test;
-- eight Python use-case functions: `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`;
-- the `gskill` CLI and eight same-named MCP tools as thin adapters over one `RuntimeApplication`;
+- thirteen Python SDK functions: eight runtime functions (`compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`) plus five integration functions (`detect_integration_hosts`, `plan_integration_install`, `install_integration`, `plan_integration_uninstall`, and `uninstall_integration`);
+- the `gskill` CLI and exactly eight runtime MCP tools—`compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`—over one `RuntimeApplication`; integration installation is not an MCP tool;
 - explicit dependency composition through `create_application`, with no process-global application singleton;
 - deterministic configuration precedence and provenance-bearing immutable run requests;
 - create-once local request snapshots at `<state_root>/runs/<run_id>/request.json`;
@@ -23,7 +23,9 @@ The current checkout provides the typed runtime facade and configuration boundar
 - shell-free process-tree ownership: Win32 Job Objects on Windows and process groups on POSIX, with a bounded exact-PGID/effective-UID fallback when a POSIX group signal is denied and whole-tree cleanup after success, timeout, cancellation, or parent exit;
 - the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded portable `LOGIC` skill;
 - one production reader for the portable root `SKILL.md` plus `graph.yaml` format, with a flat graph registry and no legacy fallback;
-- an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source.
+- an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source;
+- one optional MoirAI integration inventory at asset version `1.0.0`: four provider-neutral role instructions, eight Agent Skills, and `KB-00` through `KB-14`, with no business `graph.yaml`;
+- explicit `gskill integrations detect/install/uninstall` and equivalent SDK contracts for `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`, with dry-run planning, all-target conflict preflight, manifest ownership, causally safe rollback, idempotency, and hash-safe uninstall.
 
 The current reader accepts one explicit business skill root in the portable format:
 
@@ -50,7 +52,7 @@ The default executor is `host-native`. A graph with no Agent phase runs directly
 
 The current Agent address is narrow by design. Agent phases in registry subgraphs, graph-level iterate, Agent phase iterate, and incomparable parallel branches fail fast for both `host-native` and `cli`. Host-native Agent handoff requires a SQLite checkpoint store. `resume(checkpoint_ref)` only reads the durable current wait or terminal response; Agent output must use `submit_agent_result`. Ordinary human/breakpoint typed resume is not yet implemented.
 
-The default executor remains `host-native`; only an explicit `executor=cli` enters the direct vendor path. A `LOGIC`-only graph completes without constructing or probing a vendor executor even when its profile selects `cli`. Before creating a handoff task, a CLI run probes the executable, required flags, and any vendor-exposed authentication status, and rejects Agent declarations that require the not-yet-bridged portable tools, subagents, subgraphs, or framework context access. There is no silent `embedded` fallback. MoirAI installation and cross-platform package/release acceptance remain later phases. Gateway and Studio plugins are not deliverables in this release line; any future integration must stay behind the documented Port/Adapter boundaries.
+The default executor remains `host-native`; only an explicit `executor=cli` enters the direct vendor path. A `LOGIC`-only graph completes without constructing or probing a vendor executor even when its profile selects `cli`. Before creating a handoff task, a CLI run probes the executable, required flags, and any vendor-exposed authentication status, and rejects Agent declarations that require the not-yet-bridged portable tools, subagents, subgraphs, or framework context access. There is no silent `embedded` fallback. Phase 5 is accepted for canonical assets, six renderer formats, explicit safe installation, and the documented discovery evidence below. That acceptance does not complete Phase 3b or Phase 6 and does not add Gateway or Studio plugins; future product integrations remain behind external Port/Adapter boundaries.
 
 ## User-owned graph skills
 
@@ -60,7 +62,46 @@ The repository-level [`examples/hello-world/`](examples/hello-world/) directory 
 
 The wheel may contain runtime implementation resources. Those resources are not business gSkills and do not make the wheel a skill registry.
 
-## Requirements and local installation
+## Optional MoirAI host integration
+
+MoirAI is an optional design, repair, execution, and evaluation front door. Its canonical source bundle contains four role instructions (`moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`), eight Agent Skills, and fifteen focused knowledge files. The six renderers project those assets into each selected host's native skill and agent directories and register the existing `gskill` MCP server. They do not install a business workflow, add a `graph.yaml`, or make MoirAI a core-runtime dependency.
+
+These are installed-user commands and intentionally invoke `gskill` directly. Inspect the read-only PATH evidence, dry-run an explicit target, then apply only when the plan is acceptable:
+
+```text
+gskill integrations detect
+gskill integrations install moirai --targets codex --scope user --dry-run
+gskill integrations install moirai --targets codex --scope user
+gskill integrations uninstall moirai --targets codex --scope user --dry-run
+gskill integrations uninstall moirai --targets codex --scope user
+```
+
+For project scope, name the project and every target explicitly:
+
+```text
+gskill integrations install moirai --targets claude,codex --scope project --project-root PROJECT_ROOT --dry-run
+gskill integrations install moirai --targets claude,codex --scope project --project-root PROJECT_ROOT
+```
+
+`--targets detected` is also accepted, but detection only reports supported executable names found on `PATH`; it neither invokes a host nor authorizes writes until used in an explicit install command. Package installation, import, installer construction, MCP startup, and detection write no host or project state.
+
+The installer preflights every requested target before changing any of them. It never adopts or overwrites an unmanaged file or shared configuration entry, updates only a manifest-owned value, and uninstalls only exact unmodified owned hashes. After an apply failure, rollback restores a path only while that path still exactly equals the after-image written by this operation. If another process changed it, the installer preserves the concurrent content and raises an incomplete-rollback error instead of overwriting it. A modified managed resource is preserved and blocks the whole requested operation. Project manifests live under `PROJECT_ROOT/.gskill/integrations/moirai/`; user-scope manifests live under the runtime user state directory. OpenCode's `.opencode/opencode.json` is shared configuration: the installer merges and owns only `mcp.servers.gskill`, plus its separately projected manifest-owned files. A sibling `opencode.jsonc` causes a fail-closed conflict rather than being rewritten or shadowed.
+
+The canonical role names remain provider-neutral and hyphenated: `moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`. The Codex renderer alone normalizes hyphens to underscores for its safe identifier surface, so it writes paths such as `.codex/agents/moirai_clotho.toml` with `name = "moirai_clotho"`. Other renderers retain the hyphenated names. This adapter-specific projection does not change the canonical inventory.
+
+### Phase 5 acceptance evidence
+
+The source, built artifact, and real-host observations establish different parts of the accepted scope:
+
+- Local source gates passed: Ruff; strict mypy over 149 source files; the contract manifest validator; and pytest with `1715 passed, 1 skipped in 83.51s`. `uv build` produced the `0.1.0a1` source distribution and wheel, and the built-wheel smoke passed. `pip-audit` reported `No known vulnerabilities found` for resolved third-party distributions while skipping the unpublished local `graph-skill-runtime`; that result is neither a source-code security audit nor publication evidence.
+- The [renderer snapshot](tests/integrations/snapshots/moirai_renderers.json) locks all six renderers in project and user scope, including native paths, profile metadata, and MCP shape. A snapshot proves deterministic format projection, not operational behavior of six real products.
+- The built wheel contained exactly 28 closed MoirAI members: one `integration.json`, four role bodies, eight Agent Skills, and fifteen knowledge files, with no `graph.yaml` and no extra member. A clean Python 3.11 environment installed that wheel, loaded the 4/8/15 inventory through `PackagedMoiraiAssets`, and used the wheel's `gskill` command to project a temporary project.
+- On Windows `10.0.26200` x64, Claude Code `2.1.222` discovered all eight project skills in an isolated configuration, listed all four hyphenated MoirAI agents before authentication when given an invalid agent selector, accepted `moirai-clotho` as a valid selected profile, discovered the project `gskill` MCP entry, and started and connected its stdio server with tools, prompts, and resources capabilities. The valid-agent run then stopped at the machine's missing authentication; this proves skill, agent, and MCP discovery/startup, not authenticated Claude model execution.
+- In an isolated Codex CLI `0.144.1` project, the host supplied project skill `$moirai`, and project MCP tool `gskill.inspect` successfully returned `skill_id=hello-world`. That session's spawn tool exposed no `agent_type`; its child metadata had `agent_role=null` and did not load custom `developer_instructions`. Codex custom-agent invocation is therefore not verified. This observed limitation does not invalidate the official standalone TOML format or the underscore-normalized renderer snapshot.
+
+Phase 5 acceptance rests on Claude skill/agent/MCP discovery plus the Codex skill/MCP cross-check. It does not claim all six hosts are operational, authenticated model execution through Claude, or Codex custom-agent runtime invocation.
+
+## Source-checkout requirements and development environment
 
 - Python 3.11 or newer
 - [`uv`](https://docs.astral.sh/uv/)
@@ -84,6 +125,8 @@ uv sync --extra embedded
 ```
 
 The `embedded` extra is required only for embedded provider-backed agent execution. It is not part of the base dependency set. An embedded `LOGIC`-only skill can run without a provider call.
+
+Commands in this development section and the later runtime examples use `uv run gskill` because they execute the source checkout's managed environment. After installing the distribution into a user environment, invoke the installed `gskill` command directly, as in the MoirAI section above.
 
 ## Python SDK
 
@@ -142,7 +185,7 @@ Select the CLI path explicitly and provide the business gSkill as usual:
 uv run gskill run /absolute/path/to/my-skill --executor cli --vendor codex --run-id cli-demo --state-dir /absolute/path/to/state --inputs-json '{"question":"Why?"}'
 ```
 
-The six accepted vendors are `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`. Optional CLI projections are `--agent-profile`, `--model`, `--executable`, and `--timeout-seconds`. `--executable` accepts a PATH basename or an absolute path; a relative path containing a separator fails before execution. The timeout defaults to 600 seconds and must be greater than zero and no more than 86,400 seconds.
+The six implemented adapter values are `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`. Optional CLI projections are `--agent-profile`, `--model`, `--executable`, and `--timeout-seconds`. `--executable` accepts a PATH basename or an absolute path; a relative path containing a separator fails before execution. The timeout defaults to 600 seconds and must be greater than zero and no more than 86,400 seconds.
 
 `--agent-profile` is deliberately narrower than a generic “subagent” switch. Copilot and OpenCode pass it through their documented `--agent` selectors. Gemini prefixes `@<name>` to the task context so its main CLI agent can broker a request to that named subagent. Claude cannot select a custom agent under the required safe mode, Codex `--profile` selects configuration rather than a child agent, and Cursor has no documented direct selector, so those three reject `agent_profile` during configuration validation. If `--model` is omitted, the vendor chooses its own default. GitHub Copilot CLI is an agent product rather than a foundation model named “Copilot”; its current default and selectable models are vendor-managed, so the runtime does not hard-code them ([official CLI reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)).
 
