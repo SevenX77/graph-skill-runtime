@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from graph_skill_runtime.adapters import process as process_adapter
 from graph_skill_runtime.adapters.process import SubprocessProcessRunner
 from graph_skill_runtime.adapters.windows_job import WindowsJob
 from graph_skill_runtime.ports.process import (
@@ -219,3 +220,29 @@ def test_runner_never_requests_shell_execution(monkeypatch: pytest.MonkeyPatch, 
     else:
         assert "job_closed" not in observed
         assert observed["kwargs"]["start_new_session"] is True  # type: ignore[index]
+
+
+def test_posix_group_permission_fallback_signals_only_owned_members(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[tuple[int, int]] = []
+
+    def denied_group_signal(_process_group_id: int, _signal: int) -> None:
+        raise PermissionError
+
+    monkeypatch.setitem(os.__dict__, "killpg", denied_group_signal)
+    monkeypatch.setattr(
+        process_adapter,
+        "_posix_process_group_members",
+        lambda process_group_id: (41, 43) if process_group_id == 37 else (),
+    )
+    monkeypatch.setattr(
+        os,
+        "kill",
+        lambda process_id, requested_signal: observed.append(
+            (process_id, requested_signal)
+        ),
+    )
+
+    assert process_adapter._signal_posix_process_group(37, 15) is True
+    assert observed == [(41, 15), (43, 15)]

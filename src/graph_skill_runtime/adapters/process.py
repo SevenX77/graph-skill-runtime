@@ -29,6 +29,9 @@ from graph_skill_runtime.ports.process import (
 _POLL_SECONDS = 0.1
 _TERMINATE_GRACE_SECONDS = 1.0
 _POSIX_SIGKILL = int(getattr(signal, "SIGKILL", 9))
+_POSIX_PROCESS_LIST_TIMEOUT_SECONDS = 2.0
+_POSIX_PROCESS_LIST_MAX_BYTES = 1024 * 1024
+_POSIX_PS_CANDIDATES = (Path("/bin/ps"), Path("/usr/bin/ps"))
 
 _WINDOWS_SUPERVISOR = """
 import json
@@ -111,7 +114,69 @@ def _request_windows_tree_termination(spawned: _SpawnedProcess) -> None:
     _windows_taskkill(process.pid)
 
 
-def _signal_posix_process_group(process_id: int, requested_signal: int) -> bool:
+def _posix_process_group_members(process_group_id: int) -> tuple[int, ...]:
+    ps_executable = next(
+        (candidate for candidate in _POSIX_PS_CANDIDATES if candidate.is_file()),
+        None,
+    )
+    if ps_executable is None:
+        raise OSError("cannot inspect a POSIX process group without ps")
+    completed = subprocess.run(
+        [str(ps_executable), "-axo", "pid=,pgid=,uid="],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        timeout=_POSIX_PROCESS_LIST_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        raise OSError("POSIX process-group inspection failed")
+    payload = completed.stdout
+    if len(payload) > _POSIX_PROCESS_LIST_MAX_BYTES:
+        raise OSError("POSIX process-group inspection exceeded its output limit")
+    get_effective_user_id = cast(Callable[[], int], os.__dict__["geteuid"])
+    effective_user_id = get_effective_user_id()
+    own_process_id = os.getpid()
+    members: list[int] = []
+    for raw_line in payload.decode("utf-8", errors="strict").splitlines():
+        fields = raw_line.split()
+        if not fields:
+            continue
+        if len(fields) != 3:
+            raise OSError("POSIX process-group inspection returned malformed output")
+        try:
+            process_id, group_id, user_id = (int(field) for field in fields)
+        except ValueError as error:
+            raise OSError(
+                "POSIX process-group inspection returned malformed identifiers"
+            ) from error
+        if (
+            group_id == process_group_id
+            and user_id == effective_user_id
+            and process_id != own_process_id
+        ):
+            members.append(process_id)
+    return tuple(sorted(set(members)))
+
+
+def _signal_posix_group_members(
+    process_group_id: int,
+    requested_signal: int,
+) -> bool:
+    observed_member = False
+    for process_id in _posix_process_group_members(process_group_id):
+        observed_member = True
+        try:
+            os.kill(process_id, requested_signal)
+        except ProcessLookupError:
+            continue
+    return observed_member
+
+
+def _signal_posix_process_group(
+    process_group_id: int,
+    requested_signal: int,
+) -> bool:
     # Platform stubs intentionally omit killpg on Windows even though this module
     # is type-checked there; runtime dispatch guarantees this branch is POSIX-only.
     kill_process_group = cast(
@@ -119,9 +184,14 @@ def _signal_posix_process_group(process_id: int, requested_signal: int) -> bool:
         os.__dict__["killpg"],
     )
     try:
-        kill_process_group(process_id, requested_signal)
+        kill_process_group(process_group_id, requested_signal)
     except ProcessLookupError:
         return False
+    except PermissionError:
+        # Darwin rejects a group signal if any member is not signalable. The
+        # fallback retains the same PGID boundary and signals only members
+        # owned by the runtime's effective user.
+        return _signal_posix_group_members(process_group_id, requested_signal)
     return True
 
 
@@ -147,22 +217,18 @@ def _terminate_posix_tree(spawned: _SpawnedProcess) -> None:
     process = spawned.process
     group_existed = _signal_posix_process_group(process.pid, signal.SIGTERM)
     if group_existed:
-        # A zero-signal group probe is not portable evidence: macOS can return
-        # EPERM when group membership changes during termination. Give the
-        # owned group a fixed grace interval, then enforce the deadline.
+        # A zero-signal group probe is not portable evidence. Give the owned
+        # group a fixed grace interval, then enforce the deadline.
         time.sleep(_TERMINATE_GRACE_SECONDS)
-        try:
-            _signal_posix_process_group(process.pid, _POSIX_SIGKILL)
-        except PermissionError:
-            # macOS can retain a non-signalable group identity after every
-            # owned member has exited. Never mask a still-live direct child.
-            if process.poll() is None:
-                process.kill()
+        _signal_posix_process_group(process.pid, _POSIX_SIGKILL)
+    elif process.poll() is None:
+        process.terminate()
     if process.poll() is None:
         try:
             process.wait(timeout=_TERMINATE_GRACE_SECONDS)
         except subprocess.TimeoutExpired:
-            pass
+            process.kill()
+            process.wait(timeout=_TERMINATE_GRACE_SECONDS)
 
 
 def _terminate_process_tree(spawned: _SpawnedProcess) -> None:
