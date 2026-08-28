@@ -63,8 +63,9 @@ def test_timeout_terminates_the_whole_process_tree(tmp_path: Path) -> None:
     ready = tmp_path / "child-ready"
     forbidden = tmp_path / "child-survived"
     child_script = (
-        "import pathlib, sys, time; "
-        "time.sleep(1.0); pathlib.Path(sys.argv[1]).write_text('survived', encoding='utf-8')"
+        "import pathlib, signal, sys, time; "
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "time.sleep(2.0); pathlib.Path(sys.argv[1]).write_text('survived', encoding='utf-8')"
     )
     parent_script = (
         "import pathlib, subprocess, sys, time; "
@@ -86,7 +87,7 @@ def test_timeout_terminates_the_whole_process_tree(tmp_path: Path) -> None:
         SubprocessProcessRunner().run(request)
 
     assert ready.is_file(), "the child must have started before timeout"
-    time.sleep(1.1)
+    time.sleep(2.1)
     assert not forbidden.exists(), "a timed-out vendor CLI must not leave descendants running"
 
 

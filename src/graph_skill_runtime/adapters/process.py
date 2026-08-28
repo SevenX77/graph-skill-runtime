@@ -151,7 +151,13 @@ def _terminate_posix_tree(spawned: _SpawnedProcess) -> None:
         # EPERM when group membership changes during termination. Give the
         # owned group a fixed grace interval, then enforce the deadline.
         time.sleep(_TERMINATE_GRACE_SECONDS)
-        _signal_posix_process_group(process.pid, _POSIX_SIGKILL)
+        try:
+            _signal_posix_process_group(process.pid, _POSIX_SIGKILL)
+        except PermissionError:
+            # macOS can retain a non-signalable group identity after every
+            # owned member has exited. Never mask a still-live direct child.
+            if process.poll() is None:
+                process.kill()
     if process.poll() is None:
         try:
             process.wait(timeout=_TERMINATE_GRACE_SECONDS)
