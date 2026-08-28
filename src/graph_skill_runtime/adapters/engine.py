@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol, cast
 
-from pydantic import JsonValue, TypeAdapter, ValidationError
+from pydantic import JsonValue
 
+from graph_skill_runtime.adapters.host_native_runtime import HostNativeRuntimeAdapter
+from graph_skill_runtime.adapters.result_mapping import failed_run, json_object, run_result
 from graph_skill_runtime.core.compiler import CompileIssue as CoreCompileIssue
 from graph_skill_runtime.core.compiler import CompileResult as CoreCompileResult
 from graph_skill_runtime.core.compiler import compile_skill
@@ -22,15 +24,13 @@ from graph_skill_runtime.domain.models import (
     GoldenEvaluationResult,
     InspectRequest,
     InspectResult,
-    JsonObject,
     ResumeRequest,
     RunRequest,
     RunResult,
     RuntimeErrorCode,
     RuntimeErrorPayload,
+    SubmitAgentResultRequest,
 )
-
-_JSON_OBJECT_ADAPTER = TypeAdapter(JsonObject)
 
 
 class _PredictCallable(Protocol):
@@ -53,13 +53,6 @@ class _RunCallable(Protocol):
         thread_id: str,
         **inputs: JsonValue,
     ) -> CoreRunResult: ...
-
-
-def _json_object(value: object) -> JsonObject:
-    try:
-        return _JSON_OBJECT_ADAPTER.validate_python(value)
-    except ValidationError as exc:
-        raise ValueError(f"engine returned a non-JSON object: {exc}") from exc
 
 
 def _diagnostic(issue: CoreCompileIssue) -> CompileDiagnostic:
@@ -115,48 +108,6 @@ def _compile_failure(exc: Exception) -> CompileResult:
             ),
         )
     return CompileResult(status="failed", diagnostics=diagnostics)
-
-
-def _runtime_error(result: CoreRunResult) -> RuntimeErrorPayload:
-    if result.error is not None:
-        return RuntimeErrorPayload(
-            code=RuntimeErrorCode.RUN_FAILED,
-            message=result.error.message,
-            phase=result.error.phase_id,
-            source_path=result.error.source_path,
-            details={
-                "engine_code": result.error.code,
-                "engine_details": _json_object(result.error.details),
-            },
-        )
-    return RuntimeErrorPayload(
-        code=RuntimeErrorCode.RUN_FAILED,
-        message="the engine did not complete the run",
-    )
-
-
-def _run_result(
-    result: CoreRunResult,
-    *,
-    request: RunRequest,
-    mode: Literal["run", "predict", "resume"],
-) -> RunResult:
-    status: Literal["completed", "failed", "paused", "agent_required"]
-    if result.paused_at is not None:
-        status = "paused"
-    elif result.success:
-        status = "completed"
-    else:
-        status = "failed"
-    return RunResult(
-        status=status,
-        run_id=result.run_id,
-        mode=mode,
-        request=request,
-        outputs=_json_object(result.context),
-        trace_path=str(result.trace_path) if result.trace_path is not None else None,
-        error=_runtime_error(result) if status == "failed" else None,
-    )
 
 
 def _skill_id(compiled: CompiledSkill) -> str:
@@ -248,7 +199,7 @@ class CurrentEngineAdapter:
             thread_id=request.run_id,
             **request.inputs,
         )
-        return _run_result(result, request=request, mode="predict")
+        return run_result(result, request=request, mode="predict")
 
     def run(self, request: RunRequest) -> RunResult:
         from graph_skill_runtime.core.runner import run_skill
@@ -256,6 +207,17 @@ class CurrentEngineAdapter:
         checked = _compiled_for_run(request)
         if isinstance(checked, RunResult):
             return checked
+        executor_kind = request.profile.profile.executor.kind
+        if executor_kind == "cli":
+            return failed_run(
+                request,
+                mode="run",
+                code=RuntimeErrorCode.EXECUTOR_UNAVAILABLE,
+                message="vendor CLI execution is not implemented yet",
+                details={"executor_kind": executor_kind},
+            )
+        if executor_kind == "host-native":
+            return HostNativeRuntimeAdapter().run(request, checked)
         run_call = cast(_RunCallable, run_skill)
         result = run_call(
             request.profile.skill_root,
@@ -263,19 +225,24 @@ class CurrentEngineAdapter:
             thread_id=request.run_id,
             **request.inputs,
         )
-        return _run_result(result, request=request, mode="run")
+        return run_result(result, request=request, mode="run")
 
-    def resume(self, request: ResumeRequest) -> RunResult:
-        return RunResult(
-            status="failed",
-            run_id=request.run_id,
-            mode="resume",
-            error=RuntimeErrorPayload(
-                code=RuntimeErrorCode.NOT_IMPLEMENTED,
-                message="typed durable resume with host-native handoff belongs to Phase 3",
-                details={"checkpoint_ref": request.checkpoint_ref},
-            ),
-        )
+    def resume(self, request: ResumeRequest, run_request: RunRequest) -> RunResult:
+        return HostNativeRuntimeAdapter().resume(request, run_request)
+
+    def submit_agent_result(
+        self,
+        request: SubmitAgentResultRequest,
+        run_request: RunRequest,
+    ) -> RunResult:
+        if run_request.profile.profile.executor.kind != "host-native":
+            return failed_run(
+                run_request,
+                mode="resume",
+                code=RuntimeErrorCode.INVALID_REQUEST,
+                message="AgentResult can only be submitted to a host-native run",
+            )
+        return HostNativeRuntimeAdapter().submit_agent_result(request, run_request)
 
     def evaluate_golden(self, request: GoldenEvaluationRequest) -> GoldenEvaluationResult:
         from graph_skill_runtime.core.runner import evaluate_golden_baseline
@@ -286,7 +253,7 @@ class CurrentEngineAdapter:
                 workspace_dir=Path(request.state_root).resolve(strict=True),
                 baseline_id=request.baseline_id,
             )
-            details = _json_object(result)
+            details = json_object(result)
         except Exception as exc:
             return GoldenEvaluationResult(
                 status="failed",

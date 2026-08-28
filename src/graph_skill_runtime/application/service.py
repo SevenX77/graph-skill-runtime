@@ -17,6 +17,7 @@ from graph_skill_runtime.domain.models import (
     ResumeRequest,
     RunInvocation,
     RunPreset,
+    RunRequest,
     RunResult,
     RuntimeErrorCode,
     RuntimeErrorPayload,
@@ -65,38 +66,26 @@ class RuntimeApplication:
         resolution = self.resolve_run(invocation)
         request = resolution.request
         self._snapshot_store.save(request)
-        executor_kind = request.profile.profile.executor.kind
-        if executor_kind != "embedded":
-            phase = "host-native adapter" if executor_kind == "host-native" else "CLI adapter"
-            return RunResult(
-                status="failed",
-                run_id=request.run_id,
-                mode="run",
-                request=request,
-                error=RuntimeErrorPayload(
-                    code=RuntimeErrorCode.EXECUTOR_UNAVAILABLE,
-                    message=f"{phase} is not implemented in Phase 1",
-                    retryable=False,
-                    details={"executor_kind": executor_kind},
-                ),
-            )
         return self._engine.run(request)
 
     def resume(self, request: ResumeRequest) -> RunResult:
-        return self._engine.resume(request)
+        loaded = self._load_matching_snapshot(
+            state_root=Path(request.state_root),
+            run_id=request.run_id,
+            skill_root=request.skill_root,
+        )
+        if isinstance(loaded, RunResult):
+            return loaded
+        return self._engine.resume(request, loaded)
 
     def submit_agent_result(self, request: SubmitAgentResultRequest) -> RunResult:
-        return RunResult(
-            status="failed",
+        loaded = self._load_matching_snapshot(
+            state_root=Path(request.state_root),
             run_id=request.run_id,
-            mode="resume",
-            error=RuntimeErrorPayload(
-                code=RuntimeErrorCode.NOT_IMPLEMENTED,
-                message="host-native result submission belongs to Phase 3",
-                retryable=False,
-                details={"checkpoint_ref": request.checkpoint_ref},
-            ),
         )
+        if isinstance(loaded, RunResult):
+            return loaded
+        return self._engine.submit_agent_result(request, loaded)
 
     def evaluate_golden(self, request: GoldenEvaluationRequest) -> GoldenEvaluationResult:
         return self._engine.evaluate_golden(request)
@@ -107,3 +96,51 @@ class RuntimeApplication:
     def load_run_request(self, state_root: Path, run_id: str) -> ConfigResolution:
         request = self._snapshot_store.load(state_root, run_id)
         return ConfigResolution(profile=request.profile, request=request)
+
+    def _load_matching_snapshot(
+        self,
+        *,
+        state_root: Path,
+        run_id: str,
+        skill_root: str | None = None,
+    ) -> RunRequest | RunResult:
+        try:
+            request = self._snapshot_store.load(state_root, run_id)
+        except ValueError as exc:
+            return RunResult(
+                status="failed",
+                run_id=run_id,
+                mode="resume",
+                error=RuntimeErrorPayload(
+                    code=RuntimeErrorCode.SNAPSHOT_NOT_FOUND,
+                    message=str(exc),
+                ),
+            )
+        requested_state_root = state_root.resolve(strict=False)
+        snapshot_state_root = Path(request.profile.state_root).resolve(strict=False)
+        if requested_state_root != snapshot_state_root:
+            return RunResult(
+                status="failed",
+                run_id=run_id,
+                mode="resume",
+                request=request,
+                error=RuntimeErrorPayload(
+                    code=RuntimeErrorCode.INVALID_REQUEST,
+                    message="state_root does not match the immutable run snapshot",
+                ),
+            )
+        if skill_root is not None and (
+            Path(skill_root).resolve(strict=False)
+            != Path(request.profile.skill_root).resolve(strict=False)
+        ):
+            return RunResult(
+                status="failed",
+                run_id=run_id,
+                mode="resume",
+                request=request,
+                error=RuntimeErrorPayload(
+                    code=RuntimeErrorCode.INVALID_REQUEST,
+                    message="skill_root does not match the immutable run snapshot",
+                ),
+            )
+        return request

@@ -10,7 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from graph_skill_runtime.callbacks.events import (  # noqa: E402
     SCHEMA_VERSION,
+    AgentCompletedEvent,
+    AgentFailedEvent,
     AgentLoopIterationEvent,
+    AgentRequiredEvent,
+    AgentResultRejectedEvent,
     ArtifactSavedEvent,
     CallbackEvent,
     CompactionEvent,
@@ -64,6 +68,10 @@ _ALL_EVENT_CLASSES = [
     ResumedEvent,
     # Tier 2 — agent loop visibility
     AgentLoopIterationEvent,
+    AgentRequiredEvent,
+    AgentCompletedEvent,
+    AgentFailedEvent,
+    AgentResultRejectedEvent,
 ]
 
 
@@ -139,6 +147,38 @@ _MIN_CTOR: dict[type, dict] = {
     InterruptedEvent: {"phase_name": "p", "thread_id": "t1", "reason": "awaiting_human"},
     ResumedEvent: {"thread_id": "t1", "human_input": "yes"},
     AgentLoopIterationEvent: {"phase_name": "p", "iteration": 1},
+    AgentRequiredEvent: {
+        "handoff_event_id": "required:t1",
+        "run_id": "r1",
+        "task_id": "t1",
+        "graph_id": "main",
+        "phase_name": "p",
+        "checkpoint_ref": "handoff:t1",
+    },
+    AgentCompletedEvent: {
+        "handoff_event_id": "completed:t1",
+        "run_id": "r1",
+        "task_id": "t1",
+        "phase_name": "p",
+        "executor_id": "host/native",
+    },
+    AgentFailedEvent: {
+        "handoff_event_id": "failed:t1",
+        "run_id": "r1",
+        "task_id": "t1",
+        "phase_name": "p",
+        "executor_id": "host/native",
+        "status": "failed",
+        "error_code": "HOST_FAILED",
+        "error_message": "failed",
+    },
+    AgentResultRejectedEvent: {
+        "handoff_event_id": "rejected:t1",
+        "run_id": "r1",
+        "submitted_task_id": "t1",
+        "checkpoint_ref": "handoff:t1",
+        "reason": "wrong output",
+    },
 }
 
 

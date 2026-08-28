@@ -21,6 +21,7 @@ from graph_skill_runtime.domain.models import (
     RunInvocation,
     RunRequest,
     RunResult,
+    SubmitAgentResultRequest,
 )
 from graph_skill_runtime.sdk import compile as sdk_compile
 
@@ -39,8 +40,22 @@ class _RecordingEngine:
     def run(self, request: RunRequest) -> RunResult:
         return RunResult(status="completed", run_id=request.run_id, mode="run", request=request)
 
-    def resume(self, request: ResumeRequest) -> RunResult:
+    def resume(self, request: ResumeRequest, run_request: RunRequest) -> RunResult:
+        del run_request
         return RunResult(status="completed", run_id=request.run_id, mode="resume")
+
+    def submit_agent_result(
+        self,
+        request: SubmitAgentResultRequest,
+        run_request: RunRequest,
+    ) -> RunResult:
+        del request
+        return RunResult(
+            status="completed",
+            run_id=run_request.run_id,
+            mode="resume",
+            request=run_request,
+        )
 
     def evaluate_golden(self, request: GoldenEvaluationRequest) -> GoldenEvaluationResult:
         return GoldenEvaluationResult(status="passed", baseline_id=request.baseline_id)
@@ -95,7 +110,7 @@ def test_sdk_cli_and_mcp_compile_are_projections_of_one_application_service(
     assert engine.compile_requests == [request, request, request]
 
 
-def test_default_host_native_run_fails_explicitly_and_keeps_request_snapshot(
+def test_default_host_native_run_delegates_to_engine_and_keeps_request_snapshot(
     tmp_path: Path,
 ) -> None:
     skill_root = tmp_path / "skill"
@@ -106,9 +121,7 @@ def test_default_host_native_run_fails_explicitly_and_keeps_request_snapshot(
         RunInvocation(skill_root=str(skill_root), run_id="host-required")
     )
 
-    assert result.status == "failed"
-    assert result.error is not None
-    assert result.error.code == "GSKILL_EXECUTOR_UNAVAILABLE"
+    assert result.status == "completed"
     assert len(snapshots.requests) == 1
     assert snapshots.requests[0].profile.profile.executor.kind == "host-native"
 

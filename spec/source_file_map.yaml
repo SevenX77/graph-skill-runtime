@@ -15,6 +15,10 @@ files:
 - path: src/graph_skill_runtime/adapters/__init__.py
   classification: detail
   feature_id: F-runtime-application-service
+- path: src/graph_skill_runtime/adapters/agent_handoffs.py
+  classification: feature
+  feature_ids:
+  - F-host-native-agent-handoff
 - path: src/graph_skill_runtime/adapters/cli.py
   classification: feature
   feature_ids:
@@ -24,6 +28,15 @@ files:
   classification: feature
   feature_ids:
   - F-current-engine-adapter
+  - F-host-native-agent-handoff
+- path: src/graph_skill_runtime/adapters/host_native.py
+  classification: feature
+  feature_ids:
+  - F-host-native-agent-handoff
+- path: src/graph_skill_runtime/adapters/host_native_runtime.py
+  classification: feature
+  feature_ids:
+  - F-host-native-agent-handoff
 - path: src/graph_skill_runtime/adapters/mcp.py
   classification: feature
   feature_ids:
@@ -32,6 +45,9 @@ files:
   classification: feature
   feature_ids:
   - F-run-snapshot-persistence
+- path: src/graph_skill_runtime/adapters/result_mapping.py
+  classification: detail
+  feature_id: F-current-engine-adapter
 - path: src/graph_skill_runtime/application/__init__.py
   classification: detail
   feature_id: F-runtime-application-service
