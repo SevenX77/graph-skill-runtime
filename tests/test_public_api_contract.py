@@ -42,7 +42,20 @@ EXPECTED_PUBLIC_SYMBOLS = {
     "GoldenEvaluationRequest",
     "GoldenEvaluationResult",
     "HostNativeExecutorConfig",
+    "HostDetection",
+    "HostDetectionResult",
     "InputBinding",
+    "IntegrationAction",
+    "IntegrationChange",
+    "IntegrationConflict",
+    "IntegrationInstaller",
+    "IntegrationOperation",
+    "IntegrationPlan",
+    "IntegrationRequest",
+    "IntegrationResourceKind",
+    "IntegrationResult",
+    "IntegrationScope",
+    "IntegrationTarget",
     "InspectRequest",
     "InspectResult",
     "MemoryCheckpointStoreConfig",
@@ -72,13 +85,18 @@ EXPECTED_PUBLIC_SYMBOLS = {
     "ValueOrigin",
     "compile",
     "create_application",
+    "detect_integration_hosts",
     "evaluate_golden",
     "inspect",
+    "install_integration",
+    "plan_integration_install",
+    "plan_integration_uninstall",
     "predict",
     "resolve_run",
     "resume",
     "run",
     "submit_agent_result",
+    "uninstall_integration",
 }
 
 LEGACY_TOP_LEVEL_SYMBOLS = {
@@ -165,13 +183,18 @@ def test_runtime_event_type_catalog_matches_every_internal_callback_variant() ->
 def test_public_functions_do_not_expose_unconstrained_any() -> None:
     for name in (
         "compile",
+        "detect_integration_hosts",
         "evaluate_golden",
         "inspect",
+        "install_integration",
+        "plan_integration_install",
+        "plan_integration_uninstall",
         "predict",
         "resolve_run",
         "resume",
         "run",
         "submit_agent_result",
+        "uninstall_integration",
     ):
         hints = get_type_hints(getattr(graph_skill_runtime, name))
         assert hints

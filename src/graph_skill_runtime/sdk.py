@@ -20,6 +20,13 @@ from graph_skill_runtime.domain.models import (
     RuntimeProfileOverlay,
     SubmitAgentResultRequest,
 )
+from graph_skill_runtime.integrations.installer import IntegrationInstaller
+from graph_skill_runtime.integrations.models import (
+    HostDetectionResult,
+    IntegrationPlan,
+    IntegrationRequest,
+    IntegrationResult,
+)
 
 
 def _application(application: RuntimeApplication | None) -> RuntimeApplication:
@@ -84,3 +91,44 @@ def inspect(
     request: InspectRequest, *, application: RuntimeApplication | None = None
 ) -> InspectResult:
     return _application(application).inspect(request)
+
+
+def detect_integration_hosts(
+    *, installer: IntegrationInstaller | None = None
+) -> HostDetectionResult:
+    """Report PATH-based host discovery without writing any host state."""
+
+    active_installer = installer or IntegrationInstaller()
+    return HostDetectionResult(detections=active_installer.detect_hosts())
+
+
+def plan_integration_install(
+    request: IntegrationRequest,
+    *,
+    installer: IntegrationInstaller | None = None,
+) -> IntegrationPlan:
+    return (installer or IntegrationInstaller()).plan_install(request)
+
+
+def install_integration(
+    request: IntegrationRequest,
+    *,
+    installer: IntegrationInstaller | None = None,
+) -> IntegrationResult:
+    return (installer or IntegrationInstaller()).install(request)
+
+
+def plan_integration_uninstall(
+    request: IntegrationRequest,
+    *,
+    installer: IntegrationInstaller | None = None,
+) -> IntegrationPlan:
+    return (installer or IntegrationInstaller()).plan_uninstall(request)
+
+
+def uninstall_integration(
+    request: IntegrationRequest,
+    *,
+    installer: IntegrationInstaller | None = None,
+) -> IntegrationResult:
+    return (installer or IntegrationInstaller()).uninstall(request)

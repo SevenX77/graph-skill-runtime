@@ -1,0 +1,98 @@
+{
+  "schema_version": "gskill.integration-assets.v1",
+  "integration_id": "moirai",
+  "asset_version": "1.0.0",
+  "roles": [
+    {
+      "id": "moirai",
+      "host_name": "moirai",
+      "description": "Orchestrates graph-skill design, repair, execution, and evidence-driven evaluation while returning ownership to the current host agent.",
+      "skills": ["moirai", "moirai-brainstorming"]
+    },
+    {
+      "id": "clotho",
+      "host_name": "moirai-clotho",
+      "description": "Designs domains, graph topology, dataflow contracts, and Agent phase prompts for portable graph skills.",
+      "skills": ["moirai-domain-analysis", "moirai-graph-design", "moirai-agent-prompt-design"]
+    },
+    {
+      "id": "lachesis",
+      "host_name": "moirai-lachesis",
+      "description": "Diagnoses compile and runtime contract failures and repairs the smallest authoritative graph-skill source.",
+      "skills": ["moirai-compile-repair", "moirai-graph-design"]
+    },
+    {
+      "id": "atropos",
+      "host_name": "moirai-atropos",
+      "description": "Runs evidence-based prediction, execution, trace, artifact, and golden evaluation and issues a pass or rework verdict.",
+      "skills": ["moirai-eval-judgement", "moirai-agent-prompt-design"]
+    }
+  ],
+  "skills": [
+    {
+      "id": "moirai",
+      "references": [
+        "KB-00-hub.md",
+        "KB-01-skill-anatomy.md",
+        "KB-02-io-dataflow.md",
+        "KB-03-logic-actions.md",
+        "KB-04-agent-nodes.md",
+        "KB-05-subgraph.md",
+        "KB-06-iterate.md",
+        "KB-07-compile-diagnostics.md",
+        "KB-08-predict.md",
+        "KB-09-run-trace-checkpoint.md",
+        "KB-10-golden.md",
+        "KB-11-runtime-config.md",
+        "KB-12-agent-execution.md",
+        "KB-13-runtime-tools.md",
+        "KB-14-artifacts-persistence.md"
+      ]
+    },
+    {
+      "id": "moirai-brainstorming",
+      "references": ["KB-01-skill-anatomy.md", "KB-02-io-dataflow.md", "KB-04-agent-nodes.md", "KB-05-subgraph.md"]
+    },
+    {
+      "id": "moirai-domain-analysis",
+      "references": ["KB-01-skill-anatomy.md", "KB-02-io-dataflow.md"]
+    },
+    {
+      "id": "moirai-graph-design",
+      "references": ["KB-01-skill-anatomy.md", "KB-02-io-dataflow.md", "KB-03-logic-actions.md", "KB-04-agent-nodes.md", "KB-05-subgraph.md", "KB-06-iterate.md"]
+    },
+    {
+      "id": "moirai-agent-prompt-design",
+      "references": ["KB-04-agent-nodes.md", "KB-12-agent-execution.md"]
+    },
+    {
+      "id": "moirai-compile-repair",
+      "references": ["KB-01-skill-anatomy.md", "KB-07-compile-diagnostics.md"]
+    },
+    {
+      "id": "moirai-eval-judgement",
+      "references": ["KB-08-predict.md", "KB-09-run-trace-checkpoint.md", "KB-10-golden.md", "KB-14-artifacts-persistence.md"]
+    },
+    {
+      "id": "moirai-web-research",
+      "references": ["KB-00-hub.md"]
+    }
+  ],
+  "knowledge": [
+    "KB-00-hub.md",
+    "KB-01-skill-anatomy.md",
+    "KB-02-io-dataflow.md",
+    "KB-03-logic-actions.md",
+    "KB-04-agent-nodes.md",
+    "KB-05-subgraph.md",
+    "KB-06-iterate.md",
+    "KB-07-compile-diagnostics.md",
+    "KB-08-predict.md",
+    "KB-09-run-trace-checkpoint.md",
+    "KB-10-golden.md",
+    "KB-11-runtime-config.md",
+    "KB-12-agent-execution.md",
+    "KB-13-runtime-tools.md",
+    "KB-14-artifacts-persistence.md"
+  ]
+}

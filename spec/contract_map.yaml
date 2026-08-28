@@ -43,8 +43,34 @@ public_api_symbols:
     feature_ids: [F-typed-runtime-facade]
   HostNativeExecutorConfig:
     feature_ids: [F-runtime-config-resolution]
+  HostDetection:
+    feature_ids: [F-moirai-integration-installer]
+  HostDetectionResult:
+    feature_ids: [F-moirai-integration-installer]
   InputBinding:
     feature_ids: [F-typed-runtime-facade]
+  IntegrationAction:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationChange:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationConflict:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationInstaller:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationOperation:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationPlan:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationRequest:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationResourceKind:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationResult:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationScope:
+    feature_ids: [F-moirai-integration-installer]
+  IntegrationTarget:
+    feature_ids: [F-moirai-integration-installer]
   InspectRequest:
     feature_ids: [F-typed-runtime-facade]
   InspectResult:
@@ -103,10 +129,18 @@ public_api_symbols:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
   create_application:
     feature_ids: [F-runtime-application-service]
+  detect_integration_hosts:
+    feature_ids: [F-moirai-integration-installer]
   evaluate_golden:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
   inspect:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
+  install_integration:
+    feature_ids: [F-moirai-integration-installer]
+  plan_integration_install:
+    feature_ids: [F-moirai-integration-installer]
+  plan_integration_uninstall:
+    feature_ids: [F-moirai-integration-installer]
   predict:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
   resolve_run:
@@ -117,6 +151,8 @@ public_api_symbols:
     feature_ids: [F-agent-cli-executors, F-typed-runtime-facade, F-runtime-application-service, F-current-engine-adapter]
   submit_agent_result:
     feature_ids: [F-typed-runtime-facade, F-runtime-application-service]
+  uninstall_integration:
+    feature_ids: [F-moirai-integration-installer]
 skill_spec_sections:
   "docs/skill-spec/01-PORTABLE-GSKILL-V1.md#2. 唯一目录布局":
     feature_ids: [F-graph-skill-loading, F-portable-gskill-v1]
@@ -141,13 +177,13 @@ skill_spec_sections:
 consumer_files:
   - kind: stable-export
     path: src/graph_skill_runtime/__init__.py
-    feature_ids: [F-typed-runtime-facade]
+    feature_ids: [F-moirai-integration-installer, F-typed-runtime-facade]
   - kind: stable-export
     path: src/graph_skill_runtime/sdk.py
-    feature_ids: [F-typed-runtime-facade]
+    feature_ids: [F-moirai-integration-installer, F-typed-runtime-facade]
   - kind: live-consumer
     path: src/graph_skill_runtime/adapters/cli.py
-    feature_ids: [F-agent-cli-executors, F-runtime-cli-adapter]
+    feature_ids: [F-agent-cli-executors, F-moirai-integration-installer, F-runtime-cli-adapter]
   - kind: live-consumer
     path: src/graph_skill_runtime/adapters/mcp.py
     feature_ids: [F-runtime-mcp-adapter]

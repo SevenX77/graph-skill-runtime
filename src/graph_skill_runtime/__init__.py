@@ -46,6 +46,19 @@ from graph_skill_runtime.domain.models import SecretReference as SecretReference
 from graph_skill_runtime.domain.models import SqliteCheckpointStoreConfig as SqliteCheckpointStoreConfig
 from graph_skill_runtime.domain.models import SubmitAgentResultRequest as SubmitAgentResultRequest
 from graph_skill_runtime.domain.models import ValueOrigin as ValueOrigin
+from graph_skill_runtime.integrations.installer import IntegrationInstaller as IntegrationInstaller
+from graph_skill_runtime.integrations.models import HostDetection as HostDetection
+from graph_skill_runtime.integrations.models import HostDetectionResult as HostDetectionResult
+from graph_skill_runtime.integrations.models import IntegrationAction as IntegrationAction
+from graph_skill_runtime.integrations.models import IntegrationChange as IntegrationChange
+from graph_skill_runtime.integrations.models import IntegrationConflict as IntegrationConflict
+from graph_skill_runtime.integrations.models import IntegrationOperation as IntegrationOperation
+from graph_skill_runtime.integrations.models import IntegrationPlan as IntegrationPlan
+from graph_skill_runtime.integrations.models import IntegrationRequest as IntegrationRequest
+from graph_skill_runtime.integrations.models import IntegrationResourceKind as IntegrationResourceKind
+from graph_skill_runtime.integrations.models import IntegrationResult as IntegrationResult
+from graph_skill_runtime.integrations.models import IntegrationScope as IntegrationScope
+from graph_skill_runtime.integrations.models import IntegrationTarget as IntegrationTarget
 from graph_skill_runtime.ports.runtime import AgentExecutor as AgentExecutor
 from graph_skill_runtime.ports.runtime import ArtifactStore as ArtifactStore
 from graph_skill_runtime.ports.runtime import CheckpointStore as CheckpointStore
@@ -54,13 +67,18 @@ from graph_skill_runtime.ports.runtime import RunSnapshotStore as RunSnapshotSto
 from graph_skill_runtime.ports.runtime import RuntimeEngine as RuntimeEngine
 from graph_skill_runtime.ports.runtime import SkillSource as SkillSource
 from graph_skill_runtime.sdk import compile as compile
+from graph_skill_runtime.sdk import detect_integration_hosts as detect_integration_hosts
 from graph_skill_runtime.sdk import evaluate_golden as evaluate_golden
 from graph_skill_runtime.sdk import inspect as inspect
+from graph_skill_runtime.sdk import install_integration as install_integration
+from graph_skill_runtime.sdk import plan_integration_install as plan_integration_install
+from graph_skill_runtime.sdk import plan_integration_uninstall as plan_integration_uninstall
 from graph_skill_runtime.sdk import predict as predict
 from graph_skill_runtime.sdk import resolve_run as resolve_run
 from graph_skill_runtime.sdk import resume as resume
 from graph_skill_runtime.sdk import run as run
 from graph_skill_runtime.sdk import submit_agent_result as submit_agent_result
+from graph_skill_runtime.sdk import uninstall_integration as uninstall_integration
 
 __all__ = [
     "AgentExecutor",
@@ -85,7 +103,20 @@ __all__ = [
     "GoldenEvaluationRequest",
     "GoldenEvaluationResult",
     "HostNativeExecutorConfig",
+    "HostDetection",
+    "HostDetectionResult",
     "InputBinding",
+    "IntegrationAction",
+    "IntegrationChange",
+    "IntegrationConflict",
+    "IntegrationInstaller",
+    "IntegrationOperation",
+    "IntegrationPlan",
+    "IntegrationRequest",
+    "IntegrationResourceKind",
+    "IntegrationResult",
+    "IntegrationScope",
+    "IntegrationTarget",
     "InspectRequest",
     "InspectResult",
     "MemoryCheckpointStoreConfig",
@@ -115,11 +146,16 @@ __all__ = [
     "ValueOrigin",
     "compile",
     "create_application",
+    "detect_integration_hosts",
     "evaluate_golden",
     "inspect",
+    "install_integration",
     "predict",
+    "plan_integration_install",
+    "plan_integration_uninstall",
     "resolve_run",
     "resume",
     "run",
     "submit_agent_result",
+    "uninstall_integration",
 ]

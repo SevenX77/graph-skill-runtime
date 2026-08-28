@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from graph_skill_runtime.adapters.engine import CurrentEngineAdapter
 from graph_skill_runtime.adapters.snapshots import LocalRunSnapshotStore
 from graph_skill_runtime.application.config import ConfigResolver
@@ -9,6 +11,7 @@ from graph_skill_runtime.application.service import RuntimeApplication
 from graph_skill_runtime.domain.models import (
     CompileRequest,
     EmbeddedExecutorConfig,
+    GoldenEvaluationRequest,
     RunInvocation,
     RuntimeProfileOverlay,
 )
@@ -120,3 +123,98 @@ def test_current_engine_adapter_returns_structured_compile_diagnostics(tmp_path:
     assert result.status == "failed"
     assert result.diagnostics
     assert all(diagnostic.severity == "fatal" for diagnostic in result.diagnostics)
+
+
+@pytest.mark.parametrize("failed,stale", [(1, 0), (0, 1)])
+def test_current_engine_adapter_fails_golden_result_when_any_case_is_not_passed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failed: int,
+    stale: int,
+) -> None:
+    def evaluate_golden_baseline(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        return {
+            "baseline_id": "baseline",
+            "summary": {
+                "total_cases": 1,
+                "passed": 0,
+                "failed": failed,
+                "stale": stale,
+            },
+            "cases": [],
+        }
+
+    monkeypatch.setattr(
+        "graph_skill_runtime.core.runner.evaluate_golden_baseline",
+        evaluate_golden_baseline,
+    )
+
+    result = CurrentEngineAdapter().evaluate_golden(
+        GoldenEvaluationRequest(
+            skill_root=str(tmp_path),
+            state_root=str(tmp_path),
+            baseline_id="baseline",
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.message == "golden evaluation failed"
+
+
+def test_current_engine_adapter_passes_golden_result_only_for_a_consistent_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def evaluate_golden_baseline(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        return {
+            "baseline_id": "baseline",
+            "summary": {"total_cases": 2, "passed": 2, "failed": 0, "stale": 0},
+            "cases": [],
+        }
+
+    monkeypatch.setattr(
+        "graph_skill_runtime.core.runner.evaluate_golden_baseline",
+        evaluate_golden_baseline,
+    )
+
+    result = CurrentEngineAdapter().evaluate_golden(
+        GoldenEvaluationRequest(
+            skill_root=str(tmp_path),
+            state_root=str(tmp_path),
+            baseline_id="baseline",
+        )
+    )
+
+    assert result.status == "passed"
+    assert result.error is None
+
+
+def test_current_engine_adapter_rejects_a_malformed_golden_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def evaluate_golden_baseline(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        return {
+            "summary": {"total_cases": 2, "passed": 2, "failed": 1, "stale": 0}
+        }
+
+    monkeypatch.setattr(
+        "graph_skill_runtime.core.runner.evaluate_golden_baseline",
+        evaluate_golden_baseline,
+    )
+
+    result = CurrentEngineAdapter().evaluate_golden(
+        GoldenEvaluationRequest(
+            skill_root=str(tmp_path),
+            state_root=str(tmp_path),
+            baseline_id="baseline",
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert "summary counts are inconsistent" in result.error.message
