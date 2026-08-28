@@ -202,7 +202,10 @@ def test_runner_never_requests_shell_execution(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     monkeypatch.setattr(WindowsJob, "create", lambda: _Job())
     if sys.platform != "win32":
-        monkeypatch.setattr(os, "killpg", lambda _process_id, _signal: None)
+        def missing_process_group(_process_id: int, _signal: int) -> None:
+            raise ProcessLookupError
+
+        monkeypatch.setattr(os, "killpg", missing_process_group)
     request = _request(tmp_path, sys.executable, "-c", "pass")
 
     SubprocessProcessRunner().run(request)

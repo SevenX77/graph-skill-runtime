@@ -147,11 +147,10 @@ def _terminate_posix_tree(spawned: _SpawnedProcess) -> None:
     process = spawned.process
     group_existed = _signal_posix_process_group(process.pid, signal.SIGTERM)
     if group_existed:
-        deadline = time.monotonic() + _TERMINATE_GRACE_SECONDS
-        while time.monotonic() < deadline:
-            if not _signal_posix_process_group(process.pid, 0):
-                break
-            time.sleep(_POLL_SECONDS)
+        # A zero-signal group probe is not portable evidence: macOS can return
+        # EPERM when group membership changes during termination. Give the
+        # owned group a fixed grace interval, then enforce the deadline.
+        time.sleep(_TERMINATE_GRACE_SECONDS)
         _signal_posix_process_group(process.pid, _POSIX_SIGKILL)
     if process.poll() is None:
         try:
