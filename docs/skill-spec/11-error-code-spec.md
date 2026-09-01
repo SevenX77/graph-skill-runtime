@@ -166,3 +166,93 @@ updated: 2026-08-27
 5. 机械检查本文与 registry 的数量、重复、code set、level 和 stage 完全一致，并验证相对链接存在。
 
 删除码必须先确认没有发出点和当前 contract owner；历史解释留在 git history，不在活动目录中保留第二套 retired catalog。
+## 9. 错误码层级与归属
+
+本节是错误码**载体归属**的权威声明。这个 runtime 一共有三个已声明的错误码词表，加上一个留给外部 owner 的前缀；每个错误码恰好属于其中一个层，每个层恰好有一个可枚举的机器镜像。§1 的「目录与 registry 双射」只约束第 1 层；第 2、3 层不与第 1 层双射，理由分别写在 §9.2 与 §9.3。
+
+层与镜像的对应关系：
+
+| 层 | 词表形状 | 机器镜像（唯一 owner） | 数量 | 与第 1 层双射 |
+| --- | --- | --- | --- | --- |
+| 1 · skill 诊断目录 | `[F-v3-*]` | [`ERROR_REGISTRY`](../../src/graph_skill_runtime/core/error_registry.py) | 见 §1 | 本层即第 1 层，与本文 §2–§7 双射 |
+| 2 · 应用边界码 | `GSKILL_*` | [`RuntimeErrorCode`](../../src/graph_skill_runtime/domain/models.py) | 8 | 否（§9.2） |
+| 3 · 一次性 converter 码 | `GSKILL_MIGRATION_*` | [`MigrationErrorCode`](../../src/graph_skill_runtime/migration/studio_v030.py) | 26 | 否（§9.3） |
+| 外部前缀保留 | `[F-v3-gateway-*]` | 本仓不注册，只在 [`core/exceptions.py`](../../src/graph_skill_runtime/core/exceptions.py) 保留前缀 | 不由本仓决定 | 不适用（§9.4） |
+
+### 9.1 第 1 层 · skill 诊断目录（`[F-v3-*]`）
+
+**正向定义**：第 1 层描述「一个 portable skill 在编译、装配、运行或评测中违反了哪一条已声明规则」。它的读者是 skill 作者，每一行都指向一份 owning spec 中被违反的合法状态。
+
+- 机器镜像是 `ERROR_REGISTRY`；本文 §2–§7 是它的文档面，两者按 §1 双射。
+- 消费者是 [`ErrorPayload.code`](../../src/graph_skill_runtime/core/exceptions.py)：未注册的码在构造时即被拒绝（`unknown graph_skill_runtime error code`）。所以「进入 `ERROR_REGISTRY`」等价于「成为一个合法的编译诊断码」。
+- 每个已注册码在 [`spec/features.yaml`](../../spec/features.yaml) 有且只有一个 primary owning feature，由 `scripts/validate_round28_manifest.py` 机械校验。
+
+### 9.2 第 2 层 · 应用边界码（`GSKILL_*`，8 个）
+
+**正向定义**：第 2 层描述「一次 SDK / CLI / MCP 调用以哪一类失败结束」。它的读者是宿主与调用方，粒度是**类别**，不是规则。机器镜像是 `RuntimeErrorCode`（`StrEnum`），消费者是 `RuntimeErrorPayload.code` —— 三个 transport 返回同一个失败形状。
+
+| Code | 触发边界 | 含义 |
+| --- | --- | --- |
+| `GSKILL_COMPILE_FAILED` | compile / predict / run 入口 | 编译没有产出可运行 skill。完整第 1 层缺陷集走 `CompileResult.diagnostics`；本码只在没有任何已注册规则覆盖该异常时作为兜底行出现。 |
+| `GSKILL_CONFIG_INVALID` | 配置解析（`application/config.py`） | 解析后的配置违反 schema、取值约束或 precedence 规则。 |
+| `GSKILL_EXECUTOR_UNAVAILABLE` | executor 探测（`adapters/vendor_cli/runtime.py`） | 被选中的 executor 无法构造或探测失败；fallback 声明绝不静默顶替。 |
+| `GSKILL_INTERNAL_ERROR` | 任意 transport 出口 | 无法归入其他类别的运行时故障，必须留下可观察诊断。 |
+| `GSKILL_INVALID_REQUEST` | 请求解析与 handoff 提交 | 调用本身非法：参数、run 控制或 Agent 提交不满足契约。 |
+| `GSKILL_NOT_IMPLEMENTED` | host-native resume | 契约中存在但本 release line 未实现的路径。 |
+| `GSKILL_RUN_FAILED` | 执行与 golden 评测 | 执行到达失败终态。 |
+| `GSKILL_SNAPSHOT_NOT_FOUND` | resume（`application/service.py`） | 被寻址的不可变 request snapshot / run id 不存在。 |
+
+**为何不与第 1 层双射**：第 2 层是**包含**第 1 层的类别，不是它的同级行。`GSKILL_COMPILE_FAILED` 的语义就是「一组第 1 层诊断的容器」，把容器和被容纳者放进同一张表会让「一个词只指向一个对象」不再成立。两层唯一相接的地方是 [`CompileDiagnostic.code`](../../src/graph_skill_runtime/domain/models.py)（普通 `str`）：[`adapters/engine.py`](../../src/graph_skill_runtime/adapters/engine.py) 在引擎给出注册码时写第 1 层码，在没有任何注册规则覆盖该异常时才退到 `GSKILL_COMPILE_FAILED`。如果这个兜底码被注册进第 1 层，「没有规则匹配」就与「匹配到某条规则」不可区分了。第 2 层本身已由 `StrEnum` 闭合，拼错在类型层即不可表示，所以它从来不缺机器约束，只缺文档面——本节补上的正是文档面。
+
+### 9.3 第 3 层 · 一次性 converter 码（`GSKILL_MIGRATION_*`，26 个）
+
+**正向定义**：第 3 层描述「一棵被冻结的 Studio v0.3 输入树为什么不能被转换成 portable gSkill v1」。机器镜像是 `MigrationErrorCode`（`StrEnum`），消费者是 `MigrationDiagnostic.code` → `MigrationReport.diagnostics` → `MigrationFailure`，可达路径只有显式 `gskill migrate studio-skill`。
+
+| Code | 触发边界 | 含义 |
+| --- | --- | --- |
+| `GSKILL_MIGRATION_ARTIFACT_DUPLICATE` | runtime_config artifact | runtime_config 出现重复 artifact 定义。 |
+| `GSKILL_MIGRATION_ARTIFACT_ID_COLLISION` | runtime_config artifact | 用完整定义哈希后 artifact id 仍然歧义。 |
+| `GSKILL_MIGRATION_ARTIFACT_INVALID` | runtime_config artifact | artifact 定义的结构、类型、mode 或 format 非法。 |
+| `GSKILL_MIGRATION_CONFIG_CONFLICT` | runtime_config | Studio 输入存在未解决的冲突，converter 不替用户裁决。 |
+| `GSKILL_MIGRATION_CONFIG_INVALID` | runtime_config | runtime_config 字段缺失、类型错误或取值非法。 |
+| `GSKILL_MIGRATION_DESTINATION_EXISTS` | 发布边界 | DESTINATION 已存在（含 staged 期间出现）；迁移绝不覆盖它。 |
+| `GSKILL_MIGRATION_DESTINATION_INVALID` | 参数校验 | DESTINATION 与 SOURCE 相同，或不是合法可写目标。 |
+| `GSKILL_MIGRATION_EXTERNAL_SKILL_INVALID` | 外部 subagent 引用 | 外部 subagent 的 `target_skill` 不是合法 Agent Skills name。 |
+| `GSKILL_MIGRATION_GRAPH_ID_COLLISION` | graph id 规范化 | 多个 legacy graph name 规范化到同一个 graph id。 |
+| `GSKILL_MIGRATION_GRAPH_ID_INVALID` | graph id 规范化 | legacy graph name 无法规范化出合法 graph id。 |
+| `GSKILL_MIGRATION_GRAPH_INVALID` | graph 产出 | legacy graph 无法组成合法 `graph.yaml`。 |
+| `GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID` | graph 引用 | legacy 引用不在 root graph 的引用集内，或指向未注册目标。 |
+| `GSKILL_MIGRATION_GRAPH_RESOURCE_UNSUPPORTED` | 资源提升 | legacy 子 graph 根 `tools/` 无法在不改变 tool scope 的前提下提升。 |
+| `GSKILL_MIGRATION_NESTED_SUBGRAPH_UNSUPPORTED` | 拓扑能力边界 | legacy 子 graph 含嵌套 graph 引用，flat registry 不承接。 |
+| `GSKILL_MIGRATION_PHASE_INVALID` | phase 产出 | phase 无法组成合法 portable phase 文件。 |
+| `GSKILL_MIGRATION_PHASE_INVENTORY_INVALID` | phase 清点 | legacy phase 目录不是恰好一个行为文件。 |
+| `GSKILL_MIGRATION_PRESET_INVALID` | 参数校验 | `--preset-id` 不是合法 preset id。 |
+| `GSKILL_MIGRATION_RESOURCE_COLLISION` | 资源 owner | legacy 根同时存在两个等价资源 owner（如 `refs/` 与 `references/`）。 |
+| `GSKILL_MIGRATION_RESOURCE_PATH_UNSUPPORTED` | 资源路径 | 资源路径越出其 graph root 或不在允许目录下。 |
+| `GSKILL_MIGRATION_SKILL_METADATA_INVALID` | 根 metadata | legacy metadata 无法组成合法 Agent Skills activation 字段（如 description 过长）。 |
+| `GSKILL_MIGRATION_SOURCE_INVALID` | SOURCE 读取 | SOURCE 不是目录，缺 `GRAPH.md`，或 legacy 必需字段缺失、类型错误。 |
+| `GSKILL_MIGRATION_SOURCE_VERSION_UNSUPPORTED` | SOURCE 读取 | `GRAPH.md` 的 `schema_version` 不是 v0.3.0；converter 只接受被冻结的那一版。 |
+| `GSKILL_MIGRATION_STAGED_VALIDATION_FAILED` | staged 校验 | staging 目录的产物校验抛出未归类异常；报告仍然完整落盘。 |
+| `GSKILL_MIGRATION_SYMLINK_UNSUPPORTED` | 文件拷贝 | 迁移不拷贝 symlink。 |
+| `GSKILL_MIGRATION_TOPOLOGY_INVALID` | 拓扑一致性 | legacy frontmatter 的 phases 与 body phase 次序不完全一致。 |
+| `GSKILL_MIGRATION_UNKNOWN_FIELD` | 闭合字段校验 | legacy 声明出现该 schema 未定义的字段。 |
+
+**为何不并入第 1 层**，三条独立理由，任一条成立即足够：
+
+1. **进入 `ERROR_REGISTRY` 等价于成为合法编译诊断码**（§9.1）。把 converter 词表放进去，就让被冻结的 v0.3 词表在当前编译诊断闭集里变成可构造的值。项目规则把 legacy v0.3 解析限定在显式 `gskill migrate studio-skill` 边界，并禁止它成为 portable 失败后的 fallback；词表层面的混入正是那条边界最先被抹掉的地方。
+2. **第 1 层每一行都携带编译→装配→运行流水线中的有序 stage 和一份 owning spec**，描述的是「被编译的那个 skill」的合法状态。这 26 个码描述的是**输入树**的合法状态，它们的 owning spec 是状态为 `superseded` 的 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md)。并入需要为它们编造一个流水线里不存在的 stage，并让这份**当前**目录成为一份已退役格式的共同 owner。
+3. **第 1 层每个码在 `spec/features.yaml` 有唯一 primary owning feature**。converter 是一个有界用例，不是 26 个可追溯的 runtime feature；为通过 round28 校验而虚构 26 个 owner 会污染 traceability 事实源。
+
+**原本真正的缺陷不是「没登记」，而是「不可枚举」**：这 26 个码曾经是 66 处裸 `str` 字面量，`MigrationDiagnostic.code` 的类型是 `str`，因此一个拼写错误就等于静默新增第 27 个码，没有任何文档、类型或测试知道它。现在 `MigrationDiagnostic.code` 的类型是 `MigrationErrorCode`，拼错在校验期即 `ValidationError`。
+
+### 9.4 外部前缀保留（`[F-v3-gateway-*]`）
+
+`[F-v3-gateway-*]` **不是本仓注册的码集**，而是留给外部 gateway owner 的前缀。gateway 异常继承本仓的公共异常族并自带 `code`，所以 [`core/exceptions.py`](../../src/graph_skill_runtime/core/exceptions.py) 的 `_payload_from_message()` 对这个前缀返回 `None`，而不是按「未注册的 core 码」拒绝。当前保留的前缀恰好只有 `[F-v3-gateway-`。前缀内各码的 level、stage 与 owning spec 由 gateway 侧维护，本目录不复制。
+
+### 9.5 收口规则
+
+1. 新增错误码必须登记进**恰好一个**已声明层的机器镜像。既不属于任何镜像、又是错误码形状的字符串字面量，是契约缺陷，不是新词表。
+2. 三层的码集两两不相交；`[F-v3-gateway-*]` 前缀不得与第 1 层已注册码重叠。
+3. §9 不复制第 1 层的行——第 1 层的行只在 §2–§7。
+4. 新增一个**层**（而不是一个码）必须同批完成三件事：本节声明它、存在一个具名机器镜像、门禁覆盖它。
+5. 机械门禁：[`tests/test_error_code_vocabulary_layers.py`](../../tests/test_error_code_vocabulary_layers.py) 校验层的数量与成员、层间不相交、§9 与镜像逐码一致、`src/` 下没有逃出已声明层的错误码字面量。

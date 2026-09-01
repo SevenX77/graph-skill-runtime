@@ -10,6 +10,7 @@ import tempfile
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, NoReturn, cast
@@ -48,10 +49,56 @@ _PHASE_TAG_RE = re.compile(r"<phase\b([^>]*)>(.*?)</phase>", re.IGNORECASE | re.
 _DEPENDS_RE = re.compile(r"\bdepends_on\s*=\s*(['\"])(.*?)\1", re.IGNORECASE | re.DOTALL)
 
 
+class MigrationErrorCode(StrEnum):
+    """The closed converter-boundary error vocabulary.
+
+    This is a layer of its own, deliberately outside
+    ``graph_skill_runtime.core.error_registry.ERROR_REGISTRY``: registry
+    membership is what makes a string a legal ``ErrorPayload.code``, and these
+    codes describe the legal shape of a frozen v0.3 *input* tree, not a defect
+    in a portable skill under compilation. Admitting them to the diagnostics
+    catalog would make the converter vocabulary constructible inside the
+    current compile-diagnostics closed set, which is the boundary blur that
+    keeps legacy parsing from becoming a post-failure fallback.
+
+    ``docs/skill-spec/11-error-code-spec.md`` §9 declares this layer and is the
+    document side of the pairing; ``tests/test_error_code_vocabulary_layers.py``
+    is the mechanical check that the two agree and that no code-shaped literal
+    escapes a declared layer.
+    """
+
+    ARTIFACT_DUPLICATE = "GSKILL_MIGRATION_ARTIFACT_DUPLICATE"
+    ARTIFACT_ID_COLLISION = "GSKILL_MIGRATION_ARTIFACT_ID_COLLISION"
+    ARTIFACT_INVALID = "GSKILL_MIGRATION_ARTIFACT_INVALID"
+    CONFIG_CONFLICT = "GSKILL_MIGRATION_CONFIG_CONFLICT"
+    CONFIG_INVALID = "GSKILL_MIGRATION_CONFIG_INVALID"
+    DESTINATION_EXISTS = "GSKILL_MIGRATION_DESTINATION_EXISTS"
+    DESTINATION_INVALID = "GSKILL_MIGRATION_DESTINATION_INVALID"
+    EXTERNAL_SKILL_INVALID = "GSKILL_MIGRATION_EXTERNAL_SKILL_INVALID"
+    GRAPH_ID_COLLISION = "GSKILL_MIGRATION_GRAPH_ID_COLLISION"
+    GRAPH_ID_INVALID = "GSKILL_MIGRATION_GRAPH_ID_INVALID"
+    GRAPH_INVALID = "GSKILL_MIGRATION_GRAPH_INVALID"
+    GRAPH_REFERENCE_INVALID = "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID"
+    GRAPH_RESOURCE_UNSUPPORTED = "GSKILL_MIGRATION_GRAPH_RESOURCE_UNSUPPORTED"
+    NESTED_SUBGRAPH_UNSUPPORTED = "GSKILL_MIGRATION_NESTED_SUBGRAPH_UNSUPPORTED"
+    PHASE_INVALID = "GSKILL_MIGRATION_PHASE_INVALID"
+    PHASE_INVENTORY_INVALID = "GSKILL_MIGRATION_PHASE_INVENTORY_INVALID"
+    PRESET_INVALID = "GSKILL_MIGRATION_PRESET_INVALID"
+    RESOURCE_COLLISION = "GSKILL_MIGRATION_RESOURCE_COLLISION"
+    RESOURCE_PATH_UNSUPPORTED = "GSKILL_MIGRATION_RESOURCE_PATH_UNSUPPORTED"
+    SKILL_METADATA_INVALID = "GSKILL_MIGRATION_SKILL_METADATA_INVALID"
+    SOURCE_INVALID = "GSKILL_MIGRATION_SOURCE_INVALID"
+    SOURCE_VERSION_UNSUPPORTED = "GSKILL_MIGRATION_SOURCE_VERSION_UNSUPPORTED"
+    STAGED_VALIDATION_FAILED = "GSKILL_MIGRATION_STAGED_VALIDATION_FAILED"
+    SYMLINK_UNSUPPORTED = "GSKILL_MIGRATION_SYMLINK_UNSUPPORTED"
+    TOPOLOGY_INVALID = "GSKILL_MIGRATION_TOPOLOGY_INVALID"
+    UNKNOWN_FIELD = "GSKILL_MIGRATION_UNKNOWN_FIELD"
+
+
 class MigrationDiagnostic(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    code: str = Field(min_length=1)
+    code: MigrationErrorCode
     message: str = Field(min_length=1)
     source_path: str | None = None
     field_path: str | None = None
@@ -110,7 +157,14 @@ class MigrationFailure(ValueError):
 
 
 class _MigrationProblem(ValueError):
-    def __init__(self, code: str, message: str, *, source: Path | None = None, field: str | None = None) -> None:
+    def __init__(
+        self,
+        code: MigrationErrorCode,
+        message: str,
+        *,
+        source: Path | None = None,
+        field: str | None = None,
+    ) -> None:
         self.diagnostic = MigrationDiagnostic(
             code=code,
             message=message,
@@ -183,7 +237,7 @@ def _plain_data(value: Any) -> Any:
 
 
 def _problem(
-    code: str,
+    code: MigrationErrorCode,
     message: str,
     *,
     source: Path | None = None,
@@ -201,7 +255,7 @@ def _normalize_graph_id(value: str) -> str:
         digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:8]
         normalized = f"{normalized[:55].rstrip('-')}-{digest}"
     if re.fullmatch(GRAPH_ID_PATTERN, normalized) is None:
-        _problem("GSKILL_MIGRATION_GRAPH_ID_INVALID", f"cannot normalize graph id from {value!r}")
+        _problem(MigrationErrorCode.GRAPH_ID_INVALID, f"cannot normalize graph id from {value!r}")
     return normalized
 
 
@@ -212,7 +266,7 @@ def _legacy_phase_refs(graph_path: Path, body: str, declared: list[str]) -> tupl
         depends_match = _DEPENDS_RE.search(match.group(1))
         if depends_match is None:
             _problem(
-                "GSKILL_MIGRATION_TOPOLOGY_INVALID",
+                MigrationErrorCode.TOPOLOGY_INVALID,
                 f"legacy phase {phase_id!r} has no explicit depends_on",
                 source=graph_path,
                 field="phases",
@@ -226,7 +280,7 @@ def _legacy_phase_refs(graph_path: Path, body: str, declared: list[str]) -> tupl
     body_ids = [item[0] for item in raw_refs]
     if body_ids != declared:
         _problem(
-            "GSKILL_MIGRATION_TOPOLOGY_INVALID",
+            MigrationErrorCode.TOPOLOGY_INVALID,
             "legacy frontmatter phases and body phase order must match exactly",
             source=graph_path,
             field="phases",
@@ -244,7 +298,7 @@ def _legacy_phase_refs(graph_path: Path, body: str, declared: list[str]) -> tupl
         )
     except ValidationError as exc:
         _problem(
-            "GSKILL_MIGRATION_TOPOLOGY_INVALID",
+            MigrationErrorCode.TOPOLOGY_INVALID,
             f"legacy topology cannot be represented by portable v1: {exc}",
             source=graph_path,
             field="phases",
@@ -256,7 +310,7 @@ def _legacy_phase_document(source_root: Path, phase_id: str) -> tuple[_LegacyPha
     matches = [phase_dir / filename for filename in _PHASE_FILES if (phase_dir / filename).is_file()]
     if len(matches) != 1:
         _problem(
-            "GSKILL_MIGRATION_PHASE_INVENTORY_INVALID",
+            MigrationErrorCode.PHASE_INVENTORY_INVALID,
             f"legacy phase {phase_id!r} must contain exactly one of {', '.join(_PHASE_FILES)}",
             source=phase_dir,
         )
@@ -271,7 +325,7 @@ def _legacy_phase_document(source_root: Path, phase_id: str) -> tuple[_LegacyPha
         path_value = phase_frontmatter.get("path")
         if not isinstance(path_value, str) or not path_value.strip():
             _problem(
-                "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+                MigrationErrorCode.GRAPH_REFERENCE_INVALID,
                 f"legacy subgraph phase {phase_id!r} has no path",
                 source=phase_file,
                 field="path",
@@ -282,7 +336,7 @@ def _legacy_phase_document(source_root: Path, phase_id: str) -> tuple[_LegacyPha
         raw_subgraphs = phase_frontmatter.get("subgraphs", [])
         if not isinstance(raw_subgraphs, list):
             _problem(
-                "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+                MigrationErrorCode.GRAPH_REFERENCE_INVALID,
                 "legacy agent subgraphs must be a list",
                 source=phase_file,
                 field="subgraphs",
@@ -290,7 +344,7 @@ def _legacy_phase_document(source_root: Path, phase_id: str) -> tuple[_LegacyPha
         for item in raw_subgraphs:
             if not isinstance(item, dict) or not isinstance(item.get("path"), str):
                 _problem(
-                    "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+                    MigrationErrorCode.GRAPH_REFERENCE_INVALID,
                     "every legacy agent subgraph requires a path",
                     source=phase_file,
                     field="subgraphs",
@@ -323,35 +377,35 @@ def _legacy_phase_documents(
 def _read_legacy_graph(source_root: Path) -> _LegacyGraph:
     graph_path = source_root / "GRAPH.md"
     if not graph_path.is_file():
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "source graph has no GRAPH.md", source=graph_path)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "source graph has no GRAPH.md", source=graph_path)
     frontmatter, body, _ = parse_markdown_parts(graph_path)
     unknown = sorted(set(frontmatter) - _LEGACY_GRAPH_FIELDS)
     if unknown:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             "legacy GRAPH.md has unsupported fields: " + ", ".join(unknown),
             source=graph_path,
         )
     if frontmatter.get("schema_version") != "v0.3.0":
         _problem(
-            "GSKILL_MIGRATION_SOURCE_VERSION_UNSUPPORTED",
+            MigrationErrorCode.SOURCE_VERSION_UNSUPPORTED,
             "source GRAPH.md schema_version must be v0.3.0",
             source=graph_path,
             field="schema_version",
         )
     legacy_name = frontmatter.get("name")
     if not isinstance(legacy_name, str) or not legacy_name.strip():
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "legacy graph name is required", source=graph_path)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "legacy graph name is required", source=graph_path)
     declared = frontmatter.get("phases")
     if not isinstance(declared, list) or not declared or not all(isinstance(item, str) for item in declared):
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "legacy phases must be list[str]", source=graph_path)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "legacy phases must be list[str]", source=graph_path)
     refs = _legacy_phase_refs(graph_path, body, cast(list[str], declared))
 
     documents, local_references = _legacy_phase_documents(source_root, cast(list[str], declared))
 
     io = frontmatter.get("io")
     if not isinstance(io, dict):
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "legacy graph io is required", source=graph_path)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "legacy graph io is required", source=graph_path)
     description_raw = frontmatter.get("description")
     description = (
         description_raw.strip()
@@ -360,10 +414,10 @@ def _read_legacy_graph(source_root: Path) -> _LegacyGraph:
     )
     llm_role = frontmatter.get("llm_role")
     if llm_role is not None and (not isinstance(llm_role, str) or not llm_role.strip()):
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "llm_role must be a non-empty string", source=graph_path)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "llm_role must be a non-empty string", source=graph_path)
     iterate = frontmatter.get("iterate")
     if iterate is not None and not isinstance(iterate, dict):
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "iterate must be an object", source=graph_path)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "iterate must be an object", source=graph_path)
     return _LegacyGraph(
         source_root=source_root,
         graph_id=_normalize_graph_id(legacy_name),
@@ -384,14 +438,14 @@ def _resolved_local_graph(source: Path, graph_root: Path, value: str) -> Path:
         resolved.relative_to(source)
     except ValueError:
         _problem(
-            "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+            MigrationErrorCode.GRAPH_REFERENCE_INVALID,
             f"legacy graph reference {value!r} escapes source root",
             source=graph_root,
             field="path",
         )
     if not resolved.is_dir() or not (resolved / "GRAPH.md").is_file():
         _problem(
-            "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+            MigrationErrorCode.GRAPH_REFERENCE_INVALID,
             f"legacy graph reference {value!r} does not resolve to a v0.3 graph",
             source=graph_root,
             field="path",
@@ -415,7 +469,7 @@ def _normalized_artifact(
 ) -> tuple[dict[str, JsonValue], str, str, str]:
     if not isinstance(raw, dict):
         _problem(
-            "GSKILL_MIGRATION_ARTIFACT_INVALID",
+            MigrationErrorCode.ARTIFACT_INVALID,
             f"artifact at index {index} must be an object",
             source=source_path,
             field=f"artifacts.{index}",
@@ -423,7 +477,7 @@ def _normalized_artifact(
     unknown = sorted(set(raw) - {"stem", "fields", "mode", "format"})
     if unknown:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             f"artifact at index {index} has unknown fields: {', '.join(unknown)}",
             source=source_path,
             field=f"artifacts.{index}",
@@ -432,14 +486,14 @@ def _normalized_artifact(
     fields = raw.get("fields")
     if not isinstance(stem, str) or not stem.strip():
         _problem(
-            "GSKILL_MIGRATION_ARTIFACT_INVALID",
+            MigrationErrorCode.ARTIFACT_INVALID,
             f"artifact at index {index} requires a non-empty stem",
             source=source_path,
             field=f"artifacts.{index}.stem",
         )
     if not isinstance(fields, list) or not fields or not all(isinstance(item, str) for item in fields):
         _problem(
-            "GSKILL_MIGRATION_ARTIFACT_INVALID",
+            MigrationErrorCode.ARTIFACT_INVALID,
             f"artifact at index {index} requires non-empty string fields",
             source=source_path,
             field=f"artifacts.{index}.fields",
@@ -464,7 +518,7 @@ def _artifact_declarations(
         return (), ()
     if not isinstance(raw_artifacts, list):
         _problem(
-            "GSKILL_MIGRATION_ARTIFACT_INVALID",
+            MigrationErrorCode.ARTIFACT_INVALID,
             "runtime_config artifacts must be a list",
             source=source_path,
             field="artifacts",
@@ -486,7 +540,7 @@ def _artifact_declarations(
     duplicates = sorted({row for row in canonical_rows if canonical_rows.count(row) > 1})
     if duplicates:
         _problem(
-            "GSKILL_MIGRATION_ARTIFACT_DUPLICATE",
+            MigrationErrorCode.ARTIFACT_DUPLICATE,
             "runtime_config contains duplicate artifact definitions",
             source=source_path,
             field="artifacts",
@@ -506,7 +560,7 @@ def _artifact_declarations(
         prefix_length += 4
         if prefix_length > 64:
             _problem(
-                "GSKILL_MIGRATION_ARTIFACT_ID_COLLISION",
+                MigrationErrorCode.ARTIFACT_ID_COLLISION,
                 "artifact ids remain ambiguous after using the full definition hash",
                 source=source_path,
                 field="artifacts",
@@ -527,7 +581,7 @@ def _artifact_declarations(
             )
         except ValidationError as exc:
             _problem(
-                "GSKILL_MIGRATION_ARTIFACT_INVALID",
+                MigrationErrorCode.ARTIFACT_INVALID,
                 f"artifact at index {index} is invalid after normalization: {exc}",
                 source=source_path,
                 field=f"artifacts.{index}",
@@ -547,7 +601,7 @@ def _artifact_declarations(
 def _mapping(value: object, *, name: str, source: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         _problem(
-            "GSKILL_MIGRATION_CONFIG_INVALID",
+            MigrationErrorCode.CONFIG_INVALID,
             f"{name} must be an object",
             source=source,
             field=name,
@@ -566,7 +620,7 @@ def _has_values(value: object) -> bool:
 def _phase_address(graph_id: str, phase_id: str, known_phases: set[str], source: Path) -> PhaseAddress:
     if phase_id not in known_phases:
         _problem(
-            "GSKILL_MIGRATION_CONFIG_INVALID",
+            MigrationErrorCode.CONFIG_INVALID,
             f"runtime config references unknown root phase {phase_id!r}",
             source=source,
         )
@@ -585,14 +639,14 @@ def _migrated_inputs(
     )
     if unknown_inputs:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             "runtime inputs has unknown fields: " + ", ".join(unknown_inputs),
             source=source,
             field="inputs",
         )
     if _has_values(inputs_doc.get("conflicts", {})):
         _problem(
-            "GSKILL_MIGRATION_CONFIG_CONFLICT",
+            MigrationErrorCode.CONFIG_CONFLICT,
             "runtime config contains unresolved Studio input conflicts",
             source=source,
             field="inputs.conflicts",
@@ -617,7 +671,7 @@ def _llm_nodes(llm: dict[str, Any], field: str, *, source: Path) -> dict[str, An
     unknown = sorted(set(container) - {"nodes"})
     if unknown:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             f"llm.{field} has unknown fields: {', '.join(unknown)}",
             source=source,
             field=f"llm.{field}",
@@ -663,7 +717,7 @@ def _migrated_compare_candidates(
         address = _phase_address(root_graph.graph_id, phase_id, known_phases, source)
         if not isinstance(raw_candidates, list):
             _problem(
-                "GSKILL_MIGRATION_CONFIG_INVALID",
+                MigrationErrorCode.CONFIG_INVALID,
                 f"compare candidates for {phase_id!r} must be a list",
                 source=source,
             )
@@ -676,14 +730,14 @@ def _migrated_compare_candidates(
             unknown = sorted(set(candidate) - {"candidate_id", "id", "model_override", "model"})
             if unknown:
                 _problem(
-                    "GSKILL_MIGRATION_UNKNOWN_FIELD",
+                    MigrationErrorCode.UNKNOWN_FIELD,
                     f"compare candidate has unknown fields: {', '.join(unknown)}",
                     source=source,
                 )
             candidate_id = candidate.get("candidate_id", candidate.get("id"))
             if not isinstance(candidate_id, str):
                 _problem(
-                    "GSKILL_MIGRATION_CONFIG_INVALID",
+                    MigrationErrorCode.CONFIG_INVALID,
                     "compare candidate requires candidate_id",
                     source=source,
                 )
@@ -707,7 +761,7 @@ def _migrated_breakpoints(
     raw_breakpoints = document.get("breakpoints", [])
     if not isinstance(raw_breakpoints, list):
         _problem(
-            "GSKILL_MIGRATION_CONFIG_INVALID",
+            MigrationErrorCode.CONFIG_INVALID,
             "breakpoints must be a list",
             source=source,
             field="breakpoints",
@@ -720,7 +774,7 @@ def _migrated_breakpoints(
             breakpoint_phase_id = raw_breakpoint.get("phase_id") or raw_breakpoint.get("node_id")
         if not isinstance(breakpoint_phase_id, str):
             _problem(
-                "GSKILL_MIGRATION_CONFIG_INVALID",
+                MigrationErrorCode.CONFIG_INVALID,
                 "each breakpoint must identify a root phase",
                 source=source,
                 field="breakpoints",
@@ -748,13 +802,13 @@ def _runtime_preset(
         document = json.loads(runtime_config.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
         _problem(
-            "GSKILL_MIGRATION_CONFIG_INVALID",
+            MigrationErrorCode.CONFIG_INVALID,
             f"cannot read legacy runtime config: {exc}",
             source=runtime_config,
         )
     if not isinstance(document, dict) or document.get("schema_version") != "studio.runtime_config.v2":
         _problem(
-            "GSKILL_MIGRATION_CONFIG_INVALID",
+            MigrationErrorCode.CONFIG_INVALID,
             "runtime config schema_version must be studio.runtime_config.v2",
             source=runtime_config,
             field="schema_version",
@@ -764,7 +818,7 @@ def _runtime_preset(
     )
     if unknown_top:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             "runtime config has unknown top-level fields: " + ", ".join(unknown_top),
             source=runtime_config,
         )
@@ -776,7 +830,7 @@ def _runtime_preset(
     unknown_llm = sorted(set(llm) - {"node_params", "compare_candidates", "custom_params"})
     if unknown_llm:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             "runtime llm has unknown fields: " + ", ".join(unknown_llm),
             source=runtime_config,
             field="llm",
@@ -806,7 +860,7 @@ def _runtime_preset(
         )
     except ValidationError as exc:
         _problem(
-            "GSKILL_MIGRATION_CONFIG_INVALID",
+            MigrationErrorCode.CONFIG_INVALID,
             f"runtime config cannot form a safe RunPreset: {exc}",
             source=runtime_config,
         )
@@ -846,33 +900,33 @@ def _validate_migration_paths(source: Path, destination: Path, preset_id: str) -
     source = source.expanduser().resolve(strict=True)
     destination = destination.expanduser().resolve(strict=False)
     if not source.is_dir():
-        _problem("GSKILL_MIGRATION_SOURCE_INVALID", "SOURCE must be a directory", source=source)
+        _problem(MigrationErrorCode.SOURCE_INVALID, "SOURCE must be a directory", source=source)
     if source == destination:
-        _problem("GSKILL_MIGRATION_DESTINATION_INVALID", "SOURCE and DESTINATION must differ")
+        _problem(MigrationErrorCode.DESTINATION_INVALID, "SOURCE and DESTINATION must differ")
     try:
         destination.relative_to(source)
     except ValueError:
         pass
     else:
         _problem(
-            "GSKILL_MIGRATION_DESTINATION_INVALID",
+            MigrationErrorCode.DESTINATION_INVALID,
             "DESTINATION must not be inside SOURCE",
             source=destination,
         )
     if destination.exists():
         _problem(
-            "GSKILL_MIGRATION_DESTINATION_EXISTS",
+            MigrationErrorCode.DESTINATION_EXISTS,
             "DESTINATION already exists; migration never overwrites it",
             source=destination,
         )
     if re.fullmatch(AGENT_SKILL_NAME_PATTERN, destination.name) is None or len(destination.name) > 64:
         _problem(
-            "GSKILL_MIGRATION_DESTINATION_INVALID",
+            MigrationErrorCode.DESTINATION_INVALID,
             "DESTINATION basename must be a valid Agent Skills name",
             source=destination,
         )
     if re.fullmatch(r"^[A-Za-z][A-Za-z0-9_.-]*$", preset_id) is None:
-        _problem("GSKILL_MIGRATION_PRESET_INVALID", f"invalid preset id {preset_id!r}")
+        _problem(MigrationErrorCode.PRESET_INVALID, f"invalid preset id {preset_id!r}")
     return source, destination
 
 
@@ -895,13 +949,13 @@ def _build_plan(
         graph = _read_legacy_graph(graph_root)
         if graph.local_references:
             _problem(
-                "GSKILL_MIGRATION_NESTED_SUBGRAPH_UNSUPPORTED",
+                MigrationErrorCode.NESTED_SUBGRAPH_UNSUPPORTED,
                 f"legacy child graph {graph_root} contains nested graph references",
                 source=graph_root,
             )
         if (graph_root / "tools").exists():
             _problem(
-                "GSKILL_MIGRATION_GRAPH_RESOURCE_UNSUPPORTED",
+                MigrationErrorCode.GRAPH_RESOURCE_UNSUPPORTED,
                 "legacy child graph root tools/ cannot be promoted without changing tool scope",
                 source=graph_root / "tools",
             )
@@ -911,7 +965,7 @@ def _build_plan(
     all_graph_ids = [root_graph.graph_id, *(graph.graph_id for graph in registry_graphs)]
     if len(all_graph_ids) != len(set(all_graph_ids)):
         _problem(
-            "GSKILL_MIGRATION_GRAPH_ID_COLLISION",
+            MigrationErrorCode.GRAPH_ID_COLLISION,
             "legacy graph names normalize to duplicate graph ids",
             source=source,
         )
@@ -955,7 +1009,7 @@ def _render_root_skill(plan: _MigrationPlan) -> str:
     )
     if len(activation_description) > 1024:
         _problem(
-            "GSKILL_MIGRATION_SKILL_METADATA_INVALID",
+            MigrationErrorCode.SKILL_METADATA_INVALID,
             "legacy description is too long to form Agent Skills activation metadata",
             source=plan.root_graph.source_root / "GRAPH.md",
             field="description",
@@ -1002,7 +1056,7 @@ def _portable_graph(graph: _LegacyGraph, *, artifacts: tuple[ArtifactDeclaration
         )
     except ValidationError as exc:
         _problem(
-            "GSKILL_MIGRATION_GRAPH_INVALID",
+            MigrationErrorCode.GRAPH_INVALID,
             f"legacy graph {graph.source_root} cannot form portable graph.yaml: {exc}",
             source=graph.source_root / "GRAPH.md",
         )
@@ -1014,7 +1068,7 @@ def _resolved_reference_id(plan: _MigrationPlan, graph: _LegacyGraph, value: str
         if _resolved_local_graph(plan.source, plan.root_graph.source_root, legacy_value) == resolved:
             return graph_id
     _problem(
-        "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+        MigrationErrorCode.GRAPH_REFERENCE_INVALID,
         f"legacy reference {value!r} is not owned by the root graph reference set",
         source=graph.source_root,
     )
@@ -1045,7 +1099,7 @@ def _rewrite_resource_paths(
                 or parts[0] not in accepted_roots
             ):
                 _problem(
-                    "GSKILL_MIGRATION_RESOURCE_PATH_UNSUPPORTED",
+                    MigrationErrorCode.RESOURCE_PATH_UNSUPPORTED,
                     f"legacy {field_name} path {authored_path!r} must be under "
                     f"{sorted(accepted_roots)!r} and remain inside its graph root",
                     source=graph.source_root,
@@ -1054,7 +1108,7 @@ def _rewrite_resource_paths(
             source_file = graph.source_root.joinpath(*parts)
             if source_file.is_symlink() or not source_file.is_file():
                 _problem(
-                    "GSKILL_MIGRATION_RESOURCE_PATH_UNSUPPORTED",
+                    MigrationErrorCode.RESOURCE_PATH_UNSUPPORTED,
                     f"legacy {field_name} path {authored_path!r} is not a regular file",
                     source=source_file,
                     field=field_name,
@@ -1077,7 +1131,7 @@ def _rewrite_subgraph_phase(
     path_value = data.pop("path", None)
     if not isinstance(path_value, str):
         _problem(
-            "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+            MigrationErrorCode.GRAPH_REFERENCE_INVALID,
             "SUBGRAPH.md path disappeared during conversion",
             source=phase.source_file,
         )
@@ -1096,7 +1150,7 @@ def _rewrite_agent_phase(
         for raw in subgraphs:
             if not isinstance(raw, dict):
                 _problem(
-                    "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+                    MigrationErrorCode.GRAPH_REFERENCE_INVALID,
                     "agent subgraph declaration must be an object",
                     source=phase.source_file,
                 )
@@ -1104,7 +1158,7 @@ def _rewrite_agent_phase(
             path_value = item.pop("path", None)
             if not isinstance(path_value, str):
                 _problem(
-                    "GSKILL_MIGRATION_GRAPH_REFERENCE_INVALID",
+                    MigrationErrorCode.GRAPH_REFERENCE_INVALID,
                     "agent subgraph declaration requires path",
                     source=phase.source_file,
                 )
@@ -1118,7 +1172,7 @@ def _rewrite_agent_phase(
         target = subagent.get("target_skill") if isinstance(subagent, dict) else None
         if not isinstance(target, str) or re.fullmatch(AGENT_SKILL_NAME_PATTERN, target) is None:
             _problem(
-                "GSKILL_MIGRATION_EXTERNAL_SKILL_INVALID",
+                MigrationErrorCode.EXTERNAL_SKILL_INVALID,
                 "external subagent target_skill must already be a valid Agent Skills name",
                 source=phase.source_file,
                 field="subagents",
@@ -1133,7 +1187,7 @@ def _portable_phase_frontmatter(
     data = dict(phase.frontmatter)
     if "batch" in data:
         _problem(
-            "GSKILL_MIGRATION_UNKNOWN_FIELD",
+            MigrationErrorCode.UNKNOWN_FIELD,
             "legacy phase batch cannot be migrated without changing its execution contract; use iterate",
             source=phase.source_file,
             field="batch",
@@ -1168,7 +1222,7 @@ def _phase_model_validates(
         )
     except Exception as exc:
         _problem(
-            "GSKILL_MIGRATION_PHASE_INVALID",
+            MigrationErrorCode.PHASE_INVALID,
             f"phase {phase.phase_id!r} cannot form portable {filename}: {exc}",
             source=phase.source_file,
         )
@@ -1177,7 +1231,7 @@ def _phase_model_validates(
 def _copy_entry(source: Path, destination: Path) -> None:
     if source.is_symlink():
         _problem(
-            "GSKILL_MIGRATION_SYMLINK_UNSUPPORTED",
+            MigrationErrorCode.SYMLINK_UNSUPPORTED,
             "migration does not copy symlinks",
             source=source,
         )
@@ -1240,7 +1294,7 @@ def _render_graph(
         if legacy_refs.exists():
             if (graph.source_root / "references").exists():
                 _problem(
-                    "GSKILL_MIGRATION_RESOURCE_COLLISION",
+                    MigrationErrorCode.RESOURCE_COLLISION,
                     "legacy graph contains both refs/ and references/ resource owners",
                     source=graph.source_root,
                 )
@@ -1295,7 +1349,7 @@ def _render_plan(plan: _MigrationPlan, stage: Path) -> tuple[MigrationFileMappin
     if legacy_refs.exists():
         if (plan.source / "references").exists():
             _problem(
-                "GSKILL_MIGRATION_RESOURCE_COLLISION",
+                MigrationErrorCode.RESOURCE_COLLISION,
                 "legacy root contains both refs/ and references/ resource owners",
                 source=plan.source,
             )
@@ -1428,7 +1482,7 @@ def migrate_studio_skill(
             publish_directory_no_replace(stage, plan.destination)
         except FileExistsError:
             _problem(
-                "GSKILL_MIGRATION_DESTINATION_EXISTS",
+                MigrationErrorCode.DESTINATION_EXISTS,
                 "DESTINATION appeared while migration was staged; migration never overwrites it",
                 source=plan.destination,
             )
@@ -1441,7 +1495,7 @@ def migrate_studio_skill(
         ) from exc
     except Exception as exc:
         diagnostic = MigrationDiagnostic(
-            code="GSKILL_MIGRATION_STAGED_VALIDATION_FAILED",
+            code=MigrationErrorCode.STAGED_VALIDATION_FAILED,
             message=str(exc),
             source_path=str(stage),
         )
@@ -1460,6 +1514,7 @@ __all__ = [
     "ArtifactMigration",
     "ConfigDisposition",
     "MigrationDiagnostic",
+    "MigrationErrorCode",
     "MigrationFailure",
     "MigrationFileMapping",
     "MigrationReport",
