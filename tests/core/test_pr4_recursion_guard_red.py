@@ -59,7 +59,7 @@ def _write_graph(
     if skill_entry:
         _write(
             root / "SKILL.md",
-            f"---\nname: {name}\ndescription: Exercise recursive compilation guards.\n---\n",
+            f"---\nname: {name}\ndescription: Exercise recursive compilation guards.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
         )
     _write(
         root / "graph.yaml",

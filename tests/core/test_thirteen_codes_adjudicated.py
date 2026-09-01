@@ -160,6 +160,8 @@ def _parent(parent: Path) -> Path:
         """---
 name: seam-parent
 description: Exercise the portable subgraph seam.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

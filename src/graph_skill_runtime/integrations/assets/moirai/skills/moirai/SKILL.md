@@ -11,7 +11,7 @@ Use this skill as the coordinating front door for work on an explicit user-owned
 
 1. Identify the requested outcome, the explicit business gSkill root, constraints, and observable acceptance evidence.
 2. Separate verified facts, inferences, decisions, and open questions.
-3. Compile before prediction or execution. Prefer the tools belonging to the `gskill` MCP server; if they are unavailable, use the installed `gskill` command.
+3. Compile before prediction or execution. Prefer the tools belonging to the `gskill` MCP server; if they are unavailable, use the installed interpreter with `python -m graph_skill_runtime`.
 4. Keep the current host responsible for authorization, edits, specialist handoffs, host-native Agent execution, and the final answer.
 
 Read only the detail needed for the current stage:

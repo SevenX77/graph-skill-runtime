@@ -10,7 +10,7 @@ updated: 2026-08-27
 
 [`01-PORTABLE-GSKILL-V1.md`](./01-PORTABLE-GSKILL-V1.md) 是当前 production reader 的唯一 portable 格式契约，状态为 `audited-ready`。当前业务 gSkill 使用根 `SKILL.md` + `graph.yaml` + phase `AGENT.md` + 单层 `graphs/<graph_id>/` registry；runtime core 没有 dual reader 或格式嗅探回退。`audited-ready` 表示语义已审但尚未由 owner 建立新 SHA-256 哈希锁，因此不能标为 `FROZEN`。
 
-[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 是 `superseded` 的 v0.3 契约。它只服务显式 `gskill migrate studio-skill` converter 与历史核验，不再被 production compile、predict、run、inspect、SDK、CLI 或 MCP 当作当前格式读取。
+[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 是 `superseded` 的 v0.3 契约。它只服务显式 `python -m graph_skill_runtime migrate studio-skill` converter 与历史核验，不再被 production compile、predict、run、inspect、SDK、module CLI 或 MCP 当作当前格式读取。
 
 [`11-error-code-spec.md`](./11-error-code-spec.md) 是 `living` 的唯一当前错误码目录与语义事实源。它与代码 `ERROR_REGISTRY` 保持 98 码双射；compile rules、format spec 和其他页面只链接目录或个别 owning rule，不再复制错误码全表。
 

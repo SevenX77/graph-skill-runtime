@@ -40,6 +40,8 @@ def _host_native_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Exercise one durable host-native Agent phase.
+metadata:
+  gskill: gskill.graph.v1
 ---
 
 Run this graph with graph-skill-runtime.

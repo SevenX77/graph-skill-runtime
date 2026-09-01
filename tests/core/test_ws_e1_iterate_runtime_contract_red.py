@@ -122,6 +122,8 @@ def _logic_skill(
         """---
 name: iterate-runtime-contract
 description: Exercise declarative iterate runtime behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

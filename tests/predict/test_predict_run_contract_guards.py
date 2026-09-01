@@ -14,6 +14,8 @@ def _write_logic_skill(root: Path) -> Path:
         """---
 name: skill
 description: Guard run and predict result contracts.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

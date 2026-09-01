@@ -1,337 +1,164 @@
 # Graph Skill Runtime
 
-Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and running document-driven graph skills. The Phase 1 typed runtime foundation, Phase 2 portable gSkill format, bounded Phase 3 durable host-native handoff, Phase 4 direct vendor CLI executor, Phase 5 MoirAI host integration, and Phase 6 cross-platform package/release-candidate acceptance are accepted in their documented scopes. `graph-skill-runtime` version `0.1.0a1` is one Python distribution installable with `pip` or `uv`; it provides the importable `graph_skill_runtime` SDK, the `gskill` console command, and one Model Context Protocol (MCP) server named `gskill` that exchanges messages over standard input/output (stdio). Phase 3b host-native expansion, first-release naming review, and actual release/registry publication remain incomplete, so the complete v1 design remains drafted.
+Graph Skill Runtime is a provider-neutral Python runtime for compiling, predicting, and executing document-driven graph workflows. The current distribution target is `graph-skill-runtime` `1.0.0a1`; portable source uses the exact syntax marker `gskill.graph.v1`, and runtime and syntax majors must match.
 
-The repository has accepted an alpha release candidate; it has not published a release. The repository exists at [SevenX77/graph-skill-runtime](https://github.com/SevenX77/graph-skill-runtime) and `main` is pull-request-only. The [release workflow](.github/workflows/release.yml) verifies a GitHub Release tag against `v<pyproject version>`, builds one wheel/source-distribution pair, requires that exact candidate to pass source and installed-package acceptance on Ubuntu, Windows, and macOS, and only then makes the original distributions eligible for PyPI Trusted Publishing through OpenID Connect (OIDC). No release tag was triggered, no GitHub Release was created, nothing was published to PyPI or TestPyPI, and the PyPI project and trusted publisher have not been configured or verified.
+The package is not published to PyPI or TestPyPI. Historical release-candidate evidence and current working-tree evidence are scoped in [the v1 alignment record](docs/design/v1-alignment.md); neither is registry publication.
 
-## Current capability boundary
+## Current product boundary
 
-The current checkout provides the typed runtime facade and configuration boundary, the portable format cutover, the supported Phase 3 host-native handoff, the bounded Phase 4 direct CLI executor, the accepted Phase 5 host integration, and the accepted Phase 6 package boundary:
+The runtime provides:
 
-- exactly 77 top-level symbols defined by [`graph_skill_runtime.__all__`](src/graph_skill_runtime/__init__.py), documented in the [public API contract](docs/public-api-contract.md);
-- closed, frozen Pydantic request and result models with `schema_version` and `kind` discriminators;
-- immutable nested JSON collections after model construction;
-- a closed 44-value `RuntimeEvent.event_type` catalog kept exactly equal to every concrete internal `CallbackEvent` variant by contract test;
-- fourteen top-level Python functions: nine runtime/application entry points (`create_application`, `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`) plus five integration functions (`detect_integration_hosts`, `plan_integration_install`, `install_integration`, `plan_integration_uninstall`, and `uninstall_integration`);
-- the `gskill` command-line interface (CLI) and exactly one `gskill` stdio MCP server exposing eight runtime tools—`compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`—over one `RuntimeApplication`; integration installation is not an MCP tool;
-- explicit dependency composition through `create_application`, with no process-global application singleton;
-- deterministic configuration precedence and provenance-bearing immutable run requests;
-- create-once local request snapshots at `<state_root>/runs/<run_id>/request.json`;
-- durable root-DAG Agent waits: a LangGraph SQLite checkpoint, a separate `agent-handoffs.sqlite3` task/result owner, cross-process submission, exact-retry idempotency, and recovery across both the checkpoint-to-task and graph-commit-to-response crash windows;
-- a public `AgentResource` contract that lets an Agent task identify declared references and examples without duplicating their filesystem paths in rendered instructions;
-- direct `cli` execution for Claude, Codex, GitHub Copilot, Cursor, Gemini, and OpenCode through capability-probed vendor adapters, bounded task materialization, schema-validated output, and causal attempt events;
-- shell-free process-tree ownership: Win32 Job Objects on Windows and process groups on POSIX, with a bounded exact-PGID/effective-UID fallback when a POSIX group signal is denied and whole-tree cleanup after success, timeout, cancellation, or parent exit;
-- the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded portable `LOGIC` skill;
-- one production reader for the portable root `SKILL.md` plus `graph.yaml` format, with a flat graph registry and no legacy fallback;
-- an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source;
-- one optional MoirAI integration inventory at asset version `1.0.0`: four provider-neutral role/profile assets (`moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`), eight Agent Skills, and `KB-00` through `KB-14`; these assets share the one `gskill` MCP server and contain no business `graph.yaml`;
-- explicit `gskill integrations detect/install/uninstall` and equivalent SDK contracts for `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`, with dry-run planning, all-target conflict preflight, manifest ownership, causally safe rollback, idempotency, and hash-safe uninstall;
-- a release-artifact validator that requires exactly one wheel and one source distribution, validates metadata, the pure-wheel/console contract, safe archive paths, required and forbidden package content, and the manifest-closed MoirAI subtree, then binds their sizes and SHA-256 digests to one source commit;
-- a package-acceptance runner that verifies those manifest-owned artifact bytes and the expected source commit, installs the candidate through pip-wheel, uv-wheel, and pip-sdist channels, exercises the installed SDK/CLI/MCP/integration/durable-state behavior, and emits versioned acceptance evidence.
+- the typed `graph_skill_runtime` Python facade;
+- an installed-interpreter module CLI;
+- one stdio MCP server named `gskill` with exactly eight runtime tools: `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`;
+- a portable gSkill v1 reader and explicit one-shot legacy Studio converter;
+- default host-native execution with durable Agent handoff;
+- an explicitly selected direct vendor CLI executor;
+- optional, explicitly installed MoirAI host projections;
+- a read-only provider-neutral Agent kit containing exactly two public Skills, `gskill` and `create-gskill`.
 
-The current reader accepts one explicit business skill root in the portable format:
+Studio and Gateway plugins are not implemented in this release. Their only current design status is a future Port/Adapter boundary.
+
+## Installation and command identity
+
+Graph Skill Runtime is a dependency and SDK package. Install it into the owning Python 3.11-or-newer environment through that environment's normal dependency workflow. The package is not published, so local installation examples must name an actual locally built wheel or source path rather than a registry package name:
 
 ```text
-my-skill/
-├── SKILL.md
-├── graph.yaml
-├── phases/
-│   └── <phase_id>/
-│       └── LOGIC.md | AGENT.md | SUBGRAPH.md
-└── graphs/
-    └── <graph_id>/
-        ├── graph.yaml
-        └── phases/
-            └── <phase_id>/
-                └── LOGIC.md | AGENT.md | SUBGRAPH.md
+python -m pip install /path/to/graph_skill_runtime-1.0.0a1-py3-none-any.whl
+uv add /path/to/graph_skill_runtime-1.0.0a1-py3-none-any.whl
+uv pip install --python /path/to/python /path/to/graph_skill_runtime-1.0.0a1-py3-none-any.whl
 ```
 
-The root `SKILL.md` is the only Agent Skills discovery target. `graph.yaml` uses schema version `gskill.graph.v1`; the root Agent Skill name and root graph id are separate identities. Reusable graphs live directly under the single-level `graphs/<graph_id>/` registry, and graph ids are explicit and unique across the bundle. Only the root graph declares artifacts; presets and requests select them by `artifact_id`.
+Choose the form owned by the environment or project; these examples are alternatives, not a sequence. `uv tool install` is not the installation form for this package because uv tools install packages that expose commands, while Graph Skill Runtime intentionally exposes none. Installation, import, MCP startup, host detection, and Agent configuration guidance make no host/project configuration changes and do not register user business gSkills.
 
-Production compile, predict, run, inspect, SDK, CLI, and MCP paths do not sniff formats or fall back to v0.3. Legacy parsing exists only behind `gskill migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]`. The converter leaves `SOURCE` unchanged, refuses an existing destination, and publishes from a sibling temporary directory through an operating-system-native create-if-absent rename with a deterministic migration report.
-
-The default executor is `host-native`. A graph with no Agent phase runs directly. For a supported Agent phase in the root DAG, `run` saves the request, durably checkpoints immediately before that phase, persists a provider-neutral `AgentTask`, and returns `RunResult(status="agent_required")`. If the process stops after the graph checkpoint but before the task row is written, repeating the same run reconstructs the public task from that existing Agent breakpoint without invoking or replaying the already-completed graph prefix. The host must create a fresh clean-context native subagent, give it the task, and submit its typed result; the runtime does not call a model, create the host child itself, or silently fall back to another executor.
-
-The current Agent address is narrow by design. Agent phases in registry subgraphs, graph-level iterate, Agent phase iterate, and incomparable parallel branches fail fast for both `host-native` and `cli`. Host-native Agent handoff requires a SQLite checkpoint store. `resume(checkpoint_ref)` only reads the durable current wait or terminal response; Agent output must use `submit_agent_result`. Ordinary human/breakpoint typed resume is not yet implemented.
-
-The default executor remains `host-native`; only an explicit `executor=cli` enters the direct vendor path. A `LOGIC`-only graph completes without constructing or probing a vendor executor even when its profile selects `cli`. Before creating a handoff task, a CLI run probes the executable, required flags, and any vendor-exposed authentication status, and rejects Agent declarations that require the not-yet-bridged portable tools, subagents, subgraphs, or framework context access. There is no silent `embedded` fallback. Phase 5 is accepted for canonical assets, six renderer formats, explicit safe installation, and the documented discovery evidence below. Phase 6 is accepted for immutable artifact binding and the documented three-platform installed-package behavior. Neither phase completes Phase 3b or adds Gateway or Studio plugins; future product integrations remain behind external Port/Adapter boundaries.
-
-## User-owned graph skills
-
-A business graph skill, or gSkill, is project content owned by its user. Every SDK, CLI, or MCP invocation receives the skill path explicitly. Installing or importing the runtime does not register, discover globally, copy, or mutate business gSkills.
-
-The repository-level [`examples/hello-world/`](examples/hello-world/) directory is a portable business gSkill that has been compiled and run with the explicit `embedded` executor in the local Phase 2 evidence. It belongs to the source checkout, not the installed package: wheel validation rejects `graph_skill_runtime/examples/`, and installed acceptance rejects that namespace and every installed `graph.yaml`. A source distribution may contain this repository-level example and test fixtures as source corpus; installing that source distribution does not install or register them as a business gSkill.
-
-The wheel may contain runtime implementation resources. Those resources are not business gSkills and do not make the wheel a skill registry.
-
-## Optional MoirAI host integration
-
-MoirAI is an optional design, repair, execution, and evaluation front door. Its canonical source bundle contains four provider-neutral role/profile assets (`moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`), eight Agent Skills, and fifteen focused knowledge files. A role/profile asset is one instruction set that a renderer adapts to a host's native agent or profile format; it is not a bundled model process. The six renderers project these assets into each selected host's native skill and agent directories and register the same `gskill` stdio MCP server, whose eight tools are the runtime tools listed above. MoirAI therefore does not install four runtime agents or eight MCP servers. It also does not install or register a business gSkill, add a `graph.yaml`, or make MoirAI a core-runtime dependency.
-
-These are installed-user commands and intentionally invoke `gskill` directly. Inspect the read-only PATH evidence, dry-run an explicit target, then apply only when the plan is acceptable:
+The distribution intentionally defines no `[project.scripts]` or `console_scripts` entry. It installs no package-owned `gskill.exe` or `bin/gskill` launcher. Use the installed interpreter:
 
 ```text
-gskill integrations detect
-gskill integrations install moirai --targets codex --scope user --dry-run
-gskill integrations install moirai --targets codex --scope user
-gskill integrations uninstall moirai --targets codex --scope user --dry-run
-gskill integrations uninstall moirai --targets codex --scope user
+python -m graph_skill_runtime --version
 ```
 
-For project scope, name the project and every target explicitly:
+The exact version line is:
 
 ```text
-gskill integrations install moirai --targets claude,codex --scope project --project-root PROJECT_ROOT --dry-run
-gskill integrations install moirai --targets claude,codex --scope project --project-root PROJECT_ROOT
+python -m graph_skill_runtime gskill.graph.v1 (graph-skill-runtime 1.0.0a1)
 ```
 
-`--targets detected` is also accepted, but detection only reports supported executable names found on `PATH`; it neither invokes a host nor authorizes writes until used in an explicit install command. Package installation, import, installer construction, MCP startup, and detection write no host or project state.
+On Windows the interpreter is normally `python.exe`; that executable belongs to Python, not to this package.
 
-The installer preflights every requested target before changing any of them. It never adopts or overwrites an unmanaged file or shared configuration entry, updates only a manifest-owned value, and uninstalls only exact unmodified owned hashes. After an apply failure, rollback restores a path only while that path still exactly equals the after-image written by this operation. If another process changed it, the installer preserves the concurrent content and raises an incomplete-rollback error instead of overwriting it. A modified managed resource is preserved and blocks the whole requested operation. Project manifests live under `PROJECT_ROOT/.gskill/integrations/moirai/`; user-scope manifests live under the runtime user state directory. OpenCode's `.opencode/opencode.json` is shared configuration: the installer merges and owns only `mcp.servers.gskill`, plus its separately projected manifest-owned files. A sibling `opencode.jsonc` causes a fail-closed conflict rather than being rewritten or shadowed.
+## Portable business gSkill
 
-The canonical role names remain provider-neutral and hyphenated: `moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`. The Codex renderer alone normalizes hyphens to underscores for its safe identifier surface, so it writes paths such as `.codex/agents/moirai_clotho.toml` with `name = "moirai_clotho"`. Other renderers retain the hyphenated names. This adapter-specific projection does not change the canonical inventory.
+A business gSkill is a user-owned directory supplied explicitly on every operation. Its root contains:
 
-### Phase 5 acceptance evidence
+- `SKILL.md` with `metadata.gskill: gskill.graph.v1`;
+- `graph.yaml` with `schema_version: gskill.graph.v1`;
+- registered phase directories containing exactly one of `LOGIC.md`, `AGENT.md`, or `SUBGRAPH.md`.
 
-The source, built artifact, and real-host observations establish different parts of the accepted scope:
+Reusable graphs live in a flat `graphs/<graph_id>/` registry. The runtime neither scans the machine for business graphs nor registers them globally. Current compile, inspect, predict, and run paths do not guess or fall back to a legacy format. See the [portable format contract](docs/skill-spec/01-PORTABLE-GSKILL-V1.md).
 
-- Local source gates passed: Ruff; strict mypy over 149 source files; the contract manifest validator; and pytest with `1715 passed, 1 skipped in 83.51s`. `uv build` produced the `0.1.0a1` source distribution and wheel, and the built-wheel smoke passed. `pip-audit` reported `No known vulnerabilities found` for resolved third-party distributions while skipping the unpublished local `graph-skill-runtime`; that result is neither a source-code security audit nor publication evidence.
-- The [renderer snapshot](tests/integrations/snapshots/moirai_renderers.json) locks all six renderers in project and user scope, including native paths, profile metadata, and MCP shape. A snapshot proves deterministic format projection, not operational behavior of six real products.
-- The built wheel contained exactly 28 closed MoirAI members: one `integration.json`, four role bodies, eight Agent Skills, and fifteen knowledge files, with no `graph.yaml` and no extra member. A clean Python 3.11 environment installed that wheel, loaded the 4/8/15 inventory through `PackagedMoiraiAssets`, and used the wheel's `gskill` command to project a temporary project.
-- The original bounded Phase 5 observation on Windows `10.0.26200` x64 recorded Claude Code `2.1.222` discovering all eight project skills, listing all four hyphenated MoirAI profiles before authentication, accepting `moirai-clotho` as a valid selected profile, discovering the project `gskill` MCP entry, and reporting that server connected. The valid-profile run then stopped at the machine's missing authentication. This record is retained as time-scoped historical discovery evidence, not as a current compatibility conclusion.
-- On 2026-08-28, a current handshake retest with Claude Code `2.1.222` returned MCP error `-32022` against the MCP SDK's 2026-07-28 handshake; the `gskill` server itself did not fail. A normal `claude update` installed Claude Code `2.1.250`, after which both `claude mcp get gskill` and `claude mcp list` reported `Connected`. A subsequent `claude -p` model invocation failed before any tool call because the machine's OAuth session had expired and could not be refreshed. The current Claude conclusion is therefore connection-layer success only; the client upgrade is not a runtime compatibility shim, and authenticated execution and a default tool call against the new wheel remain unverified.
-- The original isolated Codex CLI `0.144.1` project supplied project skill `$moirai`, and project MCP tool `gskill.inspect` successfully returned `skill_id=hello-world`. The same newly built `graph-skill-runtime` `0.1.0a1` wheel was then installed globally with `uv tool install --force <wheel>`. Without an approval override or an allowed-tools whitelist, `codex exec --ephemeral -s read-only` successfully invoked `gskill.inspect` with `include_call_graph=true`, returned `skill_id=hello-world`, and exited with code `0`. This proves that the real Codex host consumed the new wheel's read-only ToolAnnotations and allowed `inspect` through its default approval path. The earlier session's spawn tool exposed no `agent_type`; its child metadata had `agent_role=null` and did not load custom `developer_instructions`, so Codex custom-agent invocation remains unverified. This observed limitation does not invalidate the official standalone TOML format or the underscore-normalized renderer snapshot.
+## Agent-facing operation flow
 
-Phase 5 acceptance retains its historical Claude skill/profile/MCP discovery and Codex skill/MCP cross-check. Current installed-host evidence adds the successful Codex CLI `0.144.1` default-approval `inspect` call against the new wheel, while Claude Code `2.1.250` is verified only at the MCP connection layer. It does not claim all six hosts are operational, authenticated model execution or a default tool call through Claude, or Codex custom-agent runtime invocation.
+Coding Agents prefer the `gskill` MCP tools when available. If MCP is absent, disconnected, or lacks the needed operation, they use the installed interpreter with `python -m graph_skill_runtime ...`.
 
-## Phase 6 package acceptance and publication boundary
+The normal flow is:
 
-[`scripts/accept_release_artifacts.py`](scripts/accept_release_artifacts.py) establishes one reproducible pre-publication boundary. `validate` requires the distribution directory to contain exactly one wheel and one `.tar.gz` source distribution. It checks names and versions, `Requires-Python`, the `gskill` console entry, the wheel's `py3-none-any` pure-Python declaration, non-traversing archive paths, explicit wheel-symlink rejection, source-distribution regular-file/directory membership, required package content, and the manifest-owned closed MoirAI asset subtree. The wheel rejects old `graph_agent/` and `graph_skill_runtime/examples/`; the source distribution rejects those namespaces under `src/`. A source distribution may still carry repository-level examples and tests as source corpus, but those files are not installed or registered as a business gSkill. This is a release content contract, not a fixed whitelist of every ordinary runtime source member.
+1. identify the explicit marked root and compatible major;
+2. compile and preserve the full aggregated diagnostic set;
+3. repair fatal diagnostics and recompile;
+4. resolve configuration or inspect topology when needed;
+5. predict, run, or evaluate an existing golden as requested;
+6. perform native child handoff at each `agent_required` boundary;
+7. verify outputs, traces, artifacts, and requested acceptance evidence.
 
-`accept` requires the wheel and source distribution to match the manifest's sizes and SHA-256 values and requires the manifest's source commit to match `--expected-source-commit`. It copies those verified bytes, creates isolated environments, installs pip-wheel, uv-wheel, and pip-sdist channels, and writes `gskill.package-acceptance.v1`. That evidence includes the SHA-256 of the manifest it consumed; independently produced platform evidence with the same manifest digest proves that the platforms accepted the same manifest. There is no separate expected-manifest-hash argument.
+The exhaustive Agent-facing command and option contract is [packaged rule 02](src/graph_skill_runtime/agent_kit/assets/rules/02-entrypoints.md).
 
-Use the exact 40-hex commit represented by the clean candidate in place of `SOURCE_COMMIT`:
+## Common module CLI forms
 
 ```text
-uv build --no-sources
-uv run --no-project --python 3.11 python scripts/accept_release_artifacts.py validate --dist-dir dist --manifest build/release-artifacts.json --source-commit SOURCE_COMMIT
-uv run --no-project --python 3.11 python scripts/accept_release_artifacts.py accept --dist-dir dist --manifest build/release-artifacts.json --expected-source-commit SOURCE_COMMIT --logic-skill examples/hello-world --agent-skill tests/fixtures/demo-echo-agent --evidence build/package-acceptance.json
+python -m graph_skill_runtime compile SKILL_ROOT [--no-cache]
+python -m graph_skill_runtime config resolve SKILL_ROOT [INVOCATION_OPTIONS]
+python -m graph_skill_runtime predict SKILL_ROOT [INVOCATION_OPTIONS]
+python -m graph_skill_runtime run SKILL_ROOT [INVOCATION_OPTIONS]
+python -m graph_skill_runtime resume SKILL_ROOT RUN_ID --state-root STATE_ROOT [--checkpoint-ref REF] [--human-response-json JSON_OBJECT]
+python -m graph_skill_runtime submit RUN_ID --state-root STATE_ROOT --checkpoint-ref REF --result-json AGENT_RESULT_JSON
+python -m graph_skill_runtime inspect SKILL_ROOT [--call-graph]
+python -m graph_skill_runtime golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT
+python -m graph_skill_runtime migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]
+python -m graph_skill_runtime integrations detect
+python -m graph_skill_runtime integrations install moirai --targets HOSTS_OR_detected --scope user|project [--project-root PATH] [--dry-run]
+python -m graph_skill_runtime integrations uninstall moirai --targets HOSTS_OR_detected --scope user|project [--project-root PATH] [--dry-run]
+python -m graph_skill_runtime guide agent-configuration
+python -m graph_skill_runtime create NAME --path EXISTING_PARENT --description TEXT
+python -m graph_skill_runtime mcp
 ```
 
-The installed smoke imports `graph_skill_runtime` from the isolated environment's site-packages and verifies that base installation did not pull provider extras or install `graph_skill_runtime/examples/` or any `graph.yaml`. It checks version and console identity, the six-target read-only host-detection inventory, exact enumeration and annotations of the eight MCP tools over a real stdio session plus a successful MCP `compile` call, CLI compile/inspect/predict/run, spaces and non-ASCII paths and values, and MoirAI project projection for Claude and Codex through planned → installed → unchanged → uninstalled. On Windows it deliberately sets `PYTHONUTF8=0` and `PYTHONIOENCODING=cp936`, then requires installed `gskill` output bytes to decode as strict UTF-8 with non-ASCII content preserved. Its host-native fixture verifies run → reopened wait → submit → exact duplicate submit → reopened terminal state; both SQLite databases pass integrity and rename/reopen checks, the immutable request and trace exist, Windows releases file handles, and no unexpected host configuration appears outside the owned compile cache.
+All one-shot commands emit structured JSON. Exit code `0` means success or a durable wait such as `agent_required`; exit code `2` means a failed, conflicting, invalid, or `passed=false` structured result. Argument-parser usage errors are nonzero. Consume structured fields instead of parsing message prose.
 
-The Phase 6 implementation checkout passed local Ruff, strict mypy over 149 source files, the contract manifest validator, `1716 passed, 1 skipped`, seven distribution-contract tests, dependency audit with no known resolved-distribution vulnerabilities, and all three Windows package channels on Python `3.11.15` / Windows 10 AMD64. The local-project audit skip is not a source-code security audit. The first remote causal run is recorded in the [cross-platform policy](docs/CROSS_PLATFORM.md): one Actions-built candidate passed the three install channels on Ubuntu, Windows, and macOS with Python `3.11.16`, with identical artifact-manifest identity and the expected compile, run, durable handoff, integration lifecycle, and zero-unexpected-host-state observations on every platform.
+Compile before predict, run, or golden evaluation. Prediction writes request and trace state but provides deterministic or heuristic shape evidence, not proof of live Agent capability or output quality. Golden evaluation accepts only an existing baseline.
 
-The later 2026-08-28 Windows CLI/MCP interoperability change has separate local causal evidence: before the change, all eight MCP tools returned `annotations=None`, `inspect` created the compile-cache directory, and console output initialized as CP936 could not be decoded as strict UTF-8. After the change, the three targeted regressions and 26 related tests passed; the full checkout then passed Ruff, strict mypy over 149 source files, the contract-manifest validator, `1718 passed, 1 skipped`, and `uv build`. `pip-audit` found no known vulnerabilities among resolved distributions but again skipped the unpublished local distribution. These results validate the source checkout and build; the installed Codex observation above additionally verifies one default-approval `inspect` call from that new wheel. Neither result is a new three-platform accepted candidate, and Claude's default tool call remains unverified.
+## Configuration and state
 
-This evidence makes the candidate eligible for a later release action; it does not publish it. The release workflow has not been triggered, no GitHub Release exists for this candidate, no registry upload has occurred, and no PyPI/TestPyPI project or trusted-publisher relationship has been exercised. The cross-platform smoke uses the deterministic host-native submission protocol, not real vendor CLIs. Direct vendor operational evidence therefore remains limited to the Windows/Codex combination documented below.
+Configuration precedence is invocation, project `<skill_root>/gskill.toml`, operating-system user configuration, portable defaults, then built-in defaults. The default executor is `host-native`. An explicit `cli` executor requires `--vendor`; CLI-only vendor options are invalid with other executors. Business `--inputs-json` values must be non-secret.
 
-## Source-checkout requirements and development environment
+The default state root is `<skill_root>/.gskill` unless overridden. Predict and run persist the immutable request and `<state_root>/runs/<run_id>/trace.jsonl`; `RunResult` returns `trace_path`. Checkpoints, Agent handoffs, traces, artifacts, and golden baselines remain separate state owners.
 
-- Python 3.11 or newer
-- [`uv`](https://docs.astral.sh/uv/)
+## Host-native handoff
 
-Create the development environment from the repository root:
+Authorizing execution of a successfully compiled gSkill with supported Agent phases also authorizes the required handoff for that run. At each serial `agent_required` boundary, the current host creates exactly one fresh native clean-context child for the returned `AgentTask`; it does not ask again for subagent permission at every wait. Because the parent graph is durably paused, this is a required business-execution step, not optional parallel delegation for development work. A general restriction on optional or parallel development subagents does not block the handoff.
 
-```bash
+The handoff authorization is limited to the returned task, canonical prompt, declared paths/tools/network/capabilities/deadline, one schema-valid output, and `submit_agent_result`. It does not authorize extra or parallel children, optional MoirAI delegation, child-created subagents, or broader access. The run blocks only if the user explicitly prohibited a native child for this run or the host cannot create or constrain one; an unavoidable host policy cannot be overridden. The parent validates the output, wraps an `AgentResult`, and submits it through MCP `submit_agent_result` or the module CLI `submit` command. `resume` observes or reopens the wait; it does not submit Agent output, and the current host retains final ownership.
+
+The exact child prompt is owned only by [packaged rule 05](src/graph_skill_runtime/agent_kit/assets/rules/05-agent-handoff.md).
+
+At returned boundaries, an Agent may summarize observed compile results, phase/wait state, native-child handoff, failures, outputs, and completion. Current module CLI and MCP calls block between returned boundaries. There is no public live event subscription or `trace` command, so continuous token-by-token or event-by-event streaming is not implemented.
+
+## Configure the provider-neutral Agent kit
+
+The unified kit has no setup or install command. Read its packaged sources and placement choices without writing:
+
+```text
+python -m graph_skill_runtime guide agent-configuration
+```
+
+The JSON result includes the canonical AGENTS section, standalone rules, and the two complete Skill/reference trees. The owner chooses:
+
+- host or hosts;
+- user/global scope or one project;
+- manual editing or explicit authorization for the current Agent to edit;
+- the rules-tree destination and exact instruction and Skill destinations.
+
+Before a write, inspect selected existing files, propose an additive merge/copy plan naming every destination, and obtain approval. Copy the standalone rules tree to the owner-chosen location, copy the two Skill trees to the selected scope, and point the merged instruction section to that rules index. Never replace an existing `AGENTS.md` or `CLAUDE.md`.
+
+Codex user instructions use `$CODEX_HOME/AGENTS.md` (normally `~/.codex/AGENTS.md`), project instructions use `<repo>/AGENTS.md`, user Skills use `~/.agents/skills`, and project Skills use `<repo>/.agents/skills`. Codex merges instruction files from repository root to current working directory.
+
+Claude Code reads `CLAUDE.md`, not `AGENTS.md`: user instructions use `~/.claude/CLAUDE.md`, project instructions use `./CLAUDE.md` or `./.claude/CLAUDE.md`, user Skills use `~/.claude/skills`, and project Skills use `.claude/skills`. A user may deliberately import `@AGENTS.md` from a `CLAUDE.md`. For another host, use its documented paths.
+
+Implicit routing uses the Skill descriptions. A vague request to create a gSkill selects `create-gskill` and asks only for missing high-impact domain and authorization facts before mutation. Ordinary non-graph Agent Skill creation selects neither. Existing marked-root operation selects `gskill`.
+
+## Optional MoirAI projection
+
+MoirAI is separate from the unified kit. `integrations detect` is read-only. Install and uninstall support `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`; `detected` cannot be mixed with explicit hosts. `--dry-run` returns the exact plan, while apply mutates only after explicit authorization. These commands project optional host assistance and do not install a business graph or unified-kit configuration.
+
+## Development checkout
+
+Repository development uses `uv`; these are contributor commands, not installed-user CLI syntax:
+
+```text
 uv sync --extra dev
-```
-
-Install only base runtime dependencies for this checkout:
-
-```bash
-uv sync
-```
-
-Provider clients are isolated in the optional `embedded` extra:
-
-```bash
-uv sync --extra embedded
-```
-
-The `embedded` extra is required only for embedded provider-backed agent execution. It is not part of the base dependency set. An embedded `LOGIC`-only skill can run without a provider call.
-
-Commands in this development section and the later runtime examples use `uv run gskill` because they execute the source checkout's managed environment. After installing the distribution into a user environment, invoke the installed `gskill` command directly, as in the MoirAI section above.
-
-## Python SDK
-
-Construct the typed request that matches the use case. This example compiles and then runs a current-format `LOGIC` skill through the explicit embedded executor:
-
-```python
-from pathlib import Path
-
-from graph_skill_runtime import (
-    CompileRequest,
-    EmbeddedExecutorConfig,
-    RunInvocation,
-    RuntimeProfileOverlay,
-    compile,
-    run,
-)
-
-skill_root = Path("/absolute/path/to/my-skill").resolve()
-
-compile_result = compile(CompileRequest(skill_root=str(skill_root)))
-if not compile_result.passed:
-    raise RuntimeError(compile_result.diagnostics)
-
-run_result = run(
-    RunInvocation(
-        skill_root=str(skill_root),
-        runtime=RuntimeProfileOverlay(executor=EmbeddedExecutorConfig()),
-        inputs={"topic": "typed runtime"},
-    )
-)
-```
-
-Each SDK function accepts an optional `application=` argument for explicit adapter injection. Without it, the function calls `create_application()` and receives a new application service composed from the current engine and local snapshot store.
-
-## Host-native two-step handoff
-
-Host-native execution is a cooperative two-step protocol. First, start the run with a stable run id and state root:
-
-```bash
-uv run gskill run /absolute/path/to/my-skill --run-id host-demo --state-dir /absolute/path/to/state --inputs-json '{"question":"Why?"}'
-```
-
-For a supported Agent wait, the JSON result has `status: "agent_required"`; this is a successful CLI outcome with exit code `0`. Read `agent_required.task`, then use the current host's native subagent mechanism to create a new clean context and execute that task. The native subagent returns only an object that satisfies `task.output_schema`. Wrap that object in an `AgentResult` and submit it:
-
-```bash
-uv run gskill submit host-demo --state-root /absolute/path/to/state --checkpoint-ref 'gskill-handoff-v1:<task-id>' --result-json '{"schema_version":"gskill.agent-result.v1","kind":"agent_result","task_id":"<task-id>","status":"completed","output":{"answer":"..."},"executor_id":"host-native-subagent","provenance":{"session":"fresh"}}'
-```
-
-Replace `<task-id>` and the example `output` with the values required by the returned task. Durable `output` and `provenance` reject literal values under secret-shaped keys. `gskill submit` validates the task identity and output schema, writes a completed phase into the existing graph state, and returns either the next `agent_required` wait or the terminal result for the same `run_id`. A terminal `failed` or `cancelled` result does not execute the Agent phase: it idempotently fails the run and emits `agent_failed`. The equivalent submission entry points are Python `submit_agent_result(...)` and the MCP `submit_agent_result` tool. Direct vendor CLI execution instead starts one fresh vendor-native top-level process session for each task; it is not this native-child protocol.
-
-## Direct vendor CLI execution
-
-Select the CLI path explicitly and provide the business gSkill as usual:
-
-```bash
-uv run gskill run /absolute/path/to/my-skill --executor cli --vendor codex --run-id cli-demo --state-dir /absolute/path/to/state --inputs-json '{"question":"Why?"}'
-```
-
-The six implemented adapter values are `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`. Optional CLI projections are `--agent-profile`, `--model`, `--executable`, and `--timeout-seconds`. `--executable` accepts a PATH basename or an absolute path; a relative path containing a separator fails before execution. The timeout defaults to 600 seconds and must be greater than zero and no more than 86,400 seconds.
-
-`--agent-profile` is deliberately narrower than a generic “subagent” switch. Copilot and OpenCode pass it through their documented `--agent` selectors. Gemini prefixes `@<name>` to the task context so its main CLI agent can broker a request to that named subagent. Claude cannot select a custom agent under the required safe mode, Codex `--profile` selects configuration rather than a child agent, and Cursor has no documented direct selector, so those three reject `agent_profile` during configuration validation. If `--model` is omitted, the vendor chooses its own default. GitHub Copilot CLI is an agent product rather than a foundation model named “Copilot”; its current default and selectable models are vendor-managed, so the runtime does not hard-code them ([official CLI reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)).
-
-All six protocol adapters and their fake-process contract tests are implemented. An adapter implementation is not a blanket operating-system or version support claim. The current real-machine evidence is Windows `10.0.26200` x64 with Python `3.11.15`:
-
-| Vendor adapter | Authentication probe | Agent profile | Session persistence provenance | Real operational evidence |
-| --- | --- | --- | --- | --- |
-| Claude | CLI-exposed and required | Rejected | `disabled` | Claude Code `2.1.222` passed executable/version/help probing but failed its auth probe; no successful run claim |
-| Codex | CLI-exposed and required | Rejected | `disabled` | Codex CLI `0.144.1` completed a real gSkill run on this Windows host |
-| Copilot | `not-exposed`; login failures surface from execution | Direct `--agent` | `vendor-default` | CLI not installed on the evidence host |
-| Cursor | CLI-exposed and required | Rejected | `vendor-default` | CLI not installed on the evidence host |
-| Gemini | `not-exposed`; login failures surface from execution | Brokered `@name` request | `vendor-default` | CLI not installed on the evidence host |
-| OpenCode | `not-exposed`; login failures surface from execution | Direct `--agent` | `vendor-default` | CLI not installed on the evidence host |
-
-Source-checkout CI on commit [`8928d13`](https://github.com/SevenX77/graph-skill-runtime/commit/8928d13b32c800a2ad303d02e1bd96551f969ab5) passed quality gates, Python 3.11/3.12/3.13 runtime tests, and both Windows and macOS cross-platform smoke jobs in [workflow run 33140732333](https://github.com/SevenX77/graph-skill-runtime/actions/runs/33140732333); the CodeQL check, including Analyze Python, also passed. Phase 6 later added same-candidate installed-package acceptance to the required CI path, but that smoke uses deterministic host-native result submission rather than a real vendor executable. Neither run expands the operational support row beyond Windows/Codex `0.144.1`.
-
-Each Agent task gets a new process and temporary working directory. The runtime passes no resume, continue, or prior session id. Claude and Codex explicitly disable session persistence; the other four may still save session records according to vendor defaults. “Fresh top-level session” therefore means no runtime-requested continuation of a prior task, not a blank vendor user configuration and not a native child of the current host conversation.
-
-The complete business prompt never enters process argv: Claude, Codex, Cursor, and Gemini receive it on UTF-8 stdin; Copilot and OpenCode receive it through a temporary UTF-8 `agent-task.md`. Declared resources are read only when their resolved files fall under `AgentTask.allowed_paths`, then materialized as handle, summary, and content without their original paths. Aggregate resource input is limited to 1 MiB, the final prompt to 2 MiB, the output schema to 1 MiB, combined stdout and stderr to 4 MiB, and the Codex final-response file to 4 MiB. Every successful output is validated with Draft 2020-12 JSON Schema even when a vendor also applies a native schema. Invalid output and nonzero-exit diagnostics retain only an output SHA-256, never the raw rejected payload.
-
-This is not one uniform cross-vendor operating-system sandbox. The runtime uses a fresh temporary working directory, a minimal allowlisted environment, vendor-exposed customization controls, and a prompt that forbids extra filesystem, shell, network, MCP, skill, and subagent tools. Vendor-managed credentials and configuration can still apply, and each CLI has different tool and sandbox strength. On this path, `allowed_paths` authorizes runtime resource materialization; it does not promise that an arbitrary vendor process can read only those paths. See the [cross-platform policy](docs/CROSS_PLATFORM.md) for process-tree ownership and the exact verification boundary.
-
-## Configuration
-
-Runtime configuration resolves from highest to lowest precedence:
-
-1. the current `RunInvocation` or equivalent CLI flags;
-2. project configuration at `<skill_root>/gskill.toml`;
-3. the operating-system user configuration;
-4. portable runtime or business defaults supplied by an integration;
-5. built-in defaults.
-
-Project configuration may define both a machine/runtime overlay and named, non-secret business presets:
-
-```toml
-schema_version = "gskill.config.v1"
-
-[runtime.executor]
-kind = "embedded"
-
-[presets.local.inputs]
-topic = "project default"
-```
-
-User configuration may contain only the machine-level runtime overlay. `RuntimeProfile` owns executor, checkpoint store, state directory, permissions, required capabilities, and fallback executor declarations. `RunPreset` owns reusable non-secret business defaults. `RunInvocation` owns one call's overrides. Resolution produces a `RunRequest` containing absolute skill and state roots plus field-level provenance.
-
-Literal values under secret-shaped keys such as `api_key`, `access_token`, or `password` are rejected from persistent input contracts. Use `SecretReference` and `SecretBinding` instead. The runtime cannot infer whether an arbitrary business string is confidential, so callers remain responsible for classifying values that do not have a structurally secret-shaped key.
-
-## CLI and MCP
-
-The console command emits structured JSON:
-
-```bash
-uv run gskill compile /absolute/path/to/my-skill
-uv run gskill config resolve /absolute/path/to/my-skill --run-id example
-uv run gskill run /absolute/path/to/my-skill --executor embedded --inputs-json '{"topic":"typed runtime"}'
-uv run gskill inspect /absolute/path/to/my-skill
-uv run gskill golden /absolute/path/to/my-skill baseline-id --state-root /absolute/path/to/state
-```
-
-The distribution's `[project.scripts]` entry maps `gskill` to `graph_skill_runtime.adapters.cli:main`. A console-script launcher is the small platform executable or script that imports and calls that Python entry point; the runtime package itself remains in the installed environment's `site-packages`. On the current Windows evidence host, `uv tool` created `C:\Users\test\.local\bin\gskill.exe` as a 46,080-byte launcher. This interoperability change does not replace that standard packaging shape.
-
-Before argument parsing or MCP startup, `main` reconfigures standard output and standard error when those streams support reconfiguration, using UTF-8 with strict error handling. Structured CLI JSON and MCP stdio output therefore do not depend on the Windows active code page, `PYTHONUTF8`, or `PYTHONIOENCODING`. The [cross-platform policy](docs/CROSS_PLATFORM.md) owns the producer contract and CP936 acceptance method.
-
-Start the MCP server over standard input/output with:
-
-```bash
-uv run gskill mcp
-```
-
-The MCP server exposes exactly `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`. These tools call the same application methods as the Python facade and CLI; they do not implement separate runtime rules.
-
-MCP ToolAnnotations are metadata that tell a host whether a tool reads or changes state, whether repeating it is expected to have the same effect, and whether it may interact beyond the runtime's closed local boundary. They describe the tool contract; they are not a permission system. All eight tools declare an annotations object; `not declared` below means that the server makes no separate assertion for that hint:
-
-| Tools | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` |
-| --- | --- | --- | --- | --- |
-| `resolve_run`, `inspect` | `true` | not declared | not declared | `false` |
-| `compile` | `false` | `false` | `true` | `false` |
-| `predict` | `false` | `false` | `false` | `false` |
-| `run`, `resume`, `evaluate_golden` | `false` | `true` | `false` | `true` |
-| `submit_agent_result` | `false` | `false` | `true` | `false` |
-
-`inspect` invokes engine compilation with `cache=false`, so its read-only annotation includes the absence of a global compile-cache write. `compile` may write that non-destructive cache and is therefore not read-only. `predict` writes local run state. `run`, `resume`, and `evaluate_golden` conservatively declare that they may execute or continue real work. `submit_agent_result` persists state, but exact repeat submission is supported, so it is non-destructive and idempotent.
-
-The CLI `submit` command and the same-named SDK/MCP use case implement durable host-native result submission. `resume --checkpoint-ref ...` reads the current handoff wait or terminal response without applying a result. `resume` without a host-native handoff reference, including an ordinary human response, remains a structured `GSKILL_NOT_IMPLEMENTED` result.
-
-Convert a legacy Studio v0.3 skill only through the explicit migration boundary:
-
-```bash
-uv run gskill migrate studio-skill /absolute/path/to/legacy-skill /absolute/path/to/new-portable-skill
-```
-
-This command is not a second production reader. Compile and execution accept only the portable destination.
-
-## Development and verification
-
-Run the required local gates from the repository root:
-
-```bash
 uv run ruff check src tests scripts tools
 uv run mypy --strict src
 uv run pytest --tb=short -q
 uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml
 uv build --no-sources
-uv run pip-audit
 ```
-
-`uv build --no-sources` must produce both a wheel and a source distribution without relying on local `tool.uv.sources` overrides. Run the Phase 6 `validate` and `accept` commands above when establishing package acceptance for a candidate. A local package skip reported by `pip-audit` is not evidence that this repository's own source has been security-audited; the command audits resolved third-party distributions.
 
 ## Documentation map
 
 - [Public typed API contract](docs/public-api-contract.md)
-- [Current portable gSkill v1 format contract](docs/skill-spec/01-PORTABLE-GSKILL-V1.md)
-- [Superseded v0.3 converter and historical evidence](docs/skill-spec/00-FORMAT-GROUND-TRUTH.md)
-- [MVP1 design index and Phase 2 ownership map](docs/mvp1/INDEX.md)
-- [Design authority and implementation-status map](docs/design/README.md)
-- [Drafted standalone v1 target](docs/design/v1-alignment.md)
-- [Historical pre-extraction baseline](docs/design/baseline.md)
-- [Feature compliance view generated from the feature manifest](docs/feature-compliance-checklist.md)
+- [Portable gSkill v1 format](docs/skill-spec/01-PORTABLE-GSKILL-V1.md)
+- [Unified Agent-kit design](docs/design/unified-agent-kit.md)
+- [Design authority and status map](docs/design/README.md)
+- [Drafted v1 alignment and revision record](docs/design/v1-alignment.md)
 - [Cross-platform policy](docs/CROSS_PLATFORM.md)
-- [Contributor and agent rules](AGENTS.md)
 
 ## License
 

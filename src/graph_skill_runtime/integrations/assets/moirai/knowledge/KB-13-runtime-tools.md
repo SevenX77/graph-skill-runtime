@@ -15,18 +15,18 @@ The server exposes exactly eight tools:
 | `inspect` | Inspect compiled graph inventory and optional call edges. |
 | `evaluate_golden` | Evaluate an existing golden baseline. |
 
-When MCP is unavailable, use the installed `gskill` command, never an internal Python module, `python -m`, `uv run`, or a source checkout:
+When MCP is unavailable, use the installed interpreter's public module CLI, never a bare launcher, `uv run`, or a source checkout:
 
 ```text
-gskill compile SKILL_ROOT
-gskill predict SKILL_ROOT
-gskill predict SKILL_ROOT --inputs-json JSON
-gskill run SKILL_ROOT
-gskill run SKILL_ROOT --inputs-json JSON
-gskill inspect SKILL_ROOT --call-graph
-gskill golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT
-gskill resume SKILL_ROOT RUN_ID --state-root STATE_ROOT --checkpoint-ref REF
-gskill submit RUN_ID --state-root STATE_ROOT --checkpoint-ref REF --result-json JSON
+python -m graph_skill_runtime compile SKILL_ROOT
+python -m graph_skill_runtime predict SKILL_ROOT
+python -m graph_skill_runtime predict SKILL_ROOT --inputs-json JSON
+python -m graph_skill_runtime run SKILL_ROOT
+python -m graph_skill_runtime run SKILL_ROOT --inputs-json JSON
+python -m graph_skill_runtime inspect SKILL_ROOT --call-graph
+python -m graph_skill_runtime golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT
+python -m graph_skill_runtime resume SKILL_ROOT RUN_ID --state-root STATE_ROOT --checkpoint-ref REF
+python -m graph_skill_runtime submit RUN_ID --state-root STATE_ROOT --checkpoint-ref REF --result-json JSON
 ```
 
 Compile before execution. Preserve structured results and error codes instead of parsing human wording. `resume` does not submit Agent output; `submit` does. There are no public MCP tools named `trace`, `artifacts`, `create_golden`, or `promote_golden`. Integration installation is an explicit CLI/SDK operation, not an MCP runtime tool.

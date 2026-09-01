@@ -45,6 +45,8 @@ def _agent_skill(parent: Path, *, reference_path: str = "references/guide.md") -
         """---
 name: reference-reader
 description: Exercise reference reader assembly behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

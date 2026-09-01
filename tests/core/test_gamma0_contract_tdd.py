@@ -27,7 +27,7 @@ def _write_portable_graph(
     if business_skill:
         _write(
             root / "SKILL.md",
-            f"---\nname: {root.name}\ndescription: Gamma contract fixture.\n---\n",
+            f"---\nname: {root.name}\ndescription: Gamma contract fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
         )
     _write(
         root / "graph.yaml",

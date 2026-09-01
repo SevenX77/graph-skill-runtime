@@ -110,6 +110,8 @@ def _write_portable_observable_skill(root: Path) -> None:
         """---
 name: observable-skill
 description: Exercise portable runtime observability events.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

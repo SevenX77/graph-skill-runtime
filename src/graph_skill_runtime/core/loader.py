@@ -51,6 +51,7 @@ from graph_skill_runtime.core.skill_resolver_protocol import (
     resolve_skill_root,
 )
 from graph_skill_runtime.core.subagents import build_subagent_input_model, build_subagent_tool_args_model
+from graph_skill_runtime.gskill_version import GSKILL_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -884,7 +885,8 @@ def _guard_portable_skill_root(skill_root: Path) -> None:
                 legacy_graph,
                 1,
                 "[F-v3-graph-root-missing]",
-                "legacy GRAPH.md is not accepted; run gskill migrate studio-skill",
+                "legacy GRAPH.md is not accepted; run python -m "
+                "graph_skill_runtime migrate studio-skill",
             )
         )
     nested_entries = (
@@ -1892,7 +1894,7 @@ def _build_graph_manifest(
             outputs={"type": "object", "properties": {"dummy": {"type": "string"}}},
         )
         manifest = GraphManifest.model_construct(
-            schema_version="gskill.graph.v1",
+            schema_version=GSKILL_SCHEMA_VERSION,
             graph_id="invalid-graph",
             description="",
             llm_role=None,

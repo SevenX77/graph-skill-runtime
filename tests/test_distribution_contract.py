@@ -15,6 +15,8 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MOIRAI_PREFIX = "graph_skill_runtime/integrations/assets/moirai/"
 MOIRAI_MANIFEST = MOIRAI_PREFIX + "integration.json"
+AGENT_KIT_PREFIX = "graph_skill_runtime/agent_kit/assets/"
+AGENT_KIT_MANIFEST = AGENT_KIT_PREFIX + "manifest.json"
 WHEEL_BASE_MEMBERS = {
     "graph_skill_runtime/__init__.py",
     "graph_skill_runtime/migration/atomic_publish.py",
@@ -22,8 +24,8 @@ WHEEL_BASE_MEMBERS = {
     "graph_skill_runtime/py.typed",
     "graph_skill_runtime/skills/builtin/md-patch/SKILL.md",
 }
-DIST_INFO = "graph_skill_runtime-0.1.0a1.dist-info"
-PACKAGE_VERSION = "0.1.0a1"
+DIST_INFO = "graph_skill_runtime-1.0.0a1.dist-info"
+PACKAGE_VERSION = "1.0.0a1"
 
 
 def _manifest() -> dict[str, object]:
@@ -55,6 +57,32 @@ def _required_moirai_assets(manifest: dict[str, object], *, prefix: str) -> set[
     }
 
 
+def _agent_kit_manifest() -> dict[str, object]:
+    return json.loads(
+        (
+            REPO_ROOT
+            / "src"
+            / "graph_skill_runtime"
+            / "agent_kit"
+            / "assets"
+            / "manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+
+
+def _required_agent_kit_assets(manifest: dict[str, object], *, prefix: str) -> set[str]:
+    rules = manifest["rules"]
+    skills = manifest["skills"]
+    assert isinstance(rules, list)
+    assert isinstance(skills, list)
+    return {
+        prefix + "manifest.json",
+        prefix + "AGENTS.md",
+        *(prefix + f"rules/{name}" for name in rules),
+        *(prefix + f"skills/{skill['id']}/SKILL.md" for skill in skills),
+    }
+
+
 def _metadata() -> str:
     return (
         "Metadata-Version: 2.4\n"
@@ -69,22 +97,32 @@ def _write_fake_wheel(
     *,
     manifest: dict[str, object],
     extra_members: tuple[str, ...] = (),
+    console_entry: bool = False,
 ) -> None:
     required_assets = _required_moirai_assets(manifest, prefix=MOIRAI_PREFIX)
+    agent_kit_manifest = _agent_kit_manifest()
+    agent_kit_assets = _required_agent_kit_assets(
+        agent_kit_manifest,
+        prefix=AGENT_KIT_PREFIX,
+    )
     members = {
         *WHEEL_BASE_MEMBERS,
         *required_assets,
+        *agent_kit_assets,
         f"{DIST_INFO}/METADATA",
         f"{DIST_INFO}/WHEEL",
-        f"{DIST_INFO}/entry_points.txt",
         f"{DIST_INFO}/licenses/LICENSE",
         f"{DIST_INFO}/RECORD",
         *extra_members,
     }
+    if console_entry:
+        members.add(f"{DIST_INFO}/entry_points.txt")
     with zipfile.ZipFile(path, "w") as archive:
         for name in members:
             if name == MOIRAI_MANIFEST:
                 content = json.dumps(manifest)
+            elif name == AGENT_KIT_MANIFEST:
+                content = json.dumps(agent_kit_manifest)
             elif name.endswith("/METADATA"):
                 content = _metadata()
             elif name.endswith("/WHEEL"):
@@ -113,6 +151,7 @@ def _write_fake_sdist(
     *,
     manifest: dict[str, object],
     extra_members: tuple[str, ...] = (),
+    console_entry: bool = False,
 ) -> None:
     root = f"graph_skill_runtime-{PACKAGE_VERSION}"
     source_prefix = f"{root}/src/"
@@ -120,6 +159,12 @@ def _write_fake_sdist(
     required_assets = _required_moirai_assets(
         manifest,
         prefix=source_prefix + MOIRAI_PREFIX,
+    )
+    agent_kit_manifest = _agent_kit_manifest()
+    agent_kit_manifest_name = source_prefix + AGENT_KIT_MANIFEST
+    agent_kit_assets = _required_agent_kit_assets(
+        agent_kit_manifest,
+        prefix=source_prefix + AGENT_KIT_PREFIX,
     )
     members = {
         f"{root}/LICENSE",
@@ -129,21 +174,29 @@ def _write_fake_sdist(
         f"{root}/src/graph_skill_runtime/__init__.py",
         f"{root}/src/graph_skill_runtime/py.typed",
         *required_assets,
+        *agent_kit_assets,
         *extra_members,
     }
     with tarfile.open(path, "w:gz") as archive:
         for name in members:
             if name == manifest_name:
                 content = json.dumps(manifest).encode()
+            elif name == agent_kit_manifest_name:
+                content = json.dumps(agent_kit_manifest).encode()
             elif name.endswith("/PKG-INFO"):
                 content = _metadata().encode()
             elif name.endswith("/pyproject.toml"):
-                content = (
+                project = (
                     '[project]\nname = "graph-skill-runtime"\n'
                     f'version = "{PACKAGE_VERSION}"\n'
                     'requires-python = ">=3.11"\n'
-                    '[project.scripts]\ngskill = "graph_skill_runtime.adapters.cli:main"\n'
-                ).encode()
+                )
+                if console_entry:
+                    project += (
+                        '[project.scripts]\n'
+                        'gskill = "graph_skill_runtime.adapters.cli:main"\n'
+                    )
+                content = project.encode()
             else:
                 content = b"asset\n"
             _add_tar_file(archive, name, content)
@@ -182,11 +235,12 @@ def test_provider_clients_are_explicit_embedded_dependencies_not_base_runtime() 
     assert embedded_names == {"langchain-openai", "openai", "python-dotenv"}
 
 
-def test_distribution_import_and_console_names_are_one_hard_cut() -> None:
+def test_distribution_import_and_module_cli_names_are_one_hard_cut() -> None:
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
     assert project["name"] == "graph-skill-runtime"
-    assert project["scripts"] == {"gskill": "graph_skill_runtime.adapters.cli:main"}
+    assert "scripts" not in project
+    assert (REPO_ROOT / "src" / "graph_skill_runtime" / "__main__.py").is_file()
     assert not (REPO_ROOT / "src" / "graph_agent").exists()
 
 
@@ -241,7 +295,7 @@ def test_import_and_version_probe_do_not_write_host_configuration(tmp_path: Path
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip().startswith("gskill ")
+    assert result.stdout.strip().startswith("python -m graph_skill_runtime ")
     assert not any(home.rglob("*"))
     assert not any(config.rglob("*"))
 
@@ -335,8 +389,16 @@ def test_distribution_validator_requires_closed_wheel_and_sdist_inventories(
     sdist = dist / f"graph_skill_runtime-{PACKAGE_VERSION}.tar.gz"
     artifact_manifest = tmp_path / "build" / "release-artifacts.json"
     manifest = _manifest()
+    root = f"graph_skill_runtime-{PACKAGE_VERSION}"
     _write_fake_wheel(wheel, manifest=manifest)
-    _write_fake_sdist(sdist, manifest=manifest)
+    _write_fake_sdist(
+        sdist,
+        manifest=manifest,
+        extra_members=(
+            f"{root}/examples/source-corpus/graph.yaml",
+            f"{root}/tests/fixtures/source-corpus/graph.yaml",
+        ),
+    )
 
     valid = _run_distribution_validator(dist, artifact_manifest)
     assert valid.returncode == 0, valid.stdout + valid.stderr
@@ -411,7 +473,6 @@ def test_distribution_validator_requires_closed_wheel_and_sdist_inventories(
     assert "graph.yaml" in invalid_wheel.stderr
 
     _write_fake_wheel(wheel, manifest=manifest)
-    root = f"graph_skill_runtime-{PACKAGE_VERSION}"
     _write_fake_sdist(
         sdist,
         manifest=manifest,
@@ -422,3 +483,15 @@ def test_distribution_validator_requires_closed_wheel_and_sdist_inventories(
     invalid_sdist = _run_distribution_validator(dist, artifact_manifest)
     assert invalid_sdist.returncode == 1
     assert "graph.yaml" in invalid_sdist.stderr
+
+    _write_fake_wheel(wheel, manifest=manifest, console_entry=True)
+    _write_fake_sdist(sdist, manifest=manifest)
+    invalid_console_wheel = _run_distribution_validator(dist, artifact_manifest)
+    assert invalid_console_wheel.returncode == 1
+    assert "entry_points.txt" in invalid_console_wheel.stderr
+
+    _write_fake_wheel(wheel, manifest=manifest)
+    _write_fake_sdist(sdist, manifest=manifest, console_entry=True)
+    invalid_console_sdist = _run_distribution_validator(dist, artifact_manifest)
+    assert invalid_console_sdist.returncode == 1
+    assert "console entry points" in invalid_console_sdist.stderr

@@ -51,6 +51,8 @@ def _batch_skill(parent: Path, *, over: str) -> Path:
         """---
 name: iterate-over-bare-field
 description: Exercise batch iteration over a root business input.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

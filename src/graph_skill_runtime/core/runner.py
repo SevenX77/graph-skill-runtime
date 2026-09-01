@@ -1,8 +1,9 @@
 """Portable graph execution primitives behind the embedded runtime adapter.
 
 These functions consume an explicit business-skill root containing ``SKILL.md``
-and ``graph.yaml``. Public callers use the typed SDK, the installed ``gskill``
-console command, or the MCP adapter rather than invoking this module directly.
+and ``graph.yaml``. Public callers use the typed SDK, the
+``python -m graph_skill_runtime`` CLI, or the MCP adapter rather than invoking
+this internal module directly.
 """
 
 from __future__ import annotations

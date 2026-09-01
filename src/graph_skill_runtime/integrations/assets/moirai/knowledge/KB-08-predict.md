@@ -5,8 +5,8 @@ Prediction resolves the request and uses deterministic or heuristic stubs to exp
 Use the `predict` tool belonging to the `gskill` MCP server, or:
 
 ```text
-gskill predict SKILL_ROOT
-gskill predict SKILL_ROOT --inputs-json JSON
+python -m graph_skill_runtime predict SKILL_ROOT
+python -m graph_skill_runtime predict SKILL_ROOT --inputs-json JSON
 ```
 
 Prediction can help verify configuration resolution, graph traversal expectations, and the shape of a `RunResult(mode="predict")`. It may create the immutable run request snapshot as part of application ordering, but it does not persist declared artifact outputs.

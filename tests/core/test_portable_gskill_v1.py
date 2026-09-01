@@ -20,7 +20,8 @@ def _write(path: Path, text: str) -> None:
 def _skill_entry(root: Path) -> None:
     _write(
         root / "SKILL.md",
-        f"---\nname: {root.name}\ndescription: Portable bundle contract fixture.\n---\n",
+        f"---\nname: {root.name}\ndescription: Portable bundle contract fixture.\n"
+        "metadata:\n  gskill: gskill.graph.v1\n---\n",
     )
 
 

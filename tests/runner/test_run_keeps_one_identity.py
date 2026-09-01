@@ -30,6 +30,8 @@ def _write_skill(root: Path, *, action_body: str) -> None:
         """---
 name: skill
 description: Exercise one durable identity per run.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

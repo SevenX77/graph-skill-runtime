@@ -36,7 +36,7 @@ def _root(tmp_path: Path) -> Path:
     root = tmp_path / "diagnostic-skill"
     _write(
         root / "SKILL.md",
-        "---\nname: diagnostic-skill\ndescription: Portable diagnostic fixture.\n---\n",
+        "---\nname: diagnostic-skill\ndescription: Portable diagnostic fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     return root
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, NamedTuple
 
+from graph_skill_runtime.gskill_version import GSKILL_SCHEMA_VERSION
+
 ERROR_CATALOG_VERSION = "gskill.error-catalog.v1"
 ERROR_METADATA_SCHEMA_VERSION = "gskill.error-metadata.v1"
 _PUBLIC_DOC_BASE_URL = "https://docs.graph-skill-runtime.dev/errors"
@@ -162,7 +164,7 @@ _CATALOG_METADATA_ROWS: tuple[tuple[str, str], ...] = (
     (_DOMAIN_GRAPH, '打断 graph 之间的调用循环'),
     (_DOMAIN_GRAPH, '删除字段或纳入 spec'),
     (_DOMAIN_GRAPH, '把 graph_id 改为小写 kebab-case'),
-    (_DOMAIN_GRAPH, '把 schema_version 改为 `gskill.graph.v1`'),
+    (_DOMAIN_GRAPH, f'把 schema_version 改为 `{GSKILL_SCHEMA_VERSION}`'),
     (_DOMAIN_GRAPH, '改用已注册 role，或在宿主的权威 role truth 中配置它'),
     (_DOMAIN_GRAPH, '在 graph directory 创建精确命名的 `graph.yaml`'),
     (_DOMAIN_GRAPH, '创建 phases 目录'),

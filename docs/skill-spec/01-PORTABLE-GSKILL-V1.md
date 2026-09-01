@@ -10,7 +10,7 @@ updated: 2026-08-27
 
 # Portable gSkill v1 格式规范
 
-本文定义 Graph Skill Runtime 当前实现的 portable 文件格式、bundle 编译边界和一次性迁移契约。Phase 2 已完成原子切换：production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取本文格式；legacy v0.3 parser 只在显式 `gskill migrate studio-skill` converter 边界可达。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 converter 输入契约与历史证据。
+本文定义 Graph Skill Runtime 当前实现的 portable 文件格式、bundle 编译边界和一次性迁移契约。Phase 2 已完成原子切换：production compile、predict、run、inspect、SDK、module CLI 与 MCP 只读取本文格式；legacy v0.3 parser 只在显式 `python -m graph_skill_runtime migrate studio-skill` converter 边界可达。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 converter 输入契约与历史证据。
 
 本文状态是 `audited-ready`：当前契约已经完成语义审校，但 owner 尚未建立新的 SHA-256 哈希锁，因此不得标为 `FROZEN`。
 
@@ -110,7 +110,7 @@ description: Compile and run the story-analysis graph skill. Use for structured 
 
 # Story analysis
 
-Use the installed `gskill` interface with this directory as the explicit skill root.
+Use the installed interpreter with `python -m graph_skill_runtime` and pass this directory as the explicit skill root, or supply the same root to the `gskill` MCP server.
 ```
 
 ### 3.2 Body 与生成协议
@@ -121,7 +121,7 @@ Body 是宿主激活该 skill 后加载的说明。作者可以写步骤、输�
 
 1. 每次调用都把当前目录作为显式 skill root；
 2. 优先使用 `gskill` MCP server 的同名结构化用例，例如 `compile`、`predict`、`run`、`resume` 或 `submit_agent_result`；
-3. MCP 不可用时，调用已安装的 `gskill` console command 及等价 subcommand；CLI fallback 不使用 `python -m graph_skill_runtime` 或其他依赖宿主当前解释器的模块入口；
+3. MCP 不可用时，使用选定安装环境中的 Python 解释器，并调用以 `python -m graph_skill_runtime` 开头的等价 module CLI command；distribution 不定义 `[project.scripts]` 或 `console_scripts`，也不安装 package-owned `gskill.exe` 或 `bin/gskill` launcher；
 4. 两种入口都把同一 skill root 传给 runtime，并消费结构化 result、diagnostic 和 error；
 5. 协议不假定 package 安装或 Python import 已注册业务 skill。
 
@@ -426,7 +426,7 @@ def validate(output: dict, state_slice: dict, **kwargs) -> None | dict:
 
 所有 registry graph 都直接位于 skill root 的 `graphs/` 下，且 graph id 在整个业务 gSkill 内唯一。`SUBGRAPH.md.graph` 和 `AGENT.md.subgraphs[].graph` 是 graph call edge 的唯一声明来源。
 
-Compiler 由这些 edge 生成 call graph、`callers` 和面向人的 parent view。Portable source 不保存 `parent` 或 `callers` 字段；同一 registry graph 可以被多个 caller 复用。`gskill inspect --call-graph` 必须投影同一组 edge，不能维护第二份 topology。
+Compiler 由这些 edge 生成 call graph、`callers` 和面向人的 parent view。Portable source 不保存 `parent` 或 `callers` 字段；同一 registry graph 可以被多个 caller 复用。`python -m graph_skill_runtime inspect SKILL_ROOT --call-graph` 必须投影同一组 edge，不能维护第二份 topology。
 
 资源与可执行实现按 owner 分三类：
 
@@ -496,7 +496,7 @@ Compiler 必须在同一轮聚合所有能够独立确认的缺陷。至少以�
 Legacy 读取只存在于显式的一次性转换命令：
 
 ```text
-gskill migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]
+python -m graph_skill_runtime migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]
 ```
 
 `SOURCE` 是待转换的 legacy v0.3 Studio skill root，`DESTINATION` 是全新 v1 skill root。`--runtime-config` 显式选择旧 `studio.runtime_config.v2` 文件；省略时，converter 在存在的情况下读取 `SOURCE/.workspace/runtime_config.json`，不存在则只转换 portable source。`--preset-id` 为生成的 project preset 命名，默认 `migrated`。
@@ -597,7 +597,7 @@ Converter 用 declaration 内容而不是旧数组位置生成 id：
 
 ### 10.4 单一 reader
 
-原子切换后的 runtime core 只读取本文格式。Legacy parser 只能由显式 `gskill migrate studio-skill` adapter 调用；`compile`、`predict`、`run`、SDK 和 MCP 不做格式嗅探，也不在新解析失败时回退 v0.3。
+原子切换后的 runtime core 只读取本文格式。Legacy parser 只能由显式 `python -m graph_skill_runtime migrate studio-skill` adapter 调用；`compile`、`predict`、`run`、SDK 和 MCP 不做格式嗅探，也不在新解析失败时回退 v0.3。
 
 运行时 package 安装、`import graph_skill_runtime`、启动 MCP server 或 capability detection 都不注册、复制、改写或全局扫描用户业务 skills。每次业务调用仍提供显式 skill root。
 

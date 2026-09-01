@@ -68,7 +68,7 @@ def _skill(tmp_path: Path) -> Path:
     root = tmp_path / "source-path-skill"
     _write(
         root / "SKILL.md",
-        "---\nname: source-path-skill\ndescription: Diagnostic path fixture.\n---\n",
+        "---\nname: source-path-skill\ndescription: Diagnostic path fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _write(
         root / "graph.yaml",

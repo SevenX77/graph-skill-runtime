@@ -125,7 +125,7 @@ def _skill(tmp_path: Path) -> Path:
     skill = tmp_path / "failing-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
     (skill / "SKILL.md").write_text(
-        "---\nname: failing-fixture\ndescription: Failed run token fixture.\n---\n",
+        "---\nname: failing-fixture\ndescription: Failed run token fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
         encoding="utf-8",
     )
     (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")

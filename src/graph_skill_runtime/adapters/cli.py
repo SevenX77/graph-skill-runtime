@@ -1,4 +1,4 @@
-"""Stable ``gskill`` console adapter over :class:`RuntimeApplication`."""
+"""Stable module CLI adapter over :class:`RuntimeApplication`."""
 
 from __future__ import annotations
 
@@ -11,8 +11,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from graph_skill_runtime.agent_kit.guide import agent_configuration_guide
 from graph_skill_runtime.application.config import ConfigurationError
 from graph_skill_runtime.application.service import RuntimeApplication
+from graph_skill_runtime.authoring.scaffold import create_gskill
 from graph_skill_runtime.composition import create_application
 from graph_skill_runtime.domain.models import (
     AgentResult,
@@ -32,6 +34,7 @@ from graph_skill_runtime.domain.models import (
     RuntimeProfileOverlay,
     SubmitAgentResultRequest,
 )
+from graph_skill_runtime.gskill_version import GSKILL_SCHEMA_VERSION
 from graph_skill_runtime.integrations.installer import IntegrationInstaller
 from graph_skill_runtime.integrations.models import (
     HostDetectionResult,
@@ -160,9 +163,17 @@ def _add_invocation_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="gskill", description="Compile and run provider-neutral graph skills"
+        prog="python -m graph_skill_runtime",
+        description="Compile and run provider-neutral graph skills",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {_package_version()}")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=(
+            f"%(prog)s {GSKILL_SCHEMA_VERSION} "
+            f"(graph-skill-runtime {_package_version()})"
+        ),
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
     compile_parser = commands.add_parser("compile", help="Compile a graph skill")
@@ -248,6 +259,24 @@ def build_parser() -> argparse.ArgumentParser:
         )
 
     commands.add_parser("mcp", help="Serve gskill tools over MCP stdio")
+
+    guide_parser = commands.add_parser(
+        "guide", help="Read provider-neutral configuration guidance without writing"
+    )
+    guide_commands = guide_parser.add_subparsers(dest="guide_command", required=True)
+    guide_commands.add_parser(
+        "agent-configuration",
+        help="Explain user/project instruction and Skill placement choices",
+    )
+
+    create_parser = commands.add_parser("create", help="Create one minimal portable gSkill")
+    create_parser.add_argument("name")
+    create_parser.add_argument("--path", required=True, help="Existing parent directory")
+    create_parser.add_argument(
+        "--description",
+        required=True,
+        help="Business purpose and activation conditions for the new gSkill",
+    )
     return parser
 
 
@@ -373,6 +402,46 @@ def _run_integration_command(
     return installer.uninstall(request)
 
 
+def _run_authoring_command(args: argparse.Namespace) -> BaseModel:
+    return create_gskill(
+        args.name,
+        parent=args.path,
+        description=args.description,
+    )
+
+
+def _handle_authoring_command(args: argparse.Namespace) -> int:
+    try:
+        result = _run_authoring_command(args)
+    except (OSError, ValueError, ValidationError) as exc:
+        _write_model(
+            RuntimeErrorPayload(
+                code=RuntimeErrorCode.INVALID_REQUEST,
+                message=str(exc),
+            )
+        )
+        return 2
+    _write_model(result)
+    return _exit_code(result)
+
+
+def _handle_migration_command(args: argparse.Namespace) -> int:
+    from graph_skill_runtime.migration import migrate_studio_skill
+
+    try:
+        migration = migrate_studio_skill(
+            args.source,
+            args.destination,
+            runtime_config=args.runtime_config,
+            preset_id=args.preset_id,
+        )
+    except MigrationFailure as exc:
+        _write_model(exc.report)
+        return 2
+    _write_model(migration)
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -413,26 +482,15 @@ def main(
         create_server(active_application).run("stdio")
         return 0
     if args.command == "migrate" and args.migrate_command == "studio-skill":
-        from graph_skill_runtime.migration import migrate_studio_skill
-
-        try:
-            migration = migrate_studio_skill(
-                args.source,
-                args.destination,
-                runtime_config=args.runtime_config,
-                preset_id=args.preset_id,
-            )
-        except MigrationFailure as exc:
-            _write_model(exc.report)
-            return 2
-        _write_model(migration)
+        return _handle_migration_command(args)
+    if args.command == "guide" and args.guide_command == "agent-configuration":
+        _write_model(agent_configuration_guide())
         return 0
+    if args.command == "create":
+        return _handle_authoring_command(args)
     active_application = application or create_application()
     try:
         result = _dispatch(args, active_application)
-    except MigrationFailure as exc:
-        _write_model(exc.report)
-        return 2
     except ConfigurationError as exc:
         _write_model(exc.payload)
         return 2

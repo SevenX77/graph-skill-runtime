@@ -23,6 +23,8 @@ def _skill_entry(root: Path) -> None:
         """---
 name: strict-compile
 description: Exercise strict portable compile boundaries.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

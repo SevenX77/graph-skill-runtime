@@ -24,6 +24,7 @@ files:
   classification: feature
   feature_ids:
   - F-agent-cli-executors
+  - F-gskill-agent-kit
   - F-moirai-integration-installer
   - F-runtime-cli-adapter
   - F-studio-skill-migration
@@ -77,6 +78,17 @@ files:
   classification: feature
   feature_ids:
   - F-agent-cli-executors
+- path: src/graph_skill_runtime/agent_kit/__init__.py
+  classification: detail
+  feature_id: F-gskill-agent-kit
+- path: src/graph_skill_runtime/agent_kit/catalog.py
+  classification: feature
+  feature_ids:
+  - F-gskill-agent-kit
+- path: src/graph_skill_runtime/agent_kit/guide.py
+  classification: feature
+  feature_ids:
+  - F-gskill-agent-kit
 - path: src/graph_skill_runtime/application/__init__.py
   classification: detail
   feature_id: F-runtime-application-service
@@ -88,6 +100,13 @@ files:
   classification: feature
   feature_ids:
   - F-runtime-application-service
+- path: src/graph_skill_runtime/authoring/__init__.py
+  classification: detail
+  feature_id: F-gskill-agent-kit
+- path: src/graph_skill_runtime/authoring/scaffold.py
+  classification: feature
+  feature_ids:
+  - F-gskill-agent-kit
 - path: src/graph_skill_runtime/bootstrap.py
   classification: feature
   feature_ids:
@@ -195,6 +214,11 @@ files:
   classification: feature
   feature_ids:
   - F-moirai-integration-installer
+- path: src/graph_skill_runtime/gskill_version.py
+  classification: feature
+  feature_ids:
+  - F-gskill-agent-kit
+  - F-portable-gskill-v1
 - path: src/graph_skill_runtime/core/__init__.py
   classification: detail
   feature_id: F-current-engine-adapter
@@ -312,6 +336,7 @@ files:
   - F-graph-skill-loading
   - F-iterate-runtime
   - F-agent-phase-orchestration
+  - F-gskill-agent-kit
   - F-portable-gskill-v1
 - path: src/graph_skill_runtime/core/local_workspace_resolver.py
   classification: feature
@@ -322,6 +347,7 @@ files:
   feature_ids:
   - F-graph-skill-loading
   - F-iterate-runtime
+  - F-gskill-agent-kit
   - F-portable-gskill-v1
 - path: src/graph_skill_runtime/core/mentions.py
   classification: feature

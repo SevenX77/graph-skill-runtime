@@ -46,6 +46,8 @@ def _agent_skill(parent: Path) -> Path:
         """---
 name: e2e-agent
 description: Exercise portable agent execution end to end.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )
@@ -125,6 +127,8 @@ def _subgraph_parent(parent: Path) -> Path:
         """---
 name: e2e-parent
 description: Exercise flat-registry subgraph execution end to end.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

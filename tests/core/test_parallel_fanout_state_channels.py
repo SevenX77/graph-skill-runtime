@@ -56,6 +56,8 @@ def _diamond_skill(parent: Path) -> Path:
         """---
 name: par-diamond
 description: Minimal parallel fan-out probe with pure logic nodes.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

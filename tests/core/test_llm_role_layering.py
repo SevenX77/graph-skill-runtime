@@ -42,6 +42,8 @@ def _write_minimal_agent_skill(
         """---
 name: llm-role-layering-test
 description: Exercise graph and agent LLM role selection.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

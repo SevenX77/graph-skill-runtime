@@ -25,6 +25,7 @@ def _write_logic_skill(root: Path, *, ui_metadata: dict[str, Any] | None = None)
 name: skill
 description: Exercise deterministic compiled artifacts.
 metadata:
+  gskill: gskill.graph.v1
   ui: {json.dumps(ui_value)}
 ---
 """,

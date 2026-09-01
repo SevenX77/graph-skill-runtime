@@ -18,6 +18,8 @@ def _write_portable_phase_token_skill(parent: Path) -> Path:
         """---
 name: phase-token-smoke
 description: Exercise portable graph phase source tokens.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

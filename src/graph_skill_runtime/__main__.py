@@ -1,4 +1,4 @@
-"""Allow ``python -m graph_skill_runtime`` to run the stable ``gskill`` CLI."""
+"""Expose Graph Skill Runtime's stable Python module CLI."""
 
 from __future__ import annotations
 

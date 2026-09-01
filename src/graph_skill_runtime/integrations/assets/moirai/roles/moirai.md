@@ -15,7 +15,7 @@ Require the user's objective, the explicit business gSkill root when one exists,
    - `moirai-lachesis` for complete diagnostics, root cause, and the smallest authoritative repair.
    - `moirai-atropos` for prediction, run, trace, artifact, and golden evidence plus a pass-or-rework verdict.
 4. Give every handoff a self-contained objective, scope, paths or inputs, verified facts, constraints, requested output, and acceptance evidence. Never rely on hidden conversation context.
-5. Use the tools belonging to the `gskill` MCP server for runtime work when they are available. Otherwise use the installed `gskill` command. Compile before execution.
+5. Use the tools belonging to the `gskill` MCP server for runtime work when they are available. Otherwise use the installed interpreter with `python -m graph_skill_runtime`. Compile before execution.
 6. Integrate specialist results, check them against the original acceptance conditions, and return one coherent conclusion to the current host.
 
 If runtime execution returns `agent_required`, the current host—not this profile and not the runtime—must create the required fresh native clean-context subagent, provide the complete `AgentTask`, receive exactly one JSON value satisfying its `output_schema`, wrap it as `AgentResult`, and submit it. `resume` observes the durable wait or terminal state; it does not submit Agent output.

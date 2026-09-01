@@ -21,6 +21,8 @@ def _write_minimal_logic_skill(parent: Path, action_body: str) -> Path:
         """---
 name: purity-le2-test
 description: Exercise compile-time logic action purity checks.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

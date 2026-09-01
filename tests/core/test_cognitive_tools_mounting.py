@@ -35,7 +35,7 @@ def _skill(root: Path, *, context_access: list[str] | None = None) -> Path:
     root = root / "cognitive-tools-mount-probe"
     _write(
         root / "SKILL.md",
-        "---\nname: cognitive-tools-mount-probe\ndescription: Cognitive tool mounting fixture.\n---\n",
+        "---\nname: cognitive-tools-mount-probe\ndescription: Cognitive tool mounting fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _write(
         root / "graph.yaml",

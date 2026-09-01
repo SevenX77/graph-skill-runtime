@@ -26,6 +26,8 @@ def _write_empty_portable_skill(root: Path) -> Path:
         """---
 name: skill
 description: Minimal boundary fixture for run-directory routing.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

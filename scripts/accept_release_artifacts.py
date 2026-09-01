@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import configparser
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -29,11 +28,13 @@ from typing import Any, Final, cast
 
 _DISTRIBUTION: Final = "graph-skill-runtime"
 _IMPORT_PACKAGE: Final = "graph_skill_runtime"
-_CONSOLE_ENTRY: Final = "graph_skill_runtime.adapters.cli:main"
 _ARTIFACT_SCHEMA: Final = "gskill.release-artifacts.v1"
 _ACCEPTANCE_SCHEMA: Final = "gskill.package-acceptance.v1"
 _MOIRAI_PREFIX: Final = "graph_skill_runtime/integrations/assets/moirai/"
 _MOIRAI_MANIFEST: Final = _MOIRAI_PREFIX + "integration.json"
+_AGENT_KIT_PREFIX: Final = "graph_skill_runtime/agent_kit/assets/"
+_AGENT_KIT_MANIFEST: Final = _AGENT_KIT_PREFIX + "manifest.json"
+_GSKILL_SCHEMA_VERSION: Final = "gskill.graph.v1"
 _EXPECTED_MCP_TOOLS: Final = {
     "compile",
     "evaluate_golden",
@@ -183,10 +184,10 @@ def _manifest_string_items(value: object, *, field: str) -> tuple[str, ...]:
     if not isinstance(value, list) or not value or not all(
         isinstance(item, str) and item for item in value
     ):
-        raise ValueError(f"MoirAI manifest field {field!r} must be a non-empty string list")
+        raise ValueError(f"manifest field {field!r} must be a non-empty string list")
     items = cast(tuple[str, ...], tuple(value))
     if len(items) != len(set(items)):
-        raise ValueError(f"MoirAI manifest field {field!r} contains duplicates")
+        raise ValueError(f"manifest field {field!r} contains duplicates")
     return items
 
 
@@ -218,9 +219,57 @@ def _moirai_members(manifest: JsonObject, *, prefix: str) -> set[str]:
     }
 
 
+def _agent_kit_members(manifest: JsonObject, *, prefix: str) -> set[str]:
+    if set(manifest) != {
+        "schema_version",
+        "kit_version",
+        "gskill_version",
+        "agents_template",
+        "rules",
+        "skills",
+    }:
+        raise ValueError("Agent kit manifest fields differ")
+    if manifest.get("schema_version") != "gskill.agent-kit-assets.v1":
+        raise ValueError("Agent kit manifest schema differs")
+    if not isinstance(manifest.get("kit_version"), str) or not manifest["kit_version"]:
+        raise ValueError("Agent kit manifest version is invalid")
+    if manifest.get("gskill_version") != _GSKILL_SCHEMA_VERSION:
+        raise ValueError("Agent kit manifest gSkill version differs")
+    if manifest.get("agents_template") != "AGENTS.md":
+        raise ValueError("Agent kit AGENTS template path differs")
+    rules = _manifest_string_items(manifest.get("rules"), field="agent-kit rules")
+    raw_skills = manifest.get("skills")
+    if not isinstance(raw_skills, list) or not raw_skills:
+        raise ValueError("Agent kit skills must be a non-empty list")
+    skill_ids: list[str] = []
+    rule_set = set(rules)
+    for raw_skill in raw_skills:
+        if not isinstance(raw_skill, dict) or set(raw_skill) != {"id", "references"}:
+            raise ValueError("Agent kit skill entry differs")
+        skill_id = raw_skill.get("id")
+        if not isinstance(skill_id, str) or not skill_id:
+            raise ValueError("Agent kit skill id is invalid")
+        references = _manifest_string_items(
+            raw_skill.get("references"),
+            field=f"agent-kit skill {skill_id} references",
+        )
+        if not set(references) <= rule_set:
+            raise ValueError(f"Agent kit skill {skill_id!r} references an unknown rule")
+        skill_ids.append(skill_id)
+    if tuple(skill_ids) != ("gskill", "create-gskill"):
+        raise ValueError(f"Agent kit public Skill inventory differs: {skill_ids}")
+    return {
+        prefix + "manifest.json",
+        prefix + "AGENTS.md",
+        *(prefix + f"rules/{name}" for name in rules),
+        *(prefix + f"skills/{skill_id}/SKILL.md" for skill_id in skill_ids),
+    }
+
+
 def _metadata(content: bytes, *, source: str) -> Mapping[str, str]:
     try:
-        return Parser().parsestr(content.decode("utf-8"))
+        message = Parser().parsestr(content.decode("utf-8"))
+        return dict(message.items())
     except UnicodeDecodeError as exc:
         raise ValueError(f"{source} metadata is not UTF-8: {exc}") from exc
 
@@ -277,6 +326,14 @@ def _validate_wheel(path: Path) -> str:
                 source=f"{path}:{_MOIRAI_MANIFEST}",
             )
             expected_moirai = _moirai_members(manifest, prefix=_MOIRAI_PREFIX)
+            agent_kit_manifest = _load_json_bytes(
+                archive.read(_AGENT_KIT_MANIFEST),
+                source=f"{path}:{_AGENT_KIT_MANIFEST}",
+            )
+            expected_agent_kit = _agent_kit_members(
+                agent_kit_manifest,
+                prefix=_AGENT_KIT_PREFIX,
+            )
             dist_info_roots = {
                 name.split("/", 1)[0]
                 for name in names
@@ -288,14 +345,23 @@ def _validate_wheel(path: Path) -> str:
             required_dist_info = {
                 f"{dist_info}/METADATA",
                 f"{dist_info}/WHEEL",
-                f"{dist_info}/entry_points.txt",
                 f"{dist_info}/licenses/LICENSE",
                 f"{dist_info}/RECORD",
             }
             missing = sorted(
-                (_WHEEL_BASE_MEMBERS | expected_moirai | required_dist_info) - member_set
+                (
+                    _WHEEL_BASE_MEMBERS
+                    | expected_moirai
+                    | expected_agent_kit
+                    | required_dist_info
+                )
+                - member_set
             )
             forbidden = sorted(_WHEEL_FORBIDDEN_MEMBERS & member_set)
+            entry_points = f"{dist_info}/entry_points.txt"
+            if entry_points in member_set:
+                forbidden.append(entry_points)
+            forbidden.extend(sorted(name for name in member_set if name.endswith("/graph.yaml")))
             forbidden.extend(
                 sorted(
                     name
@@ -308,6 +374,14 @@ def _validate_wheel(path: Path) -> str:
                     name
                     for name in member_set
                     if name.startswith(_MOIRAI_PREFIX) and name not in expected_moirai
+                )
+            )
+            forbidden.extend(
+                sorted(
+                    name
+                    for name in member_set
+                    if name.startswith(_AGENT_KIT_PREFIX)
+                    and name not in expected_agent_kit
                 )
             )
             if missing or forbidden:
@@ -325,15 +399,7 @@ def _validate_wheel(path: Path) -> str:
             wheel_metadata = archive.read(f"{dist_info}/WHEEL").decode("utf-8")
             if "Root-Is-Purelib: true" not in wheel_metadata or "Tag: py3-none-any" not in wheel_metadata:
                 raise ValueError("wheel metadata does not declare one pure py3-none-any artifact")
-            entry_points = configparser.ConfigParser(interpolation=None)
-            entry_points.optionxform = str
-            entry_points.read_string(
-                archive.read(f"{dist_info}/entry_points.txt").decode("utf-8")
-            )
-            actual_scripts = dict(entry_points.items("console_scripts"))
-            if actual_scripts != {"gskill": _CONSOLE_ENTRY}:
-                raise ValueError(f"wheel console entry points differ: {actual_scripts}")
-    except (KeyError, UnicodeDecodeError, configparser.Error, zipfile.BadZipFile) as exc:
+    except (KeyError, UnicodeDecodeError, zipfile.BadZipFile) as exc:
         raise ValueError(f"invalid wheel {path}: {exc}") from exc
     return version
 
@@ -378,6 +444,15 @@ def _validate_sdist(path: Path) -> str:
                 manifest,
                 prefix=package_prefix + _MOIRAI_PREFIX,
             )
+            agent_kit_manifest_name = package_prefix + _AGENT_KIT_MANIFEST
+            agent_kit_manifest = _load_json_bytes(
+                _tar_file_bytes(archive, agent_kit_manifest_name),
+                source=f"{path}:{agent_kit_manifest_name}",
+            )
+            expected_agent_kit = _agent_kit_members(
+                agent_kit_manifest,
+                prefix=package_prefix + _AGENT_KIT_PREFIX,
+            )
             required = {
                 f"{expected_root}/LICENSE",
                 f"{expected_root}/PKG-INFO",
@@ -386,18 +461,29 @@ def _validate_sdist(path: Path) -> str:
                 f"{expected_root}/src/graph_skill_runtime/__init__.py",
                 f"{expected_root}/src/graph_skill_runtime/py.typed",
                 *expected_moirai,
+                *expected_agent_kit,
             }
             missing = sorted(required - file_names)
             forbidden = sorted(
                 name
                 for name in file_names
                 if name.startswith(f"{expected_root}/src/graph_agent/")
+                or (
+                    name.startswith(
+                        f"{expected_root}/src/{_IMPORT_PACKAGE}/"
+                    )
+                    and name.endswith("/graph.yaml")
+                )
                 or name.startswith(
                     f"{expected_root}/src/graph_skill_runtime/examples/"
                 )
                 or (
                     name.startswith(package_prefix + _MOIRAI_PREFIX)
                     and name not in expected_moirai
+                )
+                or (
+                    name.startswith(package_prefix + _AGENT_KIT_PREFIX)
+                    and name not in expected_agent_kit
                 )
             )
             if missing or forbidden:
@@ -419,8 +505,8 @@ def _validate_sdist(path: Path) -> str:
             )["project"]
             if project.get("name") != _DISTRIBUTION or project.get("version") != version:
                 raise ValueError("sdist pyproject name/version differs from its filename")
-            if project.get("scripts") != {"gskill": _CONSOLE_ENTRY}:
-                raise ValueError("sdist pyproject console entry point differs")
+            if project.get("scripts"):
+                raise ValueError("sdist must not define console entry points")
     except (KeyError, UnicodeDecodeError, tarfile.TarError, tomllib.TOMLDecodeError) as exc:
         raise ValueError(f"invalid sdist {path}: {exc}") from exc
     return version
@@ -642,11 +728,6 @@ def _environment_python(root: Path) -> Path:
     return windows if windows.is_file() else root / "bin" / "python"
 
 
-def _environment_gskill(root: Path) -> Path:
-    windows = root / "Scripts" / "gskill.exe"
-    return windows if windows.is_file() else root / "bin" / "gskill"
-
-
 def _create_uv_environment(
     *,
     uv: Path,
@@ -721,18 +802,25 @@ def _tree_snapshot(root: Path) -> tuple[str, ...]:
 
 
 def _cli_json(
-    gskill: Path,
+    runtime_python: Path,
     arguments: Sequence[str],
     *,
     cwd: Path,
     env: Mapping[str, str],
 ) -> JsonObject:
-    result = _run_checked([str(gskill), *arguments], cwd=cwd, env=env)
-    return _load_json_bytes(result.stdout.encode("utf-8"), source=f"gskill {' '.join(arguments)}")
+    result = _run_checked(
+        [str(runtime_python), "-m", _IMPORT_PACKAGE, *arguments],
+        cwd=cwd,
+        env=env,
+    )
+    return _load_json_bytes(
+        result.stdout.encode("utf-8"),
+        source=f"python -m {_IMPORT_PACKAGE} {' '.join(arguments)}",
+    )
 
 
 def _assert_cli_utf8_transport(
-    gskill: Path,
+    runtime_python: Path,
     *,
     skill_root: Path,
     cwd: Path,
@@ -744,7 +832,9 @@ def _assert_cli_utf8_transport(
     expected = "全局安装"
     result = _run_checked_bytes(
         [
-            str(gskill),
+            str(runtime_python),
+            "-m",
+            _IMPORT_PACKAGE,
             "config",
             "resolve",
             str(skill_root),
@@ -756,11 +846,11 @@ def _assert_cli_utf8_transport(
         cwd=cwd,
         env=legacy_environment,
     )
-    payload = _load_json_bytes(result.stdout, source="gskill UTF-8 transport probe")
+    payload = _load_json_bytes(result.stdout, source="module CLI UTF-8 transport probe")
     request = cast(JsonObject, payload.get("request"))
     inputs = cast(JsonObject, request.get("inputs"))
     if inputs.get("name") != expected:
-        raise ValueError("installed console did not preserve UTF-8 JSON text")
+        raise ValueError("installed module CLI did not preserve UTF-8 JSON text")
 
 
 def _assert_completed(payload: JsonObject, *, mode: str) -> None:
@@ -785,7 +875,7 @@ def _sqlite_integrity(path: Path) -> None:
 
 async def _mcp_smoke(
     *,
-    gskill: Path,
+    runtime_python: Path,
     skill_root: Path,
     work_root: Path,
     env: Mapping[str, str],
@@ -795,8 +885,8 @@ async def _mcp_smoke(
 
     error_log_path = work_root / "mcp-stderr.log"
     parameters = StdioServerParameters(
-        command=str(gskill),
-        args=["mcp"],
+        command=str(runtime_python),
+        args=["-m", _IMPORT_PACKAGE, "mcp"],
         env=dict(env),
         cwd=work_root,
         encoding="utf-8",
@@ -871,9 +961,13 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     logic_skill = Path(args.logic_skill).resolve(strict=True)
     agent_skill = Path(args.agent_skill).resolve(strict=True)
     expected_version = cast(str, args.expected_version)
-    gskill = _environment_gskill(environment_root)
-    if not gskill.is_file():
-        raise ValueError(f"installed gskill command is missing: {gskill}")
+    runtime_python = _environment_python(environment_root)
+    forbidden_launchers = (
+        environment_root / "Scripts" / "gskill.exe",
+        environment_root / "bin" / "gskill",
+    )
+    if any(path.exists() for path in forbidden_launchers):
+        raise ValueError("installed distribution unexpectedly created a gskill launcher")
 
     controlled_root = work_root / "受控 host state"
     home = controlled_root / "home"
@@ -891,7 +985,8 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     if not module_path.is_relative_to(environment_root):
         raise ValueError(f"graph_skill_runtime resolved outside the clean environment: {module_path}")
     runtime = importlib.import_module(_IMPORT_PACKAGE)
-    if Path(runtime.__file__).resolve(strict=True) != module_path:
+    runtime_file = getattr(runtime, "__file__", None)
+    if runtime_file is None or Path(runtime_file).resolve(strict=True) != module_path:
         raise ValueError("resolved and imported graph_skill_runtime paths differ")
     if importlib.metadata.version(_DISTRIBUTION) != expected_version:
         raise ValueError("installed distribution version differs from the candidate")
@@ -899,11 +994,17 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
         if importlib.util.find_spec(optional) is not None:
             raise ValueError(f"base distribution unexpectedly installed optional provider module {optional}")
 
+    from graph_skill_runtime.agent_kit.catalog import PackagedAgentKitAssets
     from graph_skill_runtime.integrations.catalog import PackagedMoiraiAssets
 
     assets = PackagedMoiraiAssets()
     if (len(assets.role_ids()), len(assets.skill_ids())) != (4, 8):
         raise ValueError("installed MoirAI role/skill inventory differs")
+    agent_kit_assets = PackagedAgentKitAssets()
+    if agent_kit_assets.gskill_version != _GSKILL_SCHEMA_VERSION:
+        raise ValueError("installed Agent kit gSkill version differs")
+    if agent_kit_assets.skill_ids() != ("gskill", "create-gskill"):
+        raise ValueError("installed Agent kit public Skill inventory differs")
     distribution = importlib.metadata.distribution(_DISTRIBUTION)
     installed_files = tuple(str(item).replace("\\", "/") for item in distribution.files or ())
     if any("graph_skill_runtime/examples/" in name for name in installed_files):
@@ -911,16 +1012,29 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     if any(name.endswith("/graph.yaml") for name in installed_files):
         raise ValueError("installed distribution leaked a business graph.yaml")
 
-    version_result = _run_checked([str(gskill), "--version"], cwd=work_root, env=environment)
-    if version_result.stdout.strip() != f"gskill {expected_version}":
-        raise ValueError(f"installed console version differs: {version_result.stdout!r}")
+    version_result = _run_checked(
+        [str(runtime_python), "-m", _IMPORT_PACKAGE, "--version"],
+        cwd=work_root,
+        env=environment,
+    )
+    expected_cli_version = (
+        f"python -m graph_skill_runtime {_GSKILL_SCHEMA_VERSION} "
+        f"(graph-skill-runtime {expected_version})"
+    )
+    if version_result.stdout.strip() != expected_cli_version:
+        raise ValueError(f"installed module CLI version differs: {version_result.stdout!r}")
     _assert_cli_utf8_transport(
-        gskill,
+        runtime_python,
         skill_root=logic_skill,
         cwd=work_root,
         env=environment,
     )
-    detections = _cli_json(gskill, ["integrations", "detect"], cwd=work_root, env=environment)
+    detections = _cli_json(
+        runtime_python,
+        ["integrations", "detect"],
+        cwd=work_root,
+        env=environment,
+    )
     detection_targets = {
         item.get("target")
         for item in cast(list[JsonObject], detections.get("detections", []))
@@ -930,7 +1044,7 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
         raise ValueError(f"installed host detection inventory differs: {detection_targets}")
     mcp_tools = asyncio.run(
         _mcp_smoke(
-            gskill=gskill,
+            runtime_python=runtime_python,
             skill_root=logic_skill,
             work_root=work_root,
             env=environment,
@@ -943,8 +1057,59 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
             f"before={before_state}, after={read_only_state}"
         )
 
+    before_guide = _tree_snapshot(work_root)
+    first_guide = _cli_json(
+        runtime_python,
+        ["guide", "agent-configuration"],
+        cwd=work_root,
+        env=environment,
+    )
+    second_guide = _cli_json(
+        runtime_python,
+        ["guide", "agent-configuration"],
+        cwd=work_root,
+        env=environment,
+    )
+    guide_statuses = (first_guide.get("status"), second_guide.get("status"))
+    if guide_statuses != ("guidance", "guidance") or first_guide != second_guide:
+        raise ValueError(f"installed Agent kit guide differs: {guide_statuses}")
+    if first_guide.get("writes_performed") is not False:
+        raise ValueError("installed Agent kit guide claimed a write")
+    if _tree_snapshot(work_root) != before_guide:
+        raise ValueError("installed Agent kit guide wrote project state")
+
+    agent_kit_project = work_root / "agent kit project"
+    agent_kit_project.mkdir()
+
+    create_result = _cli_json(
+        runtime_python,
+        [
+            "create",
+            "release-created",
+            "--path",
+            str(agent_kit_project),
+            "--description",
+            "Exercise installed create-gskill with non-ASCII evidence 验收.",
+        ],
+        cwd=work_root,
+        env=environment,
+    )
+    if create_result.get("status") != "created" or create_result.get(
+        "gskill_version"
+    ) != _GSKILL_SCHEMA_VERSION:
+        raise ValueError(f"installed create-gskill result differs: {create_result}")
+    created_root = agent_kit_project / "release-created"
+    created_compile = _cli_json(
+        runtime_python,
+        ["compile", str(created_root), "--no-cache"],
+        cwd=work_root,
+        env=environment,
+    )
+    if created_compile.get("status") != "passed":
+        raise ValueError(f"installed created gSkill did not compile: {created_compile}")
+
     compile_result = _cli_json(
-        gskill,
+        runtime_python,
         ["compile", str(logic_skill), "--no-cache"],
         cwd=work_root,
         env=environment,
@@ -952,7 +1117,7 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     if compile_result.get("status") != "passed" or compile_result.get("diagnostics") != []:
         raise ValueError(f"installed CLI compile failed: {compile_result}")
     inspect_result = _cli_json(
-        gskill,
+        runtime_python,
         ["inspect", str(logic_skill), "--call-graph"],
         cwd=work_root,
         env=environment,
@@ -963,7 +1128,7 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     non_ascii_name = "发布验收"
     predict_state = work_root / "状态 空间" / "predict"
     predict_result = _cli_json(
-        gskill,
+        runtime_python,
         [
             "predict",
             str(logic_skill),
@@ -983,7 +1148,7 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
 
     run_state = work_root / "状态 空间" / "run"
     run_result = _cli_json(
-        gskill,
+        runtime_python,
         [
             "run",
             str(logic_skill),
@@ -1017,15 +1182,25 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
         str(integration_project),
     ]
     planned = _cli_json(
-        gskill,
+        runtime_python,
         [*integration_arguments, "--dry-run"],
         cwd=work_root,
         env=environment,
     )
-    installed = _cli_json(gskill, integration_arguments, cwd=work_root, env=environment)
-    unchanged = _cli_json(gskill, integration_arguments, cwd=work_root, env=environment)
+    installed = _cli_json(
+        runtime_python,
+        integration_arguments,
+        cwd=work_root,
+        env=environment,
+    )
+    unchanged = _cli_json(
+        runtime_python,
+        integration_arguments,
+        cwd=work_root,
+        env=environment,
+    )
     uninstalled = _cli_json(
-        gskill,
+        runtime_python,
         [
             "integrations",
             "uninstall",
@@ -1048,7 +1223,7 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
 
     handoff_state = work_root / "状态 空间" / "handoff"
     required = _cli_json(
-        gskill,
+        runtime_python,
         [
             "run",
             str(agent_skill),
@@ -1070,7 +1245,7 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
     task = cast(JsonObject, agent_required["task"])
     checkpoint_ref = cast(str, agent_required["checkpoint_ref"])
     reopened_wait = _cli_json(
-        gskill,
+        runtime_python,
         [
             "resume",
             str(agent_skill),
@@ -1105,10 +1280,20 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
         "--result-json",
         json.dumps(result_payload, ensure_ascii=False, separators=(",", ":")),
     ]
-    completed = _cli_json(gskill, submit_arguments, cwd=work_root, env=environment)
-    duplicate = _cli_json(gskill, submit_arguments, cwd=work_root, env=environment)
+    completed = _cli_json(
+        runtime_python,
+        submit_arguments,
+        cwd=work_root,
+        env=environment,
+    )
+    duplicate = _cli_json(
+        runtime_python,
+        submit_arguments,
+        cwd=work_root,
+        env=environment,
+    )
     reopened_terminal = _cli_json(
-        gskill,
+        runtime_python,
         [
             "resume",
             str(agent_skill),
@@ -1174,6 +1359,8 @@ def _installed_distribution_smoke(args: argparse.Namespace) -> JsonObject:
             reopened_terminal["status"],
         ],
         "integration_statuses": list(statuses),
+        "agent_kit_guide_statuses": list(guide_statuses),
+        "create_gskill_status": create_result["status"],
         "unexpected_host_state_changes": unexpected_host_changes,
     }
 

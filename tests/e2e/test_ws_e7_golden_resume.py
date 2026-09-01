@@ -49,6 +49,8 @@ def _skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Exercise golden evaluation and durable resume together.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

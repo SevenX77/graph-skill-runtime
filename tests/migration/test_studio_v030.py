@@ -88,7 +88,7 @@ io:
 def _portable_logic_skill(root: Path) -> None:
     _write(
         root / "SKILL.md",
-        f"---\nname: {root.name}\ndescription: Portable external migration fixture.\n---\n",
+        f"---\nname: {root.name}\ndescription: Portable external migration fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _write(
         root / "graph.yaml",
@@ -188,14 +188,15 @@ def test_converter_renames_internal_agent_entry_and_emits_one_root_skill(tmp_pat
     assert (destination / "SKILL.md").is_file()
     root_skill = (destination / "SKILL.md").read_text(encoding="utf-8")
     assert "Legacy Legacy Agent graph." in root_skill
-    assert "Use this skill when" in root_skill
+    compiled = compile_skill(destination, cache=False)
+    assert "Use this skill when" in compiled.skill_manifest.description
     assert (destination / "phases" / "work" / "AGENT.md").is_file()
     assert not (destination / "phases" / "work" / "SKILL.md").exists()
     assert [path.relative_to(destination).as_posix() for path in destination.rglob("SKILL.md")] == [
         "SKILL.md"
     ]
     assert (source / "phases" / "work" / "SKILL.md").is_file()
-    assert compile_skill(destination, cache=False).skill_manifest.name == "portable-agent"
+    assert compiled.skill_manifest.name == "portable-agent"
 
 
 def test_converter_promotes_direct_child_to_flat_registry_and_rewrites_reference(tmp_path: Path) -> None:

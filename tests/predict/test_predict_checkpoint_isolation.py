@@ -34,6 +34,8 @@ def _write_logic_skill(root: Path) -> Path:
         """---
 name: skill
 description: Exercise predict checkpoint isolation.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

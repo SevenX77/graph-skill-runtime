@@ -93,6 +93,8 @@ def _write_graph(
             f"""---
 name: {name}
 description: Portable integration fixture for {name}.
+metadata:
+  gskill: gskill.graph.v1
 ---
 Compile and run this graph skill with graph-skill-runtime.
 """,

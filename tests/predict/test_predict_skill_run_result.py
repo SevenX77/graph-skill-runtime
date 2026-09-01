@@ -19,6 +19,8 @@ def test_predict_skill_returns_run_result_with_predict_source(tmp_path: Path, mo
         "---\n"
         "name: skill\n"
         "description: Exercise the predict RunResult boundary.\n"
+        "metadata:\n"
+        "  gskill: gskill.graph.v1\n"
         "---\n",
         encoding="utf-8",
     )

@@ -16,6 +16,7 @@ from graph_skill_runtime.core.manifest import (
     IterateSpec,
     PhaseIOSchema,
 )
+from graph_skill_runtime.gskill_version import GSKILL_SCHEMA_VERSION
 
 
 class GraphTopologySerializationError(ValueError):
@@ -72,7 +73,7 @@ def serialize_graph_topology(
 
     try:
         manifest = GraphManifest(
-            schema_version="gskill.graph.v1",
+            schema_version=GSKILL_SCHEMA_VERSION,
             graph_id=graph_id,
             description=description or "",
             llm_role=llm_role,

@@ -72,6 +72,8 @@ def test_run_skill_single_skill_md_file_without_graph_returns_portable_root_erro
         """---
 name: legacy
 description: Missing its required portable graph declaration.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

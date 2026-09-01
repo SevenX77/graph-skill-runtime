@@ -11,7 +11,7 @@ The baseline includes `baseline.json` and its cases. Graph Skill Runtime exposes
 Use the `evaluate_golden` tool belonging to the `gskill` MCP server, or:
 
 ```text
-gskill golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT
+python -m graph_skill_runtime golden SKILL_ROOT BASELINE_ID --state-root STATE_ROOT
 ```
 
 The engine report must contain an internally consistent `summary` with non-negative integer fields `total_cases`, `passed`, `failed`, and `stale`, where:

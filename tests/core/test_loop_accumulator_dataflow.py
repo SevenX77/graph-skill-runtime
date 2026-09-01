@@ -121,6 +121,8 @@ def _loop_skill(parent: Path, *, finalize_input: str) -> Path:
         """---
 name: loop-accumulator
 description: Exercise loop accumulator dataflow.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

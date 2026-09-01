@@ -1,0 +1,45 @@
+{
+  "schema_version": "gskill.agent-kit-assets.v1",
+  "kit_version": "1.0.0",
+  "gskill_version": "gskill.graph.v1",
+  "agents_template": "AGENTS.md",
+  "rules": [
+    "00-index.md",
+    "01-identification-and-version.md",
+    "02-entrypoints.md",
+    "03-skill-routing.md",
+    "04-authoring.md",
+    "05-agent-handoff.md",
+    "06-configuration-and-state.md",
+    "07-diagnostics-and-repair.md",
+    "08-execution-and-evidence.md",
+    "09-safety-and-boundaries.md"
+  ],
+  "skills": [
+    {
+      "id": "gskill",
+      "references": [
+        "01-identification-and-version.md",
+        "02-entrypoints.md",
+        "03-skill-routing.md",
+        "04-authoring.md",
+        "05-agent-handoff.md",
+        "06-configuration-and-state.md",
+        "07-diagnostics-and-repair.md",
+        "08-execution-and-evidence.md",
+        "09-safety-and-boundaries.md"
+      ]
+    },
+    {
+      "id": "create-gskill",
+      "references": [
+        "01-identification-and-version.md",
+        "02-entrypoints.md",
+        "03-skill-routing.md",
+        "04-authoring.md",
+        "07-diagnostics-and-repair.md",
+        "09-safety-and-boundaries.md"
+      ]
+    }
+  ]
+}

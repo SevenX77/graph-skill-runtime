@@ -8,6 +8,11 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from graph_skill_runtime.core.skill_resolver_protocol import SKILL_ID_PATTERN
+from graph_skill_runtime.gskill_version import (
+    GSKILL_METADATA_KEY,
+    GSKILL_SCHEMA_VERSION,
+    GSkillSchemaVersion,
+)
 
 AGENT_SKILL_NAME_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 GRAPH_ID_PATTERN = AGENT_SKILL_NAME_PATTERN
@@ -25,6 +30,15 @@ class RootSkillManifest(BaseModel):
     compatibility: str | None = Field(default=None, min_length=1, max_length=500)
     metadata: dict[str, str] = Field(default_factory=dict)
     allowed_tools: str | None = Field(default=None, alias="allowed-tools", min_length=1)
+
+    @model_validator(mode="after")
+    def _require_gskill_identity(self) -> RootSkillManifest:
+        marker = self.metadata.get(GSKILL_METADATA_KEY)
+        if marker != GSKILL_SCHEMA_VERSION:
+            raise ValueError(
+                f"metadata.{GSKILL_METADATA_KEY} must equal {GSKILL_SCHEMA_VERSION!r}"
+            )
+        return self
 
 
 class GraphPhaseRef(BaseModel):
@@ -257,7 +271,7 @@ class GraphManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["gskill.graph.v1"]
+    schema_version: GSkillSchemaVersion
     graph_id: str = Field(min_length=1, max_length=64, pattern=GRAPH_ID_PATTERN)
     description: str = Field(min_length=1)
     llm_role: str | None = Field(default=None, min_length=1)

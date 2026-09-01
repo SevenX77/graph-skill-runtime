@@ -37,6 +37,7 @@ from graph_skill_runtime.domain.models import (
     PhaseAddress,
     RunPreset,
 )
+from graph_skill_runtime.gskill_version import GSKILL_SCHEMA_VERSION
 from graph_skill_runtime.migration.atomic_publish import publish_directory_no_replace
 
 _LEGACY_GRAPH_FIELDS = frozenset(
@@ -953,7 +954,8 @@ def _render_root_skill(plan: _MigrationPlan) -> str:
     activation_description = (
         f"{legacy_purpose} Use this skill when a request requires its structured graph workflow."
     )
-    if len(activation_description) > 1024:
+    gskill_description = f"gSkill for Graph Skill Runtime: {activation_description}"
+    if len(gskill_description) > 1024:
         _problem(
             "GSKILL_MIGRATION_SKILL_METADATA_INVALID",
             "legacy description is too long to form Agent Skills activation metadata",
@@ -962,16 +964,17 @@ def _render_root_skill(plan: _MigrationPlan) -> str:
         )
     frontmatter = {
         "name": plan.destination.name,
-        "description": activation_description,
+        "description": gskill_description,
+        "metadata": {"gskill": GSKILL_SCHEMA_VERSION},
     }
     body = f"""# {plan.destination.name}
 
 Use this directory as the explicit skill root for every operation.
 
 Prefer the installed Graph Skill Runtime MCP tools (`compile`, `predict`, `run`, `resume`, and
-`submit_agent_result`). If MCP is unavailable, use the equivalent installed `gskill` console
-subcommands. Consume the structured result and diagnostics. Do not invoke the runtime through
-`python -m`, and do not assume installing the runtime registered this business skill.
+`submit_agent_result`). If MCP is unavailable, use the equivalent
+`python -m graph_skill_runtime` subcommands. Consume the structured result and diagnostics.
+Do not assume installing the runtime registered this business skill.
 """
     return _markdown(frontmatter, body)
 
@@ -990,7 +993,7 @@ def _portable_graph(graph: _LegacyGraph, *, artifacts: tuple[ArtifactDeclaration
     try:
         return GraphManifest.model_validate(
             {
-                "schema_version": "gskill.graph.v1",
+                "schema_version": GSKILL_SCHEMA_VERSION,
                 "graph_id": graph.graph_id,
                 "description": graph.description,
                 "llm_role": graph.llm_role,

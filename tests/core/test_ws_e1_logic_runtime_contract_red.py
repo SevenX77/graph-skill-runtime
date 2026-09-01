@@ -43,6 +43,8 @@ def _logic_skill(
         """---
 name: logic-runtime-contract
 description: Exercise pure-return logic runtime behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

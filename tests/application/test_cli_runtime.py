@@ -37,6 +37,8 @@ def _logic_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Prove that pure logic does not require a vendor CLI.
+metadata:
+  gskill: gskill.graph.v1
 ---
 
 Run the graph.

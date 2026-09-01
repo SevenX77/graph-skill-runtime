@@ -90,7 +90,7 @@ def _write_action(phase_dir):
 def _skill(root: Path, target_line: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "SKILL.md").write_text(
-        f"---\nname: {root.name}\ndescription: Target declaration probe.\n---\n",
+        f"---\nname: {root.name}\ndescription: Target declaration probe.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
         encoding="utf-8",
     )
     (root / "graph.yaml").write_text(

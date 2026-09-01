@@ -5,7 +5,7 @@ Compilation is the single aggregated diagnostic exit for a business gSkill. Run 
 Use the `compile` tool belonging to the `gskill` MCP server, or the installed CLI fallback:
 
 ```text
-gskill compile SKILL_ROOT
+python -m graph_skill_runtime compile SKILL_ROOT
 ```
 
 One pass inventories and parses the bundle, validates graph and phase schemas, checks DAG and call-graph structure, traces I/O, resolves resources and actions/tools, and validates artifact declarations. The result contains the complete set of independently knowable diagnostics, not only the first error.

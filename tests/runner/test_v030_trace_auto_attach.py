@@ -32,6 +32,8 @@ def _write_logic_skill(root: Path, phases: list[tuple[str, list[str]]]) -> None:
         """---
 name: skill
 description: Exercise automatic trace attachment.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

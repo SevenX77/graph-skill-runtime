@@ -1,6 +1,6 @@
 [project]
 name = "graph-skill-runtime"
-version = "0.1.0a1"
+version = "1.0.0a1"
 description = "Agent-native runtime for compiled graph skills"
 requires-python = ">=3.11"
 readme = "README.md"
@@ -29,9 +29,6 @@ dependencies = [
     "mcp>=2.1.1,<3.0.0",
     "tomli-w>=1.2.0,<2.0.0",
 ]
-
-[project.scripts]
-gskill = "graph_skill_runtime.adapters.cli:main"
 
 [project.optional-dependencies]
 embedded = [

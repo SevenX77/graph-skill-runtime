@@ -45,7 +45,7 @@ def _write(path: Path, text: str) -> None:
 def _write_graph_root(root: Path, *, name: str) -> None:
     _write(
         root / "SKILL.md",
-        f"---\nname: {name}\ndescription: Exercise aggregated phase diagnostics.\n---\n",
+        f"---\nname: {name}\ndescription: Exercise aggregated phase diagnostics.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _write(
         root / "graph.yaml",

@@ -64,7 +64,7 @@ def _logic_skill(root: Path, *, declared: list[str], action_source: str) -> Path
     root = root / "action-private-helpers"
     _write(
         root / "SKILL.md",
-        "---\nname: action-private-helpers\ndescription: Action registry fixture.\n---\n",
+        "---\nname: action-private-helpers\ndescription: Action registry fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _write(
         root / "graph.yaml",

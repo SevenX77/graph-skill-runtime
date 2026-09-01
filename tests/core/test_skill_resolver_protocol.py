@@ -35,6 +35,8 @@ def _base(root: Path, *, phase: str = "main") -> None:
         f"""---
 name: {root.name}
 description: Exercise the portable skill resolver protocol.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

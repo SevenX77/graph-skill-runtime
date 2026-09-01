@@ -43,9 +43,9 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
 - **Primary contracts**: 0 error codes, 0 events
 - `[Covered By: tests/application/test_transport_parity.py::test_default_host_native_run_delegates_to_engine_and_keeps_request_snapshot]`
 
-### F-runtime-cli-adapter: Project the application service through the gskill console command using structured JSON results.
+### F-runtime-cli-adapter: Project the application service through the Python module CLI using structured JSON results.
 
-- **Boundary**: public-method - gskill console entry point and transport parity
+- **Boundary**: public-method - python -m graph_skill_runtime entry point and transport parity
 - **Sources**: `public-api`, `source-file-map`
 - **Core paths**: `src/graph_skill_runtime/__main__.py`, `src/graph_skill_runtime/adapters/cli.py`
 - **Primary contracts**: 0 error codes, 0 events
@@ -127,6 +127,28 @@ This FROZEN view follows the feature source of truth in manifest order. Each ite
   - `tests/integrations/test_cli_sdk.py::test_cli_returns_a_structured_internal_error_for_an_apply_failure`
   - `tests/integrations/test_cli_sdk.py::test_sdk_facade_projects_the_same_plan_and_result_models`
 - `[Covered By: tests/integrations/test_packaged_assets.py::test_packaged_moirai_bundle_is_closed_utf8_and_complete]`
+
+### F-gskill-agent-kit: Expose one provider-neutral AGENTS rule source and two automatically discoverable Skills through a read-only placement guide, create a minimal business gSkill through a no-adopt module CLI boundary, and bind Runtime major 1 to the portable gSkill v1 identity marker.
+
+- **Boundary**: externally-observable-behavior - packaged Agent kit, read-only guide, create, compile, and module CLI tests
+- **Sources**: `public-api`, `skill-spec`, `source-file-map`
+- **Core paths**: `src/graph_skill_runtime/adapters/cli.py`, `src/graph_skill_runtime/agent_kit/catalog.py`, `src/graph_skill_runtime/agent_kit/guide.py`, `src/graph_skill_runtime/authoring/scaffold.py`, `src/graph_skill_runtime/core/loader.py`, `src/graph_skill_runtime/core/manifest.py`, `src/graph_skill_runtime/gskill_version.py`
+- **Primary contracts**: 0 error codes, 0 events
+- **Targeted tests**:
+  - `tests/agent_kit/test_guide.py::test_packaged_agent_kit_is_closed_and_uses_two_precise_skills`
+  - `tests/agent_kit/test_guide.py::test_packaged_skills_link_exactly_their_local_reference_subsets`
+  - `tests/agent_kit/test_guide.py::test_canonical_child_prompt_has_one_owner_and_kit_is_provider_neutral`
+  - `tests/agent_kit/test_guide.py::test_agent_configuration_guide_contains_canonical_sources_without_destinations`
+  - `tests/agent_kit/test_guide.py::test_agent_configuration_guide_requires_user_choice_and_additive_merge`
+  - `tests/agent_kit/test_guide.py::test_agent_configuration_cli_is_read_only_even_in_an_empty_project`
+  - `tests/agent_kit/test_guide.py::test_removed_setup_command_cannot_mutate_a_project`
+  - `tests/authoring/test_scaffold.py::test_create_gskill_publishes_one_valid_marker_bound_bundle`
+  - `tests/authoring/test_scaffold.py::test_create_gskill_refuses_to_adopt_an_existing_destination`
+  - `tests/authoring/test_scaffold.py::test_create_cli_returns_the_same_structured_result`
+  - `tests/core/test_gskill_identity.py::test_compile_rejects_a_root_without_the_runtime_gskill_identity`
+  - `tests/core/test_gskill_identity.py::test_compile_accepts_the_exact_runtime_gskill_identity`
+  - `tests/core/test_gskill_identity.py::test_distribution_major_equals_the_only_supported_gskill_syntax_major`
+- `[Covered By: tests/agent_kit/test_guide.py::test_packaged_agent_kit_is_closed_and_uses_two_precise_skills]`
 
 ### F-md-frontmatter-parsing: Parse markdown frontmatter and body into stable skill metadata and diagnostics.
 

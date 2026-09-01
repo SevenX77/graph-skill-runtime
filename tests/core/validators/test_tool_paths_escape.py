@@ -17,6 +17,8 @@ def _write_minimal_graph(parent: Path, action_body: str) -> Path:
         """---
 name: action-path-test
 description: Exercise action path containment.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

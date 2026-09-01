@@ -27,6 +27,8 @@ phases:
 SKILL = """---
 name: bom-skill
 description: BOM portability fixture.
+metadata:
+  gskill: gskill.graph.v1
 ---
 
 Use this skill for BOM portability tests.

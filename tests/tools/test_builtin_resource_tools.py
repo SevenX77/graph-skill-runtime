@@ -51,6 +51,8 @@ def _resource_skill(
         """---
 name: resource-tools
 description: Exercise declared reference and example resources.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

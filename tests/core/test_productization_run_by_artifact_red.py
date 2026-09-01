@@ -103,6 +103,8 @@ def _write_two_phase_logic_skill(root: Path) -> None:
         """---
 name: artifact-runtime-real-graph
 description: Execute a compiled two-phase graph artifact.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )
@@ -189,6 +191,8 @@ def _write_single_agent_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Predict a compiled single-agent artifact.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )
@@ -250,6 +254,8 @@ def _write_complex_agent_skill(root: Path) -> None:
         """---
 name: artifact-runtime-predict-complex-agent
 description: Predict a compiled complex-agent artifact.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

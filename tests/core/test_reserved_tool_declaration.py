@@ -29,6 +29,8 @@ def _skill(parent: Path, *, tools: list[str]) -> Path:
         """---
 name: reserved-tool-probe
 description: Exercise reserved framework tool diagnostics.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

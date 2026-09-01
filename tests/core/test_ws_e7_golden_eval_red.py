@@ -54,6 +54,8 @@ def _logic_skill(root: Path, *, required_outputs: list[str] | None = None) -> No
         f"""---
 name: {root.name}
 description: Exercise deterministic golden evaluation behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

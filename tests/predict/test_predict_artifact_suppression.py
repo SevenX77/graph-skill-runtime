@@ -17,6 +17,8 @@ def _write_artifact_skill(root: Path, *, required_missing: bool = False) -> Path
         """---
 name: skill
 description: Exercise predict artifact suppression.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

@@ -23,7 +23,7 @@ def _write(path: Path, text: str) -> None:
 def _write_entry(root: Path) -> None:
     _write(
         root / "SKILL.md",
-        f"---\nname: {root.name}\ndescription: Strict runtime fixture.\n---\n",
+        f"---\nname: {root.name}\ndescription: Strict runtime fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
 
 

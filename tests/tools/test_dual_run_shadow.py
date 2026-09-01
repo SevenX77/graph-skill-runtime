@@ -29,6 +29,8 @@ def test_dual_run_shadow_logic_skill_idempotency(tmp_path: Path) -> None:
         """---
 name: skill
 description: Verify repeatable execution through the portable runtime.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

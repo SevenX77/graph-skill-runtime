@@ -32,6 +32,8 @@ def _write_two_phase_linear_logic_skill(root: Path) -> None:
         """---
 name: skill
 description: Exercise persisted per-node phase outputs.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )
@@ -164,6 +166,8 @@ def _write_batch_open_output_schema_skill(parent: Path) -> Path:
         """---
 name: batch-open
 description: Exercise open-schema batch phase output isolation.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

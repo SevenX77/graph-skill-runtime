@@ -21,7 +21,7 @@ updated: 2026-08-28
 | Optional MoirAI host integration | [`integration.json`](../../src/graph_skill_runtime/integrations/assets/moirai/integration.json) 与 [完整 v1 设计](../design/v1-alignment.md) | Phase 5 当前 owner：canonical inventory、六 renderer、显式 installer 与 scoped discovery；不在本索引复制 inventory 或验收证据 |
 | Cross-platform release-candidate acceptance | [Cross-platform policy](../CROSS_PLATFORM.md) 与 [`accept_release_artifacts.py`](../../scripts/accept_release_artifacts.py) | Phase 6 当前 owner：同一 manifest-bound wheel/sdist 的三平台安装验收；它是 pre-publication evidence，不是 registry publication |
 
-Production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取 portable contract。Legacy v0.3 parser 只在显式 `gskill migrate studio-skill` converter 中可达；[`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 是 `superseded` converter 输入与历史证据。
+Production compile、predict、run、inspect、SDK、module CLI 与 MCP 只读取 portable contract。Legacy v0.3 parser 只在显式 `python -m graph_skill_runtime migrate studio-skill` converter 中可达；[`skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 是 `superseded` converter 输入与历史证据。
 
 ## 2. Phase 2 已取代的模块文档
 

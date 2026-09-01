@@ -28,6 +28,8 @@ def _write_graph(root: Path, *, name: str, phase: str = "main") -> None:
         f"""---
 name: {name}
 description: Exercise cache round-trip fidelity.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

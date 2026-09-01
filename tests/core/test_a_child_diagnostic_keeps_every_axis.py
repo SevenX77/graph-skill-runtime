@@ -122,7 +122,7 @@ def nested_conflict_root(tmp_path: Path) -> Path:
     root = tmp_path / "diagnostic-skill"
     _write(
         root / "SKILL.md",
-        "---\nname: diagnostic-skill\ndescription: Nested graph diagnostic fixture.\n---\n",
+        "---\nname: diagnostic-skill\ndescription: Nested graph diagnostic fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _wrapper_skill(root, "root", "mid", "mid_stage")
     _wrapper_skill(root / "graphs" / "mid", "mid", "leaf", "leaf_stage")

@@ -12,7 +12,7 @@ The machine `RuntimeProfile` owns executor, checkpoint store, state directory, p
 
 `RunPreset` owns reusable non-secret business defaults such as inputs, bindings, breakpoints, node overrides, comparison candidates, and artifact requests. A named preset comes only from project configuration or explicitly supplied portable defaults. The current invocation owns one call's overrides.
 
-Resolution produces an immutable `RunRequest` with absolute skill and state roots and field-level provenance. The default state root is `<skill_root>/.gskill`. Use `gskill config resolve SKILL_ROOT` when a human-readable CLI workflow needs to inspect the resolved request without executing it.
+Resolution produces an immutable `RunRequest` with absolute skill and state roots and field-level provenance. The default state root is `<skill_root>/.gskill`. Use `python -m graph_skill_runtime config resolve SKILL_ROOT` when a CLI workflow needs to inspect the resolved request without executing it.
 
 Secrets are references and bindings, never persisted literal values. Keep credentials in the environment, current host, or operating-system keychain and use `SecretReference` / `SecretBinding` in durable contracts. Host UI state, MoirAI install manifests, and business topology have different owners and do not belong in runtime configuration.
 

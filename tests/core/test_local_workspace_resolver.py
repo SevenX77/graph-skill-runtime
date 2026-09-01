@@ -19,6 +19,8 @@ def _write_graph(root: Path) -> Path:
         f"""---
 name: {root.name.replace(".", "-")}
 description: Resolver target fixture.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

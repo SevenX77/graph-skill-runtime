@@ -46,6 +46,8 @@ def _external_echo_skill(root: Path) -> None:
         """---
 name: e2e-echo
 description: Echo a review note for the caller.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )
@@ -104,6 +106,8 @@ def _pipeline(root: Path) -> None:
         """---
 name: round14-e2e-pipeline
 description: Compile a complete portable agent, logic, and subgraph pipeline.
+metadata:
+  gskill: gskill.graph.v1
 ---
 Use graph-skill-runtime to compile and run this graph skill.
 """,

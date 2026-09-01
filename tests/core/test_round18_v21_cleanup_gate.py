@@ -144,6 +144,8 @@ def _write_minimal_portable_logic_skill(parent: Path) -> Path:
         """---
 name: round18-smoke
 description: Exercise the portable compiler and runtime path.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

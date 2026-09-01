@@ -53,6 +53,8 @@ def _looping_skill(root: Path) -> Path:
         """---
 name: skill
 description: Prove a finite declared loop is not a predict deadlock.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

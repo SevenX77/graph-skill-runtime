@@ -29,6 +29,8 @@ def _write_portable_root(parent: Path) -> Path:
         """---
 name: test-skill
 description: Runner binding fixture.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
         encoding="utf-8",

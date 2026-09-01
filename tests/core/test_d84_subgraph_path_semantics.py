@@ -37,6 +37,8 @@ def _root_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Portable graph registry test skill.
+metadata:
+  gskill: gskill.graph.v1
 ---
 
 Use the graph-skill runtime to execute this skill.

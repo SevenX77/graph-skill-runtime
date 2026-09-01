@@ -26,6 +26,8 @@ from graph_skill_runtime.runtime.state_mapper import StateMapper
 _SKILL_ENTRY = """---
 name: skill
 description: Exercise predict validator downgrade behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """
 

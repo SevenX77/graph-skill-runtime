@@ -53,6 +53,8 @@ def _resume_logic_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Exercise durable resume behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )
@@ -140,6 +142,8 @@ def _abc_resume_logic_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Exercise node-selective durable resume behavior.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

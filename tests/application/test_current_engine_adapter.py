@@ -29,6 +29,8 @@ def _logic_skill(root: Path) -> None:
         f"""---
 name: {root.name}
 description: Run the adapter smoke graph for embedded engine verification.
+metadata:
+  gskill: gskill.graph.v1
 ---
 
 Use the installed gskill runtime.

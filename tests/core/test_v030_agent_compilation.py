@@ -23,6 +23,8 @@ def _graph(parent: Path) -> Path:
         """---
 name: portable-agent
 description: Exercise portable Agent phase compilation.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """,
     )

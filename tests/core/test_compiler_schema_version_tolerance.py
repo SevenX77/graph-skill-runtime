@@ -15,7 +15,7 @@ def _write_skill(parent: Path, schema_version_literal: str) -> Path:
     root = parent / "schema-version-skill"
     (root / "phases" / "hello" / "actions").mkdir(parents=True)
     (root / "SKILL.md").write_text(
-        "---\nname: schema-version-skill\ndescription: Schema version fixture.\n---\n",
+        "---\nname: schema-version-skill\ndescription: Schema version fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
         encoding="utf-8",
     )
     (root / "graph.yaml").write_text(

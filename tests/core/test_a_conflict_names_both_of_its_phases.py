@@ -73,7 +73,7 @@ def _overwriting_skill(root: Path) -> Path:
     """Two chained phases that both declare the same output field."""
     _write(
         root / "SKILL.md",
-        f"---\nname: {root.name}\ndescription: Conflict diagnostic fixture.\n---\n",
+        f"---\nname: {root.name}\ndescription: Conflict diagnostic fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     _write(
         root / "graph.yaml",

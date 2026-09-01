@@ -7,14 +7,14 @@ copies, or globally discovers these examples.
 Compile the deterministic hello-world example from the repository root:
 
 ```console
-gskill compile examples/hello-world
+python -m graph_skill_runtime compile examples/hello-world
 ```
 
 Run it through the embedded executor when the optional embedded dependencies
 are installed:
 
 ```console
-gskill run examples/hello-world --executor embedded --inputs-json '{"name":"Developer"}'
+python -m graph_skill_runtime run examples/hello-world --executor embedded --inputs-json '{"name":"Developer"}'
 ```
 
 An Agent Skills host can discover [`hello-world/SKILL.md`](./hello-world/SKILL.md)

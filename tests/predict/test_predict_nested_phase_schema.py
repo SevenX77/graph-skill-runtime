@@ -20,6 +20,8 @@ from graph_skill_runtime.core.runner import predict_skill
 _SKILL_ENTRY = """---
 name: parent
 description: Exercise predict schemas inside flat-registry subgraphs.
+metadata:
+  gskill: gskill.graph.v1
 ---
 """
 

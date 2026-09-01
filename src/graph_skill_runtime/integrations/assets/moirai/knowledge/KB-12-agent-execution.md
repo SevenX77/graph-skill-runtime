@@ -9,7 +9,7 @@ The current host must then:
 3. give that subagent the complete `AgentTask` without relying on conversation history;
 4. receive exactly one JSON value satisfying `task.output_schema`;
 5. wrap it as `AgentResult` with the same `task_id`, terminal status, executor identity, and non-secret provenance;
-6. call the `submit_agent_result` tool belonging to the `gskill` MCP server, or use `gskill submit`.
+6. call the `submit_agent_result` tool belonging to the `gskill` MCP server, or use `python -m graph_skill_runtime submit`.
 
 `resume` only observes the current durable wait or terminal response. It does not accept or apply Agent output.
 

@@ -30,7 +30,7 @@ def _root(tmp_path: Path) -> Path:
     root = tmp_path / "line-location-skill"
     _write(
         root / "SKILL.md",
-        "---\nname: line-location-skill\ndescription: Line location fixture.\n---\n",
+        "---\nname: line-location-skill\ndescription: Line location fixture.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     return root
 

@@ -36,7 +36,7 @@ def _new_skill(parent: Path, name: str = "round14") -> Path:
     root = parent / name
     _write(
         root / "SKILL.md",
-        f"---\nname: {name}\ndescription: Exercise the portable compiler contract.\n---\n",
+        f"---\nname: {name}\ndescription: Exercise the portable compiler contract.\nmetadata:\n  gskill: gskill.graph.v1\n---\n",
     )
     return root
 
