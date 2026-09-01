@@ -119,17 +119,21 @@ class PhaseTokenInfo:
 
 
 @dataclass(frozen=True)
-class BodyPhaseRef:
-    """Normalized topology declaration from one ``graph.yaml`` phase entry."""
+class PhaseTopologyRef:
+    """Normalized topology declaration from one ``graph.yaml`` phase entry.
+
+    Diagnostics locate a phase by ``token.line_start``, the file-absolute
+    ``graph.yaml`` line of its ``- id:`` entry. A portable v1 graph declares its
+    topology only in ``graph.yaml``, so there is one line coordinate per phase;
+    the separate body-relative coordinate that schema-1.x needed for ``<phase>``
+    tags inside a markdown ``GRAPH.md`` body no longer has a second carrier to
+    disagree with.
+    """
 
     name: str
     depends_on: tuple[str, ...]
     output: bool
     token: PhaseTokenInfo
-    # FILE-absolute line of this phase's ``<phase>`` tag, for diagnostics
-    # (phase-cycle / depends-unknown). Kept separate from ``token.line_start``,
-    # which stays body-relative for the serializer/cache round-trip (hash-locked).
-    diag_line: int
 
 
 class SkillLoader:
@@ -187,7 +191,7 @@ class SkillLoader:
         allowed_roles: set[str] | None,
     ) -> CompiledSkill:
         _guard_portable_skill_root(root)
-        skill_manifest = _load_root_skill_manifest(root)
+        skill_manifest, skill_diags = _load_root_skill_manifest(root)
 
         graph_roots = [root]
         graphs_dir = root / "graphs"
@@ -198,6 +202,11 @@ class SkillLoader:
         graph_registry: dict[str, CompiledSkill] = {}
         compiled_graphs: list[CompiledSkill] = []
         errors: list[SkillLoadError] = []
+        # Root metadata first, so a defective SKILL.md keeps its identity as the
+        # primary error while the graph batch below still contributes its own
+        # defects to the same aggregated CompileResult.
+        if skill_diags:
+            errors.append(_diags_error(skill_diags))
         for graph_root in graph_roots:
             try:
                 compiled_graphs.append(
@@ -276,11 +285,10 @@ class SkillLoader:
 
         graph_path = root / "graph.yaml"
         graph_frontmatter = _read_graph_yaml(graph_path)
-        graph_body = ""
         _reject_deprecated_physical_io(root)
         manifest, fm_diags, manifest_poisoned = _build_graph_manifest(graph_path, graph_frontmatter)
-        body_phase_refs = [] if manifest_poisoned else _phase_refs_from_manifest(graph_path, manifest)
-        phase_tokens: dict[str, PhaseTokenInfo] = {ref.name: ref.token for ref in body_phase_refs}
+        phase_refs = [] if manifest_poisoned else _phase_refs_from_manifest(graph_path, manifest)
+        phase_tokens: dict[str, PhaseTokenInfo] = {ref.name: ref.token for ref in phase_refs}
 
         batch_errors: list[SkillLoadError] = []
         if fm_diags:
@@ -311,7 +319,7 @@ class SkillLoader:
             graph_topology = _validate_graph_topology(
                 graph_path,
                 [phase.id for phase in manifest.phases],
-                body_phase_refs,
+                phase_refs,
                 root,
                 graph_diags,
             )
@@ -457,8 +465,8 @@ class SkillLoader:
             diags=post_diags,
             poisoned_phases=poisoned_phases,
         )
-        _validate_sequential_overwrites(graph_path, body_phase_refs, phase_docs, post_diags)
-        _validate_parallel_writers(graph_path, body_phase_refs, phase_docs, post_diags)
+        _validate_sequential_overwrites(graph_path, phase_refs, phase_docs, post_diags)
+        _validate_parallel_writers(graph_path, phase_refs, phase_docs, post_diags)
 
         discovery_failed = False
         subagent_failed = False
@@ -508,7 +516,7 @@ class SkillLoader:
             _raise_diags(post_diags)
 
         raw = {
-            "graph": {"frontmatter": graph_frontmatter, "body": graph_body},
+            "graph": {"frontmatter": graph_frontmatter},
             "graph_topology": graph_topology,
             "io": {
                 "inputs": io_inputs,
@@ -601,8 +609,9 @@ def _io_fatal(
 # Collect-all diagnostics (compile/lint is static analysis, not a run): gather  #
 # every independent defect in one pass instead of aborting at the first         #
 # ``_fatal``. Structural failures that make further parsing impossible still    #
-# abort (missing graph.yaml, phase-name-set mismatch); the topology stage,     #
-# IO schema, and per-node content checks all accumulate. The full set rides on  #
+# abort (an unreadable or absent graph.yaml); the root SKILL.md metadata, the   #
+# topology stage, IO schema, and per-node content checks all accumulate — a     #
+# defect in one of them must never hide the others. The full set rides on       #
 # ``exc.compile_result.issues`` — the ONE seam every Studio consumer (compile   #
 # drawer AND realtime lint) projects; the primary ``payload`` stays the first   #
 # defect only as the exception's identity.                                      #
@@ -957,29 +966,54 @@ def _guard_portable_skill_root(skill_root: Path) -> None:
         _raise_diags(diags)
 
 
-def _load_root_skill_manifest(skill_root: Path) -> RootSkillManifest:
+def _load_root_skill_manifest(skill_root: Path) -> tuple[RootSkillManifest, list[_Diag]]:
+    """Parse the root Agent Skills metadata, collecting its defects.
+
+    Root ``SKILL.md`` metadata and the bundle's graph topology are independent
+    facts, so one compile must report both: an unusable ``name`` must not hide a
+    broken DAG, or fixing the name would only "reveal" the next defect on the
+    next compile — the collect-all rule this module's header states. This
+    mirrors ``_guard_portable_skill_root``, which already accumulates instead of
+    aborting, so the root stage runs one discipline rather than two.
+
+    When validation fails, the returned manifest is a placeholder that exists
+    only to let the graph batch reach its own diagnostics; the caller raises at
+    the collect-all barrier, so no consumer of a successful compile can see it.
+    """
     skill_path = skill_root / "SKILL.md"
+    frontmatter: dict[str, Any] = {}
     try:
         frontmatter, _body, _line_meta = parse_markdown_parts(skill_path)
         manifest = RootSkillManifest.model_validate(frontmatter)
     except ValidationError as exc:
         loc = _first_validation_loc(exc)
-        _fatal(
+        diag = _Diag(
             skill_path,
             _frontmatter_loc_line(skill_path, frontmatter, loc),
+            "[F-v3-skill-metadata-invalid]",
             f"invalid Agent Skills metadata: {exc}",
-            code="[F-v3-skill-metadata-invalid]",
             field_path=_field_path_from_loc(loc),
         )
-    if manifest.name != skill_root.name:
-        _fatal(
-            skill_path,
-            _frontmatter_key_line(skill_path, "name"),
-            f"Agent Skills name {manifest.name!r} must match directory {skill_root.name!r}",
-            code="[F-v3-skill-name-directory-mismatch]",
-            field_path="name",
+        placeholder = RootSkillManifest.model_construct(
+            name=skill_root.name,
+            description="",
+            license=None,
+            compatibility=None,
+            metadata={},
+            allowed_tools=None,
         )
-    return manifest
+        return placeholder, [diag]
+    if manifest.name != skill_root.name:
+        return manifest, [
+            _Diag(
+                skill_path,
+                _frontmatter_key_line(skill_path, "name"),
+                "[F-v3-skill-name-directory-mismatch]",
+                f"Agent Skills name {manifest.name!r} must match directory {skill_root.name!r}",
+                field_path="name",
+            )
+        ]
+    return manifest, []
 
 
 def _guard_graph_root(graph_root: Path) -> None:
@@ -1904,11 +1938,18 @@ def _build_graph_manifest(
         return manifest, diags, True
 
 
-def _phase_refs_from_manifest(graph_path: Path, manifest: GraphManifest) -> list[BodyPhaseRef]:
-    """Adapt typed YAML phase declarations to the characterized topology engine."""
+def _phase_refs_from_manifest(graph_path: Path, manifest: GraphManifest) -> list[PhaseTopologyRef]:
+    """Adapt typed YAML phase declarations to the characterized topology engine.
+
+    This is a total 1:1 map over ``manifest.phases``: one ref per declared
+    phase, no filter and no skip. Every downstream topology check therefore
+    sees exactly the ids the validated ``GraphManifest`` already guarantees to
+    be present, unique and well-formed — which is why re-checking those three
+    facts here would be unreachable rather than defensive.
+    """
 
     lines = read_authored_text(graph_path).splitlines()
-    refs: list[BodyPhaseRef] = []
+    refs: list[PhaseTopologyRef] = []
     for phase in manifest.phases:
         phase_line = _yaml_phase_id_line(lines, phase.id)
         attrs = {
@@ -1923,12 +1964,11 @@ def _phase_refs_from_manifest(graph_path: Path, manifest: GraphManifest) -> list
             attrs=attrs,
         )
         refs.append(
-            BodyPhaseRef(
+            PhaseTopologyRef(
                 name=phase.id,
                 depends_on=phase.depends_on,
                 output=phase.output,
                 token=token,
-                diag_line=phase_line,
             )
         )
     return refs
@@ -1956,39 +1996,38 @@ def get_phase_token_info(compiled: CompiledSkill, phase_id: str) -> PhaseTokenIn
 def _validate_graph_topology(
     graph_path: Path,
     phases: list[str],
-    body_phase_refs: list[BodyPhaseRef],
+    phase_refs: list[PhaseTopologyRef],
     skill_root: Path,
     diags: list[_Diag],
 ) -> dict[str, Any]:
     """Validate the phase DAG, collecting every independent defect into ``diags``.
 
-    Structural failures that make the topology unreadable (no phases declared,
-    name-set mismatch) still abort; everything below them — islands, unknown
-    deps, cycles, output markers, phase dirs — accumulates so one compile
-    reports the whole stage (compile-rules §2.1 同阶段尽量聚合). When ``diags``
-    is non-empty the returned dict is a placeholder: the caller raises at the
-    collect-all barrier before anything consumes it.
+    This stage never aborts: phase dirs, islands, unknown deps, cycles and
+    output markers all accumulate, so one compile reports the whole stage
+    (compile-rules §2.1 同阶段尽量聚合). The caller only reaches here with a
+    validated ``GraphManifest``, so phase presence, id grammar and id
+    uniqueness are already settled facts rather than checks to repeat. When
+    ``diags`` is non-empty the returned dict is a placeholder: the caller
+    raises at the collect-all barrier before anything consumes it.
     """
-    _validate_graph_phase_declarations(graph_path, phases, body_phase_refs)
-    body_names = [ref.name for ref in body_phase_refs]
-    _validate_phase_name_sets(graph_path, phases, body_names, skill_root, diags)
+    _validate_phase_name_sets(graph_path, phases, skill_root, diags)
     adjacency, input_roots, flagged = _collect_graph_dependencies(
         graph_path,
         phases,
-        body_phase_refs,
+        phase_refs,
         diags,
     )
 
-    # FILE-absolute line for each phase's own <phase> tag, shared by the cycle and
-    # island diagnostics so both mark the offending tag (not the frontmatter ---).
-    line_by_name = {ref.name: ref.diag_line for ref in body_phase_refs}
+    # File-absolute graph.yaml line of each phase's own entry, shared by the cycle
+    # and island diagnostics so both mark the offending phase (not the file head).
+    line_by_name = {ref.name: ref.token.line_start for ref in phase_refs}
     cycle_nodes = _validate_acyclic_graph(graph_path, adjacency, line_by_name, diags)
     # Phases already diagnosed (no depends_on / unknown dep / cycle member) seed
     # the reachability walk instead of re-flagging: their unreachability is the
     # defect already reported, and their downstream is only unreachable as a
     # cascade of it.
     _validate_no_islands(graph_path, adjacency, input_roots, line_by_name, diags, flagged | cycle_nodes)
-    _validate_output_phases(graph_path, body_phase_refs, adjacency, diags)
+    _validate_output_phases(graph_path, phase_refs, adjacency, diags)
     return {
         "phases": [
             {
@@ -1996,54 +2035,25 @@ def _validate_graph_topology(
                 "depends_on": list(ref.depends_on),
                 "output": ref.output,
             }
-            for ref in body_phase_refs
+            for ref in phase_refs
         ],
         "order": _topological_order(adjacency, phases) if not diags else [],
     }
 
 
-def _validate_graph_phase_declarations(
-    graph_path: Path,
-    phases: list[str],
-    body_phase_refs: list[BodyPhaseRef],
-) -> None:
-    if not phases:
-        _graph_fatal(
-            graph_path,
-            1,
-            "[F-v3-graph-phases-missing] graph.yaml must declare at least one phase",
-        )
-    if not body_phase_refs:
-        _graph_fatal(
-            graph_path,
-            1,
-            "[F-v3-graph-phase-id-invalid] graph.yaml must declare typed phase entries",
-        )
-    if len(set(phases)) != len(phases):
-        _graph_fatal(
-            graph_path,
-            _frontmatter_key_line(graph_path, "phases"),
-            "[F-v3-graph-phase-id-duplicate] duplicate phase id in graph.yaml phases",
-        )
-
-    body_names = [ref.name for ref in body_phase_refs]
-    if len(set(body_names)) != len(body_names):
-        _graph_fatal(
-            graph_path,
-            1,
-            "[F-v3-graph-phase-id-duplicate] duplicate normalized phase id in graph.yaml",
-        )
-
-
 def _validate_phase_name_sets(
     graph_path: Path,
     phases: list[str],
-    body_names: list[str],
     skill_root: Path,
     diags: list[_Diag],
 ) -> None:
+    """Report, per id, every disagreement between graph.yaml and phases/ dirs.
+
+    The two sets are independent facts — one is authored text, the other is the
+    filesystem — so each side's surplus gets its own located diagnostic instead
+    of one set-inequality fatal that names neither id.
+    """
     phase_set = set(phases)
-    body_set = set(body_names)
     physical_set = {path.name for path in (skill_root / "phases").iterdir() if path.is_dir()}
 
     missing = sorted(phase_set - physical_set)
@@ -2068,22 +2078,12 @@ def _validate_phase_name_sets(
                 field_path="phases",
             )
         )
-    if body_set != phase_set:
-        diags.append(
-            _Diag(
-                graph_path,
-                _frontmatter_key_line(graph_path, "phases"),
-                "[F-v3-graph-phase-name-mismatch]",
-                "normalized graph.yaml phase entries do not match the declared phase ids",
-                field_path="phases",
-            )
-        )
 
 
 def _collect_graph_dependencies(
     graph_path: Path,
     phases: list[str],
-    body_phase_refs: list[BodyPhaseRef],
+    phase_refs: list[PhaseTopologyRef],
     diags: list[_Diag],
 ) -> tuple[dict[str, list[str]], list[str], set[str]]:
     """Build the adjacency map, collecting per-phase/per-edge defects.
@@ -2096,7 +2096,7 @@ def _collect_graph_dependencies(
     adjacency: dict[str, list[str]] = {name: [] for name in phases}
     input_roots: list[str] = []
     flagged: set[str] = set()
-    for ref in body_phase_refs:
+    for ref in phase_refs:
         if not ref.depends_on:
             # `depends_on` is required (portable gSkill v1 contract §4.2;
             # first node must declare `depends_on: [input]`). A bare phase with no
@@ -2106,7 +2106,7 @@ def _collect_graph_dependencies(
             diags.append(
                 _make_diag(
                     graph_path,
-                    ref.diag_line,
+                    ref.token.line_start,
                     f"[F-v3-graph-phase-island] phase {ref.name!r} declares no depends_on "
                     '(every phase must connect to "input" or an upstream phase)',
                     field_path=f"{ref.name}.depends_on",
@@ -2121,7 +2121,7 @@ def _collect_graph_dependencies(
                 diags.append(
                     _make_diag(
                         graph_path,
-                        ref.diag_line,
+                        ref.token.line_start,
                         f"[F-v3-graph-depends-unknown] phase {ref.name!r} depends_on unknown phase {dep!r}",
                         field_path=f"{ref.name}.depends_on",
                     )
@@ -2132,7 +2132,7 @@ def _collect_graph_dependencies(
                 diags.append(
                     _make_diag(
                         graph_path,
-                        ref.diag_line,
+                        ref.token.line_start,
                         f"[F-v3-graph-phase-cycle] phase {ref.name!r} cannot depend on itself",
                         field_path=f"{ref.name}.depends_on",
                     )
@@ -2222,11 +2222,11 @@ def _validate_no_islands(
 
 def _validate_output_phases(
     graph_path: Path,
-    body_phase_refs: list[BodyPhaseRef],
+    phase_refs: list[PhaseTopologyRef],
     adjacency: dict[str, list[str]],
     diags: list[_Diag],
 ) -> None:
-    outputs = {ref.name for ref in body_phase_refs if ref.output}
+    outputs = {ref.name for ref in phase_refs if ref.output}
     non_terminal = {phase for phase, downstream in adjacency.items() if downstream}
     invalid = sorted(outputs & non_terminal)
     if invalid:
@@ -3268,10 +3268,10 @@ def _parse_attrs(raw: str) -> dict[str, str]:
 
 
 def _phase_ancestor_sets(
-    body_phase_refs: list[BodyPhaseRef],
+    phase_refs: list[PhaseTopologyRef],
 ) -> dict[str, set[str]]:
     """Transitive dependency closure per phase (excluding the 'input' pseudo-node)."""
-    depends_on_map = {ref.name: list(ref.depends_on) for ref in body_phase_refs}
+    depends_on_map = {ref.name: list(ref.depends_on) for ref in phase_refs}
 
     def get_ancestors(phase_name: str) -> set[str]:
         ancestors: set[str] = set()
@@ -3283,7 +3283,7 @@ def _phase_ancestor_sets(
                 queue.extend(depends_on_map.get(curr, []))
         return ancestors
 
-    return {ref.name: get_ancestors(ref.name) for ref in body_phase_refs}
+    return {ref.name: get_ancestors(ref.name) for ref in phase_refs}
 
 
 def _phase_declared_output_keys(phase_docs: list[PhaseDocument]) -> dict[str, set[str]]:
@@ -3300,7 +3300,7 @@ def _phase_declared_output_keys(phase_docs: list[PhaseDocument]) -> dict[str, se
 
 def _validate_parallel_writers(
     graph_path: Path,
-    body_phase_refs: list[BodyPhaseRef],
+    phase_refs: list[PhaseTopologyRef],
     phase_docs: list[PhaseDocument],
     diags: list[_Diag],
 ) -> None:
@@ -3312,10 +3312,10 @@ def _validate_parallel_writers(
     unrepresentable at compile time instead (parallel-fanout decision,
     2026-08-15).
     """
-    ancestor_sets = _phase_ancestor_sets(body_phase_refs)
+    ancestor_sets = _phase_ancestor_sets(phase_refs)
     phase_output_keys = _phase_declared_output_keys(phase_docs)
     docs_by_name = {doc.phase_name: doc for doc in phase_docs}
-    names = [ref.name for ref in body_phase_refs]
+    names = [ref.name for ref in phase_refs]
 
     for index, first in enumerate(names):
         for second in names[index + 1 :]:
@@ -3349,11 +3349,11 @@ def _validate_parallel_writers(
 
 def _validate_sequential_overwrites(
     graph_path: Path,
-    body_phase_refs: list[BodyPhaseRef],
+    phase_refs: list[PhaseTopologyRef],
     phase_docs: list[PhaseDocument],
     diags: list[_Diag],
 ) -> None:
-    ancestor_sets = _phase_ancestor_sets(body_phase_refs)
+    ancestor_sets = _phase_ancestor_sets(phase_refs)
     phase_output_keys = _phase_declared_output_keys(phase_docs)
 
     for doc in phase_docs:

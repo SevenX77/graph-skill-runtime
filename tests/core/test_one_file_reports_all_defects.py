@@ -16,6 +16,13 @@ sits INSIDE the ``try`` block that guards ``int(value)``, so the validator's
 own ``except (ValueError, TypeError)`` swallows it and re-raises the
 wrong-cause message ("must be an integer") for an input that IS a valid
 integer — just out of the 1..50 range.
+
+Defect 3 (loader.py ``_load_root_skill_manifest``): the root ``SKILL.md``
+metadata check runs as a single ``_fatal`` BEFORE the per-graph compile batch,
+so one defective Agent Skills field hides every graph-layer defect in the
+bundle. Fixing the root metadata then "reveals" the next defect on the NEXT
+compile — the same disease as Defect 1, one stage earlier. Root metadata and
+graph topology are independent facts, so one compile must report both.
 """
 
 from __future__ import annotations
@@ -85,7 +92,13 @@ def _issues(exc: SkillLoadError) -> list[object]:
 
 
 def _codes(exc: SkillLoadError) -> set[str]:
-    return {str(getattr(issue, "rule_id", "")) for issue in _issues(exc)}
+    # ``rule_id`` on a CompileIssue, ``code`` on the payload fallback: a fatal
+    # that never reached the aggregation seam would otherwise report an empty
+    # code and hide WHICH single defect was raised.
+    return {
+        str(getattr(issue, "rule_id", None) or getattr(issue, "code", ""))
+        for issue in _issues(exc)
+    }
 
 
 def _messages(exc: SkillLoadError) -> str:
@@ -141,3 +154,106 @@ def test_max_iterations_out_of_range_message_names_the_range(
     messages = _messages(exc)
     assert "between 1 and 50" in messages, messages
     assert "must be an integer" not in messages, messages
+
+
+def _write_root_metadata_and_graph_defect(
+    parent: Path, *, dir_name: str, skill_frontmatter: str
+) -> Path:
+    """One bundle carrying an independent root-metadata AND graph-topology defect.
+
+    The graph defect is a phase depending on an undeclared phase, which the
+    topology stage reports as a collected diagnostic; it is independent of
+    whatever the root ``SKILL.md`` metadata says.
+    """
+    root = parent / dir_name
+    _write(root / "SKILL.md", f"---\n{skill_frontmatter}\n---\n")
+    _write(
+        root / "graph.yaml",
+        "schema_version: gskill.graph.v1\ngraph_id: root\n"
+        f"description: Exercise root-plus-graph aggregation.\n{_EMPTY_IO}\n"
+        "phases:\n"
+        "  - id: main\n"
+        "    depends_on: [ghost]\n"
+        "    output: true\n",
+    )
+    _write(
+        root / "phases" / "main" / "AGENT.md",
+        f"---\nname: main\n{_EMPTY_IO}\n---\n<role>R</role>\n<goal>G</goal>\n",
+    )
+    return root
+
+
+def test_invalid_root_metadata_does_not_hide_graph_defects(
+    tmp_path: Path, mock_skill_resolver: SkillResolverProtocol
+) -> None:
+    """A defective root SKILL.md must not mask the graph layer.
+
+    ``description`` is missing (an Agent Skills metadata defect) and ``main``
+    depends on an undeclared phase (a topology defect). One compile must report
+    BOTH, so fixing the metadata cannot 'reveal' the topology defect afterwards.
+    """
+    skill_root = _write_root_metadata_and_graph_defect(
+        tmp_path,
+        dir_name="j04b-root-meta",
+        skill_frontmatter="name: j04b-root-meta",
+    )
+
+    codes = _codes(_raises(skill_root, mock_skill_resolver))
+    assert "[F-v3-skill-metadata-invalid]" in codes, codes
+    assert "[F-v3-graph-depends-unknown]" in codes, codes
+
+
+def test_root_name_directory_mismatch_does_not_hide_graph_defects(
+    tmp_path: Path, mock_skill_resolver: SkillResolverProtocol
+) -> None:
+    """Same barrier, second root code: the name/directory mismatch is one
+    independent fact and must be reported alongside the topology defect."""
+    skill_root = _write_root_metadata_and_graph_defect(
+        tmp_path,
+        dir_name="j04b-root-name",
+        skill_frontmatter="name: not-the-directory\ndescription: Wrong name on purpose.",
+    )
+
+    codes = _codes(_raises(skill_root, mock_skill_resolver))
+    assert "[F-v3-skill-name-directory-mismatch]" in codes, codes
+    assert "[F-v3-graph-depends-unknown]" in codes, codes
+
+
+def test_root_metadata_defect_alone_still_fails_and_rides_the_issues_seam(
+    tmp_path: Path, mock_skill_resolver: SkillResolverProtocol
+) -> None:
+    """Aggregating the root check must not soften it into a warning.
+
+    With every graph fact healthy, a root name/directory mismatch is still the
+    only defect — and it must both fail the compile and appear on
+    ``compile_result.issues``, the one seam realtime lint projects. Before
+    aggregation this code existed only as a bare payload, invisible to that
+    seam.
+    """
+    skill_root = tmp_path / "j04b-root-only"
+    _write(
+        skill_root / "SKILL.md",
+        "---\nname: not-the-directory\ndescription: Only the root name is wrong.\n---\n",
+    )
+    _write(
+        skill_root / "graph.yaml",
+        "schema_version: gskill.graph.v1\ngraph_id: root\n"
+        f"description: Only the root name is wrong.\n{_EMPTY_IO}\n"
+        "phases:\n"
+        "  - id: main\n"
+        "    depends_on: [input]\n"
+        "    output: true\n",
+    )
+    _write(
+        skill_root / "phases" / "main" / "AGENT.md",
+        f"---\nname: main\n{_EMPTY_IO}\n---\n<role>R</role>\n<goal>G</goal>\n",
+    )
+
+    exc = _raises(skill_root, mock_skill_resolver)
+    issues = getattr(getattr(exc, "compile_result", None), "issues", None)
+    assert issues, "the root defect must reach compile_result.issues"
+    assert [str(getattr(issue, "rule_id", "")) for issue in issues] == [
+        "[F-v3-skill-name-directory-mismatch]"
+    ]
+    assert exc.payload is not None
+    assert exc.payload.code == "[F-v3-skill-name-directory-mismatch]"
