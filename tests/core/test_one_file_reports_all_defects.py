@@ -246,7 +246,10 @@ def test_root_metadata_defect_alone_still_fails_and_rides_the_issues_seam(
     )
     _write(
         skill_root / "phases" / "main" / "AGENT.md",
-        f"---\nname: main\n{_EMPTY_IO}\n---\n<role>R</role>\n<goal>G</goal>\n",
+        # `llm_role` is part of "every graph fact healthy" since the 2026-08-31
+        # ruling: a phase that names no role is itself a defect, and this test
+        # asserts the root mismatch is the ONLY one.
+        f"---\nname: main\nllm_role: analyst\n{_EMPTY_IO}\n---\n<role>R</role>\n<goal>G</goal>\n",
     )
 
     exc = _raises(skill_root, mock_skill_resolver)

@@ -24,10 +24,19 @@ def get_cache_dir() -> Path:
     return Path.home() / ".cache" / "graph-skill-runtime-portable-v1"
 
 
-def compute_cache_key(root: Path) -> str:
+def compute_cache_key(root: Path, *, schema_version: int) -> str:
+    """Key one compiled bundle by its inputs AND by the rules that compiled it.
+
+    ``schema_version`` is the caller's compile-rule identity
+    (``compiler.CACHE_SCHEMA_VERSION``); it is passed in rather than imported so
+    this module keeps knowing nothing about compile rules. It is required, with
+    no default, because a caller that omitted it would silently mint keys that
+    outlive the rules behind them — the exact defect the field exists to close.
+    """
     root = root.resolve()
     payload = {
         "format": "portable-v1",
+        "rules": schema_version,
         "root": str(root),
         "python": list(sys.version_info[:3]),
         "package": _get_graph_skill_runtime_version(),

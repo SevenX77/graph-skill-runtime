@@ -45,6 +45,7 @@ def _agent_skill(root: Path) -> None:
         """---
 schema_version: "v0.3.0"
 name: agent-node-observability
+llm_role: analyst
 io:
   inputs:
     type: object

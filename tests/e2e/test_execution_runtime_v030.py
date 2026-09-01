@@ -54,6 +54,7 @@ description: Exercise portable agent execution end to end.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise portable agent execution end to end.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -133,6 +134,7 @@ description: Exercise flat-registry subgraph execution end to end.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise flat-registry subgraph execution end to end.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -178,6 +180,7 @@ io:
         """schema_version: gskill.graph.v1
 graph_id: child
 description: Inspect isolated child graph inputs.
+llm_role: analyst
 io:
   inputs:
     type: object

@@ -24,6 +24,7 @@ def _legacy_graph(root: Path, *, name: str, phase_id: str, output_field: str = "
 schema_version: v0.3.0
 name: {name}
 description: Legacy {name} graph.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -95,6 +96,7 @@ def _portable_logic_skill(root: Path) -> None:
         """schema_version: gskill.graph.v1
 graph_id: external
 description: Portable external graph.
+llm_role: analyst
 io:
   inputs:
     type: object

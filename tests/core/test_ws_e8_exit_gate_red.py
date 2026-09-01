@@ -133,6 +133,7 @@ def _write_exit_gate_skill(root: Path, *, max_iterations: int = 2) -> None:
         """---
 schema_version: "v0.3.0"
 name: ws-e8-exit-gate-red
+llm_role: analyst
 io:
   inputs:
     type: object

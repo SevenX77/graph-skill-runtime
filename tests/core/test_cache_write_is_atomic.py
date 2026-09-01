@@ -35,6 +35,7 @@ _GRAPH_MD = """---
 schema_version: "v0.3.0"
 name: cache-atomicity-fixture
 description: Smallest compilable skill.
+llm_role: analyst
 io:
   inputs:
     type: object

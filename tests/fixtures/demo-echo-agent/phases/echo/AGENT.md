@@ -1,5 +1,6 @@
 ---
 name: echo
+llm_role: analyst
 io:
   inputs:
     type: object

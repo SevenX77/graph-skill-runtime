@@ -56,6 +56,7 @@ def _base(root: Path, phases: str, outputs: dict[str, object] | None = None) -> 
         f"""---
 schema_version: "v0.3.0"
 name: gamma2-reference
+llm_role: analyst
 io:
   inputs:
     type: object

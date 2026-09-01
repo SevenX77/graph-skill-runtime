@@ -5,7 +5,7 @@ role: contract
 status: audited-ready
 ssot: graph_skill_format_templates
 aligns_with: ../design/v1-alignment.md
-updated: 2026-08-27
+updated: 2026-09-01
 ---
 
 # Portable gSkill v1 格式规范
@@ -362,7 +362,7 @@ examples:
 | `name` | 是 | 非空显示名 |
 | `io` | 是 | phase 输入输出 schema |
 | `llm_role` | 否 | phase 自己的 LLM role |
-| `use_graph_llm_role` | 否 | boolean，默认 `false`；为 `true` 时只走 graph role → fallback，保留但不选择 phase role |
+| `use_graph_llm_role` | 否 | boolean，默认 `false`；为 `true` 时只取 graph role，保留但不选择 phase role |
 | `validator` | 否 | boolean，默认 `false` |
 | `max_iterations` | 否 | integer，范围 1..50；默认 10 |
 | `tools` | 否 | 无重复的业务 tool name list；每项必须从 skill-root 或本 phase 的 tool registry 解析 |
@@ -374,7 +374,18 @@ examples:
 | `allow_sequential_overwrite` | 否 | 允许本 phase 覆盖祖先输出的字段名 list |
 | `iterate` | 否 | `IterateSpec` |
 
-有效 LLM role 的选择顺序是：`use_graph_llm_role: true` 时使用 graph role，graph role 不存在时直接使用宿主 fallback；phase 自己的 `llm_role` 保留但不参与本次选择。`use_graph_llm_role: false` 时依次使用 phase role、graph role、宿主 fallback。Role 是否在具体宿主可用由注入的 resolver 在严格 compile/run preflight 判定，不由 portable source 自建 registry。
+有效 LLM role 的选择顺序是：`use_graph_llm_role: true` 时只使用所属 graph 的 `llm_role`，phase 自己的 `llm_role` 保留但不参与本次选择；`use_graph_llm_role: false` 时依次使用 phase role、所属 graph 的 `llm_role`。
+
+该链条必须解析出一个显式声明的 role 名。**Runtime 不发明兜底 role 名，也没有默认 role**：链条解析不到任何名字时该 phase 未设置 role，属于缺陷而不是一种默认状态。
+
+关于 role 的两个问题分属两层，判定条件不同：
+
+1. **有没有名字**——只由 portable source 决定，与宿主无关，因此**任何编译路径无条件判定**（SDK、CLI、MCP、`inspect`、`predict` 一律适用）：解析不到名字即编译期 `[F-v3-agent-llm-role-missing]`。
+2. **这个名字在本宿主能不能路由**——只有宿主答得出，因此由注入的 role resolver 在严格 compile/run preflight 判定（`[F-v3-agent-llm-role-unknown]`），未注入 role 权威时不判定。Portable source 不自建 registry。
+
+Registry graph 各自声明自己的 `llm_role` 默认值；调用方 graph 的默认值不进入被调用 registry graph 内部。
+
+> **修订记录（2026-08-31 用户裁决，本节 role 选择链）**：本节此前规定链条末端为“宿主 fallback”，即 phase 与 graph 都未声明 role 时由 runtime 取一个约定角色名交给宿主解析。该设计被 2026-08-31 用户裁决推翻——“默认角色应该是空，必须要设置，不设置 compile 报错”。推翻依据是实证：runtime 约定的那个名字在任何宿主的种子 role 表里都不存在，于是未设置 role 的 skill 编译全绿、运行期才死在无可用路由上，缺陷位置与报错位置相隔一整个阶段。现行契约把“未设置”定为编译期缺陷，由 `[F-v3-agent-llm-role-missing]` 承载，且该判定不依赖宿主注入 role 权威——否则规则会落在生产编译入口到不了的地方，等于没有生效。
 
 `context_access` 是 framework context capability 的显式门。`working_memory` 挂载读取既有 working memory 的能力，`artifact` 挂载读取 runtime artifact 的能力；未列出的能力不挂载。它不把 framework builtin 改写成业务 tool，也不由 `tools` 重复声明。
 

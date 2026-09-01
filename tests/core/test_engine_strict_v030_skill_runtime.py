@@ -34,6 +34,7 @@ def _write_phase_config_agent_skill(root: Path) -> None:
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Strict phase config graph.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -110,6 +111,7 @@ def _write_validator_logic_skill(
         f"""schema_version: gskill.graph.v1
 graph_id: root
 description: Strict validator graph.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -321,6 +323,7 @@ def _write_text_segmentation_like_skill(root: Path) -> None:
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Strict text segmentation graph.
+llm_role: analyst
 io:
   inputs:
     type: object

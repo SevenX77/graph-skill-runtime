@@ -36,6 +36,7 @@ description: Exercise cache round-trip fidelity.
         f"""schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise cache round-trip fidelity.
+llm_role: analyst
 io:
   inputs:
     type: object

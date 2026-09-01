@@ -47,6 +47,7 @@ Run the graph.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: One deterministic phase.
+llm_role: analyst
 io:
   inputs:
     type: object

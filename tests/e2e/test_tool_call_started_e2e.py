@@ -76,6 +76,7 @@ def _write_skill(root: Path) -> None:
         """---
 schema_version: "v0.3.0"
 name: tool-call-started-e2e
+llm_role: analyst
 io:
   inputs:
     type: object

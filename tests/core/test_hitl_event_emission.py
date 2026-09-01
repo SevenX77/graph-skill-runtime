@@ -76,6 +76,7 @@ def _hitl_skill(root: Path) -> None:
         """schema_version: gskill.graph.v1
 graph_id: root
 description: HITL event graph.
+llm_role: analyst
 io:
   inputs:
     type: object

@@ -119,7 +119,10 @@ def test_graph_manifest_accepts_graph_level_llm_role(
 def test_graph_manifest_llm_role_defaults_to_none(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    skill_root = _write_minimal_agent_skill(tmp_path)
+    # The graph-level field is optional and defaults to None. Since 2026-08-31
+    # the phase then has to name its own role — "no role anywhere" no longer
+    # compiles — so a phase-level role is what leaves the graph default absent.
+    skill_root = _write_minimal_agent_skill(tmp_path, skill_extra="llm_role: analyst")
     compiled = SkillLoader().compile_skill(skill_root, skill_resolver=mock_skill_resolver)
     assert compiled.manifest.llm_role is None
 
@@ -163,7 +166,10 @@ def test_effective_role_switch_on_graph_wins() -> None:
     assert effective_llm_role(ast, "fast") == "fast"
 
 
-def test_effective_role_switch_on_without_graph_default_falls_back() -> None:
+def test_effective_role_switch_on_without_graph_default_resolves_nothing() -> None:
+    # The sharp edge of the switch: `use_graph_llm_role: true` makes the graph
+    # default win WITHOUT erasing the node's own value, so with no graph default
+    # the phase resolves nothing even though its frontmatter names a role.
     ast = AgentNodeAST(
         mode="agent",
         name="seg",
@@ -173,7 +179,7 @@ def test_effective_role_switch_on_without_graph_default_falls_back() -> None:
         use_graph_llm_role=True,
         io=_MINIMAL_IO,
     )
-    assert effective_llm_role(ast, None) == "graph_skill_runtime"
+    assert effective_llm_role(ast, None) is None
 
 
 def test_effective_role_switch_off_node_wins() -> None:
@@ -188,9 +194,21 @@ def test_effective_role_switch_off_without_node_inherits_graph() -> None:
     assert effective_llm_role(ast, "fast") == "fast"
 
 
-def test_effective_role_both_unset_uses_conventional_default() -> None:
+def test_effective_role_both_unset_resolves_nothing() -> None:
+    # User ruling 2026-08-31: the default role is EMPTY and a role must be set
+    # explicitly. The runtime invents no conventional fallback name — a name it
+    # invents exists in no host's role table, so a skill relying on it compiled
+    # green and then died at run time with no available route.
     ast = AgentNodeAST(mode="agent", name="seg", role="r", goal="g", io=_MINIMAL_IO)
-    assert effective_llm_role(ast, None) == "graph_skill_runtime"
+    assert effective_llm_role(ast, None) is None
+
+
+def test_no_module_level_fallback_role_constant_exists() -> None:
+    # Locks the ruling against a reintroduced constant: the previous defect was
+    # not the value "graph_skill_runtime" specifically, it was having one at all.
+    import graph_skill_runtime.core.manifest as manifest_module
+
+    assert not hasattr(manifest_module, "DEFAULT_LLM_ROLE")
 
 
 # --- the resolver receives the effective role, not the raw node value ---
@@ -211,6 +229,32 @@ def test_resolver_receives_effective_role() -> None:
     )
     assert model is not None
     assert resolver.calls == ["fast"]
+
+
+def test_phase_with_no_effective_role_is_refused_at_assembly() -> None:
+    # Bare-SDK backstop for the 2026-08-31 ruling. Every seam below this call
+    # declares the role in its contract (the predict stub records it, the
+    # provider resolves models by it, events are labelled with it), so a phase
+    # that resolves no role cannot honestly reach any of them. In practice
+    # nothing arrives here, because compile rejects such a phase
+    # unconditionally as [F-v3-agent-llm-role-missing]; this covers a caller
+    # that assembles a hand-built AST without going through the compiler.
+    import pytest
+
+    resolver = _RecordingResolver()
+    with pytest.raises(ValueError, match="resolves no LLM role"):
+        _resolve_phase_chat_model(
+            "seg",
+            None,
+            chat_model=None,
+            model_resolver=resolver,
+            llm_provider=None,
+            callbacks=(),
+            system_prompt=_AgentSystemPrompt(
+                text="", template_source="t", template_text="", source_path=None, variables={}
+            ),
+        )
+    assert resolver.calls == []
 
 
 # --- graph manifest still rejects genuinely unknown fields ---

@@ -3,14 +3,14 @@ module: graph-skill-runtime
 doc: error-code-catalog
 role: contract
 status: living
-updated: 2026-08-27
+updated: 2026-09-01
 ---
 
 # Graph Skill Runtime 错误码目录
 
 本文是 Graph Skill Runtime 已注册错误码的唯一当前目录与语义契约。它定义每个错误码表示的合法状态、触发原因、等级、发生阶段、修复方向和规则 owner。其他设计文档可以在描述控制流时引用某个错误码，但不得再复制一份平行全表。
 
-[`ERROR_REGISTRY`](../../src/graph_skill_runtime/core/error_registry.py) 是本文的可执行镜像。目录与 registry 必须保持双射：本文恰好列出 registry 的 98 个 code，每个 code 只出现一次，`level` 与有序 `stage` 也必须一致。修改任一方时，必须在同一变更中更新另一方并机械核对；registry 中存在但本文缺失的码、本文多出的码、重复码或 stage 漂移都属于契约缺陷。
+[`ERROR_REGISTRY`](../../src/graph_skill_runtime/core/error_registry.py) 是本文的可执行镜像。目录与 registry 必须保持双射：本文恰好列出 registry 的 99 个 code，每个 code 只出现一次，`level` 与有序 `stage` 也必须一致。修改任一方时，必须在同一变更中更新另一方并机械核对；registry 中存在但本文缺失的码、本文多出的码、重复码或 stage 漂移都属于契约缺陷。
 
 `living` 表示本目录随已注册集合持续维护，不表示关联格式已经建立机器哈希锁。[`Portable gSkill v1`](./01-PORTABLE-GSKILL-V1.md) 是状态为 `audited-ready` 的当前 production reader 契约；Phase 2 的前 10 个 bundle 边界码已经随原子切换成为当前错误语义。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 v0.3 converter 输入与历史证据。错误目录保持 `living`，portable 格式保持 `audited-ready`，两者都不得在 owner 盖章和 SHA-256 哈希锁建立前冒用 `FROZEN`。
 
@@ -97,12 +97,13 @@ updated: 2026-08-27
 | `[F-v3-subgraph-io-schema-invalid]` | FATAL | 编译期 | SUBGRAPH phase 的 inputs/outputs 都是合法 JSON Schema object。 | Subgraph I/O 缺失、不是 object schema 或 schema keyword 非法。 | 修正 phase `io.inputs` / `io.outputs`；父子边界不要求字段全集相等。 | [Portable v1 §4.3、§5.3](./01-PORTABLE-GSKILL-V1.md#53-subgraphmd) |
 | `[F-v3-golden-stale-fields]` | FATAL | eval 期 | 每个节点 golden expected output 包含当前 `io.outputs.required` 的全部字段。 | Golden 仍使用旧输出形状，缺少当前必需字段。 | 重新生成 golden，或按当前 output schema 补齐期望字段。 | [Golden eval](../mvp1/02-mechanism/05-run-inner/06-golden-eval/mvp1-alignment.md#3-接口契约) |
 
-## 5. Agent 与 mention 码（18）
+## 5. Agent 与 mention 码（19）
 
 | Code | Level | Stage | 正向定义 | 触发原因 | 修复建议 | Owning spec |
 | --- | --- | --- | --- | --- | --- | --- |
 | `[F-v3-agent-schema-unknown-field]` | FATAL | 编译期 | Agent phase frontmatter 只包含其闭合 schema 允许的字段；portable 使用 `AGENT.md`。 | 出现未知字段、authoring `system_prompt` 或其他不属于 Agent phase 的字段。 | 删除未知字段，并把行为写入结构化 body/合法 frontmatter。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
-| `[F-v3-agent-llm-role-unknown]` | FATAL | 编译期 | Agent 的有效 role 能按 phase → graph → host fallback 规则解析。 | 选中的 phase/graph role 不在宿主 resolver 中。 | 使用已注册 role，或在宿主权威配置中注册它。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
+| `[F-v3-agent-llm-role-unknown]` | FATAL | 编译期 | Agent 的有效 role 按 phase → graph 规则解析出一个名字，且该名字能被注入的 role 权威解析。 | 选中的 phase/graph role 不在宿主 resolver 中。 | 使用已注册 role，或在宿主权威配置中注册它。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
+| `[F-v3-agent-llm-role-missing]` | FATAL | 编译期 | Agent 的有效 role 按 phase → graph 规则解析出一个名字。Runtime 不发明兜底 role 名。本判定与宿主无关，任何编译路径无条件生效。 | Phase 未声明 `llm_role`、所属 graph 也没有图级默认；或 `use_graph_llm_role: true` 而所属 graph 没有图级默认。 | 为该 phase 设置 `llm_role`，或在所属 graph 的 `graph.yaml` 设图级默认（registry graph 各自声明，调用方 graph 的默认不进入其内部）。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-agent-io-schema-invalid]` | FATAL | 编译期 | Agent phase inputs/outputs 都是合法 JSON Schema object。 | Agent I/O 缺失、不是 object schema 或 schema 非法。 | 修正 `AGENT.md.io`，尤其是 output schema。 | [Portable v1 §4.3、§5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-agent-output-schema-invalid]` | FATAL | 运行期 | Agent 完成值满足 phase `io.outputs` schema。 | `finish_task` 输出未通过严格 schema 校验。 | 向模型返回结构化反馈并重试，或修正不合理的 output schema。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-agent-output-schema-missing]` | FATAL | 运行期 | 每个可执行 Agent AST 都携带编译期生成的 output schema。 | 运行时 AST 缺少 `io.outputs`，说明编译/装配管线产生非法状态。 | 修正编译与装配管线；不要在运行时猜测 schema。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |

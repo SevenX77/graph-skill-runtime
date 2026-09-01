@@ -2360,7 +2360,7 @@ def _phase_declared_output_schema(phase_ast: Any) -> dict[str, Any] | None:
 
 def _resolve_phase_chat_model(
     phase_id: str,
-    llm_role: str,
+    llm_role: str | None,
     *,
     chat_model: Any,
     model_resolver: Any,
@@ -2372,6 +2372,20 @@ def _resolve_phase_chat_model(
 ) -> Any:
     # ``llm_role`` is the phase's EFFECTIVE role, already resolved through the
     # use_graph_llm_role / graph-default chain (manifest.effective_llm_role).
+    # User ruling 2026-08-31: the runtime invents no fallback role, and every
+    # seam below declares the role in its contract — the predict stub records it,
+    # the provider request resolves models by it, the call step labels events
+    # with it. A phase that resolves no role cannot honestly reach any of them,
+    # so it fails here with the fix spelled out. In practice nothing gets this
+    # far, because compile rejects it unconditionally as
+    # [F-v3-agent-llm-role-missing]; this guard covers callers that assemble a
+    # hand-built AST without going through the compiler.
+    if llm_role is None:
+        raise ValueError(
+            f"Agent phase {phase_id!r} resolves no LLM role: set `llm_role` in the phase "
+            "frontmatter or a graph default `llm_role` in that graph's graph.yaml (a registry "
+            "graph declares its own default; the calling graph's does not reach inside it)."
+        )
     predict_strategy = getattr(predict_context, "strategy", None)
     if predict_strategy is not None:
         from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel

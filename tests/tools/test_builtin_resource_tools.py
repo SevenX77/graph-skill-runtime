@@ -59,6 +59,7 @@ description: Exercise declared reference and example resources.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise declared reference and example resources.
+llm_role: analyst
 io:
   inputs:
     type: object
