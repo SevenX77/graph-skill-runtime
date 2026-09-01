@@ -128,10 +128,18 @@ ignore_missing_imports = true
 # --------------------------------------------------------------------------- #
 # import-linter: machine-checkable module boundaries
 #
-# Every contract below cites the section of docs/design/v1-alignment.md (or
-# AGENTS.md, which restates it) that authorizes it. Contracts are derived from
-# the design's "allowed dependencies" column, never from the current directory
-# shape: a layer order copied from today's imports would only re-state drift.
+# Every contract below names its authority in its `name`, and the authority is
+# one of exactly two kinds: a section of docs/design/v1-alignment.md (restated in
+# places by AGENTS.md), or an established Python language convention. Contracts
+# are derived from the design's "allowed dependencies" column, never from the
+# current directory shape: a layer order copied from today's imports would only
+# re-state drift.
+#
+# A contract may not be justified by taste. Where the design does not actually
+# authorize an edge, say so and cite what does -- the package-private contract
+# below rests on PEP 8's leading-underscore convention, with section 3.2 as
+# corroboration only (that section enumerates the public contracts; it does not
+# itself forbid the import).
 #
 # Note on layer order: the rows of the v1-alignment section 3.1 table are NOT a
 # layer order (it lists `application` above `ports` while application depends on
@@ -145,17 +153,28 @@ ignore_missing_imports = true
 # a unit test of a package-private module is correct by design and must not be
 # turned into a boundary violation.
 #
-# ignore_imports entries are a RATCHET: each one is a registered pre-existing
-# violation with a stated debt, the list may only get shorter, and
-# tests/test_import_boundary_contracts.py fails if it grows.
+# ignore_imports entries are a RATCHET. Each one is a registered pre-existing
+# violation with a stated debt, and tests/test_import_boundary_contracts.py pins
+# the exact (contract, import expression) pair by literal identity -- not by
+# count, which would let a new violation be swapped in for a cleared one.
+#
 # `unmatched_ignore_imports_alerting = "error"` closes the other side: once a
-# registered violation is actually fixed, its stale ignore line breaks the gate
-# instead of silently widening the contract forever.
+# registered violation is actually fixed, its stale exemption breaks the gate
+# instead of silently widening the contract forever. That option is read PER
+# CONTRACT, not at session level. Verified on import-linter 2.14: with a stale
+# exemption present, setting it to "none" at the top level changed nothing
+# (exit 1, still reported), while setting it to "none" inside the contract
+# silenced the report (exit 0). `application/use_cases.py` consumes exactly six
+# session options -- root_package(s), contract_types,
+# include_external_packages, exclude_type_checking_imports, show_timings -- and
+# this is not one of them; each contract class declares it as its own field
+# (for example contracts/layers.py:132). A top-level key here would be dead
+# config that reads as protection while providing none, so it is declared only
+# on the contract that carries exemptions.
 # --------------------------------------------------------------------------- #
 [tool.importlinter]
 root_package = "graph_skill_runtime"
 include_external_packages = false
-unmatched_ignore_imports_alerting = "error"
 
 [[tool.importlinter.contracts]]
 # Why: v1-alignment section 3.1 module-boundary table, "allowed dependencies"
@@ -165,6 +184,9 @@ unmatched_ignore_imports_alerting = "error"
 # reaches the runtime only through its public typed contracts.
 name = "Layered module boundaries (v1-alignment 3.1)"
 type = "layers"
+# This is the only contract carrying exemptions, so it is the only one that needs
+# the option; it is a per-contract field, not a session option (see header).
+unmatched_ignore_imports_alerting = "error"
 layers = [
     "graph_skill_runtime.adapters",
     "graph_skill_runtime.integrations",
@@ -194,6 +216,7 @@ name = "domain is a leaf layer (v1-alignment 3.1 domain row)"
 type = "forbidden"
 source_modules = ["graph_skill_runtime.domain"]
 forbidden_modules = [
+    "graph_skill_runtime.__main__",
     "graph_skill_runtime.adapters",
     "graph_skill_runtime.application",
     "graph_skill_runtime.bootstrap",
@@ -279,69 +302,32 @@ forbidden_modules = [
 # `gskill migrate studio-skill` command. Migration code therefore stays
 # reachable only from the CLI adapter boundary and must not become an implicit
 # dependency of any running path.
+#
+# A `protected` contract states this positively -- "only these importers are
+# allowed" -- so it needs no enumerated denylist. An enumerated `forbidden`
+# contract would silently stop covering any top-level subpackage added later
+# while still reporting KEPT.
 name = "Migration is reachable only from the adapter boundary (v1-alignment 9)"
-type = "forbidden"
-source_modules = [
-    "graph_skill_runtime.application",
-    "graph_skill_runtime.bootstrap",
-    "graph_skill_runtime.callbacks",
-    "graph_skill_runtime.cognitive",
-    "graph_skill_runtime.composition",
-    "graph_skill_runtime.core",
-    "graph_skill_runtime.domain",
-    "graph_skill_runtime.integrations",
-    "graph_skill_runtime.io",
-    "graph_skill_runtime.middleware",
-    "graph_skill_runtime.models",
-    "graph_skill_runtime.patches",
-    "graph_skill_runtime.ports",
-    "graph_skill_runtime.runtime",
-    "graph_skill_runtime.sdk",
-    "graph_skill_runtime.tools",
-    "graph_skill_runtime.tracing",
-]
-forbidden_modules = ["graph_skill_runtime.migration"]
+type = "protected"
+protected_modules = ["graph_skill_runtime.migration"]
+allowed_importers = ["graph_skill_runtime.adapters"]
 
 [[tool.importlinter.contracts]]
-# Why: a leading underscore declares a package-private implementation region,
-# and v1-alignment section 3.2 lists the versioned contracts the top-level
-# package exposes -- the predict internals are not among them. Only the owning
-# package `core` may import `core._predict_internal`. The source list is every
-# other top-level module in the package; the architecture meta-test asserts the
-# list stays exhaustive, so adding a new top-level subpackage cannot silently
-# escape this contract.
-name = "Package-private modules are not imported across packages (v1-alignment 3.2)"
-type = "forbidden"
-# Direct imports only. Encapsulation forbids a foreign package REACHING INTO the
-# private region; it does not forbid calling `core`'s public surface, which then
-# uses its own internals. Without this, every caller of `core.runner` would be
-# reported for `core.runner -> core._predict_internal`, i.e. the contract would
-# flag correct encapsulation as a violation.
-allow_indirect_imports = true
-source_modules = [
-    "graph_skill_runtime.__main__",
-    "graph_skill_runtime.adapters",
-    "graph_skill_runtime.application",
-    "graph_skill_runtime.bootstrap",
-    "graph_skill_runtime.callbacks",
-    "graph_skill_runtime.cognitive",
-    "graph_skill_runtime.composition",
-    "graph_skill_runtime.config",
-    "graph_skill_runtime.domain",
-    "graph_skill_runtime.integrations",
-    "graph_skill_runtime.io",
-    "graph_skill_runtime.middleware",
-    "graph_skill_runtime.migration",
-    "graph_skill_runtime.models",
-    "graph_skill_runtime.patches",
-    "graph_skill_runtime.ports",
-    "graph_skill_runtime.runtime",
-    "graph_skill_runtime.sdk",
-    "graph_skill_runtime.settings",
-    "graph_skill_runtime.tools",
-    "graph_skill_runtime.tracing",
-]
-forbidden_modules = ["graph_skill_runtime.core._predict_internal"]
+# Why: PEP 8's leading-underscore convention -- `_predict_internal` declares
+# itself package-private, so only its owning package `core` may import it.
+# v1-alignment section 3.2 is corroboration, not the authority: it enumerates
+# the versioned contracts the top-level package exposes (predict internals are
+# absent from that list), but it does not itself forbid this import. Naming the
+# design section as the sole basis would be a hollow citation.
+#
+# `protected` checks DIRECT importers only, which is exactly what encapsulation
+# means: a foreign package must not reach INTO the private region, but calling
+# `core`'s public surface, which then uses its own internals, is correct. An
+# indirect-chain check here would flag every caller of `core.runner`.
+name = "Package-private modules are imported only by their owner (PEP 8 underscore convention, corroborated by v1-alignment 3.2)"
+type = "protected"
+protected_modules = ["graph_skill_runtime.core._predict_internal"]
+allowed_importers = ["graph_skill_runtime.core"]
 
 [[tool.importlinter.contracts]]
 # Why: v1-alignment section 3.1, integrations row -- asset instructions work

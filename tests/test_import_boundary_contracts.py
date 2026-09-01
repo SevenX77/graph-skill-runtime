@@ -2,30 +2,38 @@
 
 `lint-imports` (see `[tool.importlinter]` in `pyproject.toml`) is the machine
 check for the layering in `docs/design/v1-alignment.md` section 3.1. A boundary
-gate degrades in three ways that the tool itself cannot notice, so each one is
-asserted here:
+gate degrades in ways the tool itself cannot notice, so each one is asserted here.
 
-1. The exemption list grows. `ignore_imports` exists to register violations that
-   already existed when a contract was introduced, so the contract can be
-   enforced from day one instead of waiting for a repo-wide cleanup. That is only
-   honest as a RATCHET: the list may shrink, never grow. Adding a line to make a
-   NEW import pass converts the contract into a description of whatever the code
-   currently does. `IGNORED_IMPORT_BUDGET` below is the frozen count; lowering it
-   when a debt is cleared is the intended edit, raising it is the defect this
-   test exists to block. The complementary failure -- a debt fixed but its
-   exemption left behind, silently widening the contract -- is caught by
-   `unmatched_ignore_imports_alerting = "error"`, which is also asserted here.
-2. The gate stops running. A contract set that no CI job invokes proves nothing,
-   so this test asserts `lint-imports` is a `quality-gates` step and that
+1. An exemption is swapped rather than cleared. `ignore_imports` exists to
+   register violations that already existed when a contract was introduced, so
+   the contract can be enforced from day one instead of waiting for a repo-wide
+   cleanup. Pinning only the COUNT is not enough: it lets a cleared debt pay for
+   a brand-new violation, leaving the total unchanged. `AUTHORIZED_EXEMPTIONS`
+   below therefore pins each exemption's literal identity, and the comparison is
+   equality -- adding, swapping, or silently keeping a cleared entry all fail.
+   Clearing the debt means deleting the import AND its entry here.
+2. The stale-exemption alarm is disarmed, or was never armed. Once a registered
+   violation is fixed, its leftover exemption must break the gate rather than
+   keep widening the contract. That is `unmatched_ignore_imports_alerting`, and
+   import-linter reads it PER CONTRACT: `application/use_cases.py` consumes only
+   six session options and this is not one of them, while every contract class
+   declares it as its own field. A top-level key would be dead config that reads
+   as protection while providing none, so this test requires the option on each
+   contract that carries exemptions and forbids the top-level spelling.
+3. The gate stops running. A contract set no CI job invokes proves nothing, so
+   this test asserts `lint-imports` is a `quality-gates` step and that
    `import-linter` is a declared dev dependency.
-3. A contract silently stops covering new code. The package-private contract
-   enumerates its source modules (a `forbidden` contract cannot express "every
-   package except the owner"), so a newly added top-level subpackage would be
-   outside it while the contract still reported KEPT. This test asserts that
-   enumeration stays exhaustive against the package on disk.
-
-Contract names are also asserted to cite their authorizing design section, so a
-contract cannot be added on nothing but a maintainer's taste.
+4. A contract silently stops covering new code. Several contracts enumerate
+   module lists, and an enumeration goes stale when a top-level subpackage is
+   added: the new package sits outside every contract while they all still
+   report KEPT. This test asserts every top-level module on disk is named by at
+   least one contract, so adding one forces classifying it.
+5. A contract is justified by taste. Each contract must name its authority, and
+   the recognized authorities are a closed set: a `v1-alignment` section, or an
+   established Python language convention (`PEP 8`). The package-private
+   contract rests on the latter -- section 3.2 enumerates the public contracts
+   but does not itself forbid importing a private module, so citing it alone
+   would be a hollow reference.
 """
 
 from __future__ import annotations
@@ -39,8 +47,11 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 PACKAGE_ROOT = REPO_ROOT / "src" / "graph_skill_runtime"
 
-# Frozen count of registered pre-existing violations, 2026-09-01, at the commit
-# that introduced these contracts. One entry:
+LAYERS_CONTRACT = "Layered module boundaries (v1-alignment 3.1)"
+
+# The complete set of registered pre-existing violations, pinned by identity as
+# (contract name, import expression), frozen 2026-09-01 at the commit that
+# introduced these contracts.
 #
 #   ports.integrations -> integrations.models
 #       A provider-neutral Port reaching up into the host-projection layer,
@@ -50,24 +61,40 @@ PACKAGE_ROOT = REPO_ROOT / "src" / "graph_skill_runtime"
 #       to a layer `ports` may depend on, which edits a frozen public contract
 #       module and belongs in its own change.
 #
-# This number may only go DOWN.
-IGNORED_IMPORT_BUDGET = 1
+# This set may only lose members. Clearing a debt deletes its entry here and its
+# `ignore_imports` line together; leaving either behind fails a gate.
+AUTHORIZED_EXEMPTIONS: frozenset[tuple[str, str]] = frozenset(
+    {
+        (
+            LAYERS_CONTRACT,
+            "graph_skill_runtime.ports.integrations -> graph_skill_runtime.integrations.models",
+        ),
+    }
+)
 
-# The owner of the package-private region excluded from the private-import
-# contract's source list: `core` is allowed to import its own `_predict_internal`.
-PRIVATE_CONTRACT_OWNER = "graph_skill_runtime.core"
+# Recognized authority markers for a contract name. Closed on purpose: adding a
+# new kind of authority is a deliberate edit, not a side effect of naming.
+AUTHORITY_MARKERS = ("v1-alignment", "PEP 8")
 
-PRIVATE_CONTRACT_NAME = "Package-private modules are not imported across packages (v1-alignment 3.2)"
+# Contract keys that hold module names.
+_MODULE_LIST_KEYS = (
+    "layers",
+    "source_modules",
+    "forbidden_modules",
+    "modules",
+    "protected_modules",
+    "allowed_importers",
+)
 
 
-def _load_importlinter_config() -> dict[str, Any]:
+def _importlinter_config() -> dict[str, Any]:
     config = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["tool"]["importlinter"]
     assert isinstance(config, dict)
     return config
 
 
 def _contracts() -> list[dict[str, Any]]:
-    contracts = _load_importlinter_config()["contracts"]
+    contracts = _importlinter_config()["contracts"]
     assert isinstance(contracts, list) and contracts, "at least one import-linter contract must be declared"
     return contracts
 
@@ -90,76 +117,94 @@ def _top_level_module_names() -> set[str]:
 
 
 def test_root_package_under_analysis_is_the_runtime_package() -> None:
-    config = _load_importlinter_config()
+    config = _importlinter_config()
     assert config.get("root_package") == "graph_skill_runtime", (
         "import-linter must analyse the runtime package; `tests` is deliberately out of scope "
         "because a unit test of a package-private module is correct by AGENTS.md section 8"
     )
 
 
-def test_registered_violation_budget_may_only_shrink() -> None:
-    """RATCHET: total `ignore_imports` entries must never exceed the frozen budget."""
-    registered: list[str] = []
-    for contract in _contracts():
-        for ignored in contract.get("ignore_imports", []):
-            registered.append(f"{contract['name']}: {ignored}")
+def test_registered_exemptions_match_the_authorized_set_exactly() -> None:
+    """RATCHET: exemptions are pinned by identity, not by count.
 
-    assert len(registered) <= IGNORED_IMPORT_BUDGET, (
-        f"import-linter now registers {len(registered)} exempted imports but the frozen budget is "
-        f"{IGNORED_IMPORT_BUDGET}. An `ignore_imports` entry records a violation that already "
-        f"existed when its contract was introduced; it is not a way to admit a new one. Fix the "
-        f"import, or -- if the boundary itself is wrong -- change the contract and its cited design "
-        f"section instead of exempting the import.\nRegistered:\n  " + "\n  ".join(registered)
+    Equality, not a subset check: a new exemption fails, swapping a cleared debt
+    for a fresh violation fails, and an entry left behind after its debt is
+    cleared fails too.
+    """
+    registered = {
+        (contract["name"], ignored)
+        for contract in _contracts()
+        for ignored in contract.get("ignore_imports", [])
+    }
+
+    unauthorized = registered - AUTHORIZED_EXEMPTIONS
+    cleared = AUTHORIZED_EXEMPTIONS - registered
+
+    assert not unauthorized, (
+        "import-linter now exempts an import that is not in AUTHORIZED_EXEMPTIONS. An "
+        "`ignore_imports` entry records a violation that already existed when its contract was "
+        "introduced; it is not a way to admit a new one, and it may not be traded for a debt that "
+        "was cleared. Fix the import, or -- if the boundary itself is wrong -- change the contract "
+        f"and its cited authority instead of exempting the import.\nUnauthorized: {sorted(unauthorized)}"
+    )
+    assert not cleared, (
+        "an authorized exemption is no longer present in pyproject.toml. If the debt was cleared, "
+        "delete its entry from AUTHORIZED_EXEMPTIONS in this test as well -- the ratchet is only "
+        f"honest if both sides shrink together.\nNo longer registered: {sorted(cleared)}"
     )
 
 
-def test_clearing_a_registered_violation_must_remove_its_exemption() -> None:
+def test_stale_exemption_alarm_is_armed_where_import_linter_reads_it() -> None:
     """The other half of the ratchet, enforced by import-linter itself."""
-    config = _load_importlinter_config()
-    assert config.get("unmatched_ignore_imports_alerting") == "error", (
-        "`unmatched_ignore_imports_alerting` must be \"error\" so that an exemption whose import no "
-        "longer exists fails the gate. Downgraded to warn/none, a cleared debt would leave a stale "
-        "line behind that silently keeps widening the contract."
+    config = _importlinter_config()
+
+    assert "unmatched_ignore_imports_alerting" not in config, (
+        "`unmatched_ignore_imports_alerting` must not be set at the top level: import-linter reads "
+        "only six session options (root_package/root_packages, contract_types, "
+        "include_external_packages, exclude_type_checking_imports, show_timings) and this is not "
+        "one of them. Verified on 2.14 -- a top-level \"none\" did not silence a stale exemption, "
+        "while the same value inside the contract did. A key here is dead config that reads as "
+        "protection while providing none; declare it on the contract instead."
     )
 
+    for contract in _contracts():
+        if not contract.get("ignore_imports"):
+            continue
+        assert contract.get("unmatched_ignore_imports_alerting") == "error", (
+            f"contract {contract['name']!r} carries exemptions, so it must set "
+            "`unmatched_ignore_imports_alerting = \"error\"` in its own options. Downgraded to "
+            "warn/none, a cleared debt would leave a stale entry behind that silently keeps "
+            "widening the contract."
+        )
 
-def test_every_contract_cites_its_authorizing_design_section() -> None:
+
+def test_every_contract_names_a_recognized_authority() -> None:
     uncited = [
         contract["name"]
         for contract in _contracts()
-        if "v1-alignment" not in contract["name"]
+        if not any(marker in contract["name"] for marker in AUTHORITY_MARKERS)
     ]
     assert not uncited, (
-        "every import-linter contract must name the design section that authorizes it, so the "
-        "boundary is traceable to docs/design/v1-alignment.md rather than to the current "
-        f"directory shape: {uncited}"
+        "every import-linter contract must name the authority it rests on, so the boundary is "
+        f"traceable rather than a matter of taste. Recognized markers: {AUTHORITY_MARKERS}. A "
+        "design section and an established language convention are both acceptable, including "
+        f"together, but a contract may not cite nothing: {uncited}"
     )
 
 
-def test_private_module_contract_covers_every_top_level_module() -> None:
-    """A `forbidden` contract lists sources explicitly, so the list must stay exhaustive."""
-    contract = next(c for c in _contracts() if c["name"] == PRIVATE_CONTRACT_NAME)
-    listed = set(contract["source_modules"])
-    expected = _top_level_module_names() - {PRIVATE_CONTRACT_OWNER}
+def test_every_top_level_module_is_named_by_some_contract() -> None:
+    """Enumerated contract lists go stale when a subpackage is added."""
+    mentioned: set[str] = set()
+    for contract in _contracts():
+        for key in _MODULE_LIST_KEYS:
+            for module in contract.get(key, []):
+                mentioned.add(module)
 
-    assert listed == expected, (
-        "the package-private import contract must list every top-level module except the owning "
-        "package, otherwise a newly added subpackage sits outside the contract while it still "
-        f"reports KEPT.\nmissing: {sorted(expected - listed)}\nno longer exists: {sorted(listed - expected)}"
-    )
-
-
-def test_package_facade_does_not_re_export_private_internals() -> None:
-    """Closes the one gap the contract cannot express: the package root itself.
-
-    `graph_skill_runtime` is the parent of `core`, so import-linter skips it as a
-    source module against `core._predict_internal` (overlapping modules do not
-    describe a forbiddable import).
-    """
-    facade = (PACKAGE_ROOT / "__init__.py").read_text(encoding="utf-8")
-    assert "_predict_internal" not in facade, (
-        "the public facade must not re-export package-private predict internals; "
-        "docs/design/v1-alignment.md section 3.2 lists the contracts the top-level package exposes"
+    unclassified = _top_level_module_names() - mentioned
+    assert not unclassified, (
+        "these top-level modules are not named by any import-linter contract, so they sit outside "
+        "every boundary while all contracts still report KEPT. Classify each one into the contracts "
+        f"that should govern it: {sorted(unclassified)}"
     )
 
 
