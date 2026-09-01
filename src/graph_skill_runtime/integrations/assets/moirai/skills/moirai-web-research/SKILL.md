@@ -16,4 +16,8 @@ The Graph Skill Runtime does not provide a web or search tool. Use the current h
 5. Note conflicts, uncertainty, and facts that could not be verified.
 6. Return a compact evidence packet that another host or specialist can consume without conversation history.
 
-Use the [knowledge router](references/KB-00-hub.md) to identify which graph-skill owner should consume the findings. Do not call runtime-internal Python modules, invent host support, or treat a renderer's existence as proof that a real host discovered its projected assets.
+Rank the evidence by who can re-check it. A page anyone can open at that URL supports a documented claim; record the URL beside the claim. A page that opened only because this person is signed in cannot be checked by anyone else — a different machine or account meets a login wall — so it is a documented starting point that still owes a real measurement, and it must be labelled that way rather than passed off as public documentation. Reading a claim is never the same as testing it: if the thing can be measured, the measurement outranks the page.
+
+Do not conclude from a login wall, an empty result, or an unavailable capability that the fact does not exist; report the missing access instead. Never ask for a password, a verification code, or an exported cookie.
+
+Use the [knowledge router](references/KB-00-hub.md) to identify which graph-skill owner should consume the findings, and follow [working discipline](references/KB-15-working-discipline.md) for separating fact from inference in the report. Do not call runtime-internal Python modules, invent host support, or treat a renderer's existence as proof that a real host discovered its projected assets.

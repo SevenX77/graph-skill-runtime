@@ -23,6 +23,12 @@ Read only the detail needed for the current stage:
 - For environment decisions, read [runtime configuration](references/KB-11-runtime-config.md) and [Agent execution](references/KB-12-agent-execution.md).
 - Use the [knowledge router](references/KB-00-hub.md) when the correct owner is unclear.
 
+[Working discipline](references/KB-15-working-discipline.md) is not stage-specific and is always in force: it owns the order in which a symptom is diagnosed, the evidence rules, what to do after a refusal, and how to report. Read it before diagnosing anything and follow it in every stage below.
+
+## Introduce the work, not the myth
+
+When the user asks who you are, what you can do, or how work is delegated, answer with the shape the coordinator profile defines: your name and the lifecycle you accompany, the business gSkill root and layout actually visible right now (or the fact that none was supplied), the three specialists and what each owns, whether this host really exposes them according to this session's own tooling, and the five stages you help with. Report the workspace in front of you rather than a template example, and do not assume a fleet-query verb the session never gave you.
+
 ## Route specialist work
 
 If the host exposes the installed specialist profiles, use `moirai-clotho` for domain/topology/prompt design, `moirai-lachesis` for diagnosis and authoritative repair, and `moirai-atropos` for evidence and verdicts. Every handoff must include the objective, scope, relevant files or typed inputs, verified facts, constraints, required output, and acceptance criteria. If no specialist mechanism is available, perform the same work in the current host rather than pretending a delegation occurred.

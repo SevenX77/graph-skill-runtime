@@ -13,4 +13,6 @@ Before execution:
 
 `run` may materialize selected artifacts after the required outputs exist. `predict` does not persist declared artifact outputs. A completed run without an artifact request is not evidence that an artifact should exist.
 
+Verify along the causal chain, not from the declaration alone: declared, then requested, then run, then observed. A declaration with no observed file after a completed run that requested it is a defect worth reporting — not something to quietly regenerate, and not evidence that the declaration is wrong.
+
 Treat the immutable request snapshot, checkpoint database, trace, handoff record, and artifact files as separate owned records. Relate them by run and artifact identity; do not use an artifact file as a substitute for terminal run status or golden evidence.

@@ -24,7 +24,7 @@ updated: 2026-08-28
 | Section 6 至 Section 7：host-native durable handoff | **Phase 3 当前范围已实现** | 支持 root DAG 内串行可定位的 Agent wait point：图 checkpoint 与 `AgentTask` 先后持久化后返回 `agent_required`；SDK/MCP/CLI submit 校验结果并继续同一 run；跨进程、非法输出纠正、精确重试、checkpoint-to-task 与 graph-commit-to-response 两个 crash window 均有因果测试 |
 | Phase 3b：host-native 扩展 | **drafted；未实现** | registry subgraph、graph/phase iterate、不可比较并行 wait point、普通 human/breakpoint typed resume，以及宿主 dispatched/started acknowledgment 与 capability negotiation 尚未完成 |
 | Phase 4：direct vendor CLI executors | **已实现于当前受限范围** | Claude、Codex、Copilot、Cursor、Gemini、OpenCode 的 capability-probed adapter、fresh top-level process、资源 materialization、schema validation、attempt lifecycle 与全进程树清理已落地；仅 Codex CLI `0.144.1` / Windows `10.0.26200` x64 有成功实机 smoke，其他组合不能由 fake tests 或动态 probe 推导为支持 |
-| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply 已落地；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
+| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | 验收取自 asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply（当前 bundle 已收敛为单一 owner 的 `1.1.0` / `KB-00..15`，内容变更后需新一轮验收证据）；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
 | Phase 6：跨平台 package/release acceptance | **已验收于定义范围** | 一个 manifest-bound wheel/sdist 候选已在 Ubuntu、Windows、macOS 分别通过 pip-wheel、uv-wheel、pip-sdist 安装验收；CLI/MCP、host-native reopen/submit、SQLite、路径与 MoirAI lifecycle 的可观察行为一致。该范围是发布前候选验收，不是 registry publication，也不扩大 direct-vendor 支持矩阵 |
 | Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
@@ -406,11 +406,11 @@ artifact id 不能使用旧数组位置，因为增删或排序会改变身份�
 
 MoirAI 是可选 agentic front door：它帮助当前宿主设计、修复、执行与评估一个**由用户显式提供路径**的业务 gSkill。业务 gSkill 的 root 仍是根 `SKILL.md` + `graph.yaml`，每个 phase 恰有 `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 之一；reusable graph 平铺在 `graphs/<graph_id>/`。MoirAI bundle 不含 `graph.yaml`，不安装业务 workflow，不注册全局业务 skill，也不是 core runtime 的必需依赖。
 
-精确 inventory 与 reference subset 的唯一事实源是 `integration.json`，asset version 为 `1.0.0`：
+精确 inventory 与 reference subset 的唯一事实源是 `integration.json`，asset version 为 `1.1.0`（单一 owner 收敛的落盘记录见 [MoirAI 资产单一 owner 收敛](./moirai-asset-single-owner-2026-09-01.md)）：
 
 - 四个 role body：`moirai` → host name `moirai`，`clotho` → `moirai-clotho`，`lachesis` → `moirai-lachesis`，`atropos` → `moirai-atropos`；
 - 八个 Agent Skills：`moirai`、`moirai-brainstorming`、`moirai-domain-analysis`、`moirai-graph-design`、`moirai-agent-prompt-design`、`moirai-compile-repair`、`moirai-eval-judgement`、`moirai-web-research`；
-- 十五个 knowledge files：`KB-00-hub.md` 与 `KB-01..14` 的 manifest-listed exact filenames。每个 renderer 只把 manifest 分配给某个 skill 的 reference subset 复制到该 skill，不创建额外引用。
+- 十六个 knowledge files：`KB-00-hub.md`、subject-owned `KB-01..14` 与跨角色纪律 `KB-15-working-discipline.md` 的 manifest-listed exact filenames。每个 renderer 只把 manifest 分配给某个 skill 的 reference subset 复制到该 skill，不创建额外引用。
 
 上述 canonical 与 provider-neutral specialist names 始终使用连字符。Codex adapter 为满足该宿主的 safe identifier surface，单独把 agent projection 正规化为下划线，例如 `.codex/agents/moirai_clotho.toml` 内 `name = "moirai_clotho"`；其他宿主仍投影 manifest 中的连字符名称。该 adapter 变换不改变 canonical inventory 或 delegation 名称。
 
@@ -569,8 +569,8 @@ Windows `10.0.26200` x64 / Python `3.11.15` 上，Codex CLI `0.144.1` 的真实 
 
 **已落实工作**：
 
-- `integration.json` 以 integration id `moirai` 和 asset version `1.0.0` 封闭登记 4 roles、8 Agent Skills、15 KB filenames 与每个 skill 的 reference subset；canonical assets 不含 `graph.yaml`；
-- 四个 provider-neutral specialist role body、八份仅含 `name` / `description` frontmatter 的 progressive-disclosure `SKILL.md`、`KB-00` routing hub 与 subject-owned `KB-01..14` 已落地；
+- `integration.json` 以 integration id `moirai` 和 asset version `1.1.0` 封闭登记 4 roles、8 Agent Skills、16 KB filenames 与每个 skill 的 reference subset；canonical assets 不含 `graph.yaml`；
+- 四个 provider-neutral specialist role body、八份仅含 `name` / `description` frontmatter 的 progressive-disclosure `SKILL.md`、`KB-00` routing hub 与 subject-owned `KB-01..15` 已落地；
 - Claude、Codex、Copilot、Cursor、Gemini、OpenCode 六个 renderer 把同一份 assets 投影到 native skill/agent directories，并注册现有 `gskill` MCP server；Codex 把 projected agent filename/name 中的 canonical 连字符正规化为下划线，其他宿主保留连字符；OpenCode 只 merge/own shared `.opencode/opencode.json` 中的 V2 selector `mcp.servers.gskill`，遇到 sibling JSONC 时 fail closed；
 - `IntegrationInstaller` 与五个 SDK functions、`gskill integrations detect/install/uninstall` 已落地；construction、import、MCP startup 与 detection 零写入，只有 explicit install request 授权 host/project mutation；
 - preflight 覆盖全部 requested targets；unmanaged/modified resource 形成全局 conflict；owned JSON selector 与 Codex marker block 独立 merge；apply failure 后只对仍等于本次 after-image 的路径做因果安全 rollback，并对并发改动报告 incomplete rollback；manifest/hash-safe idempotent uninstall 已在实现中闭合；

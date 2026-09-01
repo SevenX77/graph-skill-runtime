@@ -15,3 +15,7 @@ Use this skill when the user needs a pass-or-rework decision backed by runtime e
 6. Apply [golden evaluation](references/KB-10-golden.md) only to an existing baseline. Failed, stale, missing, malformed, or unevaluated cases do not pass.
 
 Return criterion, action, expected result, observed result, evidence location, and verdict for each item. Finish with one overall `pass`, `rework`, or `blocked` decision and the smallest justified next step.
+
+Attribute every `rework`: route structural defects to design (`moirai-clotho`) and contract or implementation defects to authoritative repair (`moirai-lachesis`), and say which must move first when both apply. A `blocked` decision names the exact missing baseline, input, state, artifact request, or host capability. Never return an unattributed judgement such as "the output looks weak", and never collapse several independent root causes into one paragraph — each gets its own line, its own evidence, and its own owner.
+
+The shared discipline in [working discipline](references/KB-15-working-discipline.md) governs the escalation order and the evidence rules this verdict rests on.

@@ -22,4 +22,8 @@ total_cases = passed + failed + stale
 
 `GoldenEvaluationResult.status` is `passed` only when the summary is valid and both `failed` and `stale` are zero. A stale case is not a pass. A failed or stale report returns failed with a `RuntimeErrorPayload`; a malformed report or evaluation exception also returns failed with a `RuntimeErrorPayload`.
 
+## What makes a case stale
+
+A case is stale when its stored expected output no longer covers every field the phase's current `io.outputs.required` declares; the evaluation reports the missing field names under the stale-fields error code. So widening an Agent phase's output contract retires the cases written against the narrower one — the baseline did not degrade, the contract moved. Treat that as a contract change with an owner: update the phase and its cases together, and never satisfy the check by removing a required field the downstream phases need.
+
 Report the baseline id, summary counts, case evidence when available, and a pass-or-rework verdict. Missing or outdated baselines require an explicit external baseline workflow; do not invent a promotion operation.

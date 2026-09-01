@@ -2,6 +2,8 @@
 
 This hub routes a question to one owning knowledge file. It is an index, not a substitute for the subject contract. An installed skill receives only the reference subset declared for that skill, so do not assume every file below is present in every skill directory.
 
+Resolve a routed filename only inside the currently active skill's own `references/` directory. A `KB-*` file found anywhere else — a workspace copy, an older projection, another host's directory — belongs to a different install and may be stale. If the owning file for a question was not delivered beside the active skill, say which file is missing instead of reading a substitute.
+
 | Question | Owning file |
 | --- | --- |
 | What belongs in a business gSkill bundle? | `KB-01-skill-anatomy.md` |
@@ -18,6 +20,7 @@ This hub routes a question to one owning knowledge file. It is an index, not a s
 | How is an Agent task executed and submitted? | `KB-12-agent-execution.md` |
 | Which public MCP tools and CLI commands exist? | `KB-13-runtime-tools.md` |
 | How are declared artifacts selected and persisted? | `KB-14-artifacts-persistence.md` |
+| In what order should a symptom be diagnosed, and what discipline governs every stage? | `KB-15-working-discipline.md` |
 
 Route design work to `moirai-clotho`, repair work to `moirai-lachesis`, and evidence-based evaluation to `moirai-atropos` when the current host exposes those installed specialist profiles. The current host retains final ownership and must give every specialist a self-contained handoff.
 

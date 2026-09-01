@@ -21,4 +21,10 @@ The minimum root is:
 - Physical directories own files; explicit graph and call edges own topology. Do not infer parentage from deep nesting.
 - Optional `gskill.toml` owns project runtime overrides and named presets. Default runtime state is `.gskill/` beneath the business skill root unless resolution selects another state root.
 
+## Two-name phase identity
+
+A phase id lives in exactly two places and they must be equal: the phase directory name under `phases/`, and the `id` of its object in that graph's `graph.yaml.phases[]`. The directory name is the source of identity and the file name — `LOGIC.md`, `AGENT.md`, or `SUBGRAPH.md` — is the source of type. A phase document's frontmatter must not restate `phase_id`, `mode`, or the graph id. A third copy of the name is not a redundancy to keep in sync; it is a defect, and the format rejects it.
+
+The same rule shapes the reusable-graph registry: a registry `graph_id` equals its directory name under `graphs/`, and nothing else records that identity.
+
 MoirAI's packaged integration assets are host guidance, roles, and knowledge. They intentionally contain no `graph.yaml` and are not a business gSkill.
