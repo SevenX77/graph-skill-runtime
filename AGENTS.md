@@ -122,11 +122,14 @@ Before proposing a change, run all gates from the repository root:
 ```bash
 uv run ruff check src tests scripts tools
 uv run mypy --strict src
+uv run lint-imports
 uv run pytest --tb=short -q
 uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml
 uv build --no-sources
 uv run pip-audit
 ```
+
+`lint-imports` checks the module-boundary contracts declared under `[tool.importlinter]` in `pyproject.toml`. Each contract cites the section of [`docs/design/v1-alignment.md`](docs/design/v1-alignment.md) that authorizes it, so the contracts follow the design rather than the current directory shape. Its `ignore_imports` entries are a ratchet of registered pre-existing violations: the list may only get shorter, `tests/test_import_boundary_contracts.py` fails if it grows, and `lint-imports` itself fails on an entry that no longer matches a real import. Adding an `ignore_imports` line to make a new import pass is a boundary violation, not a fix.
 
 The manifest validator is a separate required gate; a green pytest run does not replace it. `uv build --no-sources` must produce both the wheel and source distribution without relying on local `tool.uv.sources` overrides. `pip-audit` checks resolved third-party distributions. Because this project is not published on PyPI, a local-project skip must not be reported as a security audit of this repository's own source.
 
