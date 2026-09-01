@@ -11,7 +11,7 @@ updated: 2026-09-01
 
 ## 0. 本文是什么
 
-本文是 **MoirAI 资产的单一 owner 定到本仓** 这件事的落盘正本:它记录八条已裁事项的**结论、依据与落位**,记录**哪些旧资产不迁入以及为什么**,记录**旧 id 到本仓 id 的重定向对照**,并列出**一条仍待裁决的教义冲突**。
+本文是 **MoirAI 资产的单一 owner 定到本仓** 这件事的落盘正本:它记录八条已裁事项的**结论、依据与落位**,记录**哪些旧资产不迁入以及为什么**,记录**旧 id 到本仓 id 的重定向对照**,并记录**上升后已裁的两项**(一条教义冲突的终局形态、旧映射表的退役步骤)。
 
 本文**不是**:①进度状态(进度的唯一可变载体是发起方仓库的交付台账);②资产内容本身(资产的唯一事实源是 [`integration.json`](../../src/graph_skill_runtime/integrations/assets/moirai/integration.json) 及其声明的闭集);③格式契约(格式的唯一事实源是 [portable gSkill v1 格式规范](../skill-spec/01-PORTABLE-GSKILL-V1.md))。
 
@@ -150,22 +150,33 @@ updated: 2026-09-01
 
 | 旧 owner | 本仓 | 处置 |
 |---|---|---|
-| `agent-skill-map.json` | `integration.json` 的 `roles[].skills` | 语义等价,文件退役。逐位核对:moirai=[入口技能, 头脑风暴]、clotho=[领域分析, 图设计, agent prompt 设计]、lachesis=[编译修复, 图设计]、atropos=[判定, agent prompt 设计],四条映射的成员与顺序两侧完全一致,只是技能 id 加了 `moirai-` 词缀且入口技能换了对象(`moirai-intro` → `moirai`,该对象按 U6 处置) |
+| `agent-skill-map.json` | `integration.json` 的 `roles[].skills` | 语义等价,文件退役,**退役分两步走**(见 §4.5)。逐位核对:moirai=[入口技能, 头脑风暴]、clotho=[领域分析, 图设计, agent prompt 设计]、lachesis=[编译修复, 图设计]、atropos=[判定, agent prompt 设计],四条映射的成员与顺序两侧完全一致,只是技能 id 加了 `moirai-` 词缀且入口技能换了对象(`moirai-intro` → `moirai`,该对象按 U6 处置) |
 | `operating-manual.md` | `KB-15-working-discipline.md` | 语义并入(U4) |
 | `README.md`、`contexts/panel.md`、`contexts/cli.md` | 无 | 不迁(U4) |
 | `knowledge/.gitkeep`、`roles/.gitkeep`、`skills/.gitkeep` | 无 | 目录非空,占位无意义 |
 
-## 5. 仍待裁决:判定词表由四值收窄为三值
+### 4.5 已裁:`agent-skill-map.json` 本批降格,cutover 时删除
 
-**这是本次唯一一项"既非格式驱动、也非简版缺失"的教义改写,按纪律不静默处置,列此待裁。**
+上一行已用逐位核对证明该文件与本仓 `integration.json` 的 `roles[].skills` 语义等价,因此它作为独立事实源没有存在理由。**但"该退役"不等于"今天就能删"**,这一项已于 2026-09-01 裁定为分两步走。
 
-旧 owner 的判定词表是**四值**:`pass` / `design_rework` / `repair_needed` / `needs_user_input`,并明确把前两种 rework 分流回具名专家(设计缺陷回 Clotho,代码与 prompt 缺陷回 Lachesis)。本仓是**三值**:`pass` / `rework` / `blocked`,不做具名分流。
+**裁定**:本批**降格不删除**——该文件不再是一条独立真相,而是被机械钉在本仓 owner 的声明上(发起方仓的关系一致性检查:两侧技能 id 不同,但四个角色的成员与顺序必须一致,任一侧单方面改动即门禁红);**文件本身在批E cutover 时删除**。
 
-两侧都不是格式的后果,本仓那一版也不是简版遗漏——它是独立撰写的审定内容。因此这是一次真实的语义收窄:`design_rework` 与 `repair_needed` 被并成一个 `rework`,归属信息随之丢失;`needs_user_input` 被 `blocked` 覆盖(后者更宽,不丢信息)。
+**依据**:该文件有**两个读者、两种语言**——发起方仓 Python 侧的 `load_skill_map()`,以及 Rust 侧生成 `ah.toml` 与 `.ah/rules/*` 的 `load_agent_skill_map()`(`apps/studio/tauri/src/lib.rs:1820`、`:2276`)。今天删掉只有两条路:①把这条关系**硬编码两份**(Python 一份、Rust 一份)——那是新造一个第二事实源,与"退役一份重复"正好相反;②让两个读者都去读 owner 自己的 `integration.json`——需要本仓包进发起方的 vendor 快照 + 技能 id cutover,属批E,且本批明令不动 live 资产。降格是这两条之外唯一不制造新分叉的处置。
 
-**本 PR 的临时处置(不预判裁决方向)**:保留本仓三值枚举**不改**,但把丢掉的归属信息作为 `rework` 的**必填限定**补回——`roles/atropos.md` 与 `skills/moirai-eval-judgement/SKILL.md` 现在要求:裸 `rework` 不是可用判定,必须说明它路由给设计(`moirai-clotho`)还是权威修复(`moirai-lachesis`),两者纠缠时说明谁先动;`blocked` 必须指名缺失的基线、输入、状态、artifact 请求或宿主能力。这样信息不丢,枚举也不分叉。
+## 5. 已裁:判定词表定为三值 + 必填归属限定
 
-**待裁的问题**:终局枚举本身应当是三值(归属作为限定)还是四值(归属编码进枚举)。若裁定四值,改动面是 `roles/atropos.md`、`roles/moirai.md`、`skills/moirai/SKILL.md`、`skills/moirai-eval-judgement/SKILL.md` 与 `integration.json` 的两条 role description。
+本次识别出唯一一项"既非格式驱动、也非简版缺失"的教义改写,按纪律上升,已于 2026-09-01 裁定。
+
+**冲突事实**:旧 owner 的判定词表是**四值** `pass` / `design_rework` / `repair_needed` / `needs_user_input`,并把前两种 rework 分流回具名专家(设计缺陷回 Clotho,代码与 prompt 缺陷回 Lachesis)。本仓是**三值** `pass` / `rework` / `blocked`,不做具名分流。两侧都不是格式的后果,本仓那一版也不是简版遗漏——它是独立撰写的审定内容。因此这是一次真实的语义收窄:`design_rework` 与 `repair_needed` 被并成一个 `rework`,归属信息随之丢失;`needs_user_input` 被 `blocked` 覆盖(后者更宽,不丢信息)。
+
+**裁定**:**终局形态是三值枚举 + `rework` 必填归属限定。** 本仓三值 `pass` / `rework` / `blocked` 保持不变,归属信息以限定语的形式补回,不编码进枚举。
+
+**依据两条**:
+
+1. **四值不带来机器可查性。** 两种形态都只是 prompt 层的约定——Atropos 是一个 LLM 角色,本仓**没有任何代码消费这个枚举**(既不解析判定值,也不按值分派)。既然两种写法在机器一侧完全等价,就没有理由为了枚举形状去改一份已审定的资产。
+2. **限定形态能表达枚举表达不了的事。** 现实里设计缺陷与修复缺陷常常纠缠,此时需要说清**谁先动**。一个判定值无法同时编码两种 rework,更无法编码它们之间的次序;而"`rework` + 必须说明路由给谁、纠缠时谁先动"这种限定天然容得下。四值反而逼判定者在两个都成立的取值里挑一个,丢掉的正是最该说出的那部分。
+
+**落位(即本 PR 已实现的内容,裁定后无需改动)**:`roles/atropos.md` 与 `skills/moirai-eval-judgement/SKILL.md` 要求:裸 `rework` 不是可用判定,必须说明它路由给设计(`moirai-clotho`)还是权威修复(`moirai-lachesis`),两者纠缠时说明谁先动;`blocked` 必须指名缺失的基线、输入、状态、artifact 请求或宿主能力。旧 owner 的四值词表整条退役。
 
 ## 6. 资产编辑纪律(承接旧 owner 的源文件头,落在文档而非资产正文)
 
@@ -197,3 +208,10 @@ updated: 2026-09-01
 **测试**:`tests/integrations/test_packaged_assets.py` 更新版本与知识数断言,新增三项——技能正文链到未声明 reference 被拒、技能正文链到不存在的知识文件被拒、知识文件互链被拒。renderer 快照由资产替身驱动,不随真实资产内容变化,故无需重算。
 
 **文档**:本文;并同步各处"当前资产清单"的陈述(asset version 与知识文件数)。**历史证据句不改**——描述已构建 `0.1.0a1` wheel 的那些句子(28 个成员、4/8/15 清单)说的是一个过去的构建产物,它当时确实如此;按本仓纪律,artifact 哈希与清单是证据身份,不是版本常量。**Phase 5 验收证据是在 asset version `1.0.0` 上取得的,本次内容变更之后需要一次新的验收才能主张同等结论。**
+
+## 9. 修订记录
+
+| 日期 | 变更 |
+|---|---|
+| 2026-09-01 | 初稿。八条已裁事项落位;§4.5 与 §5 两项按纪律**上升待裁**,资产侧按"信息不丢、不预判裁决方向"的临时形态实现。 |
+| 2026-09-01 | 上升两项裁定落盘,**资产与代码零改动**——裁定的正是临时形态本身。§5 判定词表定为三值 + `rework` 必填归属限定(依据:两种形态都只是 prompt 层约定、无代码消费该枚举,四值不带来机器可查性;且限定形态能表达"设计与修复纠缠时谁先动",一个判定值编码不了两种 rework);§4.5 `agent-skill-map.json` 定为本批降格、批E cutover 时删除(依据:两个读者两种语言,今天删只能硬编码两份=新造第二事实源)。 |
