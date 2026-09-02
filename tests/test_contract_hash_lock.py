@@ -54,6 +54,24 @@ _TOP_LEVEL_KEYS = frozenset({"version", "seals"})
 _SEAL_ID_PATTERN = re.compile(r"^EX-[0-9]{4}-[a-z0-9-]+$")
 _FRONTMATTER_FENCE = "---"
 
+# The complete list of sealed files that do NOT declare `status: FROZEN`, named
+# one by one. "Any file without frontmatter may be sealed" was the earlier rule
+# and it is an OPEN category: it lets anything lacking a `status:` line be
+# sealed without ever making the human-read claim, which hollows out the second
+# direction of the bijection — "sealed but not FROZEN is red" would then be
+# unenforceable against exactly the files that never say anything. A closed set
+# has to be edited, in a diff, to grow.
+#
+# `spec/round28-manifest-schema.yaml` is in it for two reasons, both concrete:
+#   * it is a JSON-Schema document, not prose — there is no frontmatter for a
+#     human-read `status:` word to live in, and inventing one would change the
+#     bytes the schema's own consumers parse;
+#   * `tests/test_round28_contract_manifests.py::
+#     test_task7_hash_lock_detects_mutated_schema_fixture` mutates that schema
+#     and requires THIS module to fail and name it, so dropping its seal would
+#     delete a guard that is currently working.
+SEALED_WITHOUT_STATUS_CARRIER = frozenset({"spec/round28-manifest-schema.yaml"})
+
 
 def _repin_command(relative_path: str) -> str:
     """The exact shell command that prints the digest a new record must carry.
@@ -214,6 +232,16 @@ def _declared_frozen_files(repo_root: Path) -> set[str]:
     return frozen
 
 
+def _seals_without_a_frozen_claim(repo_root: Path, sealed: set[str]) -> list[str]:
+    """Sealed files that neither declare `FROZEN` nor sit in the closed exemption set."""
+    return sorted(
+        relative_path
+        for relative_path in sealed
+        if relative_path not in SEALED_WITHOUT_STATUS_CARRIER
+        and _frontmatter_status(repo_root / relative_path) != "FROZEN"
+    )
+
+
 def test_sealed_documents_still_hash_to_their_current_seal() -> None:
     drifted = _collect_seal_drift(
         repo_root=REPO_ROOT, current=_current_seal_by_file(_load_seals())
@@ -226,16 +254,12 @@ def test_frozen_declarations_and_seal_records_are_the_same_set() -> None:
     """The two carriers of `FROZEN` must agree, repository-wide, both ways.
 
     A document whose frontmatter claims `FROZEN` without a seal record is an
-    unbacked claim; a record for a document that declares some OTHER status is
-    a lock contradicting its own subject.
+    unbacked claim; a record for a document that does not claim `FROZEN` is a
+    lock contradicting its own subject.
 
-    The second direction deliberately allows a sealed file that declares no
-    status at all. `spec/round28-manifest-schema.yaml` is such a file, and it
-    has to stay sealed: `tests/test_round28_contract_manifests.py::
-    test_task7_hash_lock_detects_mutated_schema_fixture` mutates that schema and
-    requires THIS module to go red and name it. A machine contract with no
-    frontmatter cannot carry a `status:` word, so binding it to one would delete
-    a working guard in the name of tidiness.
+    The only files exempt from the second direction are the ones named in
+    `SEALED_WITHOUT_STATUS_CARRIER`, and they are named individually rather
+    than described by a property, so the exemption cannot widen by accident.
     """
     sealed = set(_current_seal_by_file(_load_seals()))
     declared = _declared_frozen_files(REPO_ROOT)
@@ -246,14 +270,11 @@ def test_frozen_declarations_and_seal_records_are_the_same_set() -> None:
         f"{SEALS_PATH.name}: {unbacked}"
     )
 
-    contradicting = sorted(
-        relative_path
-        for relative_path in sealed
-        if _frontmatter_status(REPO_ROOT / relative_path) not in (None, "FROZEN")
-    )
+    contradicting = _seals_without_a_frozen_claim(REPO_ROOT, sealed)
     assert not contradicting, (
-        "these files carry a seal record while declaring a status other than FROZEN; "
-        f"drop the record or fix the status: {contradicting}"
+        "these files carry a seal record without declaring `status: FROZEN`; declare it, "
+        "drop the record, or — only for a machine contract that has no frontmatter at all "
+        f"— add the path to SEALED_WITHOUT_STATUS_CARRIER with its reason: {contradicting}"
     )
 
 
@@ -359,3 +380,35 @@ def test_drift_needs_an_appended_record_and_the_last_record_wins(tmp_path: Path)
     # live seal is the LAST record, not any record that ever existed.
     document.write_text("---\nstatus: FROZEN\n---\n\nsealed\n", encoding="utf-8")
     assert _collect_seal_drift(repo_root=tmp_path, current=_current_seal_by_file(seals)) != []
+
+
+def test_only_the_named_files_may_be_sealed_without_declaring_frozen(tmp_path: Path) -> None:
+    """The exemption is a list of paths, not a property a file can acquire.
+
+    Under the earlier rule — "sealed is fine as long as the file declares no
+    status" — any file without frontmatter could be sealed while never making
+    the human-read claim, so "sealed but not FROZEN is red" could not be
+    enforced against precisely the files that say nothing. Growing the
+    exemption now requires editing a constant, in a diff.
+    """
+    (tmp_path / "spec").mkdir()
+    schema = tmp_path / "spec" / "round28-manifest-schema.yaml"
+    schema.write_text("features:\n  type: object\n", encoding="utf-8")
+    silent = tmp_path / "untracked-machine-contract.yaml"
+    silent.write_text("kind: something\n", encoding="utf-8")
+    claimed = tmp_path / "contract.md"
+    claimed.write_text("---\nstatus: FROZEN\n---\n\nsealed\n", encoding="utf-8")
+    demoted = tmp_path / "demoted.md"
+    demoted.write_text("---\nstatus: superseded\n---\n\nold\n", encoding="utf-8")
+
+    # In the closed set, so sealing it without a `status:` word is allowed.
+    assert "spec/round28-manifest-schema.yaml" in SEALED_WITHOUT_STATUS_CARRIER
+    assert _seals_without_a_frozen_claim(tmp_path, {"spec/round28-manifest-schema.yaml"}) == []
+    assert _seals_without_a_frozen_claim(tmp_path, {"contract.md"}) == []
+
+    # Not in the closed set: having no frontmatter is not an excuse any more.
+    assert _seals_without_a_frozen_claim(tmp_path, {"untracked-machine-contract.yaml"}) == [
+        "untracked-machine-contract.yaml"
+    ]
+    # And a file that claims some other status stays red, as before.
+    assert _seals_without_a_frozen_claim(tmp_path, {"demoted.md"}) == ["demoted.md"]
