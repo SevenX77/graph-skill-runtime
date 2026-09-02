@@ -28,8 +28,13 @@ with it.
    as protection while providing none, so this test requires the option on each
    contract that carries exemptions and forbids the top-level spelling.
 3. The gate stops running. A contract set no CI job invokes proves nothing, so
-   this test asserts `lint-imports` is a `quality-gates` step and that
-   `import-linter` is a declared dev dependency.
+   this file asserts that `lint-imports` is a step of the required
+   `quality-gates` job and that `import-linter` is a declared dev dependency.
+   The workflow is PARSED, not searched: commenting the step out leaves a valid
+   YAML file that still contains the command text, so a substring search over
+   the file keeps passing while `jobs.quality-gates.steps` no longer holds the
+   step. Parsing also makes the two ways a present step stops blocking
+   visible -- an `if:` condition, and `continue-on-error`.
 4. A contract silently stops covering new code. Several contracts enumerate
    module lists, and an enumeration goes stale when a top-level subpackage is
    added: the new package sits outside every contract while they all still
@@ -76,6 +81,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
@@ -91,6 +97,12 @@ PACKAGE_PRIVATE_CONTRACT = (
     "Package-private modules are imported only by their owner "
     "(PEP 8 underscore convention, corroborated by v1-alignment 3.2)"
 )
+
+# The one CI job whose failure blocks a merge for this gate. AGENTS.md section 5
+# lists the required checks; `runtime-tests` and `cross-platform-smoke` depend on
+# this job, so a boundary failure here stops the whole run.
+QUALITY_GATES_JOB = "quality-gates"
+LINT_IMPORTS_COMMAND = "uv run lint-imports"
 
 # The one module authorized to reach the legacy converter, per AGENTS.md section 4
 # ("confined to the explicit `gskill migrate studio-skill ...` converter
@@ -347,18 +359,178 @@ def test_indirect_migration_contract_sources_stay_exhaustive() -> None:
     )
 
 
+def _is_conditional(node: dict[str, Any]) -> bool:
+    """Whether an `if:` key makes this job or step skippable.
+
+    Presence alone disqualifies it, in either polarity: `if: false` never runs,
+    and a GitHub expression is resolved at run time, so from here it is a gate
+    that MIGHT not run. A gate that runs only sometimes is not a gate.
+    """
+    return "if" in node
+
+
+def _may_fail_without_failing_the_job(node: dict[str, Any]) -> bool:
+    """Whether `continue-on-error` lets this job or step fail harmlessly.
+
+    Opposite polarity to `if:`: an explicit false is the blocking default, so
+    only a non-false value disqualifies. Any expression counts, for the same
+    reason as above -- it is not resolvable here.
+    """
+    value = node.get("continue-on-error")
+    if value is None or value is False:
+        return False
+    return str(value).strip().lower() != "false"
+
+
+def _runs_the_gate(step: Any) -> bool:
+    """Whether a workflow step actually executes `uv run lint-imports`.
+
+    Checked line by line so a commented-out line inside a `run:` block does not
+    count -- the same substring-versus-structure mistake this test exists to fix,
+    one level further in.
+    """
+    if not isinstance(step, dict):
+        return False
+    script = step.get("run")
+    if not isinstance(script, str):
+        return False
+    return any(line.strip().startswith(LINT_IMPORTS_COMMAND) for line in script.splitlines())
+
+
+def _blocking_gate_steps(workflow: Any) -> list[dict[str, Any]]:
+    """Return the `quality-gates` steps that run the boundary gate and can fail it.
+
+    Empty when the job is missing, when the job or the step may be skipped or may
+    fail without failing the job, or when the gate was moved to another job. The
+    job name is pinned: AGENTS.md section 5 lists the required checks, and
+    `quality-gates` is the one that gates a merge, so a step in any other job
+    would run without blocking anything.
+    """
+    jobs = workflow.get("jobs") if isinstance(workflow, dict) else None
+    job = jobs.get(QUALITY_GATES_JOB) if isinstance(jobs, dict) else None
+    if not isinstance(job, dict):
+        return []
+    if _is_conditional(job) or _may_fail_without_failing_the_job(job):
+        return []
+    steps = job.get("steps")
+    if not isinstance(steps, list):
+        return []
+    return [
+        step
+        for step in steps
+        if _runs_the_gate(step)
+        and not _is_conditional(step)
+        and not _may_fail_without_failing_the_job(step)
+    ]
+
+
 def test_import_boundary_gate_runs_in_ci() -> None:
-    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-    assert "uv run lint-imports" in workflow, (
-        "`lint-imports` must run in CI; a boundary contract set that no job invokes is a gate in "
-        "name only"
+    """The gate is a real, blocking step of the required job -- parsed, not grepped."""
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))
+
+    assert QUALITY_GATES_JOB in workflow["jobs"], (
+        f"the required merge gate job {QUALITY_GATES_JOB!r} is gone from the workflow; AGENTS.md "
+        "section 5 lists it among the checks that must pass before a merge"
     )
 
-    quality_gates = workflow.split("quality-gates:", 1)[1].split("\n  runtime-tests:", 1)[0]
-    assert "uv run lint-imports" in quality_gates, (
-        "`lint-imports` must run in the required `quality-gates` job. It is a static check over the "
-        "source import graph, so it is platform-independent and does not need repeating in "
-        "`cross-platform-smoke`."
+    gate_steps = _blocking_gate_steps(workflow)
+    assert len(gate_steps) == 1, (
+        f"exactly one step of the {QUALITY_GATES_JOB!r} job must run {LINT_IMPORTS_COMMAND!r} and be "
+        "able to fail it. A boundary contract set that no required job invokes is a gate in name "
+        "only -- and so is one that is commented out, guarded by an `if:`, or marked "
+        "`continue-on-error`. It is a static check over the source import graph, so it is "
+        "platform-independent and does not need repeating in `cross-platform-smoke`.\nfound "
+        f"{len(gate_steps)} such steps in that job"
+    )
+
+
+# A workflow that must be ACCEPTED, so the negative table below cannot pass by
+# rejecting everything. It is the shape `ci.yml` actually has, reduced to what
+# this check reads.
+_WIRED_WORKFLOW = """
+jobs:
+  quality-gates:
+    steps:
+      - name: Ruff
+        run: uv run ruff check src tests scripts tools
+      - name: Import boundaries
+        run: uv run lint-imports
+"""
+
+# Every way the wiring can decay while the file still parses and still contains
+# the command text. Each of these passed the substring search this check
+# replaced.
+_UNWIRED_WORKFLOWS = {
+    "the step is commented out": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Ruff
+        run: uv run ruff check src tests scripts tools
+#      - name: Import boundaries
+#        run: uv run lint-imports
+""",
+    "the gate moved to a job that does not gate a merge": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Ruff
+        run: uv run ruff check src tests scripts tools
+  advisory:
+    steps:
+      - name: Import boundaries
+        run: uv run lint-imports
+""",
+    "the step is disabled by a condition": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        if: false
+        run: uv run lint-imports
+""",
+    "the step is allowed to fail": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        continue-on-error: true
+        run: uv run lint-imports
+""",
+    "the whole job is allowed to fail": """
+jobs:
+  quality-gates:
+    continue-on-error: true
+    steps:
+      - name: Import boundaries
+        run: uv run lint-imports
+""",
+    "only a shell comment mentions the command": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        run: |
+          # uv run lint-imports
+          echo skipped
+""",
+}
+
+
+def test_the_ci_wiring_check_accepts_a_wired_workflow() -> None:
+    """Positive control: the check is not rejecting everything it is handed."""
+    assert len(_blocking_gate_steps(yaml.safe_load(_WIRED_WORKFLOW))) == 1
+
+
+@pytest.mark.parametrize("decay", sorted(_UNWIRED_WORKFLOWS), ids=lambda name: name.replace(" ", "-"))
+def test_the_ci_wiring_check_rejects_a_gate_that_cannot_block(decay: str) -> None:
+    """Negative controls: each of these still contains the command text verbatim."""
+    document = _UNWIRED_WORKFLOWS[decay]
+    assert LINT_IMPORTS_COMMAND in document, "the decayed workflow must still contain the command"
+    assert _blocking_gate_steps(yaml.safe_load(document)) == [], (
+        f"{decay}: the gate no longer blocks a merge, but the check reported it wired. This is the "
+        "defect the parsed check exists to catch -- reading the file as text cannot tell these "
+        "apart from a working gate."
     )
 
 
