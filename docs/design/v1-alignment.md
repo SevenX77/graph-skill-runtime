@@ -28,7 +28,7 @@ updated: 2026-08-28
 | Phase 6：跨平台 package/release acceptance | **已验收于定义范围** | 一个 manifest-bound wheel/sdist 候选已在 Ubuntu、Windows、macOS 分别通过 pip-wheel、uv-wheel、pip-sdist 安装验收；CLI/MCP、host-native reopen/submit、SQLite、路径与 MoirAI lifecycle 的可观察行为一致。该范围是发布前候选验收，不是 registry publication，也不扩大 direct-vendor 支持矩阵 |
 | Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
-当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前 MoirAI inventory 的精确事实源是 `src/graph_skill_runtime/integrations/assets/moirai/integration.json`；renderer 与 installer 行为分别由 `integrations/renderers.py` 与 `integrations/installer.py` 拥有。当前文件格式的事实源是状态为 `audited-ready` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；实现存在、验收通过、未来边界与未支持声明必须分开，不能互相替代。
+当前公共 API 的精确事实源是 [`../public-api-contract.md`](../public-api-contract.md) 与 `src/graph_skill_runtime/__init__.py`。当前 MoirAI inventory 的精确事实源是 `src/graph_skill_runtime/integrations/assets/moirai/integration.json`；renderer 与 installer 行为分别由 `integrations/renderers.py` 与 `integrations/installer.py` 拥有。当前文件格式的事实源是状态为 `FROZEN` 的 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)（2026-09-01 由 `audited-ready` 转入，SHA-256 哈希锁在 `tests/test_contract_hash_lock.py`）；[`../skill-spec/00-FORMAT-GROUND-TRUTH.md`](../skill-spec/00-FORMAT-GROUND-TRUTH.md) 已被取代，只保留为 legacy converter 输入契约与历史证据。本设计后文保留完整 v1 目标；实现存在、验收通过、未来边界与未支持声明必须分开，不能互相替代。
 
 当前 Phase 5 候选已完整重跑本地 required gates：全仓 Ruff green；strict mypy 覆盖 149 个 source files green；contract manifest validator green；完整 pytest 为 `1715 passed, 1 skipped in 83.51s`。`uv build` 成功生成 `0.1.0a1` source distribution 与 wheel，wheel smoke green。`pip-audit` 报告 `No known vulnerabilities found`，同时明确跳过尚未发布的本地 `graph-skill-runtime`；这只说明被解析 distributions 的已知漏洞检查结果，不是本仓源码安全审计或 PyPI publication evidence。
 
@@ -618,7 +618,7 @@ v1 只有同时满足以下条件才可标记完成。Phase 6 已满足下述 pa
 7. config 五层优先级、RuntimeProfile/RunPreset 职责分离、持久非秘密默认值、immutable RunRequest、secret exclusion 与 state-dir 绝对路径在三平台通过测试。
 8. `gskill integrations install moirai` 的 dry-run、all-target conflict、manifest、因果安全 rollback、idempotency 与 safe uninstall 通过；六 renderer snapshots、built-wheel canonical inventory 与真实宿主 skill/agent/MCP discovery smoke 均有证据；显式安装前不投影宿主，安装资产也不包含用户业务 gSkill。Phase 5 已在当前定义范围满足本项，完整 v1 仍受其余未满足项约束。
 9. wheel/sdist、clean install、CLI/MCP smoke、SQLite reopen 与受支持 handoff 在 Ubuntu、Windows、macOS 的同一候选提交上通过；Gateway/Studio plugins 不是本轮验收依赖，未来只能消费公开 Port/Adapter 边界。Phase 6 已用 manifest-bound 同一候选满足本项。
-10. Production runtime 只有 portable reader；旧 v0.3 契约保持 `superseded`，legacy parser 只服务显式 converter。当前 portable 规范处于 `audited-ready`；只有 owner 盖章并建立 SHA-256 哈希锁后才可标记 `FROZEN`。
+10. Production runtime 只有 portable reader；旧 v0.3 契约保持 `superseded`，legacy parser 只服务显式 converter。当前 portable 规范已于 2026-09-01 由 `audited-ready` 转为 `FROZEN`：owner 盖章 + SHA-256 哈希锁落入 `tests/test_contract_hash_lock.py`，两个载体同时成立。
 
 ## 15. 尚待实证的裁决
 

@@ -8,7 +8,7 @@ updated: 2026-09-01
 
 # Skill Spec 文档入口
 
-[`01-PORTABLE-GSKILL-V1.md`](./01-PORTABLE-GSKILL-V1.md) 是当前 production reader 的唯一 portable 格式契约，状态为 `audited-ready`。当前业务 gSkill 使用根 `SKILL.md` + `graph.yaml` + phase `AGENT.md` + 单层 `graphs/<graph_id>/` registry；runtime core 没有 dual reader 或格式嗅探回退。`audited-ready` 表示语义已审但尚未由 owner 建立新 SHA-256 哈希锁，因此不能标为 `FROZEN`。
+[`01-PORTABLE-GSKILL-V1.md`](./01-PORTABLE-GSKILL-V1.md) 是当前 production reader 的唯一 portable 格式契约，状态为 `FROZEN`（2026-09-01 由 `audited-ready` 转入）。当前业务 gSkill 使用根 `SKILL.md` + `graph.yaml` + phase `AGENT.md` + 单层 `graphs/<graph_id>/` registry；runtime core 没有 dual reader 或格式嗅探回退。`FROZEN` 表示语义已审、owner 已盖章，并且该文全文的 SHA-256 摘要已落入 [`tests/test_contract_hash_lock.py`](../../tests/test_contract_hash_lock.py)：它不再可能被静默改写，修订必须与重钉摘要同 PR 完成，具体两条路写在该文卷首。
 
 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 是 `superseded` 的 v0.3 契约。它只服务显式 `gskill migrate studio-skill` converter 与历史核验，不再被 production compile、predict、run、inspect、SDK、CLI 或 MCP 当作当前格式读取。
 

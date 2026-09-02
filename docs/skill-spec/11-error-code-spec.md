@@ -12,7 +12,7 @@ updated: 2026-09-01
 
 [`ERROR_REGISTRY`](../../src/graph_skill_runtime/core/error_registry.py) 是本文的可执行镜像。目录与 registry 必须保持双射：本文恰好列出 registry 的 99 个 code，每个 code 只出现一次，`level` 与有序 `stage` 也必须一致。修改任一方时，必须在同一变更中更新另一方并机械核对；registry 中存在但本文缺失的码、本文多出的码、重复码或 stage 漂移都属于契约缺陷。
 
-`living` 表示本目录随已注册集合持续维护，不表示关联格式已经建立机器哈希锁。[`Portable gSkill v1`](./01-PORTABLE-GSKILL-V1.md) 是状态为 `audited-ready` 的当前 production reader 契约；Phase 2 的前 10 个 bundle 边界码已经随原子切换成为当前错误语义。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 v0.3 converter 输入与历史证据。错误目录保持 `living`，portable 格式保持 `audited-ready`，两者都不得在 owner 盖章和 SHA-256 哈希锁建立前冒用 `FROZEN`。
+本文状态是 `living`：它随已注册码集合持续维护，因此**不进入** `audited-ready` → `FROZEN` 那条链路。这不是“还没锁上”，而是“不适用”——注册一个码就必须在同一变更里加一行（§1 的双射要求），而哈希锁的作用恰恰是让字节变化不可能悄悄发生；给一份按契约必须随代码变动的目录上字节锁，只会让每一次合法登记都撞门。[`Portable gSkill v1`](./01-PORTABLE-GSKILL-V1.md) 与此相反：它是**状态为 `FROZEN`** 的当前 production reader 契约（2026-09-01 由 `audited-ready` 转入，owner 盖章 + SHA-256 哈希锁落表），Phase 2 的前 10 个 bundle 边界码已经随原子切换成为当前错误语义。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 v0.3 converter 输入与历史证据。
 
 ## 1. 使用规则
 
@@ -22,11 +22,11 @@ updated: 2026-09-01
 - 错误码中的 `v3` 是既有码族的稳定身份，不等同于 portable 文件格式的 schema version。
 - 下表中“graph 声明”“Agent phase 声明”等词表达跨格式不变量。当前 portable graph 声明是 `graph.yaml`，内部 Agent phase 是 `AGENT.md`；legacy 规范中的 `GRAPH.md` 或 phase `SKILL.md` 示例只解释已被取代的 v0.3 表示，绝不是 portable bundle 的正确写法。
 - “Owning spec”链接到定义该合法状态的契约。目录拥有错误码语义，owner spec 拥有被校验对象的完整字段或运行规则，两者通过链接协作而不复制彼此。
-- 每个已注册码对外暴露的 `doc_link` 一律是本目录（`docs/skill-spec/11-error-code-spec.md`），registry 不为单个码另存一份 owning spec 路径。消费者走两跳：从 `ErrorPayload.doc_link` 到本目录，再从本表“Owning spec”列到具体契约小节。每一跳只有一个 owner，`doc_link` 因此不会与本表的链接漂移成两个版本。`tests/test_doc_pointer_liveness.py` 机械保证这两跳都落在存在的文件与存在的锚点上，并且 `doc_link` 只能指向 `living` 或 `FROZEN` 文档。「Owning spec」列受同一个闭集约束，当前有且只有一个例外：[`01-PORTABLE-GSKILL-V1.md`](./01-PORTABLE-GSKILL-V1.md) 在 F-T3 上冻前仍是 `audited-ready`，门禁按**这一个文件名**放行它，而不是放行整个 `audited-ready` 状态——其它 `audited-ready` 文档一律不得充当 owner。F-T3 把该文件转为 `FROZEN` 的同一变更里删除这个例外。
+- 每个已注册码对外暴露的 `doc_link` 一律是本目录（`docs/skill-spec/11-error-code-spec.md`），registry 不为单个码另存一份 owning spec 路径。消费者走两跳：从 `ErrorPayload.doc_link` 到本目录，再从本表“Owning spec”列到具体契约小节。每一跳只有一个 owner，`doc_link` 因此不会与本表的链接漂移成两个版本。`tests/test_doc_pointer_liveness.py` 机械保证这两跳都落在存在的文件与存在的锚点上，并且 `doc_link` 只能指向 `living` 或 `FROZEN` 文档。「Owning spec」列受同一个闭集约束，没有例外：任何 `drafted`/`audited-ready`/`superseded`/`retired` 文档都不得充当 owner。
 
 ## 2. Phase 2 portable bundle 新增码（10）
 
-这些码定义当前 portable v1 bundle 边界。它们与状态为 `audited-ready` 的 portable 主契约（§1 说明了门禁为何按文件名单独放行这一份）和 `ERROR_REGISTRY` 共同构成当前可执行错误语义；本目录仍是唯一错误码 catalog。
+这些码定义当前 portable v1 bundle 边界。它们与状态为 `FROZEN` 的 portable 主契约和 `ERROR_REGISTRY` 共同构成当前可执行错误语义；本目录仍是唯一错误码 catalog。
 
 | Code | Level | Stage | 正向定义 | 触发原因 | 修复建议 | Owning spec |
 | --- | --- | --- | --- | --- | --- | --- |

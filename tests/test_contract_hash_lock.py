@@ -1,12 +1,49 @@
+"""Byte lock over the documents this repository has sealed.
+
+A `FROZEN` document is sealed by two carriers that must agree: the human-read
+`status:` word in its frontmatter, and the SHA-256 digest recorded here. The
+status word alone is a claim; only the digest makes silent drift impossible.
+That is why `docs/skill-spec/01-PORTABLE-GSKILL-V1.md` stayed `audited-ready`
+for as long as it did — the semantics were audited, but no machine held the
+bytes.
+
+Locking is not a prohibition on change. It forces every byte of change to be
+an explicit, recorded decision: re-pin the digest in the same pull request
+that edits the document, and say above the line what changed and on what
+ruling or evidence. The failure message below prints the exact command that
+produces the new digest.
+"""
+
 from __future__ import annotations
 
 import hashlib
+import string
+from collections.abc import Mapping
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXEMPTIONS_PATH = Path(__file__).with_name("contract-exemptions.yaml")
+SKILL_SPEC_DIR = REPO_ROOT / "docs" / "skill-spec"
+
+
+def _repin_command(relative_path: str) -> str:
+    """The exact shell command that prints the digest this table wants.
+
+    Quoting is single-quotes-only inside a double-quoted ``-c`` argument, and
+    the CR/LF normalization is spelled with ``chr()`` rather than escapes, so
+    the printed line can be pasted into a shell unchanged.
+    """
+    return (
+        're-pin with: uv run python -c "import hashlib,pathlib;'
+        f"p=pathlib.Path('{relative_path}');"
+        "print(hashlib.sha256(p.read_text(encoding='utf-8')"
+        ".replace(chr(13)+chr(10),chr(10)).replace(chr(13),chr(10))"
+        ".encode('utf-8')).hexdigest())\""
+    )
+
 
 EXPECTED_CONTRACT_HASHES = {
     "docs/mvp0/skill-spec/00-FORMAT-GROUND-TRUTH.md": "083f158bdb4c6ae3bea7b5b66ce1d57e1897a668c81dac757a2ddb2bf067af0e",
@@ -41,6 +78,17 @@ EXPECTED_CONTRACT_HASHES = {
     # bind features to the implemented 01-PORTABLE-GSKILL-V1 sections instead
     # of the superseded v0.3 format document.
     "spec/round28-manifest-schema.yaml": "de27d0d2909f907fcd94ccfa14a282ca19f52fb8207e5f99a1eafb80fa72db81",
+    # Sealed 2026-09-01 (F-T3): the current portable format contract moves
+    # `audited-ready` -> `FROZEN`. Unlike every other entry above, this is not
+    # an archive — it is the live contract the production reader implements,
+    # and sealing it is the gate for handing single ownership of the engine to
+    # this repository. It could only be sealed once the revisions that were
+    # queued ahead of it had landed: D-T1 (#14) corrected §5.2's role-selection
+    # chain to the 2026-08-31 user ruling, and D-T3 (#18) confirmed the
+    # registry no longer depends on any section of this document. Change it
+    # through the two paths its own preamble documents, never by removing this
+    # line.
+    "docs/skill-spec/01-PORTABLE-GSKILL-V1.md": "fa2f7f21fc9c4aa58c766fe3959ad7ee3039e064649a36b1a5695582f77154f1",
 }
 
 
@@ -49,30 +97,159 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _load_hash_exemptions() -> set[str]:
-    data = yaml.safe_load(EXEMPTIONS_PATH.read_text(encoding="utf-8")) or {}
+def _frontmatter_status(path: Path) -> str | None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return None
+        if line.startswith("status:"):
+            value = line.removeprefix("status:").strip()
+            return value.split("（", 1)[0].split("(", 1)[0].strip()
+    return None
+
+
+def _load_hash_exemptions(
+    exemptions_path: Path = EXEMPTIONS_PATH,
+) -> set[tuple[str, str]]:
+    """Approved (file, sha256) pairs.
+
+    An exemption pins ONE approved set of bytes, not a file. Keying it by path
+    alone — the shape this file used to have — would have turned every
+    exemption into a permanent unlock: the named document could then drift
+    again, and again, with the lock silent. The sibling engine-doc lock
+    already pinned exact digests; the two mechanisms now agree.
+    """
+    data = yaml.safe_load(exemptions_path.read_text(encoding="utf-8")) or {}
     exemptions = data.get("exemptions", [])
     assert isinstance(exemptions, list), "contract exemptions must be a list"
 
-    approved_hashes: set[str] = set()
+    approved: set[tuple[str, str]] = set()
     for index, exemption in enumerate(exemptions):
         assert isinstance(exemption, dict), f"exemption #{index} must be a mapping"
-        hashes = exemption.get("hashes", [])
-        assert isinstance(hashes, list), f"exemption #{index} hashes must be a list"
-        if hashes:
-            assert exemption.get("pr"), f"hash exemption #{index} must include pr"
-            assert exemption.get("pm_approval"), f"hash exemption #{index} must include pm_approval"
-        approved_hashes.update(str(hash_key) for hash_key in hashes)
-    return approved_hashes
+
+        relative_path = exemption.get("file")
+        if relative_path is None:
+            continue
+
+        approved_hash = exemption.get("sha256")
+        assert isinstance(relative_path, str) and relative_path, (
+            f"hash exemption #{index} must name the file it approves"
+        )
+        assert (
+            isinstance(approved_hash, str)
+            and len(approved_hash) == 64
+            and all(character in string.hexdigits for character in approved_hash)
+        ), f"hash exemption #{index} must pin one exact SHA-256 hex digest"
+        assert exemption.get("reason"), f"hash exemption #{index} must include reason"
+        assert exemption.get("pr"), f"hash exemption #{index} must include pr"
+        assert exemption.get("pm_approval"), f"hash exemption #{index} must include pm_approval"
+
+        approved.add((relative_path, approved_hash))
+    return approved
+
+
+def _collect_hash_drift(
+    *,
+    repo_root: Path,
+    expected_hashes: Mapping[str, str],
+    approved: set[tuple[str, str]],
+) -> list[str]:
+    drifted: list[str] = []
+    for relative_path, expected_hash in expected_hashes.items():
+        actual_hash = _sha256(repo_root / relative_path)
+        if actual_hash != expected_hash and (relative_path, actual_hash) not in approved:
+            drifted.append(
+                f"{relative_path}: expected {expected_hash}, got {actual_hash}; "
+                f"{_repin_command(relative_path)}"
+            )
+    return drifted
 
 
 def test_contract_hashes_match_frozen_baseline_or_pm_exemption() -> None:
-    approved_hashes = _load_hash_exemptions()
-
-    drifted: list[str] = []
-    for relative_path, expected_hash in EXPECTED_CONTRACT_HASHES.items():
-        actual_hash = _sha256(REPO_ROOT / relative_path)
-        if actual_hash != expected_hash and relative_path not in approved_hashes:
-            drifted.append(f"{relative_path}: expected {expected_hash}, got {actual_hash}")
+    drifted = _collect_hash_drift(
+        repo_root=REPO_ROOT,
+        expected_hashes=EXPECTED_CONTRACT_HASHES,
+        approved=_load_hash_exemptions(),
+    )
 
     assert not drifted, "Unapproved contract hash drift:\n" + "\n".join(drifted)
+
+
+def test_every_frozen_skill_spec_document_is_hash_locked() -> None:
+    """The two carriers of `FROZEN` must agree in both directions.
+
+    A document whose frontmatter claims `FROZEN` without a digest here is an
+    unbacked claim; a digest here for a document that no longer declares
+    `FROZEN` is a lock nobody reads.
+
+    Scoped to `docs/skill-spec/` on purpose. `docs/feature-compliance-checklist.md`
+    also declares `FROZEN`, but it is a GENERATED view of `spec/features.yaml`
+    and is guarded by regeneration equality in
+    `tests/test_feature_traceability_matrix.py` — a stronger check than a byte
+    digest, and one that survives every legitimate feature addition. Byte-locking
+    a generated file would make each such addition require a re-pin for no added
+    assurance.
+    """
+    locked = {
+        relative_path
+        for relative_path in EXPECTED_CONTRACT_HASHES
+        if relative_path.startswith("docs/skill-spec/")
+    }
+    declared = {
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in sorted(SKILL_SPEC_DIR.glob("*.md"))
+        if _frontmatter_status(path) == "FROZEN"
+    }
+
+    assert locked == declared, (
+        "docs/skill-spec FROZEN documents and the hash table must match exactly: "
+        f"claimed but unlocked={sorted(declared - locked)}, "
+        f"locked but not claiming FROZEN={sorted(locked - declared)}"
+    )
+
+
+def test_exemption_must_pin_one_exact_digest_with_owner_approval(tmp_path: Path) -> None:
+    exemptions_path = tmp_path / "contract-exemptions.yaml"
+    exemptions_path.write_text(
+        'version: "1"\n'
+        "exemptions:\n"
+        '  - file: "docs/skill-spec/01-PORTABLE-GSKILL-V1.md"\n'
+        '    sha256: "' + "1" * 64 + '"\n'
+        '    reason: "Approved drift."\n'
+        '    pr: "PR-1"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="pm_approval"):
+        _load_hash_exemptions(exemptions_path)
+
+
+def test_exemption_approves_only_the_exact_bytes_it_pinned(tmp_path: Path) -> None:
+    document = tmp_path / "contract.md"
+    document.write_text("sealed\n", encoding="utf-8")
+    sealed_hash = _sha256(document)
+
+    document.write_text("approved drift\n", encoding="utf-8")
+    approved_hash = _sha256(document)
+    expected = {"contract.md": sealed_hash}
+
+    assert (
+        _collect_hash_drift(
+            repo_root=tmp_path,
+            expected_hashes=expected,
+            approved={("contract.md", approved_hash)},
+        )
+        == []
+    )
+
+    document.write_text("second, unapproved drift\n", encoding="utf-8")
+    drifted = _collect_hash_drift(
+        repo_root=tmp_path,
+        expected_hashes=expected,
+        approved={("contract.md", approved_hash)},
+    )
+
+    assert len(drifted) == 1
+    assert "re-pin with" in drifted[0]
