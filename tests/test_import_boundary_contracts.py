@@ -4,6 +4,13 @@
 check for the layering in `docs/design/v1-alignment.md` section 3.1. A boundary
 gate degrades in ways the tool itself cannot notice, so each one is asserted here.
 
+This file has two layers and needs both. The CONFIGURATION tests (failure modes
+1-6) read `pyproject.toml` and pin the shape each contract must keep. The
+ENFORCEMENT tests (failure mode 7) copy the package into a temporary directory,
+inject a real violating import, and run import-linter over that copy: a
+configuration of the right shape still says nothing about what the tool does
+with it.
+
 1. An exemption is swapped rather than cleared. `ignore_imports` exists to
    register violations that already existed when a contract was introduced, so
    the contract can be enforced from day one instead of waiting for a repo-wide
@@ -42,13 +49,33 @@ gate degrades in ways the tool itself cannot notice, so each one is asserted her
    contract rests on the latter -- section 3.2 enumerates the public contracts
    but does not itself forbid importing a private module, so citing it alone
    would be a hollow reference.
+7. The contracts do not actually reject the imports they name. Failure modes 1-6
+   are all read from TOML, so they keep passing if import-linter changes what a
+   field means, if a contract stops being wired to the code at all, or if an
+   assumption about a field's semantics was simply wrong to begin with.
+   Measured, not assumed: with a direct `adapters.mcp -> migration` import AND an
+   indirect `sdk -> adapters.cli -> migration` chain both present in the tree,
+   every assertion above still passed. The enforcement tests below close that gap
+   by running the gate itself -- the pristine copy stays green, each injected
+   violation turns the naming contract red, and one negative control shows the
+   redness comes from the contract rather than from the harness.
 """
 
 from __future__ import annotations
 
+import contextlib
+import os
+import re
+import shutil
+import subprocess
+import sys
 import tomllib
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
@@ -59,6 +86,10 @@ LAYERS_CONTRACT = "Layered module boundaries (v1-alignment 3.1)"
 MIGRATION_DIRECT_CONTRACT = "Migration is imported only by the CLI converter module (v1-alignment 9, AGENTS.md 4)"
 MIGRATION_INDIRECT_CONTRACT = (
     "Migration is not reachable indirectly from any runtime path (v1-alignment 9, AGENTS.md 4)"
+)
+PACKAGE_PRIVATE_CONTRACT = (
+    "Package-private modules are imported only by their owner "
+    "(PEP 8 underscore convention, corroborated by v1-alignment 3.2)"
 )
 
 # The one module authorized to reach the legacy converter, per AGENTS.md section 4
@@ -338,4 +369,358 @@ def test_import_linter_is_a_declared_dev_dependency() -> None:
     assert any(dep.startswith("import-linter") for dep in dev_dependencies), (
         "import-linter must be declared in the `dev` extra so `uv sync --extra dev` installs the "
         "gate; a gate that is not installed cannot run"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Enforcement layer: run the real contracts over an injected copy of the package
+#
+# The assertions above describe the gate; these ones execute it. Each test copies
+# `src/graph_skill_runtime` into a temporary directory next to the repository's
+# own `[tool.importlinter]` section, appends one import statement that a contract
+# claims is illegal, and runs import-linter over the copy. Nothing under `src/`
+# is touched, so a failing or interrupted test cannot leave a violation behind.
+#
+# Modelled on import-linter's own test suite, which tests contracts on two
+# levels. Its unit tests build a synthetic in-memory grimp `ImportGraph`
+# (`add_module` / `add_import`) and assert `contract.check(graph=...).kept`; its
+# functional tests (`tests/functional/test_lint_imports.py`) run the real entry
+# point over a real package directory with a real config file, using `os.chdir`
+# plus `sys.path` edits to make the assets importable, and assert
+# `cli.EXIT_STATUS_SUCCESS == cli.lint_imports()`.
+#
+# Borrowed: the functional level. A synthetic graph would prove that a contract
+# type works -- which is upstream's job, not ours -- while saying nothing about
+# whether THIS repository's contracts still cover THIS package, which is the
+# defect these tests exist to catch.
+#
+# Rejected: doing it in-process, because upstream's precondition does not hold
+# here. Its asset packages are not imported by the test session; ours is. grimp
+# locates the package under analysis through `importlib.util.find_spec`
+# (grimp/adaptors/packagefinder.py:21), and `find_spec` returns `sys.modules`'
+# entry when the name is already imported. Measured: after `import
+# graph_skill_runtime`, putting a copy first on `sys.path` still resolved to the
+# real `src/graph_skill_runtime`. A subprocess with `PYTHONPATH` pointing at the
+# copy is the form that actually analyses the copy, and it additionally keeps
+# `os.chdir` and `lint_imports`'s own `sys.path.insert(0, os.getcwd())` out of a
+# 1700-test session.
+# ---------------------------------------------------------------------------
+
+# The interpreter running the tests already has import-linter installed, and
+# `importlinter.cli.lint_imports` is exactly what the `lint-imports` console
+# script calls (see its `_run_check`). Going through `sys.executable` avoids
+# locating a platform-specific script name (`lint-imports.exe` on Windows).
+_LINT_RUNNER = (
+    "import sys;"
+    "from importlinter.cli import lint_imports;"
+    "sys.exit(lint_imports(config_filename=sys.argv[1], no_cache=True, no_logo=True))"
+)
+
+# import-linter renders through `rich`, which hard-wraps at 80 columns when
+# stdout is not a terminal -- long contract names then break across lines and
+# even lose the space before their verdict ("...(v1-alignment 3.1)KEPT",
+# observed on 2.14). `COLUMNS` is how `rich` is told otherwise.
+_WIDE_ENOUGH_TO_NEVER_WRAP = "2000"
+
+_ANALYZED_LINE = re.compile(r"^Analyzed \d+ files, \d+ dependencies\.$")
+_SUMMARY_LINE = re.compile(r"^Contracts: (?P<kept>\d+) kept, (?P<broken>\d+) broken\.$")
+_RESULT_LINE = re.compile(r"^(?P<name>.+?) (?P<verdict>KEPT|BROKEN)(?: \([^)]*\))?$")
+
+# Modules used as injection sites, relative to the package root. `adapters.mcp`
+# is the module the direct-migration contract exists to keep out of the legacy
+# converter, and it is foreign to `core`, so it also serves as the outsider
+# reaching into a package-private module.
+_MCP_MODULE = ("adapters", "mcp.py")
+_SDK_MODULE = ("sdk.py",)
+
+_IMPORTS_MIGRATION_DIRECTLY = "from graph_skill_runtime import migration as _boundary_probe"
+_IMPORTS_THE_CLI_CONVERTER = "from graph_skill_runtime.adapters import cli as _boundary_probe"
+_IMPORTS_A_PRIVATE_MODULE = (
+    "from graph_skill_runtime.core import _predict_internal as _boundary_probe"
+)
+
+# Anchor for the negative control below. It is the last line of the indirect
+# migration contract, and `allow_indirect_imports` is the one option that would
+# reduce that contract to the direct check `protected` already performs.
+_INDIRECT_CONTRACT_ANCHOR = 'forbidden_modules = ["graph_skill_runtime.migration"]'
+
+
+@dataclass(frozen=True)
+class LintRun:
+    """One `lint-imports` execution: its exit status and per-contract verdicts."""
+
+    exit_code: int
+    output: str
+    verdicts: dict[str, str]
+
+    @property
+    def broken(self) -> set[str]:
+        return {name for name, verdict in self.verdicts.items() if verdict == "BROKEN"}
+
+
+class ImportLinterSandbox:
+    """A copy of the package plus the repository's real contracts, safe to break."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.package = root / "src" / "graph_skill_runtime"
+
+    def run(self, config_filename: str = "pyproject.toml") -> LintRun:
+        environment = dict(os.environ)
+        environment.update(
+            {
+                # First on the child's `sys.path`, so `graph_skill_runtime`
+                # resolves to this copy rather than to the editable install of
+                # the real `src/` that site-packages appends.
+                "PYTHONPATH": str(self.root / "src"),
+                "COLUMNS": _WIDE_ENOUGH_TO_NEVER_WRAP,
+                # `rich` writes its progress spinner as U+2219, which a Windows
+                # child inheriting an ANSI code page cannot encode -- observed
+                # here as `UnicodeEncodeError: 'gbk' codec` under CP936. The
+                # report is then lost entirely, so the child's text I/O is
+                # pinned to UTF-8 rather than left to the active code page.
+                "PYTHONUTF8": "1",
+                "PYTHONIOENCODING": "utf-8",
+            }
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", _LINT_RUNNER, config_filename],
+            cwd=self.root,
+            env=environment,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+            check=False,
+        )
+        output = completed.stdout + completed.stderr
+        return LintRun(completed.returncode, output, _parse_verdicts(output))
+
+    @contextlib.contextmanager
+    def injected(self, module: tuple[str, ...], statement: str) -> Iterator[None]:
+        """Append one import statement to a copied module, then restore it."""
+        target = self.package.joinpath(*module)
+        original = target.read_bytes()
+        try:
+            target.write_bytes(original + f"\n{statement}  # injected by the boundary gate test\n".encode())
+            yield
+        finally:
+            target.write_bytes(original)
+
+
+def _importlinter_section_text() -> str:
+    """Return the `[tool.importlinter]` section of `pyproject.toml` verbatim.
+
+    Sliced as text rather than re-serialized from the parsed dict: the sandbox
+    must run the same configuration the real gate reads, and there is no TOML
+    writer in the dependency set to round-trip through. Fidelity is then proven
+    mechanically -- the slice is parsed back and compared to the live config.
+    """
+    lines = PYPROJECT.read_text(encoding="utf-8").splitlines(keepends=True)
+    start = next(
+        (index for index, line in enumerate(lines) if line.strip() == "[tool.importlinter]"),
+        None,
+    )
+    assert start is not None, "pyproject.toml has no [tool.importlinter] section"
+
+    end = len(lines)
+    for index, line in enumerate(lines[start + 1 :], start=start + 1):
+        # Only a table header starts a line with "[": array elements are indented
+        # and closing brackets are "]".
+        if line.startswith("[") and not line.startswith(("[tool.importlinter]", "[[tool.importlinter.")):
+            end = index
+            break
+
+    section = "".join(lines[start:end])
+    assert tomllib.loads(section)["tool"]["importlinter"] == _importlinter_config(), (
+        "the extracted [tool.importlinter] section does not parse back to the live configuration, "
+        "so the sandbox would be linting something other than the real contracts"
+    )
+    return section
+
+
+def _parse_verdicts(output: str) -> dict[str, str]:
+    """Read the per-contract KEPT/BROKEN verdicts out of an import-linter report."""
+    lines = [line.strip() for line in output.splitlines()]
+    start = next((index for index, line in enumerate(lines) if _ANALYZED_LINE.match(line)), None)
+    assert start is not None, f"import-linter produced no contract results:\n{output}"
+
+    verdicts: dict[str, str] = {}
+    summary: tuple[int, int] | None = None
+    for line in lines[start + 1 :]:
+        summary_match = _SUMMARY_LINE.match(line)
+        if summary_match:
+            summary = (int(summary_match["kept"]), int(summary_match["broken"]))
+            break
+        result_match = _RESULT_LINE.match(line)
+        if result_match:
+            verdicts[result_match["name"]] = result_match["verdict"]
+
+    assert summary is not None, f"import-linter printed no result summary:\n{output}"
+    kept = sum(1 for verdict in verdicts.values() if verdict == "KEPT")
+    assert (kept, len(verdicts) - kept) == summary, (
+        "this test's report parser and import-linter's own summary disagree about how many "
+        f"contracts were checked, so a verdict is being missed or invented:\n{output}"
+    )
+
+    declared = {contract["name"] for contract in _contracts()}
+    assert set(verdicts) == declared, (
+        "every declared contract must appear in the report with a verdict; a missing one would be "
+        f"silently unchecked.\nmissing: {sorted(declared - set(verdicts))}"
+        f"\nunexpected: {sorted(set(verdicts) - declared)}\n{output}"
+    )
+    return verdicts
+
+
+@pytest.fixture(scope="module")
+def import_linter_sandbox(tmp_path_factory: pytest.TempPathFactory) -> ImportLinterSandbox:
+    """Copy the package and the real contracts once for this module's tests.
+
+    Module-scoped because the copy costs a directory walk and every test restores
+    its injection through `injected()`, so no test can observe another's edit.
+    """
+    root = tmp_path_factory.mktemp("import-boundary")
+    (root / "src").mkdir()
+    shutil.copytree(
+        PACKAGE_ROOT,
+        root / "src" / "graph_skill_runtime",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    (root / "pyproject.toml").write_text(_importlinter_section_text(), encoding="utf-8", newline="\n")
+    return ImportLinterSandbox(root)
+
+
+def test_the_authorized_cli_converter_import_stays_kept(
+    import_linter_sandbox: ImportLinterSandbox,
+) -> None:
+    """The legal owner keeps its import, and the untouched copy is green.
+
+    Two claims in one run. First, `adapters.cli` -- the module AGENTS.md section 4
+    authorizes -- really does import the legacy converter, so the two migration
+    contracts are being exercised rather than passing vacuously over a package
+    where nothing imports migration at all. Second, the pristine copy reproduces
+    the repository's own green result, which is what makes a red verdict in the
+    tests below attributable to the injected import instead of to the harness.
+    """
+    cli_source = (import_linter_sandbox.package / "adapters" / "cli.py").read_text(encoding="utf-8")
+    assert "from graph_skill_runtime.migration import" in cli_source, (
+        "the CLI converter module no longer imports migration, so 'migration stays KEPT' would "
+        "prove nothing. If the converter moved, move this contract's `allowed_importers` with it."
+    )
+
+    result = import_linter_sandbox.run()
+
+    assert result.exit_code == 0, f"the untouched package copy must satisfy every contract:\n{result.output}"
+    assert result.broken == set()
+    assert result.verdicts[MIGRATION_DIRECT_CONTRACT] == "KEPT"
+    assert result.verdicts[MIGRATION_INDIRECT_CONTRACT] == "KEPT"
+
+
+def test_a_direct_import_of_the_legacy_converter_is_rejected(
+    import_linter_sandbox: ImportLinterSandbox,
+) -> None:
+    """`adapters.mcp -> migration`: the exact import the direct contract names.
+
+    AGENTS.md section 4 confines legacy v0.3 parsing to the `gskill migrate
+    studio-skill` converter boundary. `adapters.mcp` is the neighbour that a
+    package-wide `allowed_importers` would have admitted.
+    """
+    with import_linter_sandbox.injected(_MCP_MODULE, _IMPORTS_MIGRATION_DIRECTLY):
+        result = import_linter_sandbox.run()
+
+    assert result.verdicts[MIGRATION_DIRECT_CONTRACT] == "BROKEN", (
+        "a transport adapter importing the legacy converter must break the direct contract; it "
+        f"reported KEPT, so `allowed_importers` is admitting more than `adapters.cli`:\n{result.output}"
+    )
+    # The indirect contract lists `adapters.mcp` among its sources, so a direct
+    # import is also the shortest illegal chain and breaks it too.
+    assert result.broken == {MIGRATION_DIRECT_CONTRACT, MIGRATION_INDIRECT_CONTRACT}
+    assert result.exit_code == 1
+    # No such import exists in `src/`, where the gate is green: seeing it reported
+    # proves the injected COPY was analysed, not the installed package.
+    assert "graph_skill_runtime.adapters.mcp -> graph_skill_runtime.migration" in result.output
+
+
+def test_reaching_the_legacy_converter_through_the_cli_module_is_rejected(
+    import_linter_sandbox: ImportLinterSandbox,
+) -> None:
+    """`sdk -> adapters.cli -> migration`: legal hop, illegal destination.
+
+    Every edge in this chain is individually allowed -- `adapters.cli` is the one
+    module authorized to import migration -- yet importing the SDK now drags the
+    legacy converter in behind it, which is what "confined to the converter
+    boundary" forbids.
+    """
+    with import_linter_sandbox.injected(_SDK_MODULE, _IMPORTS_THE_CLI_CONVERTER):
+        result = import_linter_sandbox.run()
+
+    assert result.verdicts[MIGRATION_INDIRECT_CONTRACT] == "BROKEN", (
+        "importing the SDK must not reach the legacy converter through `adapters.cli`. This "
+        f"contract is the only one that can catch that chain:\n{result.output}"
+    )
+    assert result.verdicts[MIGRATION_DIRECT_CONTRACT] == "KEPT", (
+        "the `protected` contract checks DIRECT importers only, which is why the indirect claim "
+        "needs its own contract. If import-linter has changed and `protected` now follows chains, "
+        "re-decide whether two contracts are still warranted instead of relaxing this assertion."
+    )
+    assert result.broken == {MIGRATION_INDIRECT_CONTRACT}
+    assert result.exit_code == 1
+    assert "graph_skill_runtime.sdk -> graph_skill_runtime.adapters.cli" in result.output
+
+
+def test_weakening_the_indirect_contract_hides_that_chain(
+    import_linter_sandbox: ImportLinterSandbox,
+) -> None:
+    """Negative control: the red above comes from the contract, not the harness.
+
+    The same injected chain is linted against a config that differs by one line --
+    `allow_indirect_imports = true` on the indirect contract -- and goes green.
+    That is the mutation the pyproject comment warns against, so this test both
+    proves the previous test has causal power and shows what the option costs.
+    """
+    section = _importlinter_section_text()
+    assert "allow_indirect_imports" not in _contract(MIGRATION_INDIRECT_CONTRACT), (
+        "the live contract already sets `allow_indirect_imports`, so there is nothing left for this "
+        "control to weaken -- and the contract has already lost its indirect check"
+    )
+    assert section.count(_INDIRECT_CONTRACT_ANCHOR) == 1, (
+        f"expected exactly one {_INDIRECT_CONTRACT_ANCHOR!r} line to weaken; the mutation is only "
+        "meaningful if it lands on the indirect migration contract"
+    )
+    weakened = section.replace(
+        _INDIRECT_CONTRACT_ANCHOR,
+        f"{_INDIRECT_CONTRACT_ANCHOR}\nallow_indirect_imports = true",
+    )
+    (import_linter_sandbox.root / "weakened.toml").write_text(weakened, encoding="utf-8", newline="\n")
+
+    with import_linter_sandbox.injected(_SDK_MODULE, _IMPORTS_THE_CLI_CONVERTER):
+        result = import_linter_sandbox.run("weakened.toml")
+
+    assert result.verdicts[MIGRATION_INDIRECT_CONTRACT] == "KEPT", (
+        "with `allow_indirect_imports` set, the injected chain must slip through -- that is the "
+        f"whole reason the option is left off:\n{result.output}"
+    )
+    assert result.exit_code == 0
+
+
+def test_reaching_into_a_package_private_module_is_rejected(
+    import_linter_sandbox: ImportLinterSandbox,
+) -> None:
+    """`adapters.mcp -> core._predict_internal`: an outsider inside `core`.
+
+    PEP 8's leading underscore makes `_predict_internal` package-private, so only
+    `core` may import it. `adapters.mcp` is foreign to `core` and reaching the
+    private module directly, which is the shape the contract forbids.
+    """
+    with import_linter_sandbox.injected(_MCP_MODULE, _IMPORTS_A_PRIVATE_MODULE):
+        result = import_linter_sandbox.run()
+
+    assert result.broken == {PACKAGE_PRIVATE_CONTRACT}, (
+        "an outside package importing `core._predict_internal` must break exactly the "
+        f"package-private contract:\n{result.output}"
+    )
+    assert result.exit_code == 1
+    assert (
+        "graph_skill_runtime.adapters.mcp -> graph_skill_runtime.core._predict_internal"
+        in result.output
     )
