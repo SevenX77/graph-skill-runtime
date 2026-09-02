@@ -133,21 +133,16 @@ DYNAMIC_IMPORT_CALLS = frozenset({"import_module", "__import__", "importorskip"}
 VOCABULARY_MODULE = "graph_skill_runtime.migration.studio_v030"
 VOCABULARY_NAMES = frozenset({"MigrationDiagnostic", "MigrationErrorCode"})
 
-# Pinned current count. Only ever lower this, together with the conversion that
-# earns it. See the module docstring for why raising it is a defect. The target
-# is 0, at which point the shim is dead and must be deleted with it.
-MAX_LEGACY_CORPUS_MODULES = 4
+# The corpus is fully native, so this is 0 and stays 0. It is a pin rather than
+# a literal in the assertion because the gate spent three changes ratcheting
+# down to zero, and a later change that legitimately needs the converter outside
+# `tests/migration/` must raise this deliberately, with its reason, instead of
+# quietly editing an inline number.
+MAX_LEGACY_CORPUS_MODULES = 0
 
 # The exact remaining modules, so removing one here while adding another
 # elsewhere cannot keep the total flat and hide a regression.
-EXPECTED_LEGACY_CORPUS_MODULES: frozenset[str] = frozenset(
-    {
-        "e2e/test_agent_node_observability.py",
-        "e2e/test_tool_call_started_e2e.py",
-        "e2e/test_ws_e1_create_agent_step1.py",
-        "e2e/test_ws_e1_io_runtime.py",
-    }
-)
+EXPECTED_LEGACY_CORPUS_MODULES: frozenset[str] = frozenset()
 
 
 # --------------------------------------------------------------------------
