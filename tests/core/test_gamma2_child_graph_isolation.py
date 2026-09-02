@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import graph_skill_runtime.core.graph_assembler as graph_assembler_module
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 from graph_skill_runtime.core.graph_assembler import (
     _build_subgraph_node,
@@ -17,7 +18,6 @@ from graph_skill_runtime.core.graph_assembler import (
 from graph_skill_runtime.core.loader import PhaseDocument
 from graph_skill_runtime.core.manifest import PhaseIOSchema, SubgraphNodeAST
 from graph_skill_runtime.runtime.state_mapper import PhaseWrapper, StateMapper
-from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -31,18 +31,20 @@ def _base(
     outputs: dict[str, object] | None = None,
     *,
     graph_name: str = "gamma2-child",
+    skill_entry: bool = True,
 ) -> None:
     phase_entries = []
     for match in re.finditer(r'<phase id="([^"]+)" src="([^"]+)" depends_on="([^"]*)"', phases):
         deps = [dep for dep in re.split(r"[\s,]+", match.group(3).strip()) if dep]
         phase_entries.append((match.group(1), deps))
-    phase_yaml = "\n".join(f"  - {phase_id}" for phase_id, _ in phase_entries)
     depended_on = {dep for _, deps in phase_entries for dep in deps}
-    phase_body = "\n".join(
-        '<phase depends_on="{deps}"{output}>{phase_id}</phase>'.format(
-            deps=", ".join(deps) if deps else "input",
-            output=" output" if phase_id not in depended_on else "",
-            phase_id=phase_id,
+    phase_yaml = "\n".join(
+        "\n".join(
+            (
+                f"  - id: {phase_id}",
+                "    depends_on: [{deps}]".format(deps=", ".join(deps) if deps else "input"),
+                f"    output: {str(phase_id not in depended_on).lower()}",
+            )
         )
         for phase_id, deps in phase_entries
     )
@@ -55,11 +57,21 @@ def _base(
         },
     }
     output_yaml = json.dumps(output_schema, ensure_ascii=False, indent=4).replace("\n", "\n    ")
+    if skill_entry:
+        _write(
+            root / "SKILL.md",
+            f"""---
+name: {root.name}
+description: Child graph isolation fixture for {graph_name}.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+        )
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {graph_name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {graph_name}
+description: Child graph isolation fixture for {graph_name}.
 io:
   inputs:
     type: object
@@ -70,8 +82,6 @@ io:
     {output_yaml}
 phases:
 {phase_yaml}
----
-{phase_body}
 """,
     )
 
@@ -94,6 +104,7 @@ def _logic_action(root: Path, phase: str, action: str, body: str, outputs: list[
     _write(
         root / "phases" / phase / "LOGIC.md",
         f"""---
+name: {phase}
 io:
   inputs:
     type: object
@@ -107,12 +118,12 @@ io:
     _write(root / "phases" / phase / "actions" / f"{action}.py", body)
 
 
-def _subgraph(root: Path, phase: str, ref: str = "child") -> None:
-    child_path = Path(ref) if Path(ref).is_absolute() else root / "phases" / phase / ref
+def _subgraph(root: Path, phase: str, graph_id: str) -> None:
     _write(
         root / "phases" / phase / "SUBGRAPH.md",
         f"""---
-path: {child_path}
+name: {phase}
+graph: {graph_id}
 io:
   inputs:
     type: object
@@ -136,13 +147,15 @@ io:
 def test_subgraph_child_starts_from_explicit_inputs_only(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _base(tmp_path, '<phase id="sub" src="phases/sub" depends_on="" />\n')
-    _subgraph(tmp_path, "sub")
-    child = tmp_path / "phases" / "sub" / "child"
+    skill_root = tmp_path / "gamma2-child"
+    _base(skill_root, '<phase id="sub" src="phases/sub" depends_on="" />\n')
+    _subgraph(skill_root, "sub", "gamma2-inspect")
+    child = skill_root / "graphs" / "gamma2-inspect"
     _base(
         child,
         '<phase id="inspect" src="phases/inspect" depends_on="" />\n',
         graph_name="gamma2-inspect",
+        skill_entry=False,
     )
     _logic_action(
         child,
@@ -156,7 +169,7 @@ def test_subgraph_child_starts_from_explicit_inputs_only(
         "    }\n",
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     result = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph.invoke(
         {
             "data": {
@@ -180,14 +193,16 @@ def test_subgraph_child_starts_from_explicit_inputs_only(
 def test_subgraph_child_outputs_are_deterministic_across_child_phases(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _base(tmp_path, '<phase id="sub" src="phases/sub" depends_on="" />\n')
-    _subgraph(tmp_path, "sub")
-    child = tmp_path / "phases" / "sub" / "child"
+    skill_root = tmp_path / "gamma2-child"
+    _base(skill_root, '<phase id="sub" src="phases/sub" depends_on="" />\n')
+    _subgraph(skill_root, "sub", "gamma2-sequence")
+    child = skill_root / "graphs" / "gamma2-sequence"
     _base(
         child,
         '<phase id="first" src="phases/first" depends_on="" />\n'
         '<phase id="second" src="phases/second" depends_on="first" />\n',
         graph_name="gamma2-sequence",
+        skill_entry=False,
     )
     _logic_action(child, "first", "first", "def first(inputs):\n    return {'seen_public': 'a'}\n", outputs=["seen_public"])
     _logic_action(
@@ -199,7 +214,7 @@ def test_subgraph_child_outputs_are_deterministic_across_child_phases(
         outputs=["saw_parent_secret", "saw_parent_message"],
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     result = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph.invoke(
         {"data": {"inputs": {"public": "ok"}}, "flow": {}, "messages": [], "run_id": "r1"}
     )

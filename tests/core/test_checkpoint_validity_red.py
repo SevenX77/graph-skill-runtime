@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-from tests.legacy_fixture_adapter import compile_skill
+from graph_skill_runtime.core.compiler import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -33,25 +33,37 @@ def _fanout_skill(root: Path) -> None:
         required=["a", "b", "summary"],
     )
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: checkpoint-validity-red
+name: {root.name}
+description: A fan-out fan-in graph for node-scoped checkpoint validity.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: checkpoint-validity-red
+description: A fan-out fan-in graph for node-scoped checkpoint validity.
 io:
   inputs:
     {graph_input}
   outputs:
     {graph_output}
 phases:
-  - prepare
-  - branch_a
-  - branch_b
-  - assemble
----
-<phase depends_on="input">prepare</phase>
-<phase depends_on="prepare">branch_a</phase>
-<phase depends_on="prepare">branch_b</phase>
-<phase depends_on="branch_a,branch_b" output>assemble</phase>
+  - id: prepare
+    depends_on: [input]
+    output: false
+  - id: branch_a
+    depends_on: [prepare]
+    output: false
+  - id: branch_b
+    depends_on: [prepare]
+    output: false
+  - id: assemble
+    depends_on: [branch_a, branch_b]
+    output: true
 """,
     )
     _logic_phase(
@@ -98,6 +110,7 @@ def _logic_phase(
     _write(
         root / "phases" / phase_id / "LOGIC.md",
         f"""---
+name: {phase_id}
 io:
   inputs:
     {inputs}

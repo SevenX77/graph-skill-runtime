@@ -30,11 +30,17 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: phase-outcome-fixture
+description: One agent phase, so a single phase_end tells the whole story.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: phase-outcome-fixture
 description: One agent phase, so a single phase_end tells the whole story.
 llm_role: analyst
 io:
@@ -47,12 +53,14 @@ io:
     properties:
       verdict:
         type: string
-phases: [only]
----
-<phase depends_on="input" output>only</phase>
+phases:
+  - id: only
+    depends_on: [input]
+    output: true
 """
 
 _PHASE_MD = """---
+name: only
 llm_role: analyst
 validator: {validator}
 io:
@@ -121,8 +129,9 @@ def _skill(tmp_path: Path, *, validator: bool) -> Path:
     skill = tmp_path / "phase-outcome-fixture"
     phase_dir = skill / "phases" / "only"
     phase_dir.mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (phase_dir / "SKILL.md").write_text(
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (phase_dir / "AGENT.md").write_text(
         _PHASE_MD.format(validator="true" if validator else "false"), encoding="utf-8"
     )
     if validator:

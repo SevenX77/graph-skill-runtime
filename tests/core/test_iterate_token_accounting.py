@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 from ._token_spend_invariant import CallRecorder, assert_totals_match_the_calls
 
@@ -43,9 +43,8 @@ INPUT_TOKENS_PER_CALL = 11
 OUTPUT_TOKENS_PER_CALL = 7
 ITEMS = ["alpha", "beta", "gamma"]
 
-_BATCH_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: iterate-token-accounting
+_BATCH_GRAPH_MD = """schema_version: gskill.graph.v1
+graph_id: iterate-token-accounting
 description: One agent phase iterated over three items.
 llm_role: analyst
 io:
@@ -65,12 +64,14 @@ io:
         type: array
         items:
           type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
 _BATCH_SKILL_MD = """---
+name: work
 llm_role: analyst
 validator: false
 iterate:
@@ -104,9 +105,8 @@ Handle this one item:
 <step id="S1" name="finish">Call finish_task with a summary.</step>
 """
 
-_LOOP_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: loop-token-accounting
+_LOOP_GRAPH_MD = """schema_version: gskill.graph.v1
+graph_id: loop-token-accounting
 description: One agent phase looped over three items.
 llm_role: analyst
 io:
@@ -124,12 +124,14 @@ io:
     properties:
       tally:
         type: object
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
 _LOOP_SKILL_MD = """---
+name: work
 llm_role: analyst
 validator: false
 iterate:
@@ -209,8 +211,13 @@ class _CountingProvider:
 def _skill(tmp_path: Path, name: str, graph_md: str, skill_md: str) -> Path:
     skill = tmp_path / name
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(graph_md, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(skill_md, encoding="utf-8")
+    (skill / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: One agent phase iterated over three items.\n---\n"
+        "Compile and run this graph skill with graph-skill-runtime.\n",
+        encoding="utf-8",
+    )
+    (skill / "graph.yaml").write_text(graph_md, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(skill_md, encoding="utf-8")
     return skill
 
 

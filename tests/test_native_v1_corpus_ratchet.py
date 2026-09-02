@@ -136,33 +136,12 @@ VOCABULARY_NAMES = frozenset({"MigrationDiagnostic", "MigrationErrorCode"})
 # Pinned current count. Only ever lower this, together with the conversion that
 # earns it. See the module docstring for why raising it is a defect. The target
 # is 0, at which point the shim is dead and must be deleted with it.
-MAX_LEGACY_CORPUS_MODULES = 25
+MAX_LEGACY_CORPUS_MODULES = 4
 
 # The exact remaining modules, so removing one here while adding another
 # elsewhere cannot keep the total flat and hide a regression.
 EXPECTED_LEGACY_CORPUS_MODULES: frozenset[str] = frozenset(
     {
-        "core/test_a_phase_says_how_it_ended.py",
-        "core/test_a_phase_that_never_got_its_input.py",
-        "core/test_agent_loop_iteration_is_per_execution.py",
-        "core/test_agent_phase_input_delivery.py",
-        "core/test_batch_item_isolation.py",
-        "core/test_checkpoint_validity_red.py",
-        "core/test_events_name_their_execution.py",
-        "core/test_gamma2_child_graph_isolation.py",
-        "core/test_gamma2_phase_outputs_flow.py",
-        "core/test_gamma2_reference_reader_sandbox.py",
-        "core/test_iterate_token_accounting.py",
-        "core/test_llm_call_announces_its_start.py",
-        "core/test_llm_step_closes_when_the_call_returns.py",
-        "core/test_phase_spend_has_one_answer.py",
-        "core/test_productization_run_by_artifact_red.py",
-        "core/test_tool_call_history_integrity.py",
-        "core/test_workspace_dir_contract_red.py",
-        "core/test_ws_e1_io_runtime_red.py",
-        "core/test_ws_e1_subgraph_io_contract_red.py",
-        "core/test_ws_e5_checkpoint_inner_red.py",
-        "core/test_ws_e8_exit_gate_red.py",
         "e2e/test_agent_node_observability.py",
         "e2e/test_tool_call_started_e2e.py",
         "e2e/test_ws_e1_create_agent_step1.py",

@@ -6,9 +6,10 @@ from typing import Any
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import AIMessage
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.runner import run_skill
 from graph_skill_runtime.core.state import StateManager
-from tests.legacy_fixture_adapter import compile_skill, run_skill
 
 
 class NoFinishChatModel:
@@ -129,10 +130,19 @@ def _write(path: Path, text: str) -> None:
 
 def _write_exit_gate_skill(root: Path, *, max_iterations: int = 2) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: ws-e8-exit-gate-red
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: One AGENT phase used to verify the agent exit gate.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: ws-e8-exit-gate-red
+description: One AGENT phase used to verify the agent exit gate.
 llm_role: analyst
 io:
   inputs:
@@ -146,14 +156,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 max_iterations: {max_iterations}
 io:
   inputs:

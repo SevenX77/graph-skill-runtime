@@ -4,8 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -18,21 +18,31 @@ def _base(root: Path, phases: str) -> None:
     for match in re.finditer(r'<phase id="([^"]+)" src="([^"]+)" depends_on="([^"]*)"', phases):
         deps = [dep for dep in re.split(r"[\s,]+", match.group(3).strip()) if dep]
         phase_entries.append((match.group(1), deps))
-    phase_yaml = "\n".join(f"  - {phase_id}" for phase_id, _ in phase_entries)
     depended_on = {dep for _, deps in phase_entries for dep in deps}
-    phase_body = "\n".join(
-        '<phase depends_on="{deps}"{output}>{phase_id}</phase>'.format(
-            deps=", ".join(deps) if deps else "input",
-            output=" output" if phase_id not in depended_on else "",
-            phase_id=phase_id,
+    phase_yaml = "\n".join(
+        "\n".join(
+            (
+                f"  - id: {phase_id}",
+                "    depends_on: [{deps}]".format(deps=", ".join(deps) if deps else "input"),
+                f"    output: {str(phase_id not in depended_on).lower()}",
+            )
         )
         for phase_id, deps in phase_entries
     )
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: gamma2-flow
+name: {root.name}
+description: Phase outputs flow fixture for gamma2 dataflow coverage.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: gamma2-flow
+description: Phase outputs flow fixture for gamma2 dataflow coverage.
 io:
   inputs:
     type: object
@@ -44,8 +54,6 @@ io:
         type: string
 phases:
 {phase_yaml}
----
-{phase_body}
 """,
     )
 
@@ -64,6 +72,7 @@ def _logic_action(root: Path, phase: str, action: str, body: str, outputs: list[
     _write(
         root / "phases" / phase / "LOGIC.md",
         f"""---
+name: {phase}
 io:
   inputs:
     type: object
@@ -80,20 +89,21 @@ io:
 def test_downstream_phase_reads_upstream_phase_outputs_in_same_graph(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
+    skill_root = tmp_path / "gamma2-flow"
     _base(
-        tmp_path,
+        skill_root,
         '<phase id="segment" src="phases/segment" depends_on="" />\n'
         '<phase id="review" src="phases/review" depends_on="segment" />\n',
     )
     _logic_action(
-        tmp_path,
+        skill_root,
         "segment",
         "segment",
         "def segment(inputs):\n    return {'segments_summary': 'chapter summary'}\n",
         outputs=["segments_summary"],
     )
     _logic_action(
-        tmp_path,
+        skill_root,
         "review",
         "review",
         "def review(inputs):\n"
@@ -101,7 +111,7 @@ def test_downstream_phase_reads_upstream_phase_outputs_in_same_graph(
         outputs=["review_input"],
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     result = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph.invoke(
         {"data": {"inputs": {}}, "flow": {}, "messages": [], "run_id": "r1"}
     )

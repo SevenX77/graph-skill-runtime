@@ -25,7 +25,7 @@ from graph_skill_runtime.core.llm_provider import (
     LLMProviderChatModel,
     LLMProviderChunk,
 )
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 class RecordingCallback:
@@ -110,9 +110,15 @@ def test_binding_tools_keeps_one_counter_rather_than_restarting_it() -> None:
     assert numbering == [1, 2]
 
 
-GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: announce-probe
+SKILL_MD = """---
+name: {name}
+description: Agent skill used to observe when a phase reports its LLM call.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: announce-probe
 description: Agent skill used to observe when a phase reports its LLM call.
 llm_role: analyst
 io:
@@ -128,12 +134,14 @@ io:
     properties:
       summary:
         type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-SKILL_MD = """---
+AGENT_MD = """---
+name: work
 llm_role: analyst
 io:
   inputs:
@@ -157,6 +165,13 @@ validator: false
 
 <step id="S1" name="finish">Call finish_task with the summary.</step>
 """
+
+
+def _write_probe_skill(root: Path) -> None:
+    (root / "phases" / "work").mkdir(parents=True)
+    (root / "SKILL.md").write_text(SKILL_MD.format(name=root.name), encoding="utf-8")
+    (root / "graph.yaml").write_text(GRAPH_YAML, encoding="utf-8")
+    (root / "phases" / "work" / "AGENT.md").write_text(AGENT_MD, encoding="utf-8")
 
 
 class SubmittingProvider(FakeLLMProvider):
@@ -188,9 +203,7 @@ def test_an_agent_phase_announces_its_llm_call_before_reporting_it(tmp_path: Pat
     # on the way out and nothing at all on the way in, so a run spent its entire
     # duration with no step to show.
     skill = tmp_path / "announce-probe"
-    (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(SKILL_MD, encoding="utf-8")
+    _write_probe_skill(skill)
 
     seen: list[str] = []
     result = run_skill(
@@ -215,9 +228,7 @@ def test_an_agent_phase_says_which_template_made_its_prompt(tmp_path: Path) -> N
     # hides the two inputs a reader needs to know WHY the prompt says what it
     # says, and leaves two fields of the contract that no producer ever fills.
     skill = tmp_path / "template-probe"
-    (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(SKILL_MD, encoding="utf-8")
+    _write_probe_skill(skill)
 
     captured: list[Any] = []
     run_skill(

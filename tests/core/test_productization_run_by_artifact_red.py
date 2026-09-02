@@ -649,8 +649,8 @@ def test_predict_graph_resolves_engine_predict_model_before_live_provider(
     from graph_skill_runtime.core import graph_assembler
     from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
     from graph_skill_runtime.core._predict_internal.strategy import MockStrategy
+    from graph_skill_runtime.core.compiler import compile_skill
     from graph_skill_runtime.core.runner import SDKPredictContext
-    from tests.legacy_fixture_adapter import compile_skill
 
     skill_root = tmp_path / "artifact-runtime-predict-agent"
     _write_single_agent_skill(skill_root)
@@ -696,8 +696,8 @@ def test_predict_graph_predict_context_overrides_explicit_chat_model(
     from graph_skill_runtime.core import graph_assembler
     from graph_skill_runtime.core._predict_internal.interception import PredictGatewayChatModel
     from graph_skill_runtime.core._predict_internal.strategy import MockStrategy
+    from graph_skill_runtime.core.compiler import compile_skill
     from graph_skill_runtime.core.runner import SDKPredictContext
-    from tests.legacy_fixture_adapter import compile_skill
 
     skill_root = tmp_path / "artifact-runtime-predict-explicit-chat-model"
     _write_single_agent_skill(skill_root)

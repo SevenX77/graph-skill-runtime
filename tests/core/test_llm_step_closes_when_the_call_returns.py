@@ -25,7 +25,7 @@ from graph_skill_runtime.core.llm_provider import (
     LLMProviderChatModel,
     LLMProviderChunk,
 )
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 class Recorder:
@@ -184,9 +184,15 @@ def _provider_reporting_usage() -> FakeLLMProvider:
     return _UsageProvider()
 
 
-GRAPH_MD = """---
-schema_version: "v0.3.0"
+SKILL_MD = """---
 name: closing-probe
+description: Agent skill used to observe when a phase closes its LLM steps.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: closing-probe
 description: Agent skill used to observe when a phase closes its LLM steps.
 llm_role: analyst
 io:
@@ -202,12 +208,14 @@ io:
     properties:
       summary:
         type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-SKILL_MD = """---
+AGENT_MD = """---
+name: work
 llm_role: analyst
 io:
   inputs:
@@ -263,8 +271,9 @@ class RejectThenAcceptProvider(FakeLLMProvider):
 def _run_the_probe(tmp_path: Path) -> list[str]:
     skill = tmp_path / "closing-probe"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(AGENT_MD, encoding="utf-8")
 
     seen: list[str] = []
     run_skill(

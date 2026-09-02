@@ -14,6 +14,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from graph_skill_runtime.core import graph_assembler
 from graph_skill_runtime.core.checkpointer import checkpoint_serde
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import (
     NamespaceCheckpointer,
     _run_graph_loop_iterate,
@@ -22,7 +23,6 @@ from graph_skill_runtime.core.graph_assembler import (
 )
 from graph_skill_runtime.core.manifest import IterateAccumulateSpec, IterateSpec
 from graph_skill_runtime.core.state import BusinessData, FrameworkState, StateManager, WorkflowState
-from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -70,13 +70,23 @@ class _FinishTaskChatModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=message)])
 
 
-def _agent_skill(root: Path, *, graph_iterate: str | None = None) -> None:
+def _agent_skill(root: Path, *, graph_iterate: str | None = None) -> Path:
     iterate_block = f"{graph_iterate.rstrip()}\n" if graph_iterate else ""
+    skill = root / "ws-e5-checkpoint-inner-red"
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
+        skill / "SKILL.md",
+        """---
 name: ws-e5-checkpoint-inner-red
+description: One AGENT phase used to observe inner checkpoint namespaces.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        skill / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e5-checkpoint-inner-red
+description: One AGENT phase used to observe inner checkpoint namespaces.
 io:
   inputs:
     type: object
@@ -93,14 +103,15 @@ io:
       answer:
         type: string
 {iterate_block}phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        skill / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -127,6 +138,7 @@ Call @tool:finish_task with final business data.
 </goal>
 """,
     )
+    return skill
 
 
 def _invoke_agent_graph(
@@ -180,11 +192,11 @@ def test_agent_inner_checkpoint_writes_to_shared_thread_and_namespace(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(tmp_path)
+    skill_root = _agent_skill(tmp_path)
     saver = InMemorySaver(serde=checkpoint_serde())
 
     result = _invoke_agent_graph(
-        tmp_path,
+        skill_root,
         mock_skill_resolver,
         saver=saver,
         data={"topic": "checkpoint"},
@@ -219,7 +231,7 @@ def test_agent_inside_graph_iterate_preserves_iteration_namespace(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(
+    skill_root = _agent_skill(
         tmp_path,
         graph_iterate=dedent(
             """
@@ -234,7 +246,7 @@ def test_agent_inside_graph_iterate_preserves_iteration_namespace(
     saver = InMemorySaver(serde=checkpoint_serde())
 
     _invoke_agent_graph(
-        tmp_path,
+        skill_root,
         mock_skill_resolver,
         saver=saver,
         data={"topics": ["a", "b"]},
@@ -256,11 +268,11 @@ def test_history_queries_distinguish_outer_and_agent_checkpoints(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(tmp_path)
+    skill_root = _agent_skill(tmp_path)
     saver = InMemorySaver(serde=checkpoint_serde())
 
     _invoke_agent_graph(
-        tmp_path,
+        skill_root,
         mock_skill_resolver,
         saver=saver,
         data={"topic": "history"},
@@ -284,7 +296,7 @@ def test_agent_inner_invoke_uses_sync_durability_with_shared_checkpointer(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(tmp_path)
+    skill_root = _agent_skill(tmp_path)
     saver = InMemorySaver(serde=checkpoint_serde())
     captured_invoke_kwargs: dict[str, Any] = {}
 
@@ -315,7 +327,7 @@ def test_agent_inner_invoke_uses_sync_durability_with_shared_checkpointer(
 
     monkeypatch.setattr(graph_assembler, "create_agent", fake_create_agent)
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         chat_model=_FinishTaskChatModel(),
