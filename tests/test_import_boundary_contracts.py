@@ -33,8 +33,12 @@ with it.
    The workflow is PARSED, not searched: commenting the step out leaves a valid
    YAML file that still contains the command text, so a substring search over
    the file keeps passing while `jobs.quality-gates.steps` no longer holds the
-   step. Parsing also makes the two ways a present step stops blocking
-   visible -- an `if:` condition, and `continue-on-error`.
+   step. Parsing also makes visible the ways a step that IS present stops
+   blocking: an `if:` condition, `continue-on-error`, and a command whose
+   failure never reaches the runner -- `uv run lint-imports || true`, or a
+   `shell: pwsh` step ending in `exit 0`, both of which report success while the
+   contracts are broken. The last of those is why the step's `run` must equal
+   the command exactly rather than merely start with it.
 4. A contract silently stops covering new code. Several contracts enumerate
    module lists, and an enumeration goes stale when a top-level subpackage is
    added: the new package sits outside every contract while they all still
@@ -383,18 +387,25 @@ def _may_fail_without_failing_the_job(node: dict[str, Any]) -> bool:
 
 
 def _runs_the_gate(step: Any) -> bool:
-    """Whether a workflow step actually executes `uv run lint-imports`.
+    """Whether a step runs the boundary gate as its entire command, on the default shell.
 
-    Checked line by line so a commented-out line inside a `run:` block does not
-    count -- the same substring-versus-structure mistake this test exists to fix,
-    one level further in.
+    EQUALITY, not a prefix. A prefix admits every way of masking the command's
+    exit status -- `|| true`, `&& true`, `; exit 0`, or simply a second line
+    after it, since a shell script exits with its LAST command's status. Those
+    idioms have no closed enumeration, so the rule is stated positively instead:
+    the whole script is this one command and nothing else. A commented-out
+    command fails the same rule, so no separate line-by-line check is needed.
+
+    A `shell:` key disqualifies the step for the same reason one level down. The
+    default (`bash -e`) propagates the failure; an override changes the exit
+    semantics -- `shell: pwsh` reports success unless its final statement fails,
+    which turns `uv run lint-imports; exit 0` into a green gate. Rather than
+    reason about each shell, require the default.
     """
-    if not isinstance(step, dict):
+    if not isinstance(step, dict) or "shell" in step:
         return False
     script = step.get("run")
-    if not isinstance(script, str):
-        return False
-    return any(line.strip().startswith(LINT_IMPORTS_COMMAND) for line in script.splitlines())
+    return isinstance(script, str) and script.strip() == LINT_IMPORTS_COMMAND
 
 
 def _blocking_gate_steps(workflow: Any) -> list[dict[str, Any]]:
@@ -504,6 +515,30 @@ jobs:
     steps:
       - name: Import boundaries
         run: uv run lint-imports
+""",
+    "the command's failure is swallowed by `|| true`": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        run: uv run lint-imports || true
+""",
+    "a pwsh step exits 0 whatever the gate reported": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        shell: pwsh
+        run: uv run lint-imports; exit 0
+""",
+    "a later line decides the step's exit status": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        run: |
+          uv run lint-imports
+          echo ok
 """,
     "only a shell comment mentions the command": """
 jobs:
