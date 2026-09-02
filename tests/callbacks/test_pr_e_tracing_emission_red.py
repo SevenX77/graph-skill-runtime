@@ -11,8 +11,9 @@ from graph_skill_runtime.callbacks.events import (
     BuiltinSubagentExitEvent,
     BuiltinSubagentFallbackEvent,
 )
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
-from tests.legacy_fixture_adapter import load_workflow_from_md
+from graph_skill_runtime.core.graph_assembler import assemble_graph
 
 
 class CollectorCallback(Callback):
@@ -23,6 +24,17 @@ class CollectorCallback(Callback):
         self.events.append(event)
 
 
+def _load_workflow(root: Path, *, callbacks: list[Any], skill_resolver: object) -> Any:
+    """Compile the skill and assemble it, handing back the runnable graph."""
+    compiled = compile_skill(root, skill_resolver=skill_resolver)
+    return assemble_graph(
+        compiled,
+        chat_model=None,
+        callbacks=callbacks,
+        skill_resolver=skill_resolver,
+    ).graph
+
+
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -30,10 +42,19 @@ def _write(path: Path, text: str) -> None:
 
 def _agent_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: pr-e-reference-reader
+description: One agent phase that reads a skill-root reference.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: pr-e-reference-reader
+description: One agent phase that reads a skill-root reference.
 llm_role: analyst
 io:
   inputs:
@@ -47,14 +68,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -103,10 +125,11 @@ def test_e2_reference_reader_success_emits_enter_then_exit_from_loader_callbacks
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         SuccessfulReaderRuntime,
     )
-    _agent_skill(tmp_path)
+    skill_root = tmp_path / "pr-e-reference-reader"
+    _agent_skill(skill_root)
     collector = CollectorCallback()
 
-    load_workflow_from_md(tmp_path, callbacks=[collector], skill_resolver=mock_skill_resolver)
+    _load_workflow(skill_root, callbacks=[collector], skill_resolver=mock_skill_resolver)
 
     assert _event_types(collector.events) == [
         "builtin_subagent_enter",
@@ -160,10 +183,11 @@ def test_e2_e3_reference_reader_fallback_emits_slim_payload_for_each_reason(
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         FailingReaderRuntime,
     )
-    _agent_skill(tmp_path)
+    skill_root = tmp_path / "pr-e-reference-reader"
+    _agent_skill(skill_root)
     collector = CollectorCallback()
 
-    load_workflow_from_md(tmp_path, callbacks=[collector], skill_resolver=mock_skill_resolver)
+    _load_workflow(skill_root, callbacks=[collector], skill_resolver=mock_skill_resolver)
 
     assert _event_types(collector.events) == [
         "builtin_subagent_enter",

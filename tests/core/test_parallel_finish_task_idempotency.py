@@ -16,11 +16,17 @@ import json
 from pathlib import Path
 
 from graph_skill_runtime.core.llm_provider import FakeLLMProvider, LLMProviderResponse
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: dup-finish-fixture
+description: Minimal agent skill for duplicate finish_task idempotency.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: dup-finish-fixture
 description: Minimal agent skill for duplicate finish_task idempotency.
 llm_role: analyst
 io:
@@ -36,12 +42,14 @@ io:
     properties:
       summary:
         type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-_SKILL_MD = """---
+_AGENT_MD = """---
+name: work
 llm_role: analyst
 io:
   inputs:
@@ -70,8 +78,9 @@ validator: false
 def _fixture_skill(tmp_path: Path) -> Path:
     skill = tmp_path / "dup-finish-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(_AGENT_MD, encoding="utf-8")
     return skill
 
 

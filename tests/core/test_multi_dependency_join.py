@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.legacy_fixture_adapter import predict_skill
+from graph_skill_runtime.core.runner import predict_skill
 
 _AGENT = """---
+name: {name}
 llm_role: analyst
 io:
   inputs:
@@ -36,16 +37,25 @@ io:
 """
 
 
-def _agent(required: list[str], produces: str) -> str:
-    props = "\n".join(f"      {name}: {{type: string}}" for name in required)
-    return _AGENT.format(required=", ".join(required), input_props=props, produces=produces)
+def _agent(name: str, required: list[str], produces: str) -> str:
+    props = "\n".join(f"      {field}: {{type: string}}" for field in required)
+    return _AGENT.format(
+        name=name, required=", ".join(required), input_props=props, produces=produces
+    )
 
+
+_SKILL_MD = """---
+name: staggered-join
+description: A staggered fan-in whose branches have different depths.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
 
 # seed@1 → {fast@2, slow_a@2} → slow_b@3.  `join` depends on fast AND slow_b, so
 # it may only run at superstep 4, after the deeper branch has landed.
-_GRAPH = """---
-schema_version: "v0.3.0"
-name: staggered-join
+_GRAPH = """schema_version: gskill.graph.v1
+graph_id: staggered-join
+description: A staggered fan-in whose branches have different depths.
 io:
   inputs:
     type: object
@@ -57,13 +67,22 @@ io:
     required: [verdict]
     properties:
       verdict: {type: string}
-phases: [seed, fast, slow_a, slow_b, join]
----
-<phase depends_on="input">seed</phase>
-<phase depends_on="seed">fast</phase>
-<phase depends_on="seed">slow_a</phase>
-<phase depends_on="slow_a">slow_b</phase>
-<phase depends_on="fast,slow_b" output>join</phase>
+phases:
+  - id: seed
+    depends_on: [input]
+    output: false
+  - id: fast
+    depends_on: [seed]
+    output: false
+  - id: slow_a
+    depends_on: [seed]
+    output: false
+  - id: slow_b
+    depends_on: [slow_a]
+    output: false
+  - id: join
+    depends_on: [fast, slow_b]
+    output: true
 """
 
 _PHASES = {
@@ -81,10 +100,11 @@ def _write(path: Path, text: str) -> None:
 
 
 def _staggered_skill(root: Path) -> Path:
-    skill = root / "skill"
-    _write(skill / "GRAPH.md", _GRAPH)
+    skill = root / "staggered-join"
+    _write(skill / "SKILL.md", _SKILL_MD)
+    _write(skill / "graph.yaml", _GRAPH)
     for phase_id, (required, produces) in _PHASES.items():
-        _write(skill / "phases" / phase_id / "SKILL.md", _agent(required, produces))
+        _write(skill / "phases" / phase_id / "AGENT.md", _agent(phase_id, required, produces))
     return skill
 
 

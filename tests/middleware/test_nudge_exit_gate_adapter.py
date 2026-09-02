@@ -13,9 +13,10 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
+from graph_skill_runtime.core.runner import run_skill
 from graph_skill_runtime.middleware.nudge_policy import PLANNING_NUDGE
-from tests.legacy_fixture_adapter import compile_skill, run_skill
 
 
 class Recorder:
@@ -36,10 +37,19 @@ def _write(path: Path, text: str) -> None:
 
 def _write_nudge_skill(root: Path, *, max_iterations: int = 6) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: nudge-exit-gate-adapter
+description: One agent phase exercising the planning and standard nudge gates.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: nudge-exit-gate-adapter
+description: One agent phase exercising the planning and standard nudge gates.
 llm_role: analyst
 io:
   inputs:
@@ -53,14 +63,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         f"""---
+name: main
 max_iterations: {max_iterations}
 io:
   inputs:
@@ -186,7 +197,7 @@ def test_planning_nudge_fires_on_first_text_only_turn(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "nudge-exit-gate-adapter"
     _write_nudge_skill(skill_root)
     chat = PlanningNudgeThenFinishModel()
     recorder = Recorder()
@@ -216,7 +227,7 @@ def test_standard_nudge_fires_when_plan_exists(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "nudge-exit-gate-adapter"
     _write_nudge_skill(skill_root)
     chat = PlanFirstThenTextThenFinishModel()
     recorder = Recorder()
@@ -244,7 +255,7 @@ def test_nudge_budget_exhaustion_fails_explicitly(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "nudge-exit-gate-adapter"
     _write_nudge_skill(skill_root, max_iterations=6)
     chat = AlwaysTextModel()
     recorder = Recorder()
@@ -270,7 +281,7 @@ def test_nudge_budget_is_scoped_per_graph_invoke(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "nudge-exit-gate-adapter"
     _write_nudge_skill(skill_root)
 
     class NudgeAwareModel:

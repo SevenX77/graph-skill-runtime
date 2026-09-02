@@ -29,11 +29,17 @@ import pytest
 
 from graph_skill_runtime.core import cache as cache_module
 from graph_skill_runtime.core.cache import load_from_cache, save_to_cache
-from tests.legacy_fixture_adapter import compile_skill
+from graph_skill_runtime.core.compiler import compile_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: cache-atomicity-fixture
+description: Smallest compilable skill.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: cache-atomicity-fixture
 description: Smallest compilable skill.
 llm_role: analyst
 io:
@@ -47,12 +53,14 @@ io:
     required: [result]
     properties:
       result: {type: string}
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-_SKILL_MD = """---
+_AGENT_MD = """---
+name: work
 io:
   inputs:
     type: object
@@ -77,8 +85,9 @@ validator: false
 def _compiled(tmp_path: Path):
     skill = tmp_path / "cache-atomicity-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(_AGENT_MD, encoding="utf-8")
     return skill, compile_skill(skill, cache=False)
 
 

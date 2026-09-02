@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -15,10 +15,19 @@ def _write(path: Path, text: str) -> None:
 
 def _score_logic_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: inputs-facade-score
+description: Score segments with a deterministic LOGIC action.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: inputs-facade-score
+description: Score segments with a deterministic LOGIC action.
 io:
   inputs:
     type: object
@@ -35,14 +44,15 @@ io:
       report:
         type: string
 phases:
-  - score
----
-<phase depends_on="input" output>score</phase>
+  - id: score
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "score" / "LOGIC.md",
         """---
+name: score
 io:
   inputs:
     type: object
@@ -75,8 +85,9 @@ validator: false
 def test_logic_action_receives_plain_dict_not_context_facade(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
-    _score_logic_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    skill_root = tmp_path / "inputs-facade-score"
+    _score_logic_skill(skill_root)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
 
     result = assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph.invoke(
         {

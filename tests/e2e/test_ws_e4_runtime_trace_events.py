@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.callbacks.events import InputDispatchEvent
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 from ..ws_e4_runtime_skills import write_serial_two_phase_skill
 
@@ -20,7 +20,7 @@ def test_runtime_edge_events_reach_event_subscriber_and_trace_jsonl(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "ws-e4-runtime-trace-e2e"
     workspace = tmp_path / "workspace"
     write_serial_two_phase_skill(skill_root, name="ws-e4-runtime-trace-e2e")
     subscriber_events: list[object] = []
