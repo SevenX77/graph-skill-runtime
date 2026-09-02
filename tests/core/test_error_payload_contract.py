@@ -107,7 +107,11 @@ def test_error_registry_matches_error_code_spec_key_set() -> None:
     registry = _error_registry()
 
     assert set(registry) == _spec_codes()
-    assert len(registry) == len(_spec_codes()) == 98
+    # 99, not 98: the closed set gained exactly one member by user ruling
+    # 2026-08-31 ([F-v3-agent-llm-role-missing] — the default LLM role is
+    # empty, and an AGENT phase that sets none is a compile error). The lock
+    # is on the bijection, not on the number staying still.
+    assert len(registry) == len(_spec_codes()) == 99
 
 
 def test_error_registry_preserves_multi_stage_codes() -> None:
@@ -244,7 +248,11 @@ def test_builtin_tool_failure_asserts_payload_code(tmp_path: Path, mock_skill_re
 def test_error_registry_entries_have_complete_nonempty_metadata() -> None:
     registry = _error_registry()
 
-    assert len(registry) == len(_spec_codes()) == 98
+    # 99, not 98: the closed set gained exactly one member by user ruling
+    # 2026-08-31 ([F-v3-agent-llm-role-missing] — the default LLM role is
+    # empty, and an AGENT phase that sets none is a compile error). The lock
+    # is on the bijection, not on the number staying still.
+    assert len(registry) == len(_spec_codes()) == 99
     for code, metadata in registry.items():
         assert metadata.code == code
         assert metadata.code

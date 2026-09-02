@@ -50,6 +50,7 @@ Run this graph with graph-skill-runtime.
         """schema_version: gskill.graph.v1
 graph_id: main
 description: Prepare, delegate, and finalize one answer.
+llm_role: analyst
 io:
   inputs:
     type: object

@@ -75,7 +75,11 @@ def test_error_registry_metadata_exposes_p0_2_fields_for_every_existing_code() -
     registry = registry_module.ERROR_REGISTRY
 
     assert set(registry) == _spec_codes()
-    assert len(registry) == 98
+    # 99, not 98: the closed set gained exactly one member by user ruling
+    # 2026-08-31 ([F-v3-agent-llm-role-missing] — the default LLM role is
+    # empty, and an AGENT phase that sets none is a compile error). The lock
+    # is on the bijection, not on the number staying still.
+    assert len(registry) == 99
 
     for code, metadata in registry.items():
         assert (metadata.level, metadata.stage) == _spec_catalog()[code]
@@ -124,7 +128,11 @@ def test_error_catalog_export_envelope_is_json_safe_versioned_and_stably_sorted(
 
     items = dumped["items"]
     assert [item["code"] for item in items] == sorted(_spec_codes())
-    assert len(items) == 98
+    # 99, not 98: the closed set gained exactly one member by user ruling
+    # 2026-08-31 ([F-v3-agent-llm-role-missing] — the default LLM role is
+    # empty, and an AGENT phase that sets none is a compile error). The lock
+    # is on the bijection, not on the number staying still.
+    assert len(items) == 99
 
     for item in items:
         assert CATALOG_ITEM_FIELDS <= set(item)

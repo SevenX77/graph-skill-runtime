@@ -41,6 +41,7 @@ def _graph(
         f"""schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise strict portable compile boundaries.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -166,6 +167,7 @@ def test_required_io_must_be_declared_in_properties(
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise strict portable compile boundaries.
+llm_role: analyst
 io:
   inputs:
     type: object
@@ -445,6 +447,7 @@ def test_nested_json_schema_remains_legal(tmp_path: Path, mock_skill_resolver: o
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise strict portable compile boundaries.
+llm_role: analyst
 io:
   inputs:
     type: object

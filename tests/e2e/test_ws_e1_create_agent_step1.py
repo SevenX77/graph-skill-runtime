@@ -30,6 +30,7 @@ def _agent_skill(root: Path) -> None:
         """---
 schema_version: "v0.3.0"
 name: ws-e1-create-agent-e2e
+llm_role: analyst
 io:
   inputs:
     type: object

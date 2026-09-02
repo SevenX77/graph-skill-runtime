@@ -36,6 +36,7 @@ from graph_skill_runtime.core.manifest import (
     PhaseIOSchema,
     RootSkillManifest,
     SubgraphNodeAST,
+    effective_llm_role,
 )
 from graph_skill_runtime.core.mentions import first_broken_mention, scan_mentions
 from graph_skill_runtime.core.parser import (
@@ -351,9 +352,49 @@ class SkillLoader:
                 doc = build_phase_document(phase_name, phase_file, mode, frontmatter, body)
                 phase_docs.append(doc)
 
-                # R3.1 check node-level role
-                if allowed_roles is not None and isinstance(doc.ast, AgentNodeAST):
-                    if doc.ast.llm_role is not None and doc.ast.llm_role not in allowed_roles:
+                # Two DIFFERENT questions about an Agent phase's role, so two
+                # checks with two different preconditions.
+                #
+                # "Is there a role name at all?" is answered by the portable
+                # source alone, so it runs UNCONDITIONALLY on every compile path
+                # — SDK, CLI, MCP, inspect, predict. User ruling 2026-08-31:
+                # the default role is empty, a role must be set explicitly, and
+                # a skill that sets none fails at COMPILE time. The runtime
+                # invents no fallback name, so a phase nobody gave a role to
+                # must fail HERE and not at run time inside a route lookup.
+                # Gating this on injected `allowed_roles` would have made the
+                # rule unreachable: no production entry point injects that
+                # parameter (adapters/engine.py compile/inspect), so a role-less
+                # skill would still have compiled green through the whole public
+                # surface.
+                #
+                # "Can THIS host route that name?" is a different question, and
+                # only a host can answer it — it stays gated on `allowed_roles`.
+                if isinstance(doc.ast, AgentNodeAST):
+                    if effective_llm_role(doc.ast, manifest.llm_role) is None:
+                        batch_errors.append(
+                            _diags_error(
+                                [
+                                    _Diag(
+                                        doc.path,
+                                        _frontmatter_key_line(doc.path, "llm_role"),
+                                        "[F-v3-agent-llm-role-missing]",
+                                        f"Agent phase {doc.phase_name!r} resolves no LLM role: set "
+                                        "`llm_role` in this phase's frontmatter or a graph default "
+                                        "`llm_role` in this graph's graph.yaml (a registry graph "
+                                        "declares its own default; the calling graph's does not "
+                                        "reach inside it)",
+                                        field_path="llm_role",
+                                    )
+                                ]
+                            )
+                        )
+                    # R3.1 check node-level role against the host's role truth
+                    if (
+                        allowed_roles is not None
+                        and doc.ast.llm_role is not None
+                        and doc.ast.llm_role not in allowed_roles
+                    ):
                         agent_role_line = _frontmatter_key_line(doc.path, "llm_role")
                         batch_errors.append(
                             _diags_error(
@@ -1483,11 +1524,24 @@ def _compile_subagent_metadata(
         phase_subagents: list[CompiledSubagent] = []
         for spec in doc.ast.subagents:
             sub_root = resolve_skill_root(resolver, spec.target_skill)
-            sub_compiled = SkillLoader(validate_context_writes=False).compile_skill(
+            # `_compile_skill_from_root`, not the public `compile_skill`: this is
+            # a recursion INSIDE one compile, not the way out of one. The public
+            # entry rebases every diagnostic against the root it was handed, so
+            # calling it here spent the one rebase on the CHILD root and handed
+            # the parent a rootless `phases/<id>/<file>` — which the parent's own
+            # boundary then passes through untouched (a relative path has nothing
+            # to rebase), so a consumer resolved it against the PARENT root and
+            # opened a different file that happened to share the name.
+            # Staying on the internal entry keeps paths absolute until the
+            # outermost boundary, which is the only place that knows the root the
+            # caller asked about.
+            sub_compiled = SkillLoader(validate_context_writes=False)._compile_skill_from_root(
                 sub_root,
                 skill_resolver=resolver,
+                runtime_input_fields=None,
                 _loading_stack=_loading_stack,
                 _compilation_cache=_compilation_cache,
+                allowed_roles=None,
             )
             input_schema = sub_compiled.raw.get("io", {}).get("inputs")
             if not isinstance(input_schema, dict) or not input_schema:

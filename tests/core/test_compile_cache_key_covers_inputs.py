@@ -22,7 +22,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from graph_skill_runtime.core.cache import compute_cache_key
+from graph_skill_runtime.core.cache import compute_cache_key as _compute_cache_key
+from graph_skill_runtime.core.compiler import CACHE_SCHEMA_VERSION
+
+
+def compute_cache_key(root: Path) -> str:
+    """This file's subject is which INPUTS the key covers, at one fixed rule version.
+
+    The rule version is a separate axis with its own tests
+    (test_cache_key_covers_the_compiler_identity.py); pinning it here keeps
+    every comparison below about the files alone.
+    """
+    return _compute_cache_key(root, schema_version=CACHE_SCHEMA_VERSION)
 
 _GRAPH_MD = """---
 schema_version: "v0.3.0"

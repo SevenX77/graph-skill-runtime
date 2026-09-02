@@ -40,6 +40,7 @@ def _write_nudge_skill(root: Path, *, max_iterations: int = 6) -> None:
         """---
 schema_version: "v0.3.0"
 name: nudge-exit-gate-adapter
+llm_role: analyst
 io:
   inputs:
     type: object

@@ -37,6 +37,7 @@ description: Exercise reserved framework tool diagnostics.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise reserved framework tool diagnostics.
+llm_role: analyst
 io:
   inputs:
     type: object

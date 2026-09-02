@@ -92,7 +92,11 @@ def test_round28_error_registry_keeps_f_v3_metadata_shape() -> None:
     }
 
     assert set(ERROR_REGISTRY) == set(primary_owner_by_code)
-    assert len(ERROR_REGISTRY) == 98
+    # 99, not 98: the closed set gained exactly one member by user ruling
+    # 2026-08-31 ([F-v3-agent-llm-role-missing] — the default LLM role is
+    # empty, and an AGENT phase that sets none is a compile error). The lock
+    # is on the bijection, not on the number staying still.
+    assert len(ERROR_REGISTRY) == 99
     for code, metadata in ERROR_REGISTRY.items():
         assert code.startswith("[F-v3-")
         assert metadata.code == code

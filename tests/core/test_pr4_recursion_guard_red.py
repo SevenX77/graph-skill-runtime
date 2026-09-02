@@ -66,6 +66,7 @@ def _write_graph(
         f"""schema_version: gskill.graph.v1
 graph_id: {graph_id}
 description: Exercise recursive compilation guards.
+llm_role: analyst
 io:
   inputs:
     {_schema_yaml()}

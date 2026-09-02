@@ -53,6 +53,7 @@ description: Exercise reference reader assembly behavior.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise reference reader assembly behavior.
+llm_role: analyst
 io:
   inputs:
     type: object

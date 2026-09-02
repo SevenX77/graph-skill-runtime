@@ -34,6 +34,7 @@ def _write_portable_graph(
         f"""schema_version: gskill.graph.v1
 graph_id: {graph_id}
 description: Gamma contract graph.
+llm_role: analyst
 io:
   inputs:
     type: object

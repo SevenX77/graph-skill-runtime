@@ -43,6 +43,7 @@ description: Exercise the portable skill resolver protocol.
         f"""schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise the portable skill resolver protocol.
+llm_role: analyst
 io:
   inputs:
     type: object

@@ -3,7 +3,7 @@ doc: skill-spec-index
 role: index
 status: living
 ssot: graph_skill_format_templates
-updated: 2026-08-27
+updated: 2026-09-01
 ---
 
 # Skill Spec 文档入口
@@ -12,7 +12,7 @@ updated: 2026-08-27
 
 [`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 是 `superseded` 的 v0.3 契约。它只服务显式 `gskill migrate studio-skill` converter 与历史核验，不再被 production compile、predict、run、inspect、SDK、CLI 或 MCP 当作当前格式读取。
 
-[`11-error-code-spec.md`](./11-error-code-spec.md) 是 `living` 的唯一当前错误码目录与语义事实源。它与代码 `ERROR_REGISTRY` 保持 98 码双射；compile rules、format spec 和其他页面只链接目录或个别 owning rule，不再复制错误码全表。
+[`11-error-code-spec.md`](./11-error-code-spec.md) 是 `living` 的唯一当前错误码目录与语义事实源。它与代码 `ERROR_REGISTRY` 保持 99 码双射；compile rules、format spec 和其他页面只链接目录或个别 owning rule，不再复制错误码全表。
 
 当前规则：
 
@@ -28,7 +28,7 @@ updated: 2026-08-27
 
 ## Active Contract Pages
 
-- [11-error-code-spec.md](./11-error-code-spec.md): `living` 的 98 码唯一当前 catalog；逐码定义 stage、合法状态、原因、修复和 owner。
+- [11-error-code-spec.md](./11-error-code-spec.md): `living` 的 99 码唯一当前 catalog；逐码定义 stage、合法状态、原因、修复和 owner。
 
 ## Legacy Converter Input
 

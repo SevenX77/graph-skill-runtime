@@ -31,6 +31,7 @@ description: Exercise portable Agent phase compilation.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise portable Agent phase compilation.
+llm_role: analyst
 io:
   inputs:
     type: object

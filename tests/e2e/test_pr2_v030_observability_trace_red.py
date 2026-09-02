@@ -118,6 +118,7 @@ description: Exercise portable runtime observability events.
         """schema_version: gskill.graph.v1
 graph_id: root
 description: Exercise portable runtime observability events.
+llm_role: analyst
 io:
   inputs:
     type: object

@@ -101,6 +101,7 @@ def _agent_phase(
 """
     frontmatter: dict[str, Any] = {
         "name": phase_id,
+        "llm_role": "analyst",
         "validator": False,
         "io": {
             "inputs": _object_schema("text"),

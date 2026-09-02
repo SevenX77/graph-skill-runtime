@@ -12,9 +12,15 @@ than in a Studio-side check; and with it in place the compiler can serve as the
 contract oracle a session naturally reaches for.
 
 It reports under the existing `[F-v3-graph-io-schema-invalid]` family rather than
-a new code: the registry is frozen at 98 codes by design (R4.3 / design §6.5), and
-an unknown `target` IS an invalid inline io schema — the specific value and the
-legal set travel in the message and `field_path`, which is what a reader needs.
+a new code, because an unknown `target` IS an invalid inline io schema — the
+specific value and the legal set travel in the message and `field_path`, which is
+what a reader needs.
+
+The registry is a CLOSED set, not an immutable one: it grows only when a rule
+with no existing owner is adjudicated in (as `[F-v3-agent-llm-role-missing]` was
+by the 2026-08-31 user ruling on the empty default LLM role). "Reuse the owning
+family" is the rule for a defect that already has an owner; it is not a numeric
+freeze on the registry.
 """
 
 from __future__ import annotations

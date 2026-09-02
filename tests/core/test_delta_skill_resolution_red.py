@@ -47,6 +47,7 @@ def _graph(
         f"""schema_version: gskill.graph.v1
 graph_id: {graph_id}
 description: Resolver graph {graph_id}.
+llm_role: analyst
 io:
   inputs:
     {input_schema}
