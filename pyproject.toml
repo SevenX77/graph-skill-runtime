@@ -299,18 +299,79 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 # Why: v1-alignment section 9 -- the new repository ships no dual reader and no
 # legacy shim; the single one-shot conversion entry point is the
-# `gskill migrate studio-skill` command. Migration code therefore stays
-# reachable only from the CLI adapter boundary and must not become an implicit
-# dependency of any running path.
+# `gskill migrate studio-skill` command. AGENTS.md section 4 states the boundary
+# most sharply: legacy v0.3 parsing is "confined to the explicit
+# `gskill migrate studio-skill ...` converter boundary".
 #
-# A `protected` contract states this positively -- "only these importers are
-# allowed" -- so it needs no enumerated denylist. An enumerated `forbidden`
-# contract would silently stop covering any top-level subpackage added later
-# while still reporting KEPT.
-name = "Migration is reachable only from the adapter boundary (v1-alignment 9)"
+# "Confined to the CLI converter" makes two separate claims, and no single
+# import-linter contract type expresses both, so there is one contract per claim.
+#
+# Claim 1, here: nothing but the CLI converter module may import migration
+# DIRECTLY. `protected` states this positively via `allowed_importers`, so it
+# needs no denylist and covers modules that do not exist yet -- verified: a
+# brand-new `adapters/_newadapter.py` importing migration breaks this contract,
+# and so does `adapters/__init__.py`. The importer must be the exact module
+# `adapters.cli`, NOT the `adapters` package: `allowed_importers` treats a
+# package as all of its descendants, which would let any adapter -- `mcp.py`
+# included -- reach the converter. That regression is pinned by
+# tests/test_import_boundary_contracts.py.
+name = "Migration is imported only by the CLI converter module (v1-alignment 9, AGENTS.md 4)"
 type = "protected"
 protected_modules = ["graph_skill_runtime.migration"]
-allowed_importers = ["graph_skill_runtime.adapters"]
+allowed_importers = ["graph_skill_runtime.adapters.cli"]
+
+[[tool.importlinter.contracts]]
+# Claim 2: migration must never become an implicit dependency of a running path,
+# so no runtime surface may reach it INDIRECTLY either -- importing the SDK must
+# not drag the legacy converter in behind it. `protected` cannot express this:
+# it checks direct importers only (verified on 2.14 -- with the exact-module
+# `allowed_importers` above, an injected `sdk.py -> adapters.cli -> migration`
+# chain still reported KEPT). A `forbidden` contract with indirect checking left
+# ON is the form that catches it, which costs an enumerated source list; the
+# meta-test computes that list from the package on disk so it cannot go stale.
+#
+# Two modules are deliberately absent from the sources because they ARE the CLI
+# converter boundary this contract protects, not paths that must be kept clear
+# of it: `adapters.cli` itself, and `__main__`, the `python -m` console entry
+# whose only job is to call it. Nothing imports `__main__`, so excluding it
+# opens no route.
+#
+# `allow_indirect_imports` is deliberately NOT set here. Setting it would silently
+# reduce this contract to the direct-only check above and re-open the defect.
+name = "Migration is not reachable indirectly from any runtime path (v1-alignment 9, AGENTS.md 4)"
+type = "forbidden"
+source_modules = [
+    "graph_skill_runtime.application",
+    "graph_skill_runtime.bootstrap",
+    "graph_skill_runtime.callbacks",
+    "graph_skill_runtime.cognitive",
+    "graph_skill_runtime.composition",
+    "graph_skill_runtime.config",
+    "graph_skill_runtime.core",
+    "graph_skill_runtime.domain",
+    "graph_skill_runtime.integrations",
+    "graph_skill_runtime.io",
+    "graph_skill_runtime.middleware",
+    "graph_skill_runtime.models",
+    "graph_skill_runtime.patches",
+    "graph_skill_runtime.ports",
+    "graph_skill_runtime.runtime",
+    "graph_skill_runtime.sdk",
+    "graph_skill_runtime.settings",
+    "graph_skill_runtime.tools",
+    "graph_skill_runtime.tracing",
+    "graph_skill_runtime.adapters.agent_handoffs",
+    "graph_skill_runtime.adapters.engine",
+    "graph_skill_runtime.adapters.host_native",
+    "graph_skill_runtime.adapters.host_native_runtime",
+    "graph_skill_runtime.adapters.mcp",
+    "graph_skill_runtime.adapters.process",
+    "graph_skill_runtime.adapters.result_mapping",
+    "graph_skill_runtime.adapters.snapshots",
+    "graph_skill_runtime.adapters.vendor_cli",
+    "graph_skill_runtime.adapters.windows_job",
+]
+forbidden_modules = ["graph_skill_runtime.migration"]
 
 [[tool.importlinter.contracts]]
 # Why: PEP 8's leading-underscore convention -- `_predict_internal` declares

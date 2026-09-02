@@ -28,7 +28,15 @@ gate degrades in ways the tool itself cannot notice, so each one is asserted her
    added: the new package sits outside every contract while they all still
    report KEPT. This test asserts every top-level module on disk is named by at
    least one contract, so adding one forces classifying it.
-5. A contract is justified by taste. Each contract must name its authority, and
+5. A contract is rewritten into a weaker form that still reports KEPT. The
+   legacy-converter boundary is the live example: expressed as a single
+   `protected` contract it silently lost two properties -- `allowed_importers`
+   expands a package to all its descendants (so every adapter, `mcp.py`
+   included, could import migration), and `protected` checks direct importers
+   only (so `sdk -> adapters.cli -> migration` passed). It now takes two
+   contracts, one per claim, and the three assertions below pin the exact shape
+   each one needs.
+6. A contract is justified by taste. Each contract must name its authority, and
    the recognized authorities are a closed set: a `v1-alignment` section, or an
    established Python language convention (`PEP 8`). The package-private
    contract rests on the latter -- section 3.2 enumerates the public contracts
@@ -48,6 +56,25 @@ CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 PACKAGE_ROOT = REPO_ROOT / "src" / "graph_skill_runtime"
 
 LAYERS_CONTRACT = "Layered module boundaries (v1-alignment 3.1)"
+MIGRATION_DIRECT_CONTRACT = "Migration is imported only by the CLI converter module (v1-alignment 9, AGENTS.md 4)"
+MIGRATION_INDIRECT_CONTRACT = (
+    "Migration is not reachable indirectly from any runtime path (v1-alignment 9, AGENTS.md 4)"
+)
+
+# The one module authorized to reach the legacy converter, per AGENTS.md section 4
+# ("confined to the explicit `gskill migrate studio-skill ...` converter
+# boundary"). It must stay the exact module: `allowed_importers` expands a
+# package to all its descendants, so naming `graph_skill_runtime.adapters` here
+# would admit every adapter, `mcp.py` included.
+MIGRATION_ALLOWED_IMPORTER = "graph_skill_runtime.adapters.cli"
+
+# Excluded from the indirect contract's sources because they ARE the converter
+# boundary, not runtime paths that must be kept clear of it. `__main__` is the
+# `python -m` console entry whose only job is to call the CLI; nothing imports
+# it, so excluding it opens no route.
+MIGRATION_BOUNDARY_MODULES = frozenset(
+    {"graph_skill_runtime.adapters.cli", "graph_skill_runtime.__main__"}
+)
 
 # The complete set of registered pre-existing violations, pinned by identity as
 # (contract name, import expression), frozen 2026-09-01 at the commit that
@@ -97,6 +124,25 @@ def _contracts() -> list[dict[str, Any]]:
     contracts = _importlinter_config()["contracts"]
     assert isinstance(contracts, list) and contracts, "at least one import-linter contract must be declared"
     return contracts
+
+
+def _submodule_names(package: str) -> set[str]:
+    """Return the importable submodules directly inside one subpackage on disk."""
+    root = PACKAGE_ROOT / package
+    names: set[str] = set()
+    for entry in root.iterdir():
+        if entry.is_dir() and (entry / "__init__.py").exists():
+            names.add(f"graph_skill_runtime.{package}.{entry.name}")
+        elif entry.is_file() and entry.suffix == ".py" and entry.name != "__init__.py":
+            names.add(f"graph_skill_runtime.{package}.{entry.stem}")
+    assert names, f"no submodules found under {root}"
+    return names
+
+
+def _contract(name: str) -> dict[str, Any]:
+    matches = [c for c in _contracts() if c["name"] == name]
+    assert len(matches) == 1, f"expected exactly one contract named {name!r}, found {len(matches)}"
+    return matches[0]
 
 
 def _top_level_module_names() -> set[str]:
@@ -205,6 +251,68 @@ def test_every_top_level_module_is_named_by_some_contract() -> None:
         "these top-level modules are not named by any import-linter contract, so they sit outside "
         "every boundary while all contracts still report KEPT. Classify each one into the contracts "
         f"that should govern it: {sorted(unclassified)}"
+    )
+
+
+def test_only_the_cli_converter_module_may_import_migration() -> None:
+    """The exact regression this pins: a package-wide allowed importer.
+
+    `allowed_importers` expands a package to all of its descendants, so naming
+    `graph_skill_runtime.adapters` would let every adapter -- `mcp.py` included --
+    reach the legacy converter, which AGENTS.md section 4 confines to the
+    explicit `gskill migrate studio-skill` command.
+    """
+    contract = _contract(MIGRATION_DIRECT_CONTRACT)
+    assert contract["type"] == "protected"
+    assert contract["allowed_importers"] == [MIGRATION_ALLOWED_IMPORTER], (
+        "the legacy converter's authorized importer must be the exact module "
+        f"{MIGRATION_ALLOWED_IMPORTER!r}. A package name here admits every module under it: "
+        "`allowed_importers` treats a package as all of its descendants."
+    )
+    assert contract["protected_modules"] == ["graph_skill_runtime.migration"]
+
+
+def test_indirect_migration_contract_keeps_indirect_checking_on() -> None:
+    """`protected` is direct-only, so the indirect claim needs a second contract.
+
+    Verified on import-linter 2.14: with the exact-module `allowed_importers`
+    in place, an injected `sdk.py -> adapters.cli -> migration` chain still
+    reported KEPT. Setting `allow_indirect_imports` on the contract below would
+    reduce it to the direct check and re-open that hole.
+    """
+    contract = _contract(MIGRATION_INDIRECT_CONTRACT)
+    assert contract["type"] == "forbidden"
+    assert "allow_indirect_imports" not in contract, (
+        "this contract exists precisely to catch INDIRECT reach into the legacy converter -- "
+        "importing the SDK must not drag it in behind `adapters.cli`. Setting "
+        "`allow_indirect_imports` silently reduces it to the direct-only check that the "
+        "`protected` contract already performs."
+    )
+    assert contract["forbidden_modules"] == ["graph_skill_runtime.migration"]
+
+
+def test_indirect_migration_contract_sources_stay_exhaustive() -> None:
+    """A `forbidden` contract enumerates sources, so the list must track the package.
+
+    Computed from disk: every top-level module plus every `adapters` submodule,
+    minus `migration` itself and minus the two modules that ARE the converter
+    boundary. Adding an adapter or a subpackage fails here until it is
+    classified, so the enumeration cannot quietly stop covering new code.
+    """
+    contract = _contract(MIGRATION_INDIRECT_CONTRACT)
+    listed = set(contract["source_modules"])
+
+    expected = (
+        (_top_level_module_names() | _submodule_names("adapters"))
+        - {"graph_skill_runtime.migration", "graph_skill_runtime.adapters"}
+        - MIGRATION_BOUNDARY_MODULES
+    )
+
+    assert listed == expected, (
+        "the indirect-reach contract must list every module that is not part of the CLI converter "
+        "boundary; anything missing can reach the legacy converter while the contract still "
+        f"reports KEPT.\nmissing: {sorted(expected - listed)}"
+        f"\nno longer exists: {sorted(listed - expected)}"
     )
 
 
