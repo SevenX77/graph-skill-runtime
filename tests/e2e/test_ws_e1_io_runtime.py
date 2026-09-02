@@ -7,12 +7,24 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _write_skill_entry(root: Path, description: str) -> None:
+    _write(
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: {description}
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
 
 
 def _schema_yaml(properties: dict[str, Any], *, required: list[str] | None = None) -> str:
@@ -33,25 +45,27 @@ def _write_importing_logic_skill(root: Path) -> None:
         required=["title", "body"],
     )
     phase_outputs = _schema_yaml({"report_md": {"type": "string"}}, required=["report_md"])
+    _write_skill_entry(root, "Import a workspace file into a phase input at run time.")
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: ws-e1-io-e2e-import
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e1-io-e2e-import
+description: Import a workspace file into a phase input at run time.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - report
----
-<phase depends_on="input" output>report</phase>
+  - id: report
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "report" / "LOGIC.md",
         f"""---
+name: report
 io:
   inputs:
     {phase_inputs}
@@ -82,25 +96,27 @@ def _write_artifact_logic_skill(root: Path) -> None:
     )
     phase_inputs = _schema_yaml({"body": {"type": "string"}}, required=["body"])
     phase_outputs = graph_outputs
+    _write_skill_entry(root, "Materialize a manifest artifact from a graph output.")
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: ws-e1-io-e2e-artifact
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e1-io-e2e-artifact
+description: Materialize a manifest artifact from a graph output.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - report
----
-<phase depends_on="input" output>report</phase>
+  - id: report
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "report" / "LOGIC.md",
         f"""---
+name: report
 io:
   inputs:
     {phase_inputs}
@@ -227,25 +243,27 @@ def _write_batch_importing_logic_skill(root: Path) -> None:
         required=["title", "chapters"],
     )
     phase_outputs = _schema_yaml({"count": {"type": "integer"}}, required=["count"])
+    _write_skill_entry(root, "Aggregate numbered workspace files into one phase input.")
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: ws-e1-io-e2e-batch-import
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e1-io-e2e-batch-import
+description: Aggregate numbered workspace files into one phase input.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - report
----
-<phase depends_on="input" output>report</phase>
+  - id: report
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "report" / "LOGIC.md",
         f"""---
+name: report
 io:
   inputs:
     {phase_inputs}

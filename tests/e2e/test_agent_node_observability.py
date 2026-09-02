@@ -26,8 +26,9 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import Field
 
 from graph_skill_runtime.callbacks.events import CallbackEvent
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill, run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 VALID_BUSINESS_MD = """## item-1
 - answer: ok
@@ -41,10 +42,19 @@ def _write(path: Path, text: str) -> None:
 
 def _agent_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: agent-node-observability
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: Account for what an agent node spent and which model spent it.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: agent-node-observability
+description: Account for what an agent node spent and which model spent it.
 llm_role: analyst
 io:
   inputs:
@@ -58,14 +68,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -142,9 +153,10 @@ class _Recorder:
 
 
 def _run(tmp_path: Path, mock_skill_resolver: object) -> tuple[dict[str, Any], _Recorder]:
-    _agent_skill(tmp_path)
+    skill_root = tmp_path / "agent-node-observability"
+    _agent_skill(skill_root)
     recorder = _Recorder()
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         chat_model=_OneShotChatModel(),

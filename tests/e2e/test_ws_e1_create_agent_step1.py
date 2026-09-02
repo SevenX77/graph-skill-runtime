@@ -11,8 +11,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field
 
 from graph_skill_runtime.core.checkpointer import checkpoint_serde
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill
 
 VALID_BUSINESS_MD = """## item-1
 - answer: ok
@@ -26,10 +26,19 @@ def _write(path: Path, text: str) -> None:
 
 def _agent_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: ws-e1-create-agent-e2e
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: Finish an agent create_agent loop against the target schema.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: ws-e1-create-agent-e2e
+description: Finish an agent create_agent loop against the target schema.
 llm_role: analyst
 io:
   inputs:
@@ -43,14 +52,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -127,11 +137,12 @@ def test_agent_create_agent_loop_finishes_with_target_schema_and_inner_checkpoin
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(tmp_path)
+    skill_root = tmp_path / "ws-e1-create-agent-e2e"
+    _agent_skill(skill_root)
     chat = _TargetFinishTaskChatModel()
     checkpointer = InMemorySaver(serde=checkpoint_serde())
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         chat_model=chat,

@@ -16,7 +16,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from graph_skill_runtime.callbacks.events import ToolCallEvent, ToolCallStartedEvent
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 class SpyCallback:
@@ -72,10 +72,19 @@ def _write(path: Path, text: str) -> None:
 
 def _write_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: tool-call-started-e2e
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: Announce a tool call before reporting one, end to end.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: tool-call-started-e2e
+description: Announce a tool call before reporting one, end to end.
 llm_role: analyst
 io:
   inputs:
@@ -90,14 +99,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -137,7 +147,7 @@ Return the answer through finish_task.
 
 
 def _run(tmp_path: Path, resolver: object) -> SpyCallback:
-    skill_root = tmp_path / "started_skill"
+    skill_root = tmp_path / "started-skill"
     output_dir = tmp_path / "out"
     _write_skill(skill_root)
     spy = SpyCallback()
