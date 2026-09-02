@@ -130,7 +130,9 @@ class ModuleSandbox:
         if spec is None or spec.loader is None:
             raise ImportError(f"ModuleSandbox: cannot create spec for {module_file}")
         module = importlib.util.module_from_spec(spec)
-        # Phase 3 M7 follow-up (PHASE3_DESIGN.md v4 §3.5 step 3): register
+        # Phase 3 M7 follow-up (pre-extraction design record; that document
+        # was not carried into this repository, so the reason is stated here
+        # in full rather than cited): register
         # the sandbox module in ``sys.modules`` BEFORE ``exec_module`` so
         # any class declared with ``from __future__ import annotations``
         # (which keeps annotations as forward-ref strings) can later
@@ -162,7 +164,8 @@ class ModuleSandbox:
 
 
 def _rebuild_pydantic_models(module: ModuleType, module_name: str) -> None:
-    """Phase 3 M7 follow-up (PHASE3_DESIGN.md v4 §3.5 step 3, §3.8).
+    """Phase 3 M7 follow-up (pre-extraction design record, not carried into
+    this repository; the reason is stated below rather than cited).
 
     Iterate every Pydantic ``BaseModel`` subclass defined in ``module``
     and call ``model_rebuild()`` on it. With ``from __future__ import

@@ -22,10 +22,11 @@ updated: 2026-09-01
 - 错误码中的 `v3` 是既有码族的稳定身份，不等同于 portable 文件格式的 schema version。
 - 下表中“graph 声明”“Agent phase 声明”等词表达跨格式不变量。当前 portable graph 声明是 `graph.yaml`，内部 Agent phase 是 `AGENT.md`；legacy 规范中的 `GRAPH.md` 或 phase `SKILL.md` 示例只解释已被取代的 v0.3 表示，绝不是 portable bundle 的正确写法。
 - “Owning spec”链接到定义该合法状态的契约。目录拥有错误码语义，owner spec 拥有被校验对象的完整字段或运行规则，两者通过链接协作而不复制彼此。
+- 每个已注册码对外暴露的 `doc_link` 一律是本目录（`docs/skill-spec/11-error-code-spec.md`），registry 不为单个码另存一份 owning spec 路径。消费者走两跳：从 `ErrorPayload.doc_link` 到本目录，再从本表“Owning spec”列到具体契约小节。每一跳只有一个 owner，`doc_link` 因此不会与本表的链接漂移成两个版本。`tests/test_doc_pointer_liveness.py` 机械保证这两跳都落在存在的文件与存在的锚点上，并且 `doc_link` 只能指向 `living` 或 `FROZEN` 文档。「Owning spec」列受同一个闭集约束，当前有且只有一个例外：[`01-PORTABLE-GSKILL-V1.md`](./01-PORTABLE-GSKILL-V1.md) 在 F-T3 上冻前仍是 `audited-ready`，门禁按**这一个文件名**放行它，而不是放行整个 `audited-ready` 状态——其它 `audited-ready` 文档一律不得充当 owner。F-T3 把该文件转为 `FROZEN` 的同一变更里删除这个例外。
 
 ## 2. Phase 2 portable bundle 新增码（10）
 
-这些码定义当前 portable v1 bundle 边界。它们与状态为 `audited-ready` 的 portable 主契约和 `ERROR_REGISTRY` 共同构成当前可执行错误语义；本目录仍是唯一错误码 catalog。
+这些码定义当前 portable v1 bundle 边界。它们与状态为 `audited-ready` 的 portable 主契约（§1 说明了门禁为何按文件名单独放行这一份）和 `ERROR_REGISTRY` 共同构成当前可执行错误语义；本目录仍是唯一错误码 catalog。
 
 | Code | Level | Stage | 正向定义 | 触发原因 | 修复建议 | Owning spec |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -93,9 +94,9 @@ updated: 2026-09-01
 | `[F-v3-subgraph-validator-failed]` | FATAL | 运行期 | SUBGRAPH phase validator 对 child graph 输出完成确定性校验。 | Validator 抛异常、返回非法类型或产出不合 schema。 | 检查 child graph 输出和父 phase 校验规则。 | [Portable v1 §5.3、§5.4](./01-PORTABLE-GSKILL-V1.md#53-subgraphmd) |
 | `[F-v3-subgraph-schema-unknown-field]` | FATAL | 编译期 | `SUBGRAPH.md` 只包含 `name`、`graph`、`io`、validator、overwrite 与 iterate 契约字段。 | Frontmatter 出现未知字段或 legacy path 字段进入 portable 声明。 | 删除未知字段；portable graph call 使用 `graph` id。 | [Portable v1 §5.3](./01-PORTABLE-GSKILL-V1.md#53-subgraphmd) |
 | `[F-v3-subgraph-name-invalid]` | FATAL | 编译期 | SUBGRAPH phase 的显示 `name` 存在并满足 owning schema 的字符串约束。 | `name` 缺失、为空、类型错误或违反命名约束。 | 提供合法、非空的显示名称。 | [Portable v1 §5.3](./01-PORTABLE-GSKILL-V1.md#53-subgraphmd) |
-| `[F-v3-subgraph-target-skill-invalid]` | FATAL | 编译期 | 在 legacy converter 读取的 path-based v0.3 输入中，subgraph path 必须解析到 source root 内的有效 child skill。 | Legacy subgraph path 无法解析、越界、不是目录或缺少该格式根 graph。 | 修正 converter source 中的受约束 path；portable v1 不使用 path，改用 `SUBGRAPH.md.graph`，未知 id 由 graph-reference 码报告。 | [Superseded v0.3 converter input](./00-FORMAT-GROUND-TRUTH.md#4-subgraphmd) |
+| `[F-v3-subgraph-target-skill-invalid]` | FATAL | 编译期 | 在 legacy converter 读取的 path-based v0.3 输入中，subgraph path 必须解析到 source root 内的有效 child skill。 | Legacy subgraph path 无法解析、越界、不是目录或缺少该格式根 graph。 | 修正 converter source 中的受约束 path；portable v1 不使用 path，改用 `SUBGRAPH.md.graph`，未知 id 由 graph-reference 码报告。 | [Portable v1 §10.3](./01-PORTABLE-GSKILL-V1.md#103-converter) |
 | `[F-v3-subgraph-io-schema-invalid]` | FATAL | 编译期 | SUBGRAPH phase 的 inputs/outputs 都是合法 JSON Schema object。 | Subgraph I/O 缺失、不是 object schema 或 schema keyword 非法。 | 修正 phase `io.inputs` / `io.outputs`；父子边界不要求字段全集相等。 | [Portable v1 §4.3、§5.3](./01-PORTABLE-GSKILL-V1.md#53-subgraphmd) |
-| `[F-v3-golden-stale-fields]` | FATAL | eval 期 | 每个节点 golden expected output 包含当前 `io.outputs.required` 的全部字段。 | Golden 仍使用旧输出形状，缺少当前必需字段。 | 重新生成 golden，或按当前 output schema 补齐期望字段。 | [Golden eval](../mvp1/02-mechanism/05-run-inner/06-golden-eval/mvp1-alignment.md#3-接口契约) |
+| `[F-v3-golden-stale-fields]` | FATAL | eval 期 | 每个节点 golden expected output 包含当前 `io.outputs.required` 的全部字段。 | Golden 仍使用旧输出形状，缺少当前必需字段。 | 重新生成 golden，或按当前 output schema 补齐期望字段。 | —（§10） |
 
 ## 5. Agent 与 mention 码（19）
 
@@ -129,32 +130,32 @@ updated: 2026-09-01
 | `[F-v3-resource-reference-id-invalid]` | FATAL | 编译期 | Reference id 满足 grammar，并在可见 registry 中唯一。 | Id 缺失、非法、重复或发生规范化冲突。 | 改为合法唯一 id，并同步 mention。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-resource-reference-path-invalid]` | FATAL | 编译期 / 运行期 | Reference path 是从 skill root 解析的 portable 相对路径，解析后仍位于 root 且可读。 | Path 绝对、含逃逸、symlink 越界、字符非法或运行时不可读。 | 改为 skill-root-relative POSIX path，并保证目标留在 root 内。 | [Portable v1 §6](./01-PORTABLE-GSKILL-V1.md#6-flat-graph-registry调用图与资源) |
 | `[F-v3-resource-reference-summary-missing]` | FATAL | 编译期 | 每个 reference 都有能说明用途的非空 summary。 | Summary 缺失、类型错误或只含空白。 | 添加简洁、可判别用途的 summary。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
-| `[F-v3-resource-reference-not-found]` | FATAL | 运行期 | `read_reference` 只读取当前 Agent registry 中已声明的 id。 | Tool 调用给出不存在或当前 scope 不可见的 reference id。 | 使用 registry 中的 id，或先在 Agent 声明中注册资源。 | [Builtin tools](../mvp1/02-mechanism/05-run-inner/04-tools/mvp1-alignment.md#3-接口契约) |
+| `[F-v3-resource-reference-not-found]` | FATAL | 运行期 | `read_reference` 只读取当前 Agent registry 中已声明的 id。 | Tool 调用给出不存在或当前 scope 不可见的 reference id。 | 使用 registry 中的 id，或先在 Agent 声明中注册资源。 | —（§10） |
 | `[F-v3-resource-example-invalid]` | FATAL | 编译期 | 每个 document example entry 完整声明唯一 id、合法 path 和非空 summary。 | Entry 不是 object、缺字段或字段类型错误。 | 补齐 `id`、`path`、`summary`。 | [Portable v1 §5.2、§6](./01-PORTABLE-GSKILL-V1.md#6-flat-graph-registry调用图与资源) |
 | `[F-v3-resource-example-id-invalid]` | FATAL | 编译期 | Example id 满足 grammar，并在可见 registry 中唯一。 | Id 缺失、非法、重复或发生规范化冲突。 | 改为合法唯一 id，并同步 mention。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-resource-example-path-missing]` | FATAL | 编译期 | 每个 document example 都显式提供 path。 | Path 字段缺失或为空。 | 添加指向 skill-root example resource 的相对 path。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-resource-example-path-invalid]` | FATAL | 编译期 / 运行期 | Example path 是从 skill root 解析的 portable 相对路径，解析后仍位于 root 且可读。 | Path 绝对、逃逸、symlink 越界、字符非法或运行时不可读。 | 改为 skill-root-relative POSIX path，并保证目标留在 root 内。 | [Portable v1 §6](./01-PORTABLE-GSKILL-V1.md#6-flat-graph-registry调用图与资源) |
 | `[F-v3-resource-example-summary-missing]` | FATAL | 编译期 | 每个 document example 都有非空 summary。 | Summary 缺失、类型错误或只含空白。 | 添加说明示例用途的 summary。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
-| `[F-v3-resource-example-not-found]` | FATAL | 运行期 | `read_example` 只读取当前 Agent registry 中已声明的 id。 | Tool 调用给出不存在或当前 scope 不可见的 example id。 | 使用 registry 中的 id，或先在 Agent 声明中注册示例。 | [Builtin tools](../mvp1/02-mechanism/05-run-inner/04-tools/mvp1-alignment.md#3-接口契约) |
-| `[F-v3-reference-reader-failed]` | WARN | 装配期 | Reference reader 成功返回合法知识报告；失败时 runtime 记录 WARN 并使用受控 raw-excerpt fallback。 | Reader 超时、抛异常或返回不合法内容。 | 查看 trace 修复 reader/资源；在此期间确认 fallback 内容可接受。 | [Assembly](../mvp1/02-mechanism/03-assemble/mvp1-alignment.md#2-数据流--机制) |
+| `[F-v3-resource-example-not-found]` | FATAL | 运行期 | `read_example` 只读取当前 Agent registry 中已声明的 id。 | Tool 调用给出不存在或当前 scope 不可见的 example id。 | 使用 registry 中的 id，或先在 Agent 声明中注册示例。 | —（§10） |
+| `[F-v3-reference-reader-failed]` | WARN | 装配期 | Reference reader 成功返回合法知识报告；失败时 runtime 记录 WARN 并使用受控 raw-excerpt fallback。 | Reader 超时、抛异常或返回不合法内容。 | 查看 trace 修复 reader/资源；在此期间确认 fallback 内容可接受。 | —（§10） |
 | `[F-v3-resolver-skill-id-invalid]` | FATAL | 编译期 | 外部 subagent `target_skill` 满足 resolver contract 的命名与类型要求。 | `target_skill` 缺失、为空、类型错误或命名非法。 | 使用合法的外部 skill id。 | [Portable v1 `AGENT.md`](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
-| `[F-v3-skill-id-ambiguous]` | FATAL | 编译期 / 装配期 | 一个外部 skill id 在当前 search paths 中解析到且只解析到一个 root。 | Resolver 对同一 id 命中多个 skill root。 | 收窄 search paths，或移除重复注册。 | [Current resolver source](../../src/graph_skill_runtime/core/local_workspace_resolver.py) |
+| `[F-v3-skill-id-ambiguous]` | FATAL | 编译期 / 装配期 | 一个外部 skill id 在当前 search paths 中解析到且只解析到一个 root。 | Resolver 对同一 id 命中多个 skill root。 | 收窄 search paths，或移除重复注册。 | —（§10） |
 | `[F-v3-skill-not-registered]` | FATAL | 编译期 / 装配期 | 每个外部 `target_skill` 都能由注入 resolver 解析。 | Resolver 没有目标 id 的注册记录。 | 注册/导入目标 skill，或修正 `target_skill`。 | [Portable v1 `AGENT.md`](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
 | `[F-v3-resolver-path-invalid]` | FATAL | 编译期 | Resolver 返回存在、受允许边界约束且包含 portable 根入口的 skill root。 | Registry path 不存在、不是目录、越界或缺少必需入口。 | 修正 registry 记录，使其指向合法 portable skill root。 | [Portable v1 root contract](./01-PORTABLE-GSKILL-V1.md#2-唯一目录布局) |
-| `[F-v3-resolver-interface-invalid]` | FATAL | 编译期 | 注入 resolver 实现单一 `resolve_skill` protocol，签名和返回类型符合契约。 | 对象缺少方法、暴露旧接口或返回非法值。 | 实现并注入符合 protocol 的 resolver。 | [Current resolver protocol source](../../src/graph_skill_runtime/core/skill_resolver_protocol.py) |
-| `[F-v3-resolver-missing]` | FATAL | 运行期 | 需要外部解析的内部调用总能取得已解析 resolver；公共入口可按契约补默认 local resolver。 | 内部 helper 在需要 resolver 时收到 `None`。 | 在 composition/public boundary 建立 resolver，并向内部调用显式传递。 | [Current resolver protocol source](../../src/graph_skill_runtime/core/skill_resolver_protocol.py) |
+| `[F-v3-resolver-interface-invalid]` | FATAL | 编译期 | 注入 resolver 实现单一 `resolve_skill` protocol，签名和返回类型符合契约。 | 对象缺少方法、暴露旧接口或返回非法值。 | 实现并注入符合 protocol 的 resolver。 | —（§10） |
+| `[F-v3-resolver-missing]` | FATAL | 运行期 | 需要外部解析的内部调用总能取得已解析 resolver；公共入口可按契约补默认 local resolver。 | 内部 helper 在需要 resolver 时收到 `None`。 | 在 composition/public boundary 建立 resolver，并向内部调用显式传递。 | —（§10） |
 
 ## 7. Cognitive、runtime 与冲突码（7）
 
 | Code | Level | Stage | 正向定义 | 触发原因 | 修复建议 | Owning spec |
 | --- | --- | --- | --- | --- | --- | --- |
-| `[F-v3-cognitive-output-schema-invalid]` | FATAL | 装配期 / 装配前 | Cognitive assembly 接收合法 JSON output schema，并把它放入完成协议。 | 传入 schema 缺失、不是 JSON Schema 或无法生成 exit contract。 | 检查 Agent `io.outputs` 和装配调用的 schema。 | [Assembly](../mvp1/02-mechanism/03-assemble/mvp1-alignment.md#2-数据流--机制) |
-| `[F-v3-tool-argument-invalid]` | FATAL | 运行期 | Builtin tool 调用参数满足该 tool 的闭合输入 schema。 | 参数缺失、类型错误、含未知字段或违反业务约束。 | 按 tool schema 修正调用参数。 | [Builtin tools](../mvp1/02-mechanism/05-run-inner/04-tools/mvp1-alignment.md#3-接口契约) |
-| `[F-v3-runtime-state-mapping-failed]` | FATAL | 运行期 | StateMapper 只切片已声明 inputs，只合并已声明 outputs，并在每层满足 required。 | 初始化、slice、merge 或 final projection 缺字段、越界写入或违反 schema。 | 检查 graph/phase I/O、上游输出和运行输入。 | [Graph execution](../mvp1/02-mechanism/04-run-outer/01-graph-exec/mvp1-alignment.md#3-接口契约) |
-| `[F-v3-runtime-phase-failed]` | FATAL | 运行期 | Phase 执行要么成功返回合格输出，要么使用更具体的已注册错误码失败。 | 未知异常无法归入 action、validator、tool、state mapping 等细分码。 | 查看 trace 根异常，在 owning layer 修复并在适用时引入更具体契约。 | [Graph execution](../mvp1/02-mechanism/04-run-outer/01-graph-exec/mvp1-alignment.md#3-接口契约) |
+| `[F-v3-cognitive-output-schema-invalid]` | FATAL | 装配期 / 装配前 | Cognitive assembly 接收合法 JSON output schema，并把它放入完成协议。 | 传入 schema 缺失、不是 JSON Schema 或无法生成 exit contract。 | 检查 Agent `io.outputs` 和装配调用的 schema。 | [Portable v1 §5.2](./01-PORTABLE-GSKILL-V1.md#52-agentmd) |
+| `[F-v3-tool-argument-invalid]` | FATAL | 运行期 | Builtin tool 调用参数满足该 tool 的闭合输入 schema。 | 参数缺失、类型错误、含未知字段或违反业务约束。 | 按 tool schema 修正调用参数。 | —（§10） |
+| `[F-v3-runtime-state-mapping-failed]` | FATAL | 运行期 | StateMapper 只切片已声明 inputs，只合并已声明 outputs，并在每层满足 required。 | 初始化、slice、merge 或 final projection 缺字段、越界写入或违反 schema。 | 检查 graph/phase I/O、上游输出和运行输入。 | —（§10） |
+| `[F-v3-runtime-phase-failed]` | FATAL | 运行期 | Phase 执行要么成功返回合格输出，要么使用更具体的已注册错误码失败。 | 未知异常无法归入 action、validator、tool、state mapping 等细分码。 | 查看 trace 根异常，在 owning layer 修复并在适用时引入更具体契约。 | —（§10） |
 | `[F-v3-sequential-overwrite-unauthorized]` | FATAL | 编译期 | 当前 phase 只有在 `allow_sequential_overwrite` 明确列出字段时，才覆盖传递祖先写过的同名 output。 | 同一路径上的后继 phase 重写字段，但未声明授权。 | 在确有业务意图时把字段列入当前 phase 白名单；否则更名或移除重复 owner。 | [Portable v1 §5.4](./01-PORTABLE-GSKILL-V1.md#54-validator-与顺序覆盖) |
 | `[F-v3-parallel-write-conflict]` | FATAL | 编译期 | 互非祖先的并行 phase 不写同一个 blackboard 字段。 | 两个无依赖先后关系的 phase 声明同名 output。 | 让字段只有一个 owner，或用真实数据依赖排出先后次序。 | [Portable v1 §4.3、§8](./01-PORTABLE-GSKILL-V1.md#43-io-schema-与静态数据流) |
-| `[F-v3-agent-exit-control-failed]` | FATAL | 运行期 | Agent 在迭代预算内调用 `finish_task`，并提交通过 output schema 的业务结果。 | 达到迭代上限仍无合格 finish marker。 | 改进 role/goal/protocol 与 tool feedback，使模型完成 `finish_task`；必要时修正不合理 schema。 | [Exit control](../mvp1/02-mechanism/05-run-inner/05-exit-control/mvp1-alignment.md) |
+| `[F-v3-agent-exit-control-failed]` | FATAL | 运行期 | Agent 在迭代预算内调用 `finish_task`，并提交通过 output schema 的业务结果。 | 达到迭代上限仍无合格 finish marker。 | 改进 role/goal/protocol 与 tool feedback，使模型完成 `finish_task`；必要时修正不合理 schema。 | —（§10） |
 
 ## 8. 变更与验收纪律
 
@@ -257,3 +258,29 @@ updated: 2026-09-01
 3. §9 不复制第 1 层的行——第 1 层的行只在 §2–§7。
 4. 新增一个**层**（而不是一个码）必须同批完成三件事：本节声明它、存在一个具名机器镜像、门禁覆盖它。
 5. 机械门禁：[`tests/test_error_code_vocabulary_layers.py`](../../tests/test_error_code_vocabulary_layers.py) 校验层的数量与成员、层间不相交、§9 与镜像逐码一致、`src/` 下没有逃出已声明层的错误码字面量。
+
+## 10. 尚无 owning 小节的码（规范缺口）
+
+§1 要求每个码的「Owning spec」指向**声明该失败规则**的契约小节。本节登记当前**做不到**这一点的 11 个码：本仓 `docs/skill-spec/` 里没有任何一份 `living`/`FROZEN` 文档写下它们所守的那条规则。
+
+**「有个相似小节」不算 owner。** 这 11 个码里有 4 个是复审推翻的：它们曾被指向语义相邻、但并不声明该失败判定的小节。判据是**声明**，不是**相关**——`01-PORTABLE-GSKILL-V1.md` 是**格式契约**，它声明文件形状、字段闭合与编译期失败；builtin tool 的查表语义、framework state 所有权、迭代与 nudge 预算耗尽后的退出判定属于**运行期契约**，本仓尚未成文。把这些码挂到格式契约的小节上，读者会拿到一份解释不了自己那次失败的规则。
+
+**这是缺口登记，不是豁免。** 登记的后果只有一个——把“没有 owner”这件事写在明处，而不是用一个作废文档、一个相邻小节或一句泛指把它盖住。机器约束由 [`tests/test_doc_pointer_liveness.py`](../../tests/test_doc_pointer_liveness.py) 施加，判定是**三值互斥**：一行要么在「Owning spec」列给出指向 `docs/skill-spec/` 下 `living`/`FROZEN` 文档**具体锚点**的链接，要么该格**恰好只写 `—（§10）` 这一个标记、别无他字**并在本节登记；两者都占、都不占、链接指向作废文档、链接没有锚点、格里除标记外还有任何内容（含外部 URL）——一律红。两个集合的**异或**必须恰好覆盖 registry 的全部 99 个码。
+
+**每条的「发出文件」由源码机械派生，并被同一份门禁双向钉住。** 派生方式：在 `src/graph_skill_runtime/` 下找出所有以字符串字面量写出该码的文件（排除只声明词表、并不发出任何码的 `core/error_registry.py`），路径相对 `src/graph_skill_runtime/`。写**文件**而不写行号，是因为行号在它上方任何一行增删后就失真——本节第一版正是如此：两条目给的行号已经漂移，并且漏掉了整整几个发出模块。手写的只剩「缺哪条契约」那一句，它必须覆盖**所有**发出文件所守的规则。
+
+**每条的「缺」一栏是摘要，不是穷举。** 一个码当前守着哪些规则，**以它的发出文件的源码为准**；本节写的是让读者知道「要补的契约大概有多大、涉及哪些面」，不是一份可以逐条对完就宣布收工的闭集。唯一被机器钉死的是**发出文件集合**——它由测试从源码派生并双向断言，所以摘要可以滞后于实现，读者却始终能顺着文件找到当前全部判定。
+
+补齐一条的做法是**写出那份契约**（当前缺的主要是一份运行期契约），再把该码的「Owning spec」改成指向它的锚点链接并从本节删除——不是给本节加一行例外。「发出文件」给的是实现坐标，用来定位行为，**不是**契约来源。
+
+- **`[F-v3-golden-stale-fields]`** — 缺：golden 用例的 expected output 与 `io.outputs.required` 的对应规则；`01` 通篇不涉及 golden。发出文件：`core/_predict_internal/golden_eval.py`。
+- **`[F-v3-reference-reader-failed]`** — 缺：reference reader 这个 builtin subagent 的成功/降级契约（失败时记 WARN 并使用受控 raw-excerpt fallback），以及装配期发现该 subagent 不可用时的处置。发出文件：`core/builtin_subagents/reference_reader.py`、`core/graph_assembler.py`。
+- **`[F-v3-resource-reference-not-found]`** — 缺：builtin `read_reference` 的输入与 registry membership 判定。`01` §5.2 只声明 `references` 条目的字段与 body mention 语法，§6 反而明写 builtin「由 runtime contract 挂载」——那份 runtime contract 尚未成文。发出文件：`tools/builtin/read_reference.py`。
+- **`[F-v3-resource-example-not-found]`** — 缺：同上，`read_example` 一侧。发出文件：`tools/builtin/read_example.py`。
+- **`[F-v3-tool-argument-invalid]`** — 缺：framework builtin tool 的闭合参数 schema，同属上述未成文的 runtime contract。发出文件：`tools/builtin/read_example.py`、`tools/builtin/read_reference.py`。
+- **`[F-v3-runtime-state-mapping-failed]`** — 缺：这个码同时守着五组规则，`01` §4.3 只声明了其中第一组的一半。①业务 blackboard 的 slice/write/schema（§4.3 已声明）；②**framework state 所有权冲突**——`data.inputs` 初始化后只读、`phase_outputs[phase_id]` 与 `scratch` 键各自只许写一次，无契约；③**artifact `per-item` 字段必须是 list** 的类型判定，无契约；④**相位映射契约**——声明为 required 的输入字段缺失于 blackboard 即失败、相位 updates 必须过本相位 output schema、同一节点不得被二次包裹、映射过程中的任何意外异常一律升级为 fatal，无契约；⑤**装配、循环与收尾**——loop 累加器的类型与模式（`append` 的累加器必须是 list、`extend` 的累加器与增量都必须是 list、`merge` 双方都必须是对象、模式必须落在 `append`/`extend`/`merge`/`replace` 闭集内），每轮 iterate 的输出必须含有 `accumulate.from` 指名的键，声明式文件输入的目标字段必须是业务字段（不得以 `_` 开头）、`dir` 模式必须含 `{n}` 占位、非目录绑定必须给 `path`、读取前必须能从 `persistent_storage_config` 拿到 `workspace_dir`，以及读入与解析失败（文件读不到、JSON/JSONL 不合法、CSV/TSV 解析失败、JSON 路径取不到字段、批量成员编号解析失败）一律 fatal，子相位输出键不得重名，根 `io.outputs` schema 必须自身合法且最终上下文必须通过它，输出保存阶段抛出的任何异常一律升级为 fatal，均无契约。发出文件：`core/graph_assembler.py`、`core/runner.py`、`io/artifact_manifest.py`、`runtime/state.py`、`runtime/state_mapper.py`。
+- **`[F-v3-runtime-phase-failed]`** — 缺：相位执行失败的传播规则（“要么成功返回合格输出，要么以父级注入的诊断失败”）。发出文件：`core/runner.py`。
+- **`[F-v3-agent-exit-control-failed]`** — 缺：退出判定的因果条件，两条都缺——①迭代预算耗尽、且本 phase 没有 schema-valid 的 `finish_task` marker 时构成 fatal failure；②**nudge 预算耗尽**（自检不实质、或整轮无 tool call 又未提交，nudge 已无可再教）且仍无合格 marker 时，同样构成 fatal failure 而不得静默正常结束。`01` §5.2:367 只规定 `max_iterations` 的取值范围与默认值，:392 只泛称“完成协议”，都不是这两条判定，nudge 预算更是通篇未提。发出文件：`middleware/exit_control.py`。
+- **`[F-v3-skill-id-ambiguous]`** — 缺：外部 skill id 在 search paths 中解析必须唯一。`01` §5.2 只声明 `target_skill` 是“显式解析的外部 Agent Skill 名称”。发出文件：`core/local_workspace_resolver.py`。
+- **`[F-v3-resolver-interface-invalid]`** — 缺：注入式 skill resolver 的 `resolve_skill` protocol（签名、返回类型、返回值约束）。`01` 只在 role 一处提到“注入的 resolver”，没有定义 skill resolver 协议。发出文件：`core/skill_resolver_protocol.py`。
+- **`[F-v3-resolver-missing]`** — 缺：“需要外部解析但未注入 resolver 时失败、且不隐式回退到默认 local resolver”这条规则。发出文件：`core/skill_resolver_protocol.py`。

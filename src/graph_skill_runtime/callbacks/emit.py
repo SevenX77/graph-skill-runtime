@@ -95,8 +95,10 @@ class _RunSpendLedger:
     the model directly).
 
     Counting here instead makes the run total equal to the sum over the run's
-    own ``llm_call`` events by construction: ``report.md`` re-aggregates those
-    events and ``metrics.json`` quotes this ledger, so the two cannot disagree.
+    own ``llm_call`` events by construction: a host's run report re-aggregates
+    those events while its metrics file quotes this ledger, so the two cannot
+    disagree. Neither file is written here; this runtime owns the events they
+    are built from.
 
     Batch items run on their own threads and only ever add, but ``+=`` on an
     int attribute is a read and a write, so the lock is what keeps two items
@@ -115,8 +117,8 @@ class _RunSpendLedger:
         A run that stopped at a breakpoint and was continued is ONE run, so its
         total is the sum over all of its ``llm_call`` events — not over the ones
         the latest segment happened to make. Its own trace is where those are
-        written down, and re-reading them is the same aggregation ``report.md``
-        performs, which is what keeps the two agreeing across a resume as well
+        written down, and re-reading them is the same aggregation a host's run
+        report performs, which is what keeps the two agreeing across a resume
         as within one segment.
 
         This is not the reconstruction the class docstring rejects. That one

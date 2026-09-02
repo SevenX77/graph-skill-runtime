@@ -17,7 +17,8 @@ Layout::
                         <artifact files ...>
             {run_id}.golden/              # never deleted by cleanup
 
-Design constraints (see ``.kiro/specs/graph-skill-runtime-optimizations/design.md``):
+Design constraints (each is stated in full here; the pre-extraction design
+document they came from was not carried into this repository):
 
 * **No ``user_id`` in the signature.** Per-user partitioning is a UI-layer
   concern and must not leak into the engine.

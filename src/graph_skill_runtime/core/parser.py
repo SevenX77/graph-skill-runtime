@@ -311,10 +311,11 @@ def parse_markdown_parts_best_effort(path: Path | str) -> tuple[dict[str, Any], 
     all. Under the strict parser, ruamel treats the whole frontmatter mapping
     as one atomic document: an unrelated duplicate key anywhere in ``io``
     blanks out the unrelated, syntactically-fine ``phases`` list too, which
-    defeats the repair view's entire purpose (see
-    ``docs/studio/mvp1/01_workflows/01_init.md`` D2: opening a non-standard
-    skill must not block — "我们有 compile, 有 copilot" — the whole point is
-    that the user can still see and repair it).
+    defeats the repair view's entire purpose: opening a non-standard skill
+    must not block, because the whole point is that the user can still see and
+    repair it. (Host ruling D2 of the origin agent-harness Studio init
+    workflow — "我们有 compile, 有 copilot". That document belongs to the host
+    product, not to this runtime, so it is named rather than linked.)
 
     This tolerates duplicate mapping keys (ruamel's ``allow_duplicate_keys``,
     last value wins) so callers that only need a subset of frontmatter

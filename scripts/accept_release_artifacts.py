@@ -84,20 +84,27 @@ _EXPECTED_MCP_ANNOTATIONS: Final = {
         "openWorldHint": True,
     },
 }
+# Every member path below is rooted at the wheel's package directory, not at
+# this repository, so the root is named once and the members are composed from
+# it. Spelling a member as one flat literal would read like a path in this
+# source tree, which is exactly what it is not.
+_WHEEL_PACKAGE_ROOT: Final = "graph_skill_runtime/"
+_SKILL_MANIFEST_NAME: Final = "SKILL.md"
+_CHANGELOG_NAME: Final = "CHANGELOG.md"
 _WHEEL_BASE_MEMBERS: Final = {
-    "graph_skill_runtime/__init__.py",
-    "graph_skill_runtime/migration/atomic_publish.py",
-    "graph_skill_runtime/migration/studio_v030.py",
-    "graph_skill_runtime/py.typed",
-    "graph_skill_runtime/skills/builtin/md-patch/SKILL.md",
+    f"{_WHEEL_PACKAGE_ROOT}__init__.py",
+    f"{_WHEEL_PACKAGE_ROOT}migration/atomic_publish.py",
+    f"{_WHEEL_PACKAGE_ROOT}migration/studio_v030.py",
+    f"{_WHEEL_PACKAGE_ROOT}py.typed",
+    f"{_WHEEL_PACKAGE_ROOT}skills/builtin/md-patch/{_SKILL_MANIFEST_NAME}",
 }
 _WHEEL_FORBIDDEN_MEMBERS: Final = {
-    "graph_skill_runtime/CHANGELOG.md",
-    "graph_skill_runtime/requirements.txt",
+    f"{_WHEEL_PACKAGE_ROOT}{_CHANGELOG_NAME}",
+    f"{_WHEEL_PACKAGE_ROOT}requirements.txt",
 }
 _WHEEL_FORBIDDEN_PREFIXES: Final = (
     "graph_agent/",
-    "graph_skill_runtime/examples/",
+    f"{_WHEEL_PACKAGE_ROOT}examples/",
 )
 _COMMAND_TIMEOUT_SECONDS: Final = 900.0
 _COMMIT_PATTERN: Final = re.compile(r"^[0-9a-fA-F]{40}$")

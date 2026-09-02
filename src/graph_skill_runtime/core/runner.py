@@ -980,7 +980,7 @@ def _run_skill_dict(
             when you still want to resume from a specific earlier
             checkpoint after the pipeline has technically finished
             (e.g. human review loops, golden regression data gathering).
-            Task 2.8 (simplified) — see deferred-items.md D-2.8.
+            Task 2.8 (simplified).
         **inputs: Runtime inputs matching SKILL.md io.inputs declarations.
             Each kwarg name must match an input's ``name`` field.
 
@@ -2170,8 +2170,8 @@ def _run_metrics(spend: _RunSpendLedger, *, wall_time: float) -> dict[str, Any]:
 
     The ledger is fed by the same events ``trace.jsonl`` records, so this is a
     reading of the calls that were actually made rather than a second tally
-    kept in graph state — which is what makes ``metrics.json`` and ``report.md``
-    agree by construction. Wall time is the runner's own measurement, layered
+    kept in graph state — which is what makes a host's metrics file and its run
+    report agree by construction. Wall time is the runner's own measurement, layered
     on top. Every exit of a run — finished, interrupted, crashed — reports
     through here, so none of them can quietly report a different number.
     """

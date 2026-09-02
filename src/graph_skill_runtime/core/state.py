@@ -182,7 +182,8 @@ class FrameworkState(BaseModel):
     """Framework control namespace.
 
     Strictly typed metadata; extra="forbid" prevents business pollution.
-    All fields explicitly declared; see design.md §1.2 for migration table.
+    All fields explicitly declared; the field list below is the whole
+    contract, so there is no separate migration table to consult.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=False)

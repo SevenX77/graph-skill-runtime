@@ -29,7 +29,8 @@ from typing import Any, Literal
 
 NudgeKind = Literal["planning", "selfcheck", "standard"]
 
-#: Per-kind nudge budget. User ruling (plan.md 悬决表 #1, Task 6.5):
+#: Per-kind nudge budget. User ruling (recorded pre-extraction; the ruling
+#: text itself is quoted here because that document was not carried over):
 #: "保留但降权:默认 max_nudges=1"; the global cap stays max_nudges * 2.
 DEFAULT_MAX_NUDGES = 1
 

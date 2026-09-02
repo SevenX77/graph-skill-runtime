@@ -4,8 +4,9 @@ Lets a SKILL.md declare declarative concurrency without hand-rolling a
 ThreadPoolExecutor dispatcher. Each item is handed to a fresh child-skill
 run; the function returns the list of child contexts in input order.
 
-Spec reference: tasks.md Task 4.3, research.md decision "parallel_map
-default max_concurrent=3".
+The default ``max_concurrent=3`` comes from a pre-extraction research
+decision; that document was not carried into this repository, so the
+bound and its reason are stated on the parameter itself below.
 
 Behaviour:
 
@@ -61,7 +62,7 @@ def parallel_map(
             current item's value is forwarded as ``{item_as: item}``.
         max_concurrent: Upper bound on concurrent child runs. Default 3
             matches DeerFlow's SubagentExecutor limit so the two pools don't
-            compound unexpectedly (research.md decision).
+            compound unexpectedly.
         base_runtime_inputs: Dict merged into every child's runtime_inputs
             *before* the per-item ``{item_as: item}`` and the framework's
             ``_sub_run_id`` / ``_group_key`` grouping keys.
