@@ -25,6 +25,6 @@ It does not submit Agent output. Submission uses:
 gskill submit RUN_ID --state-root STATE_ROOT --checkpoint-ref REF --result-json JSON
 ```
 
-Checkpoint state is segmented by namespace so concurrent scopes cannot collide: the empty namespace is the graph's own execution scope, `agent:<phase_id>` scopes one Agent phase's inner loop, and `iter<index>` scopes one iteration. A wait or a resumed state always belongs to exactly one of those scopes; read the scope before concluding which unit paused.
+Checkpoint state is segmented by namespace so concurrent scopes cannot collide. Two segments compose, in this order: an active iteration contributes `iter<index>`, and an Agent phase's inner loop contributes `agent:<phase_id>`. So the values you can actually observe are the empty namespace (the graph's own execution scope), `iter<index>` (one iteration item), `agent:<phase_id>` (an Agent phase with no iteration active), and `iter<index>.agent:<phase_id>` (an Agent phase inside an iteration item). A wait or a resumed state always belongs to exactly one namespace; read the whole value, not its prefix, before concluding which unit paused — `agent:draft` and `iter2.agent:draft` are different lanes of the same phase.
 
 There is no public `trace` CLI command. Use the returned trace reference and public runtime events as evidence. Relate trace, request snapshot, checkpoint, handoff, and artifact observations by the same run identity; none of those stores substitutes for another.

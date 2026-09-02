@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "what": "Content fingerprint of the MoirAI integration asset bundle, which this repository owns. agent-harness keeps a provenance record of these same values; the two must name the same asset_version and the same digest.",
+    "regenerate": "uv run python scripts/repin_moirai_asset_lock.py",
+    "digest": "sha256 over every file, ordered by POSIX relative path string, content normalized to LF, each path and body NUL-terminated"
+  },
+  "asset_version": "1.1.0",
+  "tree_digest": "94c9c1fcb5d76fc2457b40ab6b27c8017e3d5545d33d1bb23eb0ced64d81c061",
+  "file_count": 29,
+  "role_skills": {
+    "moirai": [
+      "moirai",
+      "moirai-brainstorming"
+    ],
+    "clotho": [
+      "moirai-domain-analysis",
+      "moirai-graph-design",
+      "moirai-agent-prompt-design"
+    ],
+    "lachesis": [
+      "moirai-compile-repair",
+      "moirai-graph-design"
+    ],
+    "atropos": [
+      "moirai-eval-judgement",
+      "moirai-agent-prompt-design"
+    ]
+  }
+}

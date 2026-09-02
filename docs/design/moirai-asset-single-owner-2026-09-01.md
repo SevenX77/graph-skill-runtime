@@ -190,20 +190,34 @@ updated: 2026-09-01
 6. **知识文件之间不互链。** 一个知识文件能否到达宿主,取决于宿主激活了哪个技能、而该技能声明了哪些 reference;知识文件无法知道兄弟文件是否被一起投影,互链因此在部分投影里必然是死链。路由由 `KB-00-hub.md` 与各技能正文承担。**本条已代码化**(见 §7),因为撰写本次内容时正是先犯了这个错才发现它。
 7. **改内容就升 `asset_version`。** 该字段是 installer ownership manifest 记录的版本锚;内容变了不升版,"宿主装的是哪一版"就失去判据。
 
-## 7. 本次同批落地的两道资产门禁
+## 7. 本次同批落地的三道资产门禁
 
-两条都属"让非法状态不可表示",而非事后检查:
+前两条属"让非法状态不可表示",而非事后检查:
 
 1. **技能正文的 `references/<file>` 链接必须在该技能的 manifest reference 子集里。** renderer 只把声明过的子集拷到投影的 `references/` 下,所以正文链到别的文件,在**每一个**宿主投影里都是死链。manifest 是该子集的 owner,这道校验让正文无法与它不一致。
 2. **知识文件不得链接兄弟知识文件**(理由见 §6-6)。
 
 两条都在 `PackagedMoiraiAssets` 构造时报错,报错文本指名违规的技能/文件与目标文件名。
 
+第三条是**自指纹门禁**,承担的是另一件事——**证明本仓的 bundle 就是它登记的那个**:
+
+3. **bundle 的树 digest、文件数、`asset_version` 与 `roles[].skills` 关系必须等于随仓登记值**(`tests/integrations/moirai-asset-lock.json`)。资产内容一改,门禁即红,必须在**同一次评审**里用 `uv run python scripts/repin_moirai_asset_lock.py` 重钉。
+
+**为什么这道门必须在本仓,而不在下游读者那里。** 下游读者(发起方仓)手上只有一份**出处记录**,它没有 bundle 的副本,因此它**无法验证**自己记的值对不对——"权威侧变动未同批重钉即红"这句话此前没有任何代码编码。能证明"资产现在是什么"的只有资产所在地,所以门禁落在本仓;下游那份记录的作用是让人在评审时看见"当时读的是哪一版",两仓的**版本锚 + digest 互相印证**是人审的对账点。
+
+**形状借自 `go.sum` 与 `package-lock.json` 的 `integrity`**:内容哈希入库,改内容必须在同一次评审里改哈希,于是静默改动不可能发生。**拒掉自动刷新**——记录的全部价值就在于"有人动了它、且被看见";自动重钉会把每次静默改动报成绿。报错文本自带重钉命令,这一点借自发起方仓的 audited-doc 哈希锁。
+
+**登记文件为什么不放在资产目录旁边**:bundle 是闭集,`integration.json` 声明每一个成员、`PackagedMoiraiAssets` 拒绝任何未声明文件——锁文件放进 `assets/moirai/` 会把它本该保护的那个包直接弄坏。所以它放在 `tests/integrations/` 下,它是门禁产物,不是资产。
+
+**digest 算法上的两处跨平台陷阱**(两仓必须逐字节一致,否则两份记录无法由人对照):①排序键必须是 **POSIX 相对路径字符串**,不能是 `Path` 对象——`PurePath` 的比较在 Windows 上不区分大小写、在 POSIX 上区分,同一棵树会得出两个 digest(这一条是实测踩出来的:第一版在 Windows 上算的值,在 Ubuntu 与 macOS 两个 runner 上同时红);②内容先**归一化为 LF** 再哈希,行尾是 checkout 的属性、不是内容的属性。
+
+**`asset_version` 本次不再上调的理由**:内容在 `1.1.0` 之上又改了两处(KB-04 角色解析、KB-09 命名空间),但 `1.1.0` **尚未落 main、也没有任何已合并的下游记录引用过它**——它此刻只存在于本 PR 与发起方仓那个同样未合并的 PR 正文里,两处都在同一批修订中改。若为此跳到 `1.1.1`,main 就会从 `1.0.0` 直接跳到 `1.1.1`,而 `1.1.0` 从未命名过任何东西——一个指向空的版本号比复用一个未发布的版本号更妨碍阅读。规则本身写进门禁的报错文本:**被替换掉的 digest 一旦已发布(已合并,或已被下游记录),就必须同时上调 `asset_version`**,一个锚永不命名两份内容。
+
 ## 8. 本次改动清单与验收
 
 **资产**:`integration.json`(`asset_version` 1.0.0 → 1.1.0、知识清单 15 → 16、八个技能各加 KB-15 reference、`moirai-agent-prompt-design` 与 `moirai-compile-repair` 的 reference 子集按新正文补齐)、新增 `knowledge/KB-15-working-discipline.md`、改 `knowledge/{KB-00,KB-01,KB-02,KB-04,KB-07,KB-08,KB-09,KB-10,KB-14}`、改四份 `roles/*.md`、改八份 `skills/*/SKILL.md` 中的七份(`moirai`、`moirai-graph-design`、`moirai-domain-analysis`、`moirai-agent-prompt-design`、`moirai-compile-repair`、`moirai-eval-judgement`、`moirai-web-research`)与 `moirai-brainstorming`。
 
-**代码**:`integrations/catalog.py` 增两道校验(§7)。
+**代码**:`integrations/catalog.py` 增两道校验(§7-1、§7-2);新增自指纹门禁 `tests/integrations/test_moirai_asset_lock.py` + 登记文件 `tests/integrations/moirai-asset-lock.json` + 重钉脚本 `scripts/repin_moirai_asset_lock.py`(§7-3)。
 
 **测试**:`tests/integrations/test_packaged_assets.py` 更新版本与知识数断言,新增三项——技能正文链到未声明 reference 被拒、技能正文链到不存在的知识文件被拒、知识文件互链被拒。renderer 快照由资产替身驱动,不随真实资产内容变化,故无需重算。
 
@@ -215,3 +229,4 @@ updated: 2026-09-01
 |---|---|
 | 2026-09-01 | 初稿。八条已裁事项落位;§4.5 与 §5 两项按纪律**上升待裁**,资产侧按"信息不丢、不预判裁决方向"的临时形态实现。 |
 | 2026-09-01 | 上升两项裁定落盘,**资产与代码零改动**——裁定的正是临时形态本身。§5 判定词表定为三值 + `rework` 必填归属限定(依据:两种形态都只是 prompt 层约定、无代码消费该枚举,四值不带来机器可查性;且限定形态能表达"设计与修复纠缠时谁先动",一个判定值编码不了两种 rework);§4.5 `agent-skill-map.json` 定为本批降格、批E cutover 时删除(依据:两个读者两种语言,今天删只能硬编码两份=新造第二事实源)。 |
+| 2026-09-01 | 初审 rework 返修。资产两处按代码事实改写:`KB-04-agent-nodes.md` 的角色解析改为"只有相位与所属图两个来源、无宿主 fallback、解析不出即编译期 `[F-v3-agent-llm-role-missing]`"(对齐同批 PR 的终态,并做了全资产同族排查——其余 `fallback` 命中全部指执行器或 CLI 回退,与角色无关,不改);`KB-09-run-trace-checkpoint.md` 的 checkpoint 命名空间由三分法改为"两段可组合",补全实现会生成的 `iter<index>.agent:<phase_id>`。新增 §7-3 自指纹门禁,把"权威侧变动未同批重钉即红"真正编码在真相所在地。 |

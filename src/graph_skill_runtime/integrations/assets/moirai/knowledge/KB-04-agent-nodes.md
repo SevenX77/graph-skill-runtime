@@ -32,6 +32,8 @@ Design checklist:
 - Use `context_access` only for the explicit `working_memory` or `artifact` capabilities.
 - Define what to do when evidence is insufficient; never instruct the executor to invent a value.
 
-Role selection is explicit. With `use_graph_llm_role: false`, the phase role precedes graph role and host fallback. With `true`, graph role precedes host fallback and the phase role is not selected for that run.
+Role selection is explicit and has exactly two sources: the phase's own `llm_role`, and the default `llm_role` of the graph that declares the phase. With `use_graph_llm_role: false` — the default — the phase's own value wins and inherits the graph default when the phase declares none. With `true`, the graph default wins; the phase's own value stays in the file but is inactive for that run. A registry graph declares its own default, and the calling graph's default does not reach inside it.
+
+There is no third source. The runtime invents no fallback role and consults no host default, so a chain that resolves to nothing is a compile error, `[F-v3-agent-llm-role-missing]`, not a run-time surprise. Design for a named role; a bundle written around an assumed host default does not compile.
 
 The default host-native executor currently supports serially addressable Agent waits in the root DAG. Agent phases in registry subgraphs, graph-level iteration, Agent phase iteration, and incomparable parallel branches fail fast. Design around this current boundary or report that Phase 3b support is required; do not rely on silent fallback.
