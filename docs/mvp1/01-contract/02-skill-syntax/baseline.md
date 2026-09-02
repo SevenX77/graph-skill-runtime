@@ -4,12 +4,12 @@ doc: baseline
 status: superseded（Phase 2 portable syntax 已取代本文的 v0.3 baseline）
 updated: 2026-06-28
 binds_alignment: ./mvp1-alignment.md
-format_ssot: ../../../skill-spec/00-FORMAT-GROUND-TRUTH.md
+format_ssot: ../../../skill-spec/01-PORTABLE-GSKILL-V1.md
 ---
 
 # 02-skill-syntax - Baseline
 
-> **已被 Phase 2 取代（2026-08-27）**：当前 `SKILL.md`、`graph.yaml`、`LOGIC.md`、`AGENT.md` 与 `SUBGRAPH.md` 契约见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前解析实现见 [`parser.py`](../../../../src/graph_skill_runtime/core/parser.py) 与 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py)。后文只保留 v0.3 pre-cutover evidence，所有现在时与 `format_ssot` 指针均为历史描述。
+> **已被 Phase 2 取代（2026-08-27）**：当前 `SKILL.md`、`graph.yaml`、`LOGIC.md`、`AGENT.md` 与 `SUBGRAPH.md` 契约见 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前解析实现见 [`parser.py`](../../../../src/graph_skill_runtime/core/parser.py) 与 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py)。后文只保留 v0.3 pre-cutover evidence，其中所有现在时描述均为历史。frontmatter 的 `format_ssot` 指向当前格式契约 `01-PORTABLE-GSKILL-V1.md`，不是后文正文引用的已 `superseded` 的 `00-FORMAT-GROUND-TRUTH.md`。
 
 本文只记录当前代码与 MVP1 格式规范之间的差异。格式规范唯一真相源见：
 

@@ -3,12 +3,12 @@ module: 01-contract/02-skill-syntax
 doc: mvp1-alignment
 status: superseded（Phase 2 portable syntax 已取代本文的 v0.3 alignment）
 binds_baseline: ./baseline.md
-format_ssot: ../../../skill-spec/00-FORMAT-GROUND-TRUTH.md
+format_ssot: ../../../skill-spec/01-PORTABLE-GSKILL-V1.md
 ---
 
 # 02-skill-syntax - MVP1 Alignment
 
-> **已被 Phase 2 取代（2026-08-27）**：当前格式唯一权威是 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前解析实现见 [`parser.py`](../../../../src/graph_skill_runtime/core/parser.py) 与 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py)。后文保留为 root `GRAPH.md`、phase `SKILL.md` 和 path-based subgraph 的 v0.3 pre-cutover evidence；后文“唯一真相源”等现在时不再有效。
+> **已被 Phase 2 取代（2026-08-27）**：当前格式唯一权威是 [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../../../skill-spec/01-PORTABLE-GSKILL-V1.md)，当前解析实现见 [`parser.py`](../../../../src/graph_skill_runtime/core/parser.py) 与 [`loader.py`](../../../../src/graph_skill_runtime/core/loader.py)。后文保留为 root `GRAPH.md`、phase `SKILL.md` 和 path-based subgraph 的 v0.3 pre-cutover evidence；后文“唯一真相源”等现在时不再有效。frontmatter 的 `format_ssot` 指向当前格式契约 `01-PORTABLE-GSKILL-V1.md`，不是后文正文引用的已 `superseded` 的 `00-FORMAT-GROUND-TRUTH.md`。
 
 本模块只说明 skill 语法在 MVP1 架构中的职责和边界，不再重复 YAML / Markdown 模板。
 
