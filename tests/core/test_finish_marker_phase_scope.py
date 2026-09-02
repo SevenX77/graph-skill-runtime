@@ -16,11 +16,17 @@ from collections import Counter
 from pathlib import Path
 
 from graph_skill_runtime.core.llm_provider import FakeLLMProvider, LLMProviderChunk
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: two-agent-fixture
+description: Two chained agent phases for finish-marker scoping.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: two-agent-fixture
 description: Two chained agent phases for finish-marker scoping.
 llm_role: analyst
 io:
@@ -36,13 +42,17 @@ io:
     properties:
       reviewed:
         type: string
-phases: [draft, review]
----
-<phase depends_on="input">draft</phase>
-<phase depends_on="draft" output>review</phase>
+phases:
+  - id: draft
+    depends_on: [input]
+    output: false
+  - id: review
+    depends_on: [draft]
+    output: true
 """
 
 _DRAFT_MD = """---
+name: draft
 llm_role: analyst
 io:
   inputs:
@@ -68,6 +78,7 @@ validator: false
 """
 
 _REVIEW_MD = """---
+name: review
 llm_role: analyst
 io:
   inputs:
@@ -97,8 +108,9 @@ def _fixture_skill(tmp_path: Path) -> Path:
     skill = tmp_path / "two-agent-fixture"
     for phase, body in (("draft", _DRAFT_MD), ("review", _REVIEW_MD)):
         (skill / "phases" / phase).mkdir(parents=True)
-        (skill / "phases" / phase / "SKILL.md").write_text(body, encoding="utf-8")
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
+        (skill / "phases" / phase / "AGENT.md").write_text(body, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
     return skill
 
 

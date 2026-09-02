@@ -28,21 +28,21 @@ from graph_skill_runtime.callbacks.events import (
     LLMRouteDecisionEvent,
     PhaseStartEvent,
 )
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 
 
-def _child_skill(root: Path, in_field: str, out_field: str) -> None:
+def _child_graph(root: Path, graph_id: str, in_field: str, out_field: str) -> None:
     """One-phase child whose only phase is named `review` — in BOTH children."""
     _write_graph(
         root,
-        name="child-" + out_field,
+        name=graph_id,
         inputs={in_field: {"type": "string"}},
         outputs={out_field: {"type": "string"}},
-        phases=["review"],
-        phase_edges='<phase depends_on="input" output>review</phase>',
+        phases=[("review", ["input"], True)],
         required_inputs=[in_field],
+        skill_entry=False,
     )
     write_logic_phase(
         root,
@@ -57,13 +57,13 @@ def _child_skill(root: Path, in_field: str, out_field: str) -> None:
     )
 
 
-def _subgraph_phase(root: Path, phase: str, child_rel: str, in_field: str, out_field: str) -> None:
+def _subgraph_phase(root: Path, phase: str, graph_id: str, in_field: str, out_field: str) -> None:
     phase_dir = root / "phases" / phase
     phase_dir.mkdir(parents=True, exist_ok=True)
     lines = [
         "---",
         f"name: {phase}",
-        f"path: {child_rel}",
+        f"graph: {graph_id}",
         "io:",
         "  inputs:",
         "    type: object",
@@ -87,17 +87,13 @@ def test_two_subgraphs_same_phase_name_get_distinct_paths(tmp_path: Path) -> Non
         name="parent",
         inputs={"text": {"type": "string"}},
         outputs={"final": {"type": "string"}},
-        phases=["alpha", "beta"],
-        phase_edges=(
-            '<phase depends_on="input">alpha</phase>' + chr(10)
-            + '<phase depends_on="alpha" output>beta</phase>'
-        ),
+        phases=[("alpha", ["input"], False), ("beta", ["alpha"], True)],
         required_inputs=["text"],
     )
-    _child_skill(root / "subgraph" / "alpha-child", "text", "middle")
-    _child_skill(root / "subgraph" / "beta-child", "middle", "final")
-    _subgraph_phase(root, "alpha", "subgraph/alpha-child", "text", "middle")
-    _subgraph_phase(root, "beta", "subgraph/beta-child", "middle", "final")
+    _child_graph(root / "graphs" / "alpha-child", "alpha-child", "text", "middle")
+    _child_graph(root / "graphs" / "beta-child", "beta-child", "middle", "final")
+    _subgraph_phase(root, "alpha", "alpha-child", "text", "middle")
+    _subgraph_phase(root, "beta", "beta-child", "middle", "final")
 
     events: list[CallbackEvent] = []
     result = run_skill(

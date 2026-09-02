@@ -37,11 +37,17 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: exit-decision
+description: One agent phase that submits and is accepted.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: exit-decision
 description: One agent phase that submits and is accepted.
 llm_role: analyst
 io:
@@ -57,12 +63,14 @@ io:
     properties:
       summary:
         type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-_SKILL_MD = """---
+_AGENT_MD = """---
+name: work
 llm_role: analyst
 validator: false
 io:
@@ -143,8 +151,9 @@ class _Recorder:
 def _run(tmp_path: Path, provider: Any) -> _Recorder:
     skill = tmp_path / "exit-decision"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(_AGENT_MD, encoding="utf-8")
     recorder = _Recorder()
     result = run_skill(
         skill,

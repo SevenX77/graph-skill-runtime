@@ -8,15 +8,14 @@ consult would change the code path of the thing being observed.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 
@@ -27,11 +26,7 @@ def _write_two_phase_skill(root: Path) -> None:
         name="stop-before-phase",
         inputs={"items": {"type": "array"}},
         outputs={"total": {"type": "number"}},
-        phases=["collect", "summarize"],
-        phase_edges=(
-            '<phase depends_on="input">collect</phase>\n'
-            '<phase depends_on="collect" output>summarize</phase>'
-        ),
+        phases=[("collect", ["input"], False), ("summarize", ["collect"], True)],
         required_inputs=["items"],
     )
     write_logic_phase(
@@ -70,8 +65,9 @@ def test_a_named_phase_stops_the_graph_before_it_runs(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_two_phase_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    skill_root = tmp_path / "stop-before-phase"
+    _write_two_phase_skill(skill_root)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         skill_resolver=mock_skill_resolver,
@@ -94,8 +90,9 @@ def test_the_run_goes_on_when_it_is_invoked_again(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_two_phase_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    skill_root = tmp_path / "stop-before-phase"
+    _write_two_phase_skill(skill_root)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         skill_resolver=mock_skill_resolver,
@@ -111,37 +108,20 @@ def test_the_run_goes_on_when_it_is_invoked_again(
 
 
 def _write_graph_level_iterate_skill(root: Path) -> None:
-    """A skill whose WHOLE graph runs once per item (`iterate` on GRAPH.md)."""
-    schema = json.dumps(
-        {"type": "object", "properties": {"items": {"type": "array"}}},
-        ensure_ascii=False,
-        indent=4,
-    ).replace("\n", "\n    ")
-    outputs = json.dumps(
-        {"type": "object", "properties": {"doubled": {"type": "array"}}},
-        ensure_ascii=False,
-        indent=4,
-    ).replace("\n", "\n    ")
-    (root / "GRAPH.md").write_text(
-        f"""---
-schema_version: "v0.3.0"
-name: stop-before-in-an-iterating-graph
-io:
-  inputs:
-    {schema}
-  outputs:
-    {outputs}
-phases:
-  - worker
+    """A skill whose WHOLE graph runs once per item (`iterate` on graph.yaml)."""
+    _write_graph(
+        root,
+        name="stop-before-in-an-iterating-graph",
+        inputs={"items": {"type": "array"}},
+        outputs={"doubled": {"type": "array"}},
+        phases=[("worker", ["input"], True)],
+        iterate="""
 iterate:
   mode: batch
   over: items
   item_var: item
   concurrency: 2
----
-<phase depends_on="input" output>worker</phase>
 """,
-        encoding="utf-8",
     )
     write_logic_phase(
         root,
@@ -164,8 +144,9 @@ def test_a_graph_that_iterates_refuses_a_stopping_point(
     rounds itself — so a stop inside one round could neither be reported nor
     resumed from outside. Say no out loud rather than accept a breakpoint that
     would never fire."""
-    _write_graph_level_iterate_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    skill_root = tmp_path / "stop-before-in-an-iterating-graph"
+    _write_graph_level_iterate_skill(skill_root)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
 
     with pytest.raises(ValueError, match="iterates over its whole graph"):
         assemble_graph(
@@ -180,8 +161,9 @@ def test_an_iterating_graph_is_still_assembled_when_nothing_asked_it_to_stop(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_graph_level_iterate_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    skill_root = tmp_path / "stop-before-in-an-iterating-graph"
+    _write_graph_level_iterate_skill(skill_root)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
 
     assert assemble_graph(compiled, skill_resolver=mock_skill_resolver).graph is not None
 
@@ -190,8 +172,9 @@ def test_naming_no_phase_leaves_the_graph_running_straight_through(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_two_phase_skill(tmp_path)
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    skill_root = tmp_path / "stop-before-phase"
+    _write_two_phase_skill(skill_root)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         skill_resolver=mock_skill_resolver,

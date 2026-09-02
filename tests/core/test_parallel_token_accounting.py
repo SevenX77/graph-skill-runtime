@@ -29,7 +29,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 from ._token_spend_invariant import CallRecorder, assert_totals_match_the_calls
 
@@ -39,9 +39,15 @@ BRANCHES = ("red", "green", "blue")
 #: seed + one call per branch + join.
 EXPECTED_CALLS = len(BRANCHES) + 2
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: parallel-token-accounting
+_SKILL_MD = """---
+name: parallel-fixture
+description: One phase fanning out to three, then joining.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: parallel-token-accounting
 description: One phase fanning out to three, then joining.
 llm_role: analyst
 io:
@@ -57,18 +63,28 @@ io:
     properties:
       joined:
         type: string
-phases: [seed, red, green, blue, joined]
----
-<phase depends_on="input">seed</phase>
-<phase depends_on="seed">red</phase>
-<phase depends_on="seed">green</phase>
-<phase depends_on="seed">blue</phase>
-<phase depends_on="red,green,blue" output>joined</phase>
+phases:
+  - id: seed
+    depends_on: [input]
+    output: false
+  - id: red
+    depends_on: [seed]
+    output: false
+  - id: green
+    depends_on: [seed]
+    output: false
+  - id: blue
+    depends_on: [seed]
+    output: false
+  - id: joined
+    depends_on: [red, green, blue]
+    output: true
 """
 
 
 def _phase_md(output_key: str) -> str:
     return f"""---
+name: {output_key}
 llm_role: analyst
 validator: false
 io:
@@ -134,11 +150,12 @@ class _CountingProvider:
 def _skill(tmp_path: Path) -> Path:
     skill = tmp_path / "parallel-fixture"
     skill.mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
     for name in ("seed", *BRANCHES, "joined"):
         phase_dir = skill / "phases" / name
         phase_dir.mkdir(parents=True)
-        (phase_dir / "SKILL.md").write_text(_phase_md(name), encoding="utf-8")
+        (phase_dir / "AGENT.md").write_text(_phase_md(name), encoding="utf-8")
     return skill
 
 

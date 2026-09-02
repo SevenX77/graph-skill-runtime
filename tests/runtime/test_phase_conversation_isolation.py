@@ -52,11 +52,17 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: phase-conversation-isolation
+description: Two sequential agent phases.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: phase-conversation-isolation
 description: Two sequential agent phases.
 llm_role: analyst
 io:
@@ -72,13 +78,17 @@ io:
     properties:
       beta_out:
         type: string
-phases: [alpha, beta]
----
-<phase depends_on="input">alpha</phase>
-<phase depends_on="alpha" output>beta</phase>
+phases:
+  - id: alpha
+    depends_on: [input]
+    output: false
+  - id: beta
+    depends_on: [alpha]
+    output: true
 """
 
 _ALPHA_MD = """---
+name: alpha
 llm_role: analyst
 io:
   inputs:
@@ -109,6 +119,7 @@ validator: false
 """
 
 _BETA_MD = """---
+name: beta
 llm_role: analyst
 io:
   inputs:
@@ -199,9 +210,10 @@ def _run(tmp_path: Path) -> tuple[_RecordingProvider, Any]:
     skill = tmp_path / "phase-conversation-isolation"
     (skill / "phases" / "alpha").mkdir(parents=True)
     (skill / "phases" / "beta").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "alpha" / "SKILL.md").write_text(_ALPHA_MD, encoding="utf-8")
-    (skill / "phases" / "beta" / "SKILL.md").write_text(_BETA_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "alpha" / "AGENT.md").write_text(_ALPHA_MD, encoding="utf-8")
+    (skill / "phases" / "beta" / "AGENT.md").write_text(_BETA_MD, encoding="utf-8")
 
     provider = _RecordingProvider()
     result = run_skill(

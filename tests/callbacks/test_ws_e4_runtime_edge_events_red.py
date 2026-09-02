@@ -11,8 +11,9 @@ from graph_skill_runtime.callbacks.events import (
     InputDispatchEvent,
     InputFileInjectedEvent,
 )
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill, run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 from ..ws_e4_runtime_skills import (
     write_batch_iterate_skill,
@@ -62,12 +63,13 @@ def test_serial_graph_emits_input_dispatch_for_each_phase_before_execution(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    write_serial_two_phase_skill(tmp_path)
+    skill_root = tmp_path / "ws-e4-runtime-serial"
+    write_serial_two_phase_skill(skill_root)
     events: list[object] = []
     sink = _event_sink(tmp_path / "trace", events)
 
     result = _invoke(
-        tmp_path,
+        skill_root,
         mock_skill_resolver,
         {"source": "seed"},
         callbacks=sink,
@@ -99,12 +101,13 @@ def test_batch_iterate_emits_input_dispatch_for_each_branch_with_stable_branch_i
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    write_batch_iterate_skill(tmp_path)
+    skill_root = tmp_path / "ws-e4-runtime-batch-dispatch"
+    write_batch_iterate_skill(skill_root)
     events: list[object] = []
     sink = _event_sink(tmp_path / "trace", events)
 
     result = _invoke(
-        tmp_path,
+        skill_root,
         mock_skill_resolver,
         {"items": ["a", "b", "c"]},
         callbacks=sink,
@@ -131,12 +134,13 @@ def test_loop_accumulate_emits_blackboard_reduce_after_each_declared_merge(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    write_loop_accumulate_skill(tmp_path)
+    skill_root = tmp_path / "ws-e4-runtime-loop-reduce"
+    write_loop_accumulate_skill(skill_root)
     events: list[object] = []
     sink = _event_sink(tmp_path / "trace", events)
 
     result = _invoke(
-        tmp_path,
+        skill_root,
         mock_skill_resolver,
         {"items": ["a", "b", "c"]},
         callbacks=sink,
@@ -162,7 +166,7 @@ def test_input_file_injected_event_emits_before_dispatch_for_runtime_file_input(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    skill_root = tmp_path / "skill"
+    skill_root = tmp_path / "ws-e4-runtime-file-input"
     workspace_dir = tmp_path / "workspace"
     events: list[object] = []
     input_path = workspace_dir / "inputs" / "body.md"

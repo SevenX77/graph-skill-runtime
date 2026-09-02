@@ -42,9 +42,9 @@ from langchain.agents.middleware import ModelRequest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
+from graph_skill_runtime.core.runner import run_skill
 from graph_skill_runtime.core.state import BusinessData, FrameworkState
 from graph_skill_runtime.middleware.runtime_input import RuntimeInputMiddleware
-from tests.legacy_fixture_adapter import run_skill
 
 # The literal opening of the engine's own input block. Authored `{key}`
 # interpolation produces the value without this prefix, so counting on the
@@ -274,9 +274,15 @@ class TestTheEventSaysWhatActuallyHappened:
 # integration: the real nudge, from the real middleware, through a real run
 # --------------------------------------------------------------------------
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: runtime-input-after-nudge
+description: One agent phase that gets nudged on its first turn.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: runtime-input-after-nudge
 description: One agent phase that gets nudged on its first turn.
 llm_role: analyst
 io:
@@ -292,12 +298,14 @@ io:
     properties:
       alpha_out:
         type: string
-phases: [alpha]
----
-<phase depends_on="input" output>alpha</phase>
+phases:
+  - id: alpha
+    depends_on: [input]
+    output: true
 """
 
 _ALPHA_MD = """---
+name: alpha
 llm_role: analyst
 io:
   inputs:
@@ -362,8 +370,9 @@ class _RecordingProvider:
 def _run(tmp_path: Path) -> tuple[_RecordingProvider, Any]:
     skill = tmp_path / "runtime-input-after-nudge"
     (skill / "phases" / "alpha").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "alpha" / "SKILL.md").write_text(_ALPHA_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "alpha" / "AGENT.md").write_text(_ALPHA_MD, encoding="utf-8")
 
     provider = _RecordingProvider()
     result = run_skill(

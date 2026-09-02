@@ -15,8 +15,8 @@ from typing import Any
 
 from graph_skill_runtime.callbacks.emit import _CompositeEventSink, _SubscriberSink
 from graph_skill_runtime.callbacks.events import EdgeStartEvent, PhaseStartEvent
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill
 
 from ..ws_e4_runtime_skills import _write_graph, write_logic_phase
 
@@ -28,11 +28,7 @@ def _write_loop_then_summarize_skill(root: Path) -> None:
         name="loop-execution-identity",
         inputs={"items": {"type": "array"}},
         outputs={"total": {"type": "number"}},
-        phases=["collect", "summarize"],
-        phase_edges=(
-            '<phase depends_on="input">collect</phase>\n'
-            '<phase depends_on="collect" output>summarize</phase>'
-        ),
+        phases=[("collect", ["input"], False), ("summarize", ["collect"], True)],
         required_inputs=["items"],
     )
     write_logic_phase(
@@ -77,11 +73,7 @@ def _write_batch_then_summarize_skill(root: Path) -> None:
         name="batch-execution-identity",
         inputs={"items": {"type": "array"}},
         outputs={"total": {"type": "number"}},
-        phases=["worker", "summarize"],
-        phase_edges=(
-            '<phase depends_on="input">worker</phase>\n'
-            '<phase depends_on="worker" output>summarize</phase>'
-        ),
+        phases=[("worker", ["input"], False), ("summarize", ["worker"], True)],
         required_inputs=["items"],
     )
     write_logic_phase(
@@ -118,9 +110,10 @@ def test_transition_out_of_a_batch_phase_names_every_item_execution(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_batch_then_summarize_skill(tmp_path)
+    skill_root = tmp_path / "batch-execution-identity"
+    _write_batch_then_summarize_skill(skill_root)
     events: list[Any] = []
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         callbacks=_CompositeEventSink([_SubscriberSink(events.append)]),
@@ -157,9 +150,10 @@ def test_transition_out_of_a_loop_phase_names_the_execution_it_left(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _write_loop_then_summarize_skill(tmp_path)
+    skill_root = tmp_path / "loop-execution-identity"
+    _write_loop_then_summarize_skill(skill_root)
     events: list[Any] = []
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph = assemble_graph(
         compiled,
         callbacks=_CompositeEventSink([_SubscriberSink(events.append)]),

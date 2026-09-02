@@ -11,6 +11,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 
 import graph_skill_runtime.core.graph_assembler as graph_assembler
 from graph_skill_runtime.callbacks.base import Callback
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import GraphAgentFatalError
 from graph_skill_runtime.core.io_manager import IOManager
 from graph_skill_runtime.core.state import BusinessData, FrameworkState, WorkflowState
@@ -19,7 +20,6 @@ from graph_skill_runtime.middleware.factory import build_middleware_chain
 from graph_skill_runtime.middleware.loop_detection import LoopDetectionMiddleware
 from graph_skill_runtime.middleware.tool_error import ToolErrorHandlingMiddleware
 from graph_skill_runtime.middleware.tracing import TracingMiddleware
-from tests.legacy_fixture_adapter import compile_skill
 
 
 class _RecordingCallback(Callback):
@@ -190,7 +190,8 @@ def test_live_agent_assembly_passes_tail_slots_to_create_agent(
     tmp_path: Path,
     mock_skill_resolver: object,
 ) -> None:
-    _agent_skill(tmp_path)
+    skill_root = tmp_path / "ws-e2-tail-slots"
+    _agent_skill(skill_root)
     captured: dict[str, Any] = {}
 
     class _Agent:
@@ -204,7 +205,7 @@ def test_live_agent_assembly_passes_tail_slots_to_create_agent(
 
     monkeypatch.setattr(graph_assembler, "create_agent", fake_create_agent, raising=False)
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     graph_assembler.assemble_graph(
         compiled,
         chat_model=object(),
@@ -230,10 +231,19 @@ def _write(path: Path, text: str) -> None:
 
 def _agent_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         """---
-schema_version: "v0.3.0"
 name: ws-e2-tail-slots
+description: One agent phase used to inspect the assembled middleware tail slots.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: ws-e2-tail-slots
+description: One agent phase used to inspect the assembled middleware tail slots.
 io:
   inputs:
     type: object
@@ -246,14 +256,15 @@ io:
       answer:
         type: string
 phases:
-  - main
----
-<phase depends_on="input" output>main</phase>
+  - id: main
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object

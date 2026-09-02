@@ -7,6 +7,10 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
+#: One `graph.yaml` phase entry: its id, its direct upstreams, and whether it is
+#: a graph output node. `input` is the graph-input sentinel, not a phase id.
+PhaseSpec = tuple[str, list[str], bool]
+
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -26,16 +30,44 @@ def _write_graph(
     name: str,
     inputs: dict[str, Any],
     outputs: dict[str, Any],
-    phases: list[str],
-    phase_edges: str,
+    phases: list[PhaseSpec],
     required_inputs: list[str] | None = None,
+    iterate: str | None = None,
+    skill_entry: bool = True,
 ) -> None:
-    phase_list = "\n".join(f"  - {phase}" for phase in phases)
+    """Write a portable gSkill v1 graph.
+
+    ``skill_entry`` is False for a registry graph under ``graphs/<graph_id>/``:
+    only a skill root owns the Agent Skills entrypoint, and its ``name`` must
+    equal the root directory basename.
+    """
+
+    if skill_entry:
+        _write(
+            root / "SKILL.md",
+            f"""---
+name: {root.name}
+description: WS-E4 runtime fixture skill for {name}.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+        )
+    phase_list = "\n".join(
+        "\n".join(
+            (
+                f"  - id: {phase_id}",
+                f"    depends_on: [{', '.join(depends_on)}]",
+                f"    output: {str(is_output).lower()}",
+            )
+        )
+        for phase_id, depends_on, is_output in phases
+    )
+    iterate_block = f"{iterate.strip()}\n" if iterate else ""
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {name}
+description: WS-E4 runtime fixture graph for {name}.
 io:
   inputs:
     {_schema_yaml(inputs, required=required_inputs)}
@@ -43,9 +75,7 @@ io:
     {_schema_yaml(outputs)}
 phases:
 {phase_list}
----
-{phase_edges}
-""",
+{iterate_block}""",
     )
 
 
@@ -63,6 +93,7 @@ def write_logic_phase(
     _write(
         root / "phases" / phase_id / "LOGIC.md",
         f"""---
+name: {phase_id}
 io:
   inputs:
     {_schema_yaml(inputs, required=required)}
@@ -86,9 +117,7 @@ def write_serial_two_phase_skill(root: Path, *, name: str = "ws-e4-runtime-seria
         name=name,
         inputs={"source": {"type": "string"}},
         outputs={"answer": {"type": "string"}},
-        phases=["prepare", "finish"],
-        phase_edges='<phase depends_on="input">prepare</phase>\n'
-        '<phase depends_on="prepare" output>finish</phase>',
+        phases=[("prepare", ["input"], False), ("finish", ["prepare"], True)],
         required_inputs=["source"],
     )
     write_logic_phase(
@@ -121,8 +150,7 @@ def write_loop_accumulate_skill(root: Path) -> None:
         name="ws-e4-runtime-loop-reduce",
         inputs={"items": {"type": "array"}},
         outputs={"collected": {"type": "array"}},
-        phases=["collect"],
-        phase_edges='<phase depends_on="input" output>collect</phase>',
+        phases=[("collect", ["input"], True)],
     )
     write_logic_phase(
         root,
@@ -154,8 +182,7 @@ def write_batch_iterate_skill(root: Path) -> None:
         name="ws-e4-runtime-batch-dispatch",
         inputs={"items": {"type": "array"}},
         outputs={"seen": {"type": "array"}},
-        phases=["worker"],
-        phase_edges='<phase depends_on="input" output>worker</phase>',
+        phases=[("worker", ["input"], True)],
     )
     write_logic_phase(
         root,
@@ -183,8 +210,7 @@ def write_file_input_skill(root: Path) -> None:
         name="ws-e4-runtime-file-input",
         inputs={"title": {"type": "string"}},
         outputs={"answer": {"type": "string"}},
-        phases=["reader"],
-        phase_edges='<phase depends_on="input" output>reader</phase>',
+        phases=[("reader", ["input"], True)],
         required_inputs=["title"],
     )
     write_logic_phase(
