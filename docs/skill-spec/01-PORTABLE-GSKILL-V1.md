@@ -12,26 +12,19 @@ updated: 2026-09-01
 
 本文定义 Graph Skill Runtime 当前实现的 portable 文件格式、bundle 编译边界和一次性迁移契约。Phase 2 已完成原子切换：production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取本文格式；legacy v0.3 parser 只在显式 `gskill migrate studio-skill` converter 边界可达。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 converter 输入契约与历史证据。
 
-**本文状态是 `FROZEN`。** 这个状态词由两个同时成立的条件定义：契约语义已完成审校并由 owner 盖章；本文全文的 SHA-256 摘要（先把 CRLF 与 CR 归一化成 LF，再对 UTF-8 字节求摘要）已落入 [`tests/test_contract_hash_lock.py`](../../tests/test_contract_hash_lock.py) 的锁表。前者是人读的背书，后者是机器强制，两个载体缺一不可——只改状态词而不落哈希不构成 `FROZEN`，这正是本文在 2026-09-01 之前处于 `audited-ready`（语义已审、机器锁未接上）的原因。
+**本文状态是 `FROZEN`。** 这个状态词由两个同时成立的条件定义：契约语义已完成审校并由 owner 盖章；本文全文的 SHA-256 摘要（先把 CRLF 与 CR 归一化成 LF，再对 UTF-8 字节求摘要）已作为一条 seal 记录落入 [`tests/contract-exemptions.yaml`](../../tests/contract-exemptions.yaml)。前者是人读的背书，后者是机器强制，两个载体缺一不可——只改状态词而不落记录不构成 `FROZEN`，这正是本文在 2026-09-01 之前处于 `audited-ready`（语义已审、机器锁未接上）的原因。
 
 `FROZEN` 是审计通过的背书，不是禁止改动。它保证的是：本文不会被静默改写，任何一个字节的变化都必须是一次显式的、留下书面痕迹的决定。
 
-**之后如何修订本文**——两条路，都必须在同一个 pull request 内闭合：
+**之后如何修订本文——只有一条路。** 改正文，并在同一个 pull request 内往 [`tests/contract-exemptions.yaml`](../../tests/contract-exemptions.yaml) **追加**一条带 `pm_approval` 的 seal 记录（`exemption_id` / `file` / `sha256` / `reason` / `pr` / `pm_approval`）；同一文件的**最后一条**记录即当前钉值，旧记录原样保留作为审计轨迹。**没有记录的改动会被锁拦下**——这就是主仓状态机 §1.2「`FROZEN` ──改动需 exemption（否则哈希锁拦）」与 §1.3「改动触发测试，须 exemption」在本仓的落地形态。
 
-1. **正常修订（默认路）**：改正文，重新计算摘要并替换锁表中本文那一行，在该行上方的注释里写明改了什么、依据哪条裁决或哪份实证证据。锁失败信息本身会打印重钉命令；也可以随时手动执行：
+新摘要由锁的失败信息直接打印；**失败信息里那条命令就是权威命令**，可原样粘贴执行（单行、无 here-document，Windows PowerShell 与 bash 同样可跑）：
 
-   ```bash
-   uv run python - <<'PY'
-   import hashlib, pathlib
-   path = pathlib.Path("docs/skill-spec/01-PORTABLE-GSKILL-V1.md")
-   text = path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
-   print(hashlib.sha256(text.encode("utf-8")).hexdigest())
-   PY
-   ```
+```
+uv run python -c "import hashlib,pathlib;p=pathlib.Path('docs/skill-spec/01-PORTABLE-GSKILL-V1.md');print(hashlib.sha256(p.read_text(encoding='utf-8').replace(chr(13)+chr(10),chr(10)).replace(chr(13),chr(10)).encode('utf-8')).hexdigest())"
+```
 
-2. **临时豁免（例外路）**：改动必须先合并、而 owner 盖章还没到位时，在 [`tests/contract-exemptions.yaml`](../../tests/contract-exemptions.yaml) 登记一条豁免，写明本文路径、被批准的那**一个**确切摘要、理由、PR 与批准人。豁免钉死的是那一份确切字节：登记之后本文再次改动，锁照样拦下。
-
-**不存在第三条路。** 把状态词降回 `audited-ready`，或从锁表里删掉本文那一行，都不是修订而是撤销背书。`FROZEN` 的唯一合法去向是被新版契约取代后转 `superseded`，而那要求新版契约先存在并通过同样的审计。
+**不存在第二条路。** 把状态词降回 `audited-ready`，或删掉本文的 seal 记录，都不是修订而是撤销背书。`FROZEN` 的唯一合法去向是被新版契约取代后转 `superseded`，而那要求新版契约先存在并通过同样的审计。
 
 本文使用“必须”“不得”“可以”表达强制要求、禁止行为和允许行为。目标设计的架构依据见 [`v1-alignment.md`](../design/v1-alignment.md)，Agent Skills 入口遵守 [Agent Skills specification](https://github.com/agentskills/agentskills/blob/main/docs/specification.mdx)。
 
