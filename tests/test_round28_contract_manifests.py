@@ -278,6 +278,15 @@ def test_task8_exemption_schema_accepts_valid_and_rejects_invalid_fixtures() -> 
     public_api_test = _read(PUBLIC_API_TEST_PATH)
     assert "test_exemptions_yaml_currently_empty_in_pr1" not in public_api_test
 
+    # The REAL governance file, not only the fixtures beside it. Validating
+    # fixtures proves the schema can judge something; validating this path is
+    # what makes the schema its owner. While only fixtures were checked, the
+    # live file was migrated to a different record shape and the whole suite
+    # stayed green — one path, two schema owners, and the authoritative one had
+    # no way to object. Byte seals now live in tests/contract-seals.yaml, owned
+    # by tests/test_contract_hash_lock.py.
+    _validate_manifest(_load_yaml(EXEMPTIONS_PATH), "contract_exemptions")
+
     valid_exemption = _load_yaml(FIXTURES / "valid_contract_exemption.yaml")
     _validate_manifest(valid_exemption, "contract_exemptions")
 

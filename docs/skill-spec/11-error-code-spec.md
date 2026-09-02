@@ -12,7 +12,7 @@ updated: 2026-09-01
 
 [`ERROR_REGISTRY`](../../src/graph_skill_runtime/core/error_registry.py) 是本文的可执行镜像。目录与 registry 必须保持双射：本文恰好列出 registry 的 99 个 code，每个 code 只出现一次，`level` 与有序 `stage` 也必须一致。修改任一方时，必须在同一变更中更新另一方并机械核对；registry 中存在但本文缺失的码、本文多出的码、重复码或 stage 漂移都属于契约缺陷。
 
-本文状态是 `living`：它随已注册码集合持续维护，因此**不进入** `audited-ready` → `FROZEN` 那条链路。这不是“还没锁上”，而是“不适用”——注册一个码就必须在同一变更里加一行（§1 的双射要求），而哈希锁的作用恰恰是让字节变化不可能悄悄发生；给一份按契约必须随代码变动的目录上字节锁，只会让每一次合法登记都撞门。[`Portable gSkill v1`](./01-PORTABLE-GSKILL-V1.md) 与此相反：它是**状态为 `FROZEN`** 的当前 production reader 契约（2026-09-01 由 `audited-ready` 转入：owner 盖章，且 SHA-256 摘要已作为 seal 记录落入 `tests/contract-exemptions.yaml`；此后修订必须在同一 PR 内追加一条新的 seal 记录），Phase 2 的前 10 个 bundle 边界码已经随原子切换成为当前错误语义。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 v0.3 converter 输入与历史证据。
+本文状态是 `living`：它随已注册码集合持续维护，因此**不进入** `audited-ready` → `FROZEN` 那条链路。这不是“还没锁上”，而是“不适用”——注册一个码就必须在同一变更里加一行（§1 的双射要求），而哈希锁的作用恰恰是让字节变化不可能悄悄发生；给一份按契约必须随代码变动的目录上字节锁，只会让每一次合法登记都撞门。[`Portable gSkill v1`](./01-PORTABLE-GSKILL-V1.md) 与此相反：它是**状态为 `FROZEN`** 的当前 production reader 契约（2026-09-01 由 `audited-ready` 转入：owner 盖章，且 SHA-256 摘要已作为 seal 记录落入 `tests/contract-seals.yaml`；此后修订必须在同一 PR 内追加一条新的 seal 记录），Phase 2 的前 10 个 bundle 边界码已经随原子切换成为当前错误语义。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 v0.3 converter 输入与历史证据。
 
 ## 1. 使用规则
 

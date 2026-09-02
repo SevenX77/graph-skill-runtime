@@ -12,11 +12,11 @@ updated: 2026-09-01
 
 本文定义 Graph Skill Runtime 当前实现的 portable 文件格式、bundle 编译边界和一次性迁移契约。Phase 2 已完成原子切换：production compile、predict、run、inspect、SDK、CLI 与 MCP 只读取本文格式；legacy v0.3 parser 只在显式 `gskill migrate studio-skill` converter 边界可达。[`00-FORMAT-GROUND-TRUTH.md`](./00-FORMAT-GROUND-TRUTH.md) 已是 `superseded` 的 converter 输入契约与历史证据。
 
-**本文状态是 `FROZEN`。** 这个状态词由两个同时成立的条件定义：契约语义已完成审校并由 owner 盖章；本文全文的 SHA-256 摘要（先把 CRLF 与 CR 归一化成 LF，再对 UTF-8 字节求摘要）已作为一条 seal 记录落入 [`tests/contract-exemptions.yaml`](../../tests/contract-exemptions.yaml)。前者是人读的背书，后者是机器强制，两个载体缺一不可——只改状态词而不落记录不构成 `FROZEN`，这正是本文在 2026-09-01 之前处于 `audited-ready`（语义已审、机器锁未接上）的原因。
+**本文状态是 `FROZEN`。** 这个状态词由两个同时成立的条件定义：契约语义已完成审校并由 owner 盖章；本文全文的 SHA-256 摘要（先把 CRLF 与 CR 归一化成 LF，再对 UTF-8 字节求摘要）已作为一条 seal 记录落入 [`tests/contract-seals.yaml`](../../tests/contract-seals.yaml)。前者是人读的背书，后者是机器强制，两个载体缺一不可——只改状态词而不落记录不构成 `FROZEN`，这正是本文在 2026-09-01 之前处于 `audited-ready`（语义已审、机器锁未接上）的原因。
 
 `FROZEN` 是审计通过的背书，不是禁止改动。它保证的是：本文不会被静默改写，任何一个字节的变化都必须是一次显式的、留下书面痕迹的决定。
 
-**之后如何修订本文——只有一条路。** 改正文，并在同一个 pull request 内往 [`tests/contract-exemptions.yaml`](../../tests/contract-exemptions.yaml) **追加**一条带 `pm_approval` 的 seal 记录（`exemption_id` / `file` / `sha256` / `reason` / `pr` / `pm_approval`）；同一文件的**最后一条**记录即当前钉值，旧记录原样保留作为审计轨迹。**没有记录的改动会被锁拦下**——这就是主仓状态机 §1.2「`FROZEN` ──改动需 exemption（否则哈希锁拦）」与 §1.3「改动触发测试，须 exemption」在本仓的落地形态。
+**之后如何修订本文——只有一条路。** 改正文，并在同一个 pull request 内往 [`tests/contract-seals.yaml`](../../tests/contract-seals.yaml) **追加**一条带 `pm_approval` 的 seal 记录（`exemption_id` / `file` / `sha256` / `reason` / `pr` / `pm_approval`）；同一文件的**最后一条**记录即当前钉值，旧记录原样保留作为审计轨迹。**没有记录的改动会被锁拦下**——这就是主仓状态机 §1.2「`FROZEN` ──改动需 exemption（否则哈希锁拦）」与 §1.3「改动触发测试，须 exemption」在本仓的落地形态。
 
 新摘要由锁的失败信息直接打印；**失败信息里那条命令就是权威命令**，可原样粘贴执行（单行、无 here-document，Windows PowerShell 与 bash 同样可跑）：
 

@@ -2,17 +2,17 @@
 
 A `FROZEN` document is sealed by two carriers that must agree: the human-read
 `status:` word in its frontmatter, and a SHA-256 digest recorded in
-`tests/contract-exemptions.yaml`. The status word alone is a claim; only the
+`tests/contract-seals.yaml`. The status word alone is a claim; only the
 digest makes silent drift impossible. That is why
 `docs/skill-spec/01-PORTABLE-GSKILL-V1.md` stayed `audited-ready` for as long
 as it did — the semantics were audited, but no machine held the bytes.
 
 **The digest lives in the governance file, not here.** Until F-T3 this module
 carried an `EXPECTED_CONTRACT_HASHES` constant, which made re-pinning a code
-edit: `.github/CODEOWNERS` covers `/tests/contract-exemptions.yaml` but not
-this file, so an author could change a sealed document, update the constant,
-leave the governance file empty, and pass every gate without an owner ever
-seeing a record. That is a route around the state machine, whose only
+edit: `.github/CODEOWNERS` covers the governance file but not this one, so an
+author could change a sealed document, update the constant, leave the
+governance file empty, and pass every gate without an owner ever seeing a
+record. That is a route around the state machine, whose only
 transition out of `FROZEN` is "改动需 exemption"
 (`docs/development/design-doc-standards/01-writing-standard.md` §1.2-§1.3).
 Moving the pin into the record file removes the route rather than documenting
@@ -39,7 +39,13 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SEALS_PATH = Path(__file__).with_name("contract-exemptions.yaml")
+SEALS_PATH = Path(__file__).with_name("contract-seals.yaml")
+
+# The record format this loader understands. A governance file with no version,
+# or a version this code was not written against, is not "probably fine" — it is
+# a file whose meaning is unknown, and reading it anyway is how a format change
+# turns into a silently weakened lock.
+SUPPORTED_SEALS_VERSION = "1"
 
 # Exactly the keys a seal record may carry. Strict in both directions: a record
 # missing one is incomplete governance, and a record carrying an unknown one is
@@ -60,7 +66,10 @@ _FRONTMATTER_FENCE = "---"
 # sealed without ever making the human-read claim, which hollows out the second
 # direction of the bijection — "sealed but not FROZEN is red" would then be
 # unenforceable against exactly the files that never say anything. A closed set
-# has to be edited, in a diff, to grow.
+# has to be edited, in a diff, to grow — and the bijection test also requires
+# every member to hold a current seal record, so widening the set and filing the
+# governance record are the same pull request, reviewed together. Without that
+# second direction the allowlist alone would be a green pre-authorisation.
 #
 # `spec/round28-manifest-schema.yaml` is in it for two reasons, both concrete:
 #   * it is a JSON-Schema document, not prose — there is no frontmatter for a
@@ -156,8 +165,17 @@ def _load_seals(
     unknown_top = sorted(set(data) - _TOP_LEVEL_KEYS)
     assert not unknown_top, (
         f"unknown top-level key(s) {unknown_top} in {seals_path.name}; this file holds "
-        f"exactly {sorted(_TOP_LEVEL_KEYS)}. The path-keyed `exemptions:`/`hashes:` shape "
-        "was deleted in F-T3 — restate each record as a `seals:` entry."
+        f"exactly {sorted(_TOP_LEVEL_KEYS)}. Feature-retirement exemptions belong in "
+        "tests/contract-exemptions.yaml, whose shape the round-28 schema owns."
+    )
+    version = data.get("version")
+    assert isinstance(version, str) and version.strip(), (
+        f"{seals_path.name} must declare a non-empty string `version`"
+    )
+    assert version == SUPPORTED_SEALS_VERSION, (
+        f"{seals_path.name} declares version {version!r}, but this loader reads "
+        f"{SUPPORTED_SEALS_VERSION!r}; update the loader in the same change that "
+        "changes the format, rather than reading records whose meaning it does not know"
     )
     assert "seals" in data, f"{seals_path.name} must declare a `seals` list"
     seals = data["seals"]
@@ -260,6 +278,9 @@ def test_frozen_declarations_and_seal_records_are_the_same_set() -> None:
     The only files exempt from the second direction are the ones named in
     `SEALED_WITHOUT_STATUS_CARRIER`, and they are named individually rather
     than described by a property, so the exemption cannot widen by accident.
+    Every member of that set must itself hold a current seal record: an entry
+    with no record would be an allowlist slot standing open, approved ahead of
+    the change it would excuse.
     """
     sealed = set(_current_seal_by_file(_load_seals()))
     declared = _declared_frozen_files(REPO_ROOT)
@@ -268,6 +289,13 @@ def test_frozen_declarations_and_seal_records_are_the_same_set() -> None:
     assert not unbacked, (
         "these documents declare `status: FROZEN` but have no seal record in "
         f"{SEALS_PATH.name}: {unbacked}"
+    )
+
+    unsealed_allowlist = sorted(SEALED_WITHOUT_STATUS_CARRIER - sealed)
+    assert not unsealed_allowlist, (
+        "every path in SEALED_WITHOUT_STATUS_CARRIER must carry a current seal record; "
+        "otherwise a path could be added to the allowlist ahead of the change it would "
+        f"excuse, and the gate would stay green with nothing to review: {unsealed_allowlist}"
     )
 
     contradicting = _seals_without_a_frozen_claim(REPO_ROOT, sealed)
@@ -350,6 +378,43 @@ def test_seal_schema_rejects_the_path_keyed_shape_and_malformed_records(tmp_path
     assert len(accepted) == 1
 
 
+def test_seal_file_must_declare_a_version_this_loader_reads(tmp_path: Path) -> None:
+    """A governance file with no version identity is a file of unknown meaning.
+
+    Accepting it is how a later format change becomes a silently weakened lock:
+    the records still parse, the fields still have the old names, and nothing
+    says the reader and the writer disagree.
+    """
+    document = tmp_path / "contract.md"
+    document.write_text("---\nstatus: FROZEN\n---\n\nsealed\n", encoding="utf-8")
+    seals_path = tmp_path / "contract-seals.yaml"
+    record = _good_record(_sha256(document))
+
+    seals_path.write_text(yaml.safe_dump({"seals": [record]}, sort_keys=False), encoding="utf-8")
+    with pytest.raises(AssertionError, match="non-empty string `version`"):
+        _load_seals(seals_path, repo_root=tmp_path)
+
+    seals_path.write_text(
+        yaml.safe_dump({"version": "", "seals": [record]}, sort_keys=False), encoding="utf-8"
+    )
+    with pytest.raises(AssertionError, match="non-empty string `version`"):
+        _load_seals(seals_path, repo_root=tmp_path)
+
+    seals_path.write_text(
+        yaml.safe_dump({"version": "2", "seals": [record]}, sort_keys=False), encoding="utf-8"
+    )
+    with pytest.raises(AssertionError, match="this loader reads"):
+        _load_seals(seals_path, repo_root=tmp_path)
+
+    seals_path.write_text(
+        yaml.safe_dump(
+            {"version": SUPPORTED_SEALS_VERSION, "seals": [record]}, sort_keys=False
+        ),
+        encoding="utf-8",
+    )
+    assert len(_load_seals(seals_path, repo_root=tmp_path)) == 1
+
+
 def test_drift_needs_an_appended_record_and_the_last_record_wins(tmp_path: Path) -> None:
     """One approved digest per edit — and the newest record is the live seal."""
     document, first = _seal_fixture(tmp_path)
@@ -412,3 +477,12 @@ def test_only_the_named_files_may_be_sealed_without_declaring_frozen(tmp_path: P
     ]
     # And a file that claims some other status stays red, as before.
     assert _seals_without_a_frozen_claim(tmp_path, {"demoted.md"}) == ["demoted.md"]
+
+    # Reverse direction: a path may sit in the closed set only while it holds a
+    # current seal record. Adding one ahead of the change it would excuse is a
+    # pre-authorisation nobody reviews, so the live set is checked against the
+    # live records.
+    sealed_now = set(_current_seal_by_file(_load_seals()))
+    assert SEALED_WITHOUT_STATUS_CARRIER <= sealed_now, sorted(
+        SEALED_WITHOUT_STATUS_CARRIER - sealed_now
+    )
