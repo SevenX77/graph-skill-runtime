@@ -122,11 +122,18 @@ Before proposing a change, run all gates from the repository root:
 ```bash
 uv run ruff check src tests scripts tools
 uv run mypy --strict src
+uv run lint-imports
 uv run pytest --tb=short -q
 uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml
 uv build --no-sources
 uv run pip-audit
 ```
+
+`lint-imports` checks the module-boundary contracts declared under `[tool.importlinter]` in `pyproject.toml`. Each contract names the authority it rests on — a section of [`docs/design/v1-alignment.md`](docs/design/v1-alignment.md), or an established Python language convention where the design does not speak to the edge — so the contracts follow the design rather than the current directory shape.
+
+Its `ignore_imports` entries are a ratchet of registered pre-existing violations. `tests/test_import_boundary_contracts.py` pins each entry by literal identity, not by count: a count-only budget would let a cleared debt pay for a brand-new violation. Clearing a debt deletes the import, its `ignore_imports` line, and its entry in that test together — `unmatched_ignore_imports_alerting = "error"` fails the gate on an exemption that no longer matches a real import, and the test fails on an authorized entry that has gone missing. That option is read **per contract**; import-linter ignores it at session level, so it belongs on the contract that carries exemptions. Adding an `ignore_imports` line to make a new import pass is a boundary violation, not a fix.
+
+That same test file also executes the contracts rather than only reading their configuration: it copies the package into a temporary directory, appends one import that a contract names as illegal, and asserts import-linter reports that contract broken — while the untouched copy stays green and one deliberately weakened contract is shown letting the violation through. Nothing under `src/` is modified. Reading the TOML alone cannot establish that a contract still rejects anything, so do not reduce those tests to configuration assertions.
 
 The manifest validator is a separate required gate; a green pytest run does not replace it. `uv build --no-sources` must produce both the wheel and source distribution without relying on local `tool.uv.sources` overrides. `pip-audit` checks resolved third-party distributions. Because this project is not published on PyPI, a local-project skip must not be reported as a security audit of this repository's own source.
 

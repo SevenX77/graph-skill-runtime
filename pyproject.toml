@@ -45,6 +45,7 @@ dev = [
     "coverage>=7.0.0,<8.0.0",
     "mypy>=1.10",
     "ruff>=0.6",
+    "import-linter>=2.14,<3.0.0",
     "pre-commit>=3.6",
     "pip-audit>=2.7.3,<3.0.0",
     "langchain-openai>=1.3.5,<1.4.0",
@@ -123,3 +124,304 @@ exclude_lines = [
 [[tool.mypy.overrides]]
 module = ["jsonschema", "jsonschema.*", "langchain_anthropic", "yaml", "yaml.*"]
 ignore_missing_imports = true
+
+# --------------------------------------------------------------------------- #
+# import-linter: machine-checkable module boundaries
+#
+# Every contract below names its authority in its `name`, and the authority is
+# one of exactly two kinds: a section of docs/design/v1-alignment.md (restated in
+# places by AGENTS.md), or an established Python language convention. Contracts
+# are derived from the design's "allowed dependencies" column, never from the
+# current directory shape: a layer order copied from today's imports would only
+# re-state drift.
+#
+# A contract may not be justified by taste. Where the design does not actually
+# authorize an edge, say so and cite what does -- the package-private contract
+# below rests on PEP 8's leading-underscore convention, with section 3.2 as
+# corroboration only (that section enumerates the public contracts; it does not
+# itself forbid the import).
+#
+# Note on layer order: the rows of the v1-alignment section 3.1 table are NOT a
+# layer order (it lists `application` above `ports` while application depends on
+# ports). The order below is derived from that table's "allowed dependencies"
+# column plus the section 3.1 Phase 1/4/5 implementation note, which records
+# that the `gskill integrations` CLI consumes `IntegrationInstaller` -- putting
+# the adapters surface above the integrations domain.
+#
+# Only `graph_skill_runtime` is analysed. `tests` is deliberately excluded: per
+# AGENTS.md section 8 regression evidence belongs next to the unit it covers, so
+# a unit test of a package-private module is correct by design and must not be
+# turned into a boundary violation.
+#
+# ignore_imports entries are a RATCHET. Each one is a registered pre-existing
+# violation with a stated debt, and tests/test_import_boundary_contracts.py pins
+# the exact (contract, import expression) pair by literal identity -- not by
+# count, which would let a new violation be swapped in for a cleared one.
+#
+# `unmatched_ignore_imports_alerting = "error"` closes the other side: once a
+# registered violation is actually fixed, its stale exemption breaks the gate
+# instead of silently widening the contract forever. That option is read PER
+# CONTRACT, not at session level. Verified on import-linter 2.14: with a stale
+# exemption present, setting it to "none" at the top level changed nothing
+# (exit 1, still reported), while setting it to "none" inside the contract
+# silenced the report (exit 0). `application/use_cases.py` consumes exactly six
+# session options -- root_package(s), contract_types,
+# include_external_packages, exclude_type_checking_imports, show_timings -- and
+# this is not one of them; each contract class declares it as its own field
+# (for example contracts/layers.py:132). A top-level key here would be dead
+# config that reads as protection while providing none, so it is declared only
+# on the contract that carries exemptions.
+# --------------------------------------------------------------------------- #
+[tool.importlinter]
+root_package = "graph_skill_runtime"
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+# Why: v1-alignment section 3.1 module-boundary table, "allowed dependencies"
+# column -- domain depends on neither of the others, ports carries only
+# host-neutral types, application depends on domain ports plus typed
+# requests/results, adapters depend on ports, and the integrations installer
+# reaches the runtime only through its public typed contracts.
+name = "Layered module boundaries (v1-alignment 3.1)"
+type = "layers"
+# This is the only contract carrying exemptions, so it is the only one that needs
+# the option; it is a per-contract field, not a session option (see header).
+unmatched_ignore_imports_alerting = "error"
+layers = [
+    "graph_skill_runtime.adapters",
+    "graph_skill_runtime.integrations",
+    "graph_skill_runtime.application",
+    "graph_skill_runtime.ports",
+    "graph_skill_runtime.domain",
+]
+ignore_imports = [
+    # DEBT: ports/integrations.py must not reach up into the integrations layer.
+    # `IntegrationScope` / `IntegrationTarget` are host-neutral value types, so
+    # a provider-neutral Port may legitimately need them -- but they currently
+    # live in the integrations layer, which also imports ports.integrations
+    # (installer.py, renderers.py). That is a two-way dependency between a
+    # protocol layer and its implementation layer. Clearing this debt means
+    # moving those two value types down to a layer ports may depend on, which
+    # edits a frozen public contract module and belongs in its own change.
+    "graph_skill_runtime.ports.integrations -> graph_skill_runtime.integrations.models",
+]
+
+[[tool.importlinter.contracts]]
+# Why: v1-alignment section 3.1, domain row -- "Python standard library and
+# explicit domain dependencies; does not depend on Studio, Gateway or any one
+# host". The public runtime data contracts are the bottom of the graph, so the
+# strongest true form of that row is: domain imports nothing else in the
+# package.
+name = "domain is a leaf layer (v1-alignment 3.1 domain row)"
+type = "forbidden"
+source_modules = ["graph_skill_runtime.domain"]
+forbidden_modules = [
+    "graph_skill_runtime.__main__",
+    "graph_skill_runtime.adapters",
+    "graph_skill_runtime.application",
+    "graph_skill_runtime.bootstrap",
+    "graph_skill_runtime.callbacks",
+    "graph_skill_runtime.cognitive",
+    "graph_skill_runtime.composition",
+    "graph_skill_runtime.config",
+    "graph_skill_runtime.core",
+    "graph_skill_runtime.integrations",
+    "graph_skill_runtime.io",
+    "graph_skill_runtime.middleware",
+    "graph_skill_runtime.migration",
+    "graph_skill_runtime.models",
+    "graph_skill_runtime.patches",
+    "graph_skill_runtime.ports",
+    "graph_skill_runtime.runtime",
+    "graph_skill_runtime.sdk",
+    "graph_skill_runtime.settings",
+    "graph_skill_runtime.tools",
+    "graph_skill_runtime.tracing",
+]
+
+[[tool.importlinter.contracts]]
+# Why: v1-alignment section 3.1, application row -- application may depend only
+# on "domain ports and strongly typed requests/results". AGENTS.md section 2
+# assigns the extracted engine to `adapters` ("adapters owns engine, local
+# persistence, CLI, and MCP translation"), so the engine implementation region
+# is reachable only through an adapter, never from the typed stack itself.
+name = "Typed stack does not reach the adapted engine implementation (v1-alignment 3.1)"
+type = "forbidden"
+source_modules = [
+    "graph_skill_runtime.application",
+    "graph_skill_runtime.ports",
+]
+forbidden_modules = [
+    "graph_skill_runtime.callbacks",
+    "graph_skill_runtime.cognitive",
+    "graph_skill_runtime.core",
+    "graph_skill_runtime.io",
+    "graph_skill_runtime.middleware",
+    "graph_skill_runtime.models",
+    "graph_skill_runtime.patches",
+    "graph_skill_runtime.runtime",
+    "graph_skill_runtime.tools",
+    "graph_skill_runtime.tracing",
+]
+
+[[tool.importlinter.contracts]]
+# Why: v1-alignment section 3.3 -- "the Python SDK, the `gskill` CLI and the
+# `gskill` MCP server are all thin adapters". A thin transport surface can be
+# replaced only if nothing beneath it imports it, so the engine implementation
+# region must never import back into the CLI/MCP/SDK/composition surfaces or
+# into the use-case layer that drives it. `migration` is included because
+# section 4 (see the one-shot `gskill migrate studio-skill` converter) makes it
+# a CLI-triggered leaf, not part of the running pipeline.
+name = "Engine implementation and migration do not import the driving surfaces (v1-alignment 3.3)"
+type = "forbidden"
+source_modules = [
+    "graph_skill_runtime.callbacks",
+    "graph_skill_runtime.cognitive",
+    "graph_skill_runtime.core",
+    "graph_skill_runtime.io",
+    "graph_skill_runtime.middleware",
+    "graph_skill_runtime.migration",
+    "graph_skill_runtime.models",
+    "graph_skill_runtime.patches",
+    "graph_skill_runtime.runtime",
+    "graph_skill_runtime.tools",
+    "graph_skill_runtime.tracing",
+]
+forbidden_modules = [
+    "graph_skill_runtime.adapters",
+    "graph_skill_runtime.application",
+    "graph_skill_runtime.bootstrap",
+    "graph_skill_runtime.composition",
+    "graph_skill_runtime.integrations",
+    "graph_skill_runtime.sdk",
+]
+
+[[tool.importlinter.contracts]]
+# Why: v1-alignment section 9 -- the new repository ships no dual reader and no
+# legacy shim; the single one-shot conversion entry point is the
+# `gskill migrate studio-skill` command. AGENTS.md section 4 states the boundary
+# most sharply: legacy v0.3 parsing is "confined to the explicit
+# `gskill migrate studio-skill ...` converter boundary".
+#
+# "Confined to the CLI converter" makes two separate claims, and no single
+# import-linter contract type expresses both, so there is one contract per claim.
+#
+# Claim 1, here: nothing but the CLI converter module may import migration
+# DIRECTLY. `protected` states this positively via `allowed_importers`, so it
+# needs no denylist and covers modules that do not exist yet -- verified: a
+# brand-new `adapters/_newadapter.py` importing migration breaks this contract,
+# and so does `adapters/__init__.py`. The importer must be the exact module
+# `adapters.cli`, NOT the `adapters` package: `allowed_importers` treats a
+# package as all of its descendants, which would let any adapter -- `mcp.py`
+# included -- reach the converter. That regression is pinned by
+# tests/test_import_boundary_contracts.py.
+name = "Migration is imported only by the CLI converter module (v1-alignment 9, AGENTS.md 4)"
+type = "protected"
+protected_modules = ["graph_skill_runtime.migration"]
+allowed_importers = ["graph_skill_runtime.adapters.cli"]
+
+[[tool.importlinter.contracts]]
+# Claim 2: migration must never become an implicit dependency of a running path,
+# so no runtime surface may reach it INDIRECTLY either -- importing the SDK must
+# not drag the legacy converter in behind it. `protected` cannot express this:
+# it checks direct importers only (verified on 2.14 -- with the exact-module
+# `allowed_importers` above, an injected `sdk.py -> adapters.cli -> migration`
+# chain still reported KEPT). A `forbidden` contract with indirect checking left
+# ON is the form that catches it, which costs an enumerated source list; the
+# meta-test computes that list from the package on disk so it cannot go stale.
+#
+# Two modules are deliberately absent from the sources because they ARE the CLI
+# converter boundary this contract protects, not paths that must be kept clear
+# of it: `adapters.cli` itself, and `__main__`, the `python -m` console entry
+# whose only job is to call it. Nothing imports `__main__`, so excluding it
+# opens no route.
+#
+# `allow_indirect_imports` is deliberately NOT set here. Setting it would silently
+# reduce this contract to the direct-only check above and re-open the defect.
+name = "Migration is not reachable indirectly from any runtime path (v1-alignment 9, AGENTS.md 4)"
+type = "forbidden"
+source_modules = [
+    "graph_skill_runtime.application",
+    "graph_skill_runtime.bootstrap",
+    "graph_skill_runtime.callbacks",
+    "graph_skill_runtime.cognitive",
+    "graph_skill_runtime.composition",
+    "graph_skill_runtime.config",
+    "graph_skill_runtime.core",
+    "graph_skill_runtime.domain",
+    "graph_skill_runtime.integrations",
+    "graph_skill_runtime.io",
+    "graph_skill_runtime.middleware",
+    "graph_skill_runtime.models",
+    "graph_skill_runtime.patches",
+    "graph_skill_runtime.ports",
+    "graph_skill_runtime.runtime",
+    "graph_skill_runtime.sdk",
+    "graph_skill_runtime.settings",
+    "graph_skill_runtime.tools",
+    "graph_skill_runtime.tracing",
+    "graph_skill_runtime.adapters.agent_handoffs",
+    "graph_skill_runtime.adapters.engine",
+    "graph_skill_runtime.adapters.host_native",
+    "graph_skill_runtime.adapters.host_native_runtime",
+    "graph_skill_runtime.adapters.mcp",
+    "graph_skill_runtime.adapters.process",
+    "graph_skill_runtime.adapters.result_mapping",
+    "graph_skill_runtime.adapters.snapshots",
+    "graph_skill_runtime.adapters.vendor_cli",
+    "graph_skill_runtime.adapters.windows_job",
+]
+forbidden_modules = ["graph_skill_runtime.migration"]
+
+[[tool.importlinter.contracts]]
+# Why: PEP 8's leading-underscore convention -- `_predict_internal` declares
+# itself package-private, so only its owning package `core` may import it.
+# v1-alignment section 3.2 is corroboration, not the authority: it enumerates
+# the versioned contracts the top-level package exposes (predict internals are
+# absent from that list), but it does not itself forbid this import. Naming the
+# design section as the sole basis would be a hollow citation.
+#
+# `protected` checks DIRECT importers only, which is exactly what encapsulation
+# means: a foreign package must not reach INTO the private region, but calling
+# `core`'s public surface, which then uses its own internals, is correct. An
+# indirect-chain check here would flag every caller of `core.runner`.
+name = "Package-private modules are imported only by their owner (PEP 8 underscore convention, corroborated by v1-alignment 3.2)"
+type = "protected"
+protected_modules = ["graph_skill_runtime.core._predict_internal"]
+allowed_importers = ["graph_skill_runtime.core"]
+
+[[tool.importlinter.contracts]]
+# Why: v1-alignment section 3.1, integrations row -- asset instructions work
+# "through the public SDK/CLI/MCP runtime contracts, and do not enter core";
+# AGENTS.md section 2 calls the MoirAI integration "a separate host-projection
+# domain". "Separate" is a two-way claim, which is what an independence
+# contract states: core must not learn about host projection either.
+name = "Host-projection domain and runtime core are independent (v1-alignment 3.1 integrations row)"
+type = "independence"
+modules = [
+    "graph_skill_runtime.integrations",
+    "graph_skill_runtime.core",
+]
+
+[[tool.importlinter.contracts]]
+# Why: same integrations row -- asset instructions reach the runtime only
+# through its public typed contracts (domain, ports, application), so the
+# installer and renderers must not bind to engine internals, to the migration
+# converter, or to a concrete transport adapter. The `core` pair is owned by the
+# independence contract above and is deliberately not repeated here.
+name = "Integrations bind only to public typed contracts (v1-alignment 3.1 integrations row)"
+type = "forbidden"
+source_modules = ["graph_skill_runtime.integrations"]
+forbidden_modules = [
+    "graph_skill_runtime.adapters",
+    "graph_skill_runtime.callbacks",
+    "graph_skill_runtime.cognitive",
+    "graph_skill_runtime.io",
+    "graph_skill_runtime.middleware",
+    "graph_skill_runtime.migration",
+    "graph_skill_runtime.models",
+    "graph_skill_runtime.patches",
+    "graph_skill_runtime.runtime",
+    "graph_skill_runtime.tools",
+    "graph_skill_runtime.tracing",
+]
