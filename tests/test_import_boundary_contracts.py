@@ -27,18 +27,26 @@ with it.
    declares it as its own field. A top-level key would be dead config that reads
    as protection while providing none, so this test requires the option on each
    contract that carries exemptions and forbids the top-level spelling.
-3. The gate stops running. A contract set no CI job invokes proves nothing, so
-   this file asserts that `lint-imports` is a step of the required
-   `quality-gates` job and that `import-linter` is a declared dev dependency.
-   The workflow is PARSED, not searched: commenting the step out leaves a valid
-   YAML file that still contains the command text, so a substring search over
-   the file keeps passing while `jobs.quality-gates.steps` no longer holds the
-   step. Parsing also makes visible the ways a step that IS present stops
-   blocking: an `if:` condition, `continue-on-error`, and a command whose
-   failure never reaches the runner -- `uv run lint-imports || true`, or a
-   `shell: pwsh` step ending in `exit 0`, both of which report success while the
-   contracts are broken. The last of those is why the step's `run` must equal
-   the command exactly rather than merely start with it.
+3. The gate stops running, or stops meaning anything. A contract set no CI job
+   invokes proves nothing, so this file asserts that `lint-imports` is a step of
+   the required `quality-gates` job and that `import-linter` is a declared dev
+   dependency. The workflow is PARSED, not searched, and the assertion is
+   structural rather than a list of banned shapes -- because three separate
+   classes of decay turned up, each found by enumerating the previous one:
+   - the step is gone while the file still contains the command text, by being
+     commented out or moved to a job that gates no merge;
+   - the step is present but cannot fail the job: `if:`, `continue-on-error`,
+     `|| true`, `; exit 0` under a `shell:` override, or a second line after the
+     command, since a script exits with its LAST command's status;
+   - the step is present and can fail, but does not check THIS repository:
+     `env` aiming `UV_PROJECT` at another project or putting a fake `uv` first
+     on `PATH`, `working-directory` running a same-named script elsewhere, or a
+     workflow/job `defaults.run.shell` wrapping every run step.
+   Each class was closed by naming its members, and each time the next member
+   was one nobody had named. So the rule now says what the gate IS: the step's
+   `run` equals the command exactly, its keys are a subset of {name, run}, and
+   neither level above it declares `defaults` or an `env` key outside a pinned
+   allowlist.
 4. A contract silently stops covering new code. Several contracts enumerate
    module lists, and an enumeration goes stale when a top-level subpackage is
    added: the new package sits outside every contract while they all still
@@ -107,6 +115,32 @@ PACKAGE_PRIVATE_CONTRACT = (
 # this job, so a boundary failure here stops the whole run.
 QUALITY_GATES_JOB = "quality-gates"
 LINT_IMPORTS_COMMAND = "uv run lint-imports"
+
+# The only keys the gate step may carry. An allowlist, because the list of keys
+# that redirect what a step executes has no end -- see `_runs_the_gate`. `id` is
+# excluded as well: it is harmless, but this repository does not use it, and a
+# key that cannot appear is one nobody has to reason about.
+GATE_STEP_KEYS = frozenset({"name", "run"})
+
+# `env` keys admitted ABOVE the step, pinned by identity for the same reason. A
+# denylist cannot close this class: `PATH` and `VIRTUAL_ENV` choose which `uv`
+# and which environment run, `UV_PROJECT` and `UV_PROJECT_ENVIRONMENT` choose
+# which project, `UV_DEFAULT_INDEX` chooses where `import-linter` itself comes
+# from, and `PYTHONPATH` chooses which package grimp finds -- and the next one is
+# always the one nobody listed. So the rule is what IS allowed:
+#
+#   PYTHONUTF8  workflow level -- fixes the interpreter's text encoding. It
+#               cannot change which uv, project, or package is analysed.
+#   UV_PYTHON   `quality-gates` level -- selects the interpreter VERSION for this
+#               project's environment (`"3.11"` today). It does not choose the
+#               project, the `uv` executable, or the environment directory.
+#
+# The rule is key-level. Constraining values would mean interpreting uv's
+# semantics and GitHub expressions here, which is the same enumeration trap one
+# level down; the step allowlist plus the `defaults` ban is what closes the
+# reported bypasses.
+ALLOWED_WORKFLOW_ENV = frozenset({"PYTHONUTF8"})
+ALLOWED_QUALITY_GATES_ENV = frozenset({"UV_PYTHON"})
 
 # The one module authorized to reach the legacy converter, per AGENTS.md section 4
 # ("confined to the explicit `gskill migrate studio-skill ...` converter
@@ -363,76 +397,91 @@ def test_indirect_migration_contract_sources_stay_exhaustive() -> None:
     )
 
 
-def _is_conditional(node: dict[str, Any]) -> bool:
-    """Whether an `if:` key makes this job or step skippable.
+def _job_is_conditional(job: dict[str, Any]) -> bool:
+    """Whether an `if:` key makes the gating job skippable.
 
     Presence alone disqualifies it, in either polarity: `if: false` never runs,
-    and a GitHub expression is resolved at run time, so from here it is a gate
+    and a GitHub expression is resolved at run time, so from here it is a job
     that MIGHT not run. A gate that runs only sometimes is not a gate.
     """
-    return "if" in node
+    return "if" in job
 
 
-def _may_fail_without_failing_the_job(node: dict[str, Any]) -> bool:
-    """Whether `continue-on-error` lets this job or step fail harmlessly.
+def _job_may_fail_harmlessly(job: dict[str, Any]) -> bool:
+    """Whether `continue-on-error` lets the gating job fail without failing the run.
 
     Opposite polarity to `if:`: an explicit false is the blocking default, so
     only a non-false value disqualifies. Any expression counts, for the same
     reason as above -- it is not resolvable here.
     """
-    value = node.get("continue-on-error")
+    value = job.get("continue-on-error")
     if value is None or value is False:
         return False
     return str(value).strip().lower() != "false"
 
 
+def _env_is_within(env: Any, allowed: frozenset[str]) -> bool:
+    """Whether an `env:` mapping carries only keys that cannot redirect execution."""
+    if env is None:
+        return True
+    return isinstance(env, dict) and set(env) <= allowed
+
+
 def _runs_the_gate(step: Any) -> bool:
-    """Whether a step runs the boundary gate as its entire command, on the default shell.
+    """Whether a step IS the boundary gate: this command, nothing else, nothing around it.
 
-    EQUALITY, not a prefix. A prefix admits every way of masking the command's
-    exit status -- `|| true`, `&& true`, `; exit 0`, or simply a second line
-    after it, since a shell script exits with its LAST command's status. Those
-    idioms have no closed enumeration, so the rule is stated positively instead:
-    the whole script is this one command and nothing else. A commented-out
-    command fails the same rule, so no separate line-by-line check is needed.
+    Two rules, both stated positively, because their negative forms have no end.
 
-    A `shell:` key disqualifies the step for the same reason one level down. The
-    default (`bash -e`) propagates the failure; an override changes the exit
-    semantics -- `shell: pwsh` reports success unless its final statement fails,
-    which turns `uv run lint-imports; exit 0` into a green gate. Rather than
-    reason about each shell, require the default.
+    The script must EQUAL the command. A prefix admits every way of dropping the
+    command's exit status -- `|| true`, `&& true`, `; exit 0`, or simply a second
+    line, since a shell script exits with its LAST command's status. Equality
+    also rejects a commented-out command, so no line-by-line scan is needed.
+
+    The step's keys must be a subset of `GATE_STEP_KEYS`. Listing forbidden keys
+    fails the same way: `shell` changes exit semantics, `env` can put a fake `uv`
+    first on `PATH` or aim `UV_PROJECT` at another project, `working-directory`
+    can run a same-named script belonging to a different project, `if` and
+    `continue-on-error` stop the step blocking, `uses`/`with` replace the command
+    outright -- and the next entry is always one nobody listed. A step carrying
+    only a name and this command has nowhere to hide any of them.
     """
-    if not isinstance(step, dict) or "shell" in step:
+    if not isinstance(step, dict) or not set(step) <= GATE_STEP_KEYS:
         return False
     script = step.get("run")
     return isinstance(script, str) and script.strip() == LINT_IMPORTS_COMMAND
 
 
 def _blocking_gate_steps(workflow: Any) -> list[dict[str, Any]]:
-    """Return the `quality-gates` steps that run the boundary gate and can fail it.
+    """Return the `quality-gates` steps that are the boundary gate and can fail the job.
 
-    Empty when the job is missing, when the job or the step may be skipped or may
-    fail without failing the job, or when the gate was moved to another job. The
-    job name is pinned: AGENTS.md section 5 lists the required checks, and
-    `quality-gates` is the one that gates a merge, so a step in any other job
-    would run without blocking anything.
+    Empty when the job is missing, when the gate moved to another job, when the
+    job may be skipped or may fail harmlessly, when either level declares
+    `defaults` (which GitHub applies to every `run` step, so a `defaults.run.shell`
+    of `bash -c "source {0}; exit 0"` masks a failure the step itself cannot see),
+    or when either level's `env` carries a key outside its allowlist.
+
+    The job name is pinned: AGENTS.md section 5 lists the required checks, and
+    `quality-gates` is the one that gates a merge, so the same step in any other
+    job would run without blocking anything.
     """
-    jobs = workflow.get("jobs") if isinstance(workflow, dict) else None
+    if not isinstance(workflow, dict):
+        return []
+    if "defaults" in workflow or not _env_is_within(workflow.get("env"), ALLOWED_WORKFLOW_ENV):
+        return []
+
+    jobs = workflow.get("jobs")
     job = jobs.get(QUALITY_GATES_JOB) if isinstance(jobs, dict) else None
     if not isinstance(job, dict):
         return []
-    if _is_conditional(job) or _may_fail_without_failing_the_job(job):
+    if "defaults" in job or not _env_is_within(job.get("env"), ALLOWED_QUALITY_GATES_ENV):
         return []
+    if _job_is_conditional(job) or _job_may_fail_harmlessly(job):
+        return []
+
     steps = job.get("steps")
     if not isinstance(steps, list):
         return []
-    return [
-        step
-        for step in steps
-        if _runs_the_gate(step)
-        and not _is_conditional(step)
-        and not _may_fail_without_failing_the_job(step)
-    ]
+    return [step for step in steps if _runs_the_gate(step)]
 
 
 def test_import_boundary_gate_runs_in_ci() -> None:
@@ -459,8 +508,12 @@ def test_import_boundary_gate_runs_in_ci() -> None:
 # rejecting everything. It is the shape `ci.yml` actually has, reduced to what
 # this check reads.
 _WIRED_WORKFLOW = """
+env:
+  PYTHONUTF8: "1"
 jobs:
   quality-gates:
+    env:
+      UV_PYTHON: "3.11"
     steps:
       - name: Ruff
         run: uv run ruff check src tests scripts tools
@@ -539,6 +592,42 @@ jobs:
         run: |
           uv run lint-imports
           echo ok
+""",
+    "the step points uv at a different project": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        env:
+          UV_PROJECT: ./tools/decoy
+        run: uv run lint-imports
+""",
+    "the step runs somewhere other than the repository root": """
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        working-directory: tools/decoy
+        run: uv run lint-imports
+""",
+    "the job's defaults wrap every run step in a masking shell": """
+jobs:
+  quality-gates:
+    defaults:
+      run:
+        shell: bash -c "source {0}; exit 0"
+    steps:
+      - name: Import boundaries
+        run: uv run lint-imports
+""",
+    "the workflow env puts a different uv first on PATH": """
+env:
+  PATH: ./tools/decoy/bin:/usr/bin
+jobs:
+  quality-gates:
+    steps:
+      - name: Import boundaries
+        run: uv run lint-imports
 """,
     "only a shell comment mentions the command": """
 jobs:
