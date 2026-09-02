@@ -36,15 +36,21 @@ from typing import Any
 
 from graph_skill_runtime.callbacks.events import AgentLoopIterationEvent, CallbackEvent, PromptCapturedEvent
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 ITEM_1 = "MARKER_ITEM_1"
 ITEM_2 = "MARKER_ITEM_2"
 TURNS_PER_ITEM = 2
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: iteration-per-execution-fixture
+description: One agent phase iterated over two items.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: iteration-per-execution-fixture
 description: One agent phase iterated over two items.
 llm_role: analyst
 io:
@@ -64,12 +70,14 @@ io:
         type: array
         items:
           type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
-_SKILL_MD = """---
+_PHASE_MD = """---
+name: work
 llm_role: analyst
 iterate:
   mode: batch
@@ -107,8 +115,9 @@ validator: false
 def _fixture_skill(tmp_path: Path) -> Path:
     skill = tmp_path / "iteration-per-execution-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(_PHASE_MD, encoding="utf-8")
     return skill
 
 

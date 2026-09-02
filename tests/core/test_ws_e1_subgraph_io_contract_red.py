@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
-from tests.legacy_fixture_adapter import compile_skill
 
 
 class DictSkillResolver:
@@ -49,23 +49,34 @@ def _write_graph(
     phase: str,
     input_required: list[str] | None = None,
     output_required: list[str] | None = None,
+    skill_entry: bool = True,
 ) -> None:
     input_yaml = _schema_yaml(input_properties, required=input_required)
     output_yaml = _schema_yaml(output_properties, required=output_required)
+    if skill_entry:
+        _write(
+            root / "SKILL.md",
+            f"""---
+name: {root.name}
+description: WS-E1 Step5 subgraph IO fixture for {name}.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+        )
     _write(
-        root / "GRAPH.md",
-        f"""---
-schema_version: "v0.3.0"
-name: {name}
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: {name}
+description: WS-E1 Step5 subgraph IO fixture for {name}.
 io:
   inputs:
     {input_yaml}
   outputs:
     {output_yaml}
 phases:
-  - {phase}
----
-<phase depends_on="input" output>{phase}</phase>
+  - id: {phase}
+    depends_on: [input]
+    output: true
 """,
     )
 
@@ -73,7 +84,7 @@ phases:
 def _write_subgraph_phase(
     root: Path,
     *,
-    child_path: Path,
+    child_graph_id: str,
     input_properties: dict[str, Any],
     output_properties: dict[str, Any],
     input_required: list[str] | None = None,
@@ -84,7 +95,8 @@ def _write_subgraph_phase(
     _write(
         root / "phases" / "delegate" / "SUBGRAPH.md",
         f"""---
-path: {child_path}
+name: delegate
+graph: {child_graph_id}
 io:
   inputs:
     {input_yaml}
@@ -110,6 +122,7 @@ def _write_logic_phase(
     _write(
         root / "phases" / "worker" / "LOGIC.md",
         f"""---
+name: worker
 io:
   inputs:
     {input_yaml}
@@ -134,7 +147,8 @@ def _subgraph_skill(
     action_body: str | None = None,
 ) -> tuple[Path, Path, DictSkillResolver]:
     parent = root / "parent"
-    child = parent / "subgraphs" / "child"
+    child_graph_id = "ws-e1-step5-child"
+    child = parent / "graphs" / child_graph_id
     child_outputs = child_outputs or parent_outputs
 
     _write_graph(
@@ -148,7 +162,7 @@ def _subgraph_skill(
     )
     _write_subgraph_phase(
         parent,
-        child_path=child,
+        child_graph_id=child_graph_id,
         input_properties=parent_inputs,
         output_properties=parent_outputs,
         input_required=list(parent_inputs),
@@ -156,12 +170,13 @@ def _subgraph_skill(
     )
     _write_graph(
         child,
-        name="ws-e1-step5-child",
+        name=child_graph_id,
         input_properties=child_inputs,
         output_properties=child_outputs,
         phase="worker",
         input_required=list(child_inputs),
         output_required=list(child_outputs),
+        skill_entry=False,
     )
     _write_logic_phase(
         child,
@@ -175,7 +190,10 @@ def _subgraph_skill(
                 return {"report": inputs.get("child_text", inputs.get("shared_text", "missing"))}
         """,
     )
-    return parent, child, DictSkillResolver({"child": child})
+    # The child is a registry graph now, resolved by the compiler from
+    # `graphs/<graph_id>/`; the resolver is still supplied because the
+    # production signature takes one, but it no longer maps this subgraph.
+    return parent, child, DictSkillResolver({})
 
 
 @pytest.mark.parametrize(

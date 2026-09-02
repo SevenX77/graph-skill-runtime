@@ -7,9 +7,9 @@ from typing import Any
 
 from langchain_core.messages import AIMessage
 
+from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.graph_assembler import assemble_graph
 from graph_skill_runtime.runtime.state import BlackboardState
-from tests.legacy_fixture_adapter import compile_skill
 
 
 class FakeToolChatModel:
@@ -39,23 +39,33 @@ def _base(root: Path, phases: str, outputs: dict[str, object] | None = None) -> 
     for match in re.finditer(r'<phase id="([^"]+)" src="([^"]+)" depends_on="([^"]*)"', phases):
         deps = [dep for dep in re.split(r"[\s,]+", match.group(3).strip()) if dep]
         phase_entries.append((match.group(1), deps))
-    phase_yaml = "\n".join(f"  - {phase_id}" for phase_id, _ in phase_entries)
     depended_on = {dep for _, deps in phase_entries for dep in deps}
-    phase_body = "\n".join(
-        '<phase depends_on="{deps}"{output}>{phase_id}</phase>'.format(
-            deps=", ".join(deps) if deps else "input",
-            output=" output" if phase_id not in depended_on else "",
-            phase_id=phase_id,
+    phase_yaml = "\n".join(
+        "\n".join(
+            (
+                f"  - id: {phase_id}",
+                "    depends_on: [{deps}]".format(deps=", ".join(deps) if deps else "input"),
+                f"    output: {str(phase_id not in depended_on).lower()}",
+            )
         )
         for phase_id, deps in phase_entries
     )
     output_schema = outputs or {"type": "object", "properties": {}}
     output_yaml = json.dumps(output_schema, ensure_ascii=False, indent=4).replace("\n", "\n    ")
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: gamma2-reference
+name: {root.name}
+description: Reference reader sandbox fixture for gamma2 coverage.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: gamma2-reference
+description: Reference reader sandbox fixture for gamma2 coverage.
 llm_role: analyst
 io:
   inputs:
@@ -67,16 +77,15 @@ io:
     {output_yaml}
 phases:
 {phase_yaml}
----
-{phase_body}
 """,
     )
 
 
 def _agent_with_reference(root: Path) -> None:
     _write(
-        root / "phases" / "main" / "SKILL.md",
+        root / "phases" / "main" / "AGENT.md",
         """---
+name: main
 io:
   inputs:
     type: object
@@ -88,8 +97,6 @@ io:
     properties:
       answer:
         type: string
-role: reader
-goal: read reference
 references:
   - id: Guide
     path: references/guide.md
@@ -156,12 +163,13 @@ def test_reference_reader_runtime_is_invoked_with_sandbox(
         "graph_skill_runtime.core.graph_assembler.ReferenceReaderRuntime",
         SpyReferenceReaderRuntime,
     )
+    skill_root = tmp_path / "gamma2-reference"
     _base(
-        tmp_path,
+        skill_root,
         '<phase id="main" src="phases/main" depends_on="" />\n',
         {"type": "object", "properties": {"answer": {"type": "string"}}},
     )
-    _agent_with_reference(tmp_path)
+    _agent_with_reference(skill_root)
     chat = FakeToolChatModel(
         [
             [{"name": "read_reference", "args": {"reference_id": "Guide"}, "id": "read-1"}],
@@ -169,7 +177,7 @@ def test_reference_reader_runtime_is_invoked_with_sandbox(
         ]
     )
 
-    compiled = compile_skill(tmp_path, cache=False, skill_resolver=mock_skill_resolver)
+    compiled = compile_skill(skill_root, cache=False, skill_resolver=mock_skill_resolver)
     result = assemble_graph(
         compiled, chat_model=chat, skill_resolver=mock_skill_resolver
     ).graph.invoke(

@@ -32,11 +32,17 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: batch-item-isolation-fixture
+description: One agent phase iterated over two items.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: batch-item-isolation-fixture
 description: One agent phase iterated over two items.
 llm_role: analyst
 io:
@@ -56,14 +62,16 @@ io:
         type: array
         items:
           type: string
-phases: [work]
----
-<phase depends_on="input" output>work</phase>
+phases:
+  - id: work
+    depends_on: [input]
+    output: true
 """
 
 
-def _skill_md(max_iterations: int) -> str:
+def _phase_md(max_iterations: int) -> str:
     return f"""---
+name: work
 llm_role: analyst
 iterate:
   mode: batch
@@ -105,9 +113,10 @@ ITEM_2 = "MARKER_ITEM_2"
 def _fixture_skill(tmp_path: Path, *, max_iterations: int) -> Path:
     skill = tmp_path / "batch-item-isolation-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(
-        _skill_md(max_iterations), encoding="utf-8"
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(
+        _phase_md(max_iterations), encoding="utf-8"
     )
     return skill
 
@@ -230,7 +239,8 @@ def test_a_batch_item_gets_its_own_iteration_budget(tmp_path: Path) -> None:
     )
 
 
-_LOOP_SKILL_MD = """---
+_LOOP_PHASE_MD = """---
+name: work
 llm_role: analyst
 iterate:
   mode: loop
@@ -271,7 +281,11 @@ validator: false
 <step id="S1" name="finish">调用 finish_task 提交 summary。</step>
 """
 
-_LOOP_GRAPH_MD = _GRAPH_MD.replace(
+_LOOP_SKILL_MD = _SKILL_MD.replace(
+    "name: batch-item-isolation-fixture", "name: loop-isolation-fixture"
+)
+
+_LOOP_GRAPH_YAML = _GRAPH_YAML.replace(
     """  outputs:
     type: object
     required: [summary]
@@ -331,8 +345,9 @@ def test_a_loop_round_does_not_see_the_previous_round_conversation(tmp_path: Pat
     the same missing identity — round 2 resuming round 1's conversation."""
     skill = tmp_path / "loop-isolation-fixture"
     (skill / "phases" / "work").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_LOOP_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "work" / "SKILL.md").write_text(_LOOP_SKILL_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_LOOP_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_LOOP_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "work" / "AGENT.md").write_text(_LOOP_PHASE_MD, encoding="utf-8")
 
     provider = _LoopEchoProvider()
     run_skill(

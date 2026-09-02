@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from graph_skill_runtime.core import runner as engine_runner
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 
 def _write(path: Path, text: str) -> None:
@@ -18,10 +18,19 @@ def _write(path: Path, text: str) -> None:
 
 def _write_logic_skill(root: Path) -> None:
     _write(
-        root / "GRAPH.md",
-        """---
-schema_version: "v0.3.0"
-name: workspace-dir-contract
+        root / "SKILL.md",
+        f"""---
+name: {root.name}
+description: Workspace-dir contract fixture with one deterministic LOGIC phase.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        """schema_version: gskill.graph.v1
+graph_id: workspace-dir-contract
+description: Workspace-dir contract fixture with one deterministic LOGIC phase.
 io:
   inputs:
     type: object
@@ -35,14 +44,15 @@ io:
       answer:
         type: string
 phases:
-  - draft
----
-<phase depends_on="input" output>draft</phase>
+  - id: draft
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "draft" / "LOGIC.md",
         """---
+name: draft
 io:
   inputs:
     type: object
@@ -144,7 +154,7 @@ def test_run_skill_pathless_file_output_defaults_to_run_artifacts_dir(
     workspace_dir = tmp_path / "workspace"
     run_id = "workspace-artifacts-contract"
     _write_logic_skill(skill_root)
-    graph_path = skill_root / "GRAPH.md"
+    graph_path = skill_root / "graph.yaml"
     graph_path.write_text(
         graph_path.read_text(encoding="utf-8").replace(
             "      answer:\n        type: string",

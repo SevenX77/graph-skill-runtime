@@ -31,7 +31,7 @@ from typing import Any
 
 from graph_skill_runtime.callbacks.events import PhaseEndEvent
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 #: Distinct per phase so a per-phase total cannot pass by accident.
 TOKENS = {"prepare": (13, 5), "draft": (29, 17)}
@@ -39,9 +39,15 @@ TOKENS = {"prepare": (13, 5), "draft": (29, 17)}
 #: Any of these on a phase lifecycle event would be a second answer.
 _SPEND_WORDS = ("metric", "token", "spend", "cost", "usage")
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: phase-spend-one-answer
+_SKILL_MD = """---
+name: phase-spend-fixture
+description: Two agent phases, each calling the model once.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: phase-spend-one-answer
 description: Two agent phases, each calling the model once.
 llm_role: analyst
 io:
@@ -57,15 +63,19 @@ io:
     properties:
       draft:
         type: string
-phases: [prepare, draft]
----
-<phase depends_on="input">prepare</phase>
-<phase depends_on="prepare" output>draft</phase>
+phases:
+  - id: prepare
+    depends_on: [input]
+    output: false
+  - id: draft
+    depends_on: [prepare]
+    output: true
 """
 
 
 def _phase_md(output_key: str) -> str:
     return f"""---
+name: {output_key}
 llm_role: analyst
 validator: false
 io:
@@ -138,11 +148,12 @@ class _EventLog:
 def _skill(tmp_path: Path) -> Path:
     skill = tmp_path / "phase-spend-fixture"
     skill.mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
     for name in TOKENS:
         phase_dir = skill / "phases" / name
         phase_dir.mkdir(parents=True)
-        (phase_dir / "SKILL.md").write_text(_phase_md(name), encoding="utf-8")
+        (phase_dir / "AGENT.md").write_text(_phase_md(name), encoding="utf-8")
     return skill
 
 

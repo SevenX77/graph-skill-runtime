@@ -11,7 +11,7 @@ import pytest
 
 from graph_skill_runtime.callbacks.events import InputFileInjectedEvent
 from graph_skill_runtime.core.result import RunResult
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
 RAW_BUSINESS_MD = "## main\n- answer: raw ok\n\n<!-- preserve-me -->\n\n- note: keep spacing"
 
@@ -81,24 +81,34 @@ def _write_single_reader_skill(root: Path) -> None:
         required=["summary", "seen_keys"],
     )
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e1-io-reader
+name: {root.name}
+description: Import a runtime text file into one LOGIC reader phase.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e1-io-reader
+description: Import a runtime text file into one LOGIC reader phase.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - reader
----
-<phase depends_on="input" output>reader</phase>
+  - id: reader
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "reader" / "LOGIC.md",
         f"""---
+name: reader
 io:
   inputs:
     {phase_inputs}
@@ -138,26 +148,37 @@ def _write_guard_then_reader_skill(root: Path) -> None:
     )
     reader_outputs = _schema_yaml({"summary": {"type": "string"}})
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e1-io-lazy-guard
+name: {root.name}
+description: Fail in a guard phase before the reader phase imports its file.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e1-io-lazy-guard
+description: Fail in a guard phase before the reader phase imports its file.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - guard
-  - reader
----
-<phase depends_on="input">guard</phase>
-<phase depends_on="guard" output>reader</phase>
+  - id: guard
+    depends_on: [input]
+    output: false
+  - id: reader
+    depends_on: [guard]
+    output: true
 """,
     )
     _write(
         root / "phases" / "guard" / "LOGIC.md",
         f"""---
+name: guard
 io:
   inputs:
     {guard_inputs}
@@ -176,6 +197,7 @@ validator: false
     _write(
         root / "phases" / "reader" / "LOGIC.md",
         f"""---
+name: reader
 io:
   inputs:
     {reader_inputs}
@@ -208,24 +230,34 @@ def _write_structured_reader_skill(root: Path) -> None:
     )
     phase_outputs = _schema_yaml({"summary": {"type": "string"}}, required=["summary"])
     _write(
-        root / "GRAPH.md",
+        root / "SKILL.md",
         f"""---
-schema_version: "v0.3.0"
-name: ws-e1-io-structured
+name: {root.name}
+description: Import structured runtime files into one LOGIC reader phase.
+---
+Compile and run this graph skill with graph-skill-runtime.
+""",
+    )
+    _write(
+        root / "graph.yaml",
+        f"""schema_version: gskill.graph.v1
+graph_id: ws-e1-io-structured
+description: Import structured runtime files into one LOGIC reader phase.
 io:
   inputs:
     {graph_inputs}
   outputs:
     {graph_outputs}
 phases:
-  - reader
----
-<phase depends_on="input" output>reader</phase>
+  - id: reader
+    depends_on: [input]
+    output: true
 """,
     )
     _write(
         root / "phases" / "reader" / "LOGIC.md",
         f"""---
+name: reader
 io:
   inputs:
     {phase_inputs}

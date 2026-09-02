@@ -29,11 +29,17 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
-name: events-name-their-execution
+_SKILL_MD = """---
+name: execution-id-fixture
+description: Two agent phases in a row, each making one model call.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: events-name-their-execution
 description: Two agent phases in a row, each making one model call.
 llm_role: analyst
 io:
@@ -49,15 +55,19 @@ io:
     properties:
       draft:
         type: string
-phases: [prepare, draft]
----
-<phase depends_on="input">prepare</phase>
-<phase depends_on="prepare" output>draft</phase>
+phases:
+  - id: prepare
+    depends_on: [input]
+    output: false
+  - id: draft
+    depends_on: [prepare]
+    output: true
 """
 
 
 def _phase_md(output_key: str) -> str:
     return f"""---
+name: {output_key}
 llm_role: analyst
 validator: false
 io:
@@ -120,11 +130,12 @@ class _EventLog:
 def _skill(tmp_path: Path) -> Path:
     skill = tmp_path / "execution-id-fixture"
     skill.mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
     for name in ("prepare", "draft"):
         phase_dir = skill / "phases" / name
         phase_dir.mkdir(parents=True)
-        (phase_dir / "SKILL.md").write_text(_phase_md(name), encoding="utf-8")
+        (phase_dir / "AGENT.md").write_text(_phase_md(name), encoding="utf-8")
     return skill
 
 

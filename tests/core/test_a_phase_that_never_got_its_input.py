@@ -29,11 +29,17 @@ from pathlib import Path
 from typing import Any
 
 from graph_skill_runtime.core.llm_provider import LLMProviderChunk, LLMProviderRequest
-from tests.legacy_fixture_adapter import run_skill
+from graph_skill_runtime.core.runner import run_skill
 
-_GRAPH_MD = """---
-schema_version: "v0.3.0"
+_SKILL_MD = """---
 name: missing-input-fixture
+description: Two phases where the second needs something the first never writes.
+---
+Compile and run this graph skill with graph-skill-runtime.
+"""
+
+_GRAPH_YAML = """schema_version: gskill.graph.v1
+graph_id: missing-input-fixture
 description: Two phases where the second needs something the first never writes.
 llm_role: analyst
 io:
@@ -46,17 +52,20 @@ io:
     properties:
       verdict:
         type: string
-phases: [first, second]
----
-<phase depends_on="input">first</phase>
-
-<phase depends_on="first" output>second</phase>
+phases:
+  - id: first
+    depends_on: [input]
+    output: false
+  - id: second
+    depends_on: [first]
+    output: true
 """
 
 # `note` is declared so the dataflow has a source the compiler can see, and left
 # optional so the phase is free to finish without ever writing it. That gap is
 # the whole fixture: it compiles clean and only comes apart at runtime.
 _FIRST_MD = """---
+name: first
 llm_role: analyst
 validator: false
 io:
@@ -78,6 +87,7 @@ max_iterations: 2
 """
 
 _SECOND_MD = """---
+name: second
 llm_role: analyst
 validator: false
 io:
@@ -155,9 +165,10 @@ def _skill(tmp_path: Path) -> Path:
     skill = tmp_path / "missing-input-fixture"
     (skill / "phases" / "first").mkdir(parents=True)
     (skill / "phases" / "second").mkdir(parents=True)
-    (skill / "GRAPH.md").write_text(_GRAPH_MD, encoding="utf-8")
-    (skill / "phases" / "first" / "SKILL.md").write_text(_FIRST_MD, encoding="utf-8")
-    (skill / "phases" / "second" / "SKILL.md").write_text(_SECOND_MD, encoding="utf-8")
+    (skill / "SKILL.md").write_text(_SKILL_MD, encoding="utf-8")
+    (skill / "graph.yaml").write_text(_GRAPH_YAML, encoding="utf-8")
+    (skill / "phases" / "first" / "AGENT.md").write_text(_FIRST_MD, encoding="utf-8")
+    (skill / "phases" / "second" / "AGENT.md").write_text(_SECOND_MD, encoding="utf-8")
     return skill
 
 
