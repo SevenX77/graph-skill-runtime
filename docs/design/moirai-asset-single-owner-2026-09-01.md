@@ -4,7 +4,7 @@ doc: moirai-asset-single-owner
 role: workflow-record
 status: drafted
 aligns_with: ./v1-alignment.md
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # 决议:MoirAI 资产单一 owner 收敛(批B′)
@@ -262,7 +262,7 @@ updated: 2026-09-01
 
 **一处环境事实必须记明,否则后来人会把它读成候选缺陷。** 首次 `uv run pytest -q` 报 `5 failed, 1802 passed, 1 skipped in 143.86s`,五项全部落在 `tests/test_import_boundary_contracts.py`,失败文本一致:`import-linter produced no contract results: ... ModuleNotFoundError: No module named 'importlinter'`。原因是本机 venv 的上次同步早于提交 `2638fd6c`(该提交把 `import-linter` 引入 dev 依赖并建立模块边界门禁),缺这个开发期依赖。执行 `uv sync --all-extras` 装入 `import-linter==2.14` 与 `grimp==3.16` 后复跑得到上表的 `1807 passed, 1 skipped`。**两次运行之间工作树一个字节未改**(`git status --short` 两次均无输出),所以这是本机环境滞后,不是被验候选的缺陷。
 
-**renderer 一层要把两件事分开,否则会把替身证据当成资产证据。** `tests/integrations/snapshots/moirai_renderers.json` 那条快照由 `FakeMoiraiAssets()` 驱动(`tests/integrations/test_renderers.py:98`),它钉住六个 renderer 的项目/用户路径、profile 元数据与 MCP 形状,**不随真实资产内容变化**——因此它对 `1.1.0` 的资产内容不构成证据。真正覆盖 `1.1.0` 内容的是同文件的 `test_every_canonical_asset_is_projected_for_every_renderer`(`tests/integrations/test_renderers.py:168`):它用真实 `PackagedMoiraiAssets()` 跑遍 `IntegrationTarget` 的全部六个成员,断言每个 renderer 产出的 resource id 集合**恰等于**「八个 `skill:<id>:SKILL.md` + 各技能 manifest 声明的每个 reference + 四个 `role:<id>` + 一个 `mcp:gskill`」。KB-15 进入八个技能 reference 子集这件事,由这条断言在六个宿主上同时覆盖。
+**renderer 一层要把两件事分开,否则会把替身证据当成资产证据。** `tests/integrations/snapshots/moirai_renderers.json` 那条快照由 `FakeMoiraiAssets()` 驱动(`tests/integrations/test_renderers.py:98`),它钉住六个 renderer 的项目/用户路径、profile 元数据与 MCP 形状,**不随真实资产内容变化**——因此它对 `1.1.0` 的资产内容不构成证据。真正覆盖 `1.1.0` 内容的是同文件的 `test_every_canonical_asset_is_projected_for_every_renderer`(`tests/integrations/test_renderers.py:169`):它用真实 `PackagedMoiraiAssets()` 跑遍 `IntegrationTarget` 的全部六个成员,断言每个 renderer 产出的 resource id 集合**恰等于**「八个 `skill:<id>:SKILL.md` + 各技能 manifest 声明的每个 reference + 四个 `role:<id>` + 一个 `mcp:gskill`」。KB-15 进入八个技能 reference 子集这件事,由这条断言在六个宿主上同时覆盖。
 
 **结论**:源候选在 `1.1.0` 上重新成立,证据种类与 1.0.0 那次同构。
 
@@ -414,4 +414,6 @@ ls ~/.claude/skills/moirai/references → 16 (KB-00 … KB-15)
 2. **已认证的 Claude 模型执行与默认工具调用**。本次验收的约束是不发起任何消耗用户 OAuth 会话或触发模型调用的命令,因此这一层与 1.0.0 那次同样停在连接层。
 3. **Codex 宿主的任何运行时行为**。本次未运行 `codex exec`,故 `1.0.0` 那次的 `gskill.inspect` 默认审批调用结论**不迁移**到 `1.1.0`。
 
-**观测到的偏差(照记不判)**:本机 `~/.codex/` 下存在四份 MoirAI profile 投影(`moirai.toml`、`moirai_atropos.toml`、`moirai_clotho.toml`、`moirai_lachesis.toml`,mtime 均为 2026-08-28),而 `%APPDATA%/graph-skill-runtime/integrations/moirai/` 下**只有 `claude` 一个目录**,没有 codex 的 ownership manifest。这四份文件的 `developer_instructions` 不含 `1.1.0` 才引入的 Identity 段落(§3 U5),`~/.codex/config.toml` 的 `[mcp_servers.gskill]` 指向 `C:\Users\test\AppData\Local\graph-skill-runtime\runtimes\1.0.0a1\.venv\Scripts\python.exe`。即:这台机器上的 codex 投影是一份**早于本次内容变更、且不在任何 installer manifest 管辖之下**的残留。本节只记录该事实,处置不在本次验收范围内。
+**观测到的偏差(照记不判)。观测时刻早于 2026-09-02 04:11:40 -0700**——该时刻是承载本节初稿的提交 `87f1f628` 的作者时间,本段的取证命令全部执行于它之前;时刻必须写明,因为这台机器的宿主目录随后被改动过(见下一段),没有时刻的话这段观测无法被复核。当时的观测是:本机 `~/.codex/` 下存在四份 MoirAI profile 投影(`moirai.toml`、`moirai_atropos.toml`、`moirai_clotho.toml`、`moirai_lachesis.toml`,mtime 均为 2026-08-28),而 `%APPDATA%/graph-skill-runtime/integrations/moirai/` 下**只有 `claude` 一个目录**,没有 codex 的 ownership manifest。这四份文件的 `developer_instructions` 不含 `1.1.0` 才引入的 Identity 段落(§3 U5),`~/.codex/config.toml` 的 `[mcp_servers.gskill]` 指向 `C:\Users\test\AppData\Local\graph-skill-runtime\runtimes\1.0.0a1\.venv\Scripts\python.exe`。即:当时这台机器上的 codex 投影是一份**早于本次内容变更、且不在任何 installer manifest 管辖之下**的残留。
+
+**该残留的后续处置(2026-09-02 04:26)**:协调方已按 Claude 侧的同一配方处置——摘除无主的 `~/.agents/skills/moirai*`(8 个)、`~/.codex/agents/moirai*.toml`(4 个)与 `~/.codex/config.toml` 里孤悬的 `graph-skill-runtime:moirai:gskill-mcp` 闭标记,再执行 `gskill integrations install moirai --targets codex --scope user` 重装,结果 `installed` / `applied 62`;`%APPDATA%/graph-skill-runtime/integrations/moirai/` 现有 `claude` 与 `codex` 两份 manifest。**这是一次投影重装的记录,不是 Codex 宿主的运行时证据**:本节上文第 3 条「Codex 宿主的任何运行时行为未验」不因此改变,`1.0.0` 那次的 `gskill.inspect` 默认审批调用结论仍不迁移到 `1.1.0`。
