@@ -288,6 +288,12 @@ features:
     evidence: tests/integrations/test_installer.py::test_unmanaged_file_conflict_blocks_every_target_without_overwrite
   targeted_tests:
   - tests/integrations/test_packaged_assets.py::test_packaged_moirai_bundle_is_closed_utf8_and_complete
+  - tests/integrations/test_packaged_assets.py::test_catalog_rejects_a_skill_body_link_to_an_undeclared_reference
+  - tests/integrations/test_packaged_assets.py::test_catalog_rejects_a_skill_body_link_to_a_nonexistent_knowledge_file
+  - tests/integrations/test_packaged_assets.py::test_catalog_rejects_a_knowledge_file_that_links_another_knowledge_file
+  - tests/integrations/test_moirai_asset_lock.py::test_bundle_digest_matches_the_committed_lock
+  - tests/integrations/test_moirai_asset_lock.py::test_lock_names_the_asset_version_it_describes
+  - tests/integrations/test_moirai_asset_lock.py::test_role_skill_relation_matches_the_committed_lock
   - tests/integrations/test_renderers.py::test_six_host_renderers_match_the_reviewed_project_and_user_snapshot
   - tests/integrations/test_renderers.py::test_each_host_agent_profile_uses_only_its_native_metadata_shape
   - tests/integrations/test_renderers.py::test_every_canonical_asset_is_projected_for_every_renderer

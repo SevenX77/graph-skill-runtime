@@ -1,7 +1,7 @@
 {
   "schema_version": "gskill.integration-assets.v1",
   "integration_id": "moirai",
-  "asset_version": "1.0.0",
+  "asset_version": "1.1.0",
   "roles": [
     {
       "id": "moirai",
@@ -46,36 +46,74 @@
         "KB-11-runtime-config.md",
         "KB-12-agent-execution.md",
         "KB-13-runtime-tools.md",
-        "KB-14-artifacts-persistence.md"
+        "KB-14-artifacts-persistence.md",
+        "KB-15-working-discipline.md"
       ]
     },
     {
       "id": "moirai-brainstorming",
-      "references": ["KB-01-skill-anatomy.md", "KB-02-io-dataflow.md", "KB-04-agent-nodes.md", "KB-05-subgraph.md"]
+      "references": [
+        "KB-01-skill-anatomy.md",
+        "KB-02-io-dataflow.md",
+        "KB-04-agent-nodes.md",
+        "KB-05-subgraph.md",
+        "KB-15-working-discipline.md"
+      ]
     },
     {
       "id": "moirai-domain-analysis",
-      "references": ["KB-01-skill-anatomy.md", "KB-02-io-dataflow.md"]
+      "references": [
+        "KB-01-skill-anatomy.md",
+        "KB-02-io-dataflow.md",
+        "KB-15-working-discipline.md"
+      ]
     },
     {
       "id": "moirai-graph-design",
-      "references": ["KB-01-skill-anatomy.md", "KB-02-io-dataflow.md", "KB-03-logic-actions.md", "KB-04-agent-nodes.md", "KB-05-subgraph.md", "KB-06-iterate.md"]
+      "references": [
+        "KB-01-skill-anatomy.md",
+        "KB-02-io-dataflow.md",
+        "KB-03-logic-actions.md",
+        "KB-04-agent-nodes.md",
+        "KB-05-subgraph.md",
+        "KB-06-iterate.md",
+        "KB-15-working-discipline.md"
+      ]
     },
     {
       "id": "moirai-agent-prompt-design",
-      "references": ["KB-04-agent-nodes.md", "KB-12-agent-execution.md"]
+      "references": [
+        "KB-02-io-dataflow.md",
+        "KB-03-logic-actions.md",
+        "KB-04-agent-nodes.md",
+        "KB-08-predict.md",
+        "KB-10-golden.md",
+        "KB-12-agent-execution.md",
+        "KB-15-working-discipline.md"
+      ]
     },
     {
       "id": "moirai-compile-repair",
-      "references": ["KB-01-skill-anatomy.md", "KB-07-compile-diagnostics.md"]
+      "references": [
+        "KB-01-skill-anatomy.md",
+        "KB-07-compile-diagnostics.md",
+        "KB-08-predict.md",
+        "KB-15-working-discipline.md"
+      ]
     },
     {
       "id": "moirai-eval-judgement",
-      "references": ["KB-08-predict.md", "KB-09-run-trace-checkpoint.md", "KB-10-golden.md", "KB-14-artifacts-persistence.md"]
+      "references": [
+        "KB-08-predict.md",
+        "KB-09-run-trace-checkpoint.md",
+        "KB-10-golden.md",
+        "KB-14-artifacts-persistence.md",
+        "KB-15-working-discipline.md"
+      ]
     },
     {
       "id": "moirai-web-research",
-      "references": ["KB-00-hub.md"]
+      "references": ["KB-00-hub.md", "KB-15-working-discipline.md"]
     }
   ],
   "knowledge": [
@@ -93,6 +131,7 @@
     "KB-11-runtime-config.md",
     "KB-12-agent-execution.md",
     "KB-13-runtime-tools.md",
-    "KB-14-artifacts-persistence.md"
+    "KB-14-artifacts-persistence.md",
+    "KB-15-working-discipline.md"
   ]
 }

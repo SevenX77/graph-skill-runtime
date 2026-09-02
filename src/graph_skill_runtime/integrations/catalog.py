@@ -14,6 +14,7 @@ from ruamel.yaml.error import YAMLError as RuamelYAMLError
 
 _ASSET_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _FILE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+_REFERENCE_LINK = re.compile(r"references/([A-Za-z0-9][A-Za-z0-9_.-]*)")
 
 
 class _RoleAsset(BaseModel):
@@ -129,6 +130,50 @@ def _validate_skill_metadata(content: bytes, *, skill_id: str) -> None:
         )
     if not "\n".join(lines[closing + 1 :]).strip():
         raise ValueError(f"MoirAI skill {skill_id!r} has an empty instruction body")
+
+
+def _validate_skill_reference_links(
+    content: bytes,
+    *,
+    skill_id: str,
+    declared: tuple[str, ...],
+) -> None:
+    """Reject a skill body link into `references/` that the manifest does not declare.
+
+    A renderer copies only the manifest's declared reference subset next to a
+    projected skill, so a body link naming any other file becomes a dead link in
+    every host projection. The manifest is the owner of that subset; this check
+    makes the instruction body unable to disagree with it.
+    """
+    linked = set(_REFERENCE_LINK.findall(content.decode("utf-8")))
+    undeclared = sorted(linked - set(declared))
+    if undeclared:
+        raise ValueError(
+            f"MoirAI skill {skill_id!r} links an undeclared reference: " + ", ".join(undeclared)
+        )
+
+
+def _validate_knowledge_has_no_cross_links(
+    text: str,
+    *,
+    filename: str,
+    knowledge: tuple[str, ...],
+) -> None:
+    """Reject a knowledge file that links a sibling knowledge file.
+
+    Which knowledge files reach a host is decided per skill by the manifest's
+    reference subset, so a knowledge file cannot know whether a sibling was
+    delivered beside it. A cross-link is therefore dead in every projection whose
+    activating skill did not also declare the target; the knowledge router plus
+    each skill body own routing instead.
+    """
+    siblings = set(knowledge) - {filename}
+    linked = sorted(name for name in siblings if f"({name})" in text)
+    if linked:
+        raise ValueError(
+            f"MoirAI knowledge file {filename!r} must not link another knowledge file: "
+            + ", ".join(linked)
+        )
 
 
 def _validate_inventory(*, actual: set[str], expected: set[str]) -> None:
@@ -270,6 +315,11 @@ class PackagedMoiraiAssets:
         for skill_id in self.skill_ids():
             content = self.skill_file(skill_id)
             _validate_skill_metadata(content, skill_id=skill_id)
+            _validate_skill_reference_links(
+                content,
+                skill_id=skill_id,
+                declared=self._skill(skill_id).references,
+            )
             self.skill_reference_files(skill_id)
         for filename in self.knowledge_files():
             content = self._read_bytes("knowledge", filename)
@@ -281,6 +331,11 @@ class PackagedMoiraiAssets:
                 raise ValueError(f"MoirAI knowledge file {filename!r} is empty")
             if "\r" in text:
                 raise ValueError(f"MoirAI knowledge file {filename!r} must use LF line endings")
+            _validate_knowledge_has_no_cross_links(
+                text,
+                filename=filename,
+                knowledge=self.knowledge_files(),
+            )
 
 
 __all__ = ["PackagedMoiraiAssets"]

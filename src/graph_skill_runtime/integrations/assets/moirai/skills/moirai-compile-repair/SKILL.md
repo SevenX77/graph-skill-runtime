@@ -13,6 +13,14 @@ Use this skill when compilation fails or when topology and schema validity must 
 4. Repair the source contract rather than adding a parallel validator, compatibility alias, catch-and-ignore path, or downstream fixup.
 5. Recompile once and compare the complete diagnostic set. Treat remaining diagnostics as independent work, not hidden success.
 
-Read [skill anatomy](references/KB-01-skill-anatomy.md) to identify owners and [compile diagnostics](references/KB-07-compile-diagnostics.md) for the repair loop.
+Work from the diagnostics themselves, never from a summary of them: read the full set with each code, severity, source path, and location. A repair started on a partial or second-hand error list fixes the wrong file.
 
-Return root cause, files or fields changed, before/after diagnostic evidence, and unresolved failures. Do not run a failing bundle merely to gather later-stage symptoms.
+Match on the diagnostic **code**, not on the message wording. A code is a stable identity registered by the runtime; the human sentence beside it can be reworded. Do not guess what a code means — if its meaning is not established, say so and look it up rather than inventing a remediation.
+
+Group the set before editing anything. The recurring categories are identity mismatch, DAG shape, schema incompatibility, implementation contract, and resource or mention reachability; [compile diagnostics](references/KB-07-compile-diagnostics.md) defines each and what compilation can and cannot establish. Fix one category at a time so a recompile attributes the change.
+
+When a failure appears only at prediction and not at compile, it is a runtime-structural defect, not a compile defect: read [prediction](references/KB-08-predict.md) for what that stage substitutes and what it can therefore expose.
+
+Read [skill anatomy](references/KB-01-skill-anatomy.md) to identify owners and [working discipline](references/KB-15-working-discipline.md) for the escalation order this loop sits inside.
+
+Return root cause, files or fields changed, before/after diagnostic evidence, and unresolved failures. Do not run a failing bundle merely to gather later-stage symptoms, and do not attempt several unrelated categories at once.
