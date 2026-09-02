@@ -125,7 +125,8 @@ class CognitiveFlowMiddleware(AgentMiddleware[AgentState[Any]]):
         interrupt_fn: InterruptFn | None = None,
         callbacks: Sequence[Any] | None = None,
     ) -> None:
-        # Phase 2 A2 v3 + Phase 3 M7 (PHASE2_DESIGN.md §3.4, PHASE3_DESIGN.md §3):
+        # Phase 2 A2 v3 + Phase 3 M7 (pre-extraction design records, not
+        # carried into this repository):
         # ``current_phase_schema`` accepts ``type[BaseModel] | SchemaObject |
         # None``. ``_validate_finish_args`` dispatches on schema kind:
         # ``SchemaObject`` walks ``schema_engine.get_pydantic_model`` +
@@ -240,7 +241,7 @@ class CognitiveFlowMiddleware(AgentMiddleware[AgentState[Any]]):
         args: dict[str, Any],
         state: WorkflowState,
     ) -> tuple[bool, Any]:
-        """Return ``(handled, result)`` for design.md §5.3 callers.
+        """Return ``(handled, result)`` for the tool-call interception path.
 
         ``wrap_tool_call`` uses the richer private helper so it can keep
         the original tool-call id in the emitted ``ToolMessage``. This

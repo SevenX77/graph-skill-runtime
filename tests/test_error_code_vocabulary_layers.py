@@ -42,18 +42,28 @@ SOURCE_ROOT = REPO_ROOT / "src" / "graph_skill_runtime"
 ERROR_SPEC = REPO_ROOT / "docs" / "skill-spec" / "11-error-code-spec.md"
 
 _LAYER_SECTION_RE = re.compile(r"(?m)^## 9\. .*$")
+_TOP_LEVEL_HEADING_RE = re.compile(r"(?m)^## ")
 _DIAGNOSTIC_CODE_RE = re.compile(r"\[F-v3-[a-z0-9-]+\]")
 _BOUNDARY_CODE_RE = re.compile(r"GSKILL_[A-Z0-9_]+")
 _SPEC_ROW_CODE_RE = re.compile(r"(?m)^\| `(GSKILL_[A-Z0-9_]+)` \|")
 
 
 def _layer_declaration_text() -> str:
-    """Return only §9, the section that declares the layers."""
+    """Return only §9, the section that declares the layers.
+
+    Bounded at the next top-level heading rather than at end of file. §9 was
+    the last section when this was written, so slicing to EOF happened to be
+    the same text; it stopped being the same the moment §10 was added, and a
+    slice that silently grows with the document is a trap for whatever section
+    comes next.
+    """
 
     text = ERROR_SPEC.read_text(encoding="utf-8")
     match = _LAYER_SECTION_RE.search(text)
     assert match is not None, "11-error-code-spec.md must declare the layer section §9"
-    return text[match.start() :]
+    section = text[match.start() :]
+    next_heading = _TOP_LEVEL_HEADING_RE.search(section, pos=match.end() - match.start())
+    return section if next_heading is None else section[: next_heading.start()]
 
 
 def _declared_boundary_codes() -> set[str]:

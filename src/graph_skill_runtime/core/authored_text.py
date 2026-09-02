@@ -28,8 +28,9 @@ authored content in the one case where the two differ; and being a call-site
 fix, it has to be remembered at every reader, which is how the two readings came
 about.
 
-This is the read-side half of the repo's encoding rule (``docs/development/
-CROSS_PLATFORM.md``): that rule governs what we WRITE (UTF-8, no signature, LF),
+This is the read-side half of the repo's encoding rule
+(``docs/CROSS_PLATFORM.md``): that rule governs what we WRITE (UTF-8, no
+signature, LF),
 and it cannot govern what an outside editor hands us.
 """
 

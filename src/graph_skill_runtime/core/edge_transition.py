@@ -9,7 +9,10 @@ therefore parented to whichever phase happened to be current, which is why
 
 This module owns that stretch as a first-class run segment, peer to a phase
 segment: it opens, it closes, it has an identity, and it names both ends.
-Authoritative design: docs/design/2026-08-15-edge-as-first-class-run-segment-decision.md
+Design origin: the 2026-08-15 "edge as a first-class run segment" decision
+taken in the origin agent-harness repository, before this runtime was
+extracted. That decision record was not carried over, so this module and its
+``EdgeStartEvent``/``EdgeEndEvent`` contracts are the current authority here.
 
 It sits below both the assembler (which opens transitions) and the state
 mapper (which records a phase execution's identity for the transitions

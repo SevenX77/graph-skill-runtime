@@ -18,6 +18,16 @@ from graph_skill_runtime.core.authored_text import read_authored_text
 
 logger = logging.getLogger(__name__)
 
+# The directory a skill keeps its reference files in, and the example values
+# the tool description quotes. Both name locations inside a USER's business
+# skill, not documents of this repository, which is why the example path is
+# composed from the two parts rather than written as one literal: the parts are
+# what this module actually knows, and `references` is the same directory the
+# tool resolves against below.
+_REFERENCES_DIR_NAME = "references"
+_EXAMPLE_REFERENCE_NAME = "01_role.md"
+_EXAMPLE_REFERENCE_PATH = f"{_REFERENCES_DIR_NAME}/{_EXAMPLE_REFERENCE_NAME}"
+
 _MAX_FILE_SIZE_BYTES = 200_000
 
 
@@ -43,7 +53,7 @@ def make_read_file_tool(
     under ``base_dir`` and files over 200KB are rejected.
     """
     base_resolved = base_dir.resolve()
-    references_root = (base_resolved / "references").resolve()
+    references_root = (base_resolved / _REFERENCES_DIR_NAME).resolve()
 
     allowed_resolved = _allowed_reference_paths(allowed_paths, base_resolved, references_root)
 
@@ -66,7 +76,7 @@ def make_read_file_tool(
         "\n"
         "Args:\n"
         "    path: relative path to the reference file "
-        "(e.g. 'references/01_role.md' or '01_role.md')"
+        f"(e.g. {_EXAMPLE_REFERENCE_PATH!r} or {_EXAMPLE_REFERENCE_NAME!r})"
     )
     return read_file
 

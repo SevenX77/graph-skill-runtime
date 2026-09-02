@@ -2919,9 +2919,10 @@ def build_phase_document(
     # model_validate) used to be two sequential steps that could each abort
     # this file's compile independently — whichever ran first won, and the
     # other's defect in the SAME file only surfaced on the NEXT compile after
-    # the first was fixed. That is the exact PM complaint F6 names ("将role
-    # 补上,goal的报错才出现"): docs/studio/mvp1/02_capabilities/compile-lint/
-    # mvp1-alignment.md F6. Each branch below collects its own body-structure
+    # the first was fixed. That is the exact host-product complaint F6 names
+    # ("将role 补上,goal的报错才出现"); F6 belongs to the host product's
+    # compile-lint design, not to this repository, so it is named rather than
+    # linked. Each branch below collects its own body-structure
     # diagnostics instead of raising them immediately, then hands them to
     # ``_validate_phase_ast`` to merge with any schema diagnostics from the
     # SAME model_validate call before raising once.

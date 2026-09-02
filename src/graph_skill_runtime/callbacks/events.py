@@ -44,10 +44,10 @@ class _EventBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Whether this kind of frame belongs in the permanent record. A step frame
-    # does: it is what `report.md`, evidence queries, canvas node state and the
-    # token totals are all read back out of. A delta frame does not: it may be
-    # merged with its neighbours or dropped under backpressure, and a record
-    # that keeps some of a droppable stream describes a run nobody had.
+    # does: it is what a host's run report, evidence queries, canvas node state
+    # and the token totals are all read back out of. A delta frame does not: it
+    # may be merged with its neighbours or dropped under backpressure, and a
+    # record that keeps some of a droppable stream describes a run nobody had.
     #
     # It is a ClassVar, not a field: the answer is decided by the kind of frame,
     # so an instance carrying its own copy could contradict its own type.
