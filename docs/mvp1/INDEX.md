@@ -13,7 +13,7 @@ updated: 2026-08-28
 
 | 事实 | 当前 owner | 边界 |
 | --- | --- | --- |
-| Portable 目录、`SKILL.md`、`graph.yaml`、phase schema、flat registry、artifact declaration/request、bundle compile 与 converter | [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md) | `audited-ready` 当前 contract；不复制第二套模板 |
+| Portable 目录、`SKILL.md`、`graph.yaml`、phase schema、flat registry、artifact declaration/request、bundle compile 与 converter | [`skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md) | `FROZEN` 当前 contract（2026-09-01 由 `audited-ready` 转入：owner 盖章 + SHA-256 seal 记录落入 [`tests/contract-seals.yaml`](../../tests/contract-seals.yaml)）；此后修订只有一条路——改正文并在同一 PR 内追加一条带 `pm_approval` 的 seal 记录，没有记录的改动被哈希锁拦下。不复制第二套模板 |
 | Error code、level、stage、正向定义、原因、修复与 owning spec | [`skill-spec/11-error-code-spec.md`](../skill-spec/11-error-code-spec.md) | `living` 唯一 catalog，与 `ERROR_REGISTRY` 双射 |
 | Parser、loader、bundle inventory、compile 聚合与 flat graph call resolution | [`parser.py`](../../src/graph_skill_runtime/core/parser.py)、[`loader.py`](../../src/graph_skill_runtime/core/loader.py)、[`compiler.py`](../../src/graph_skill_runtime/core/compiler.py) | 当前可执行行为；格式与错误语义仍分别回到 `01` 与 `11` |
 | Graph/phase typed manifest 与本地 resolver | [`manifest.py`](../../src/graph_skill_runtime/core/manifest.py)、[`local_workspace_resolver.py`](../../src/graph_skill_runtime/core/local_workspace_resolver.py) | 当前可执行结构与解析；内部 graph id 由 portable flat registry 拥有 |
