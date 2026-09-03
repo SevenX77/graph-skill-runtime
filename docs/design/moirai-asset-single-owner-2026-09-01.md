@@ -4,7 +4,7 @@ doc: moirai-asset-single-owner
 role: workflow-record
 status: drafted
 aligns_with: ./v1-alignment.md
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # 决议:MoirAI 资产单一 owner 收敛(批B′)
@@ -221,7 +221,7 @@ updated: 2026-09-01
 
 **测试**:`tests/integrations/test_packaged_assets.py` 更新版本与知识数断言,新增三项——技能正文链到未声明 reference 被拒、技能正文链到不存在的知识文件被拒、知识文件互链被拒。renderer 快照由资产替身驱动,不随真实资产内容变化,故无需重算。
 
-**文档**:本文;并同步各处"当前资产清单"的陈述(asset version 与知识文件数)。**历史证据句不改**——描述已构建 `0.1.0a1` wheel 的那些句子(28 个成员、4/8/15 清单)说的是一个过去的构建产物,它当时确实如此;按本仓纪律,artifact 哈希与清单是证据身份,不是版本常量。**Phase 5 验收证据是在 asset version `1.0.0` 上取得的,本次内容变更之后需要一次新的验收才能主张同等结论。**
+**文档**:本文;并同步各处"当前资产清单"的陈述(asset version 与知识文件数)。**历史证据句不改**——描述已构建 `0.1.0a1` wheel 的那些句子(28 个成员、4/8/15 清单)说的是一个过去的构建产物,它当时确实如此;按本仓纪律,artifact 哈希与清单是证据身份,不是版本常量。**Phase 5 验收证据是在 asset version `1.0.0` 上取得的,本次内容变更之后需要一次新的验收才能主张同等结论。** 该次验收已于 2026-09-02 在 asset version `1.1.0` 上执行,逐条命令与原始输出见 [§10](#10-asset-version-110-再验收2026-09-02)。
 
 ## 9. 修订记录
 
@@ -230,3 +230,190 @@ updated: 2026-09-01
 | 2026-09-01 | 初稿。八条已裁事项落位;§4.5 与 §5 两项按纪律**上升待裁**,资产侧按"信息不丢、不预判裁决方向"的临时形态实现。 |
 | 2026-09-01 | 上升两项裁定落盘,**资产与代码零改动**——裁定的正是临时形态本身。§5 判定词表定为三值 + `rework` 必填归属限定(依据:两种形态都只是 prompt 层约定、无代码消费该枚举,四值不带来机器可查性;且限定形态能表达"设计与修复纠缠时谁先动",一个判定值编码不了两种 rework);§4.5 `agent-skill-map.json` 定为本批降格、批E cutover 时删除(依据:两个读者两种语言,今天删只能硬编码两份=新造第二事实源)。 |
 | 2026-09-01 | 初审 rework 返修。资产两处按代码事实改写:`KB-04-agent-nodes.md` 的角色解析改为"只有相位与所属图两个来源、无宿主 fallback、解析不出即编译期 `[F-v3-agent-llm-role-missing]`"(对齐同批 PR 的终态,并做了全资产同族排查——其余 `fallback` 命中全部指执行器或 CLI 回退,与角色无关,不改);`KB-09-run-trace-checkpoint.md` 的 checkpoint 命名空间由三分法改为"两段可组合",补全实现会生成的 `iter<index>.agent:<phase_id>`。新增 §7-3 自指纹门禁,把"权威侧变动未同批重钉即红"真正编码在真相所在地。 |
+| 2026-09-02 | 新增 §10:asset version `1.1.0` 的 Phase 5 三层再验收证据(源候选 / 构建产物 / 真宿主),兑现 §8 末句声明的那次验收。**资产与代码零改动**,本次只写证据。同批订正 §8 末句,使其指向 §10。 |
+
+## 10. asset version 1.1.0 再验收(2026-09-02)
+
+### 10.0 被验对象、判据形状与环境
+
+本节兑现 §8 末句声明的那次验收。**判据形状照搬 1.0.0 那一次**:源候选、构建产物、真宿主三层各自独立取证,任何一层的结论都不替另外两层作数。三层的定义与 1.0.0 时相同——源候选是"这份源码通过了哪些门禁",构建产物是"打出来的 wheel 里到底装了什么、装到干净环境里读出来是什么",真宿主是"真实客户端在这台机器上看到了什么"。
+
+**被验对象由三个可机械核对的锚指定**,后文每一条结论都只对这三个锚成立:
+
+| 锚 | 值 | 怎么核对 |
+|---|---|---|
+| 源 | `origin/main` 提交 `dc6f32af2cdbebe52b330fb27d98722616ff3295` | 本节全部源候选命令在该提交的工作树上执行,执行前 `git status --short` 无输出(工作树干净) |
+| 资产 | `asset_version = 1.1.0`,bundle 树 digest `94c9c1fcb5d76fc2457b40ab6b27c8017e3d5545d33d1bb23eb0ced64d81c061`,文件数 `29` | 与 `tests/integrations/moirai-asset-lock.json` 登记值逐字段相等;digest 算法见 §7-3 |
+| 构建产物 | 由该提交现场打出的 `graph_skill_runtime-0.1.0a1-py3-none-any.whl` | 见 §10.2 第一条命令;本次不复用任何既存 wheel |
+
+**环境**:Windows `10.0.26200.9168` x64;`uv 0.11.24`;仓内解释器与干净环境均为 CPython `3.11.15`。
+
+### 10.1 源候选
+
+| 命令 | 原始输出(截到必要长度) |
+|---|---|
+| `uv run ruff check .` | `All checks passed!` |
+| `uv run mypy --strict src` | `Success: no issues found in 149 source files` |
+| `uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml` | 无输出,`EXIT=0` |
+| `uv run pytest -q` | `1807 passed, 1 skipped in 130.51s (0:02:10)` |
+| `uv run pytest -q tests/integrations` | `57 passed in 5.05s` |
+| `uv run pytest -q tests/integrations/test_moirai_asset_lock.py tests/integrations/test_packaged_assets.py` | `12 passed in 0.69s` |
+| `uv run --with pip-audit pip-audit` | `No known vulnerabilities found`,并列出唯一跳过项 `graph-skill-runtime  Dependency not found on PyPI and could not be audited: graph-skill-runtime (0.1.0a1)` |
+
+**一处环境事实必须记明,否则后来人会把它读成候选缺陷。** 首次 `uv run pytest -q` 报 `5 failed, 1802 passed, 1 skipped in 143.86s`,五项全部落在 `tests/test_import_boundary_contracts.py`,失败文本一致:`import-linter produced no contract results: ... ModuleNotFoundError: No module named 'importlinter'`。原因是本机 venv 的上次同步早于提交 `2638fd6c`(该提交把 `import-linter` 引入 dev 依赖并建立模块边界门禁),缺这个开发期依赖。执行 `uv sync --all-extras` 装入 `import-linter==2.14` 与 `grimp==3.16` 后复跑得到上表的 `1807 passed, 1 skipped`。**两次运行之间工作树一个字节未改**(`git status --short` 两次均无输出),所以这是本机环境滞后,不是被验候选的缺陷。
+
+**renderer 一层要把两件事分开,否则会把替身证据当成资产证据。** `tests/integrations/snapshots/moirai_renderers.json` 那条快照由 `FakeMoiraiAssets()` 驱动(`tests/integrations/test_renderers.py:98`),它钉住六个 renderer 的项目/用户路径、profile 元数据与 MCP 形状,**不随真实资产内容变化**——因此它对 `1.1.0` 的资产内容不构成证据。真正覆盖 `1.1.0` 内容的是同文件的 `test_every_canonical_asset_is_projected_for_every_renderer`(`tests/integrations/test_renderers.py:169`):它用真实 `PackagedMoiraiAssets()` 跑遍 `IntegrationTarget` 的全部六个成员,断言每个 renderer 产出的 resource id 集合**恰等于**「八个 `skill:<id>:SKILL.md` + 各技能 manifest 声明的每个 reference + 四个 `role:<id>` + 一个 `mcp:gskill`」。KB-15 进入八个技能 reference 子集这件事,由这条断言在六个宿主上同时覆盖。
+
+**结论**:源候选在 `1.1.0` 上重新成立,证据种类与 1.0.0 那次同构。
+
+### 10.2 构建产物
+
+**第一步,现场打包。**
+
+```
+uv build --wheel --no-sources --out-dir <tmp>/dist
+→ Successfully built ...\graph_skill_runtime-0.1.0a1-py3-none-any.whl
+```
+
+**第二步,逐项清点 wheel 内 `graph_skill_runtime/integrations/assets/moirai/` 的成员**(`uv run python -c "import zipfile, collections; ..."`):
+
+```
+TOTAL MoirAI members: 29
+  manifest:integration.json = 1
+  roles = 4
+  skills = 8
+  knowledge = 16
+graph.yaml members: []
+```
+
+十六个知识文件为 `KB-00-hub.md` 至 `KB-15-working-discipline.md` 连续无缺;八个技能目录各只含一个 `SKILL.md`;四个 role 为 `moirai` / `clotho` / `lachesis` / `atropos`。wheel 内 `integration.json` 自报 `asset_version = 1.1.0`、`schema_version = gskill.integration-assets.v1`、`roles/skills/knowledge = 4/8/16`。
+
+**"无额外成员"这一条不靠人工数数。** `PackagedMoiraiAssets` 构造时就对 `integration.json` 声明的闭集与实际文件清单做双向比对,多一个或少一个文件都直接报错(§0 术语「资产闭集」)。下一步它在干净环境里构造成功,即是该断言的机械证据。
+
+**第三步,干净 Python 3.11 环境安装并读清单。**
+
+```
+uv venv --python 3.11 <tmp>/cleanenv        → Using CPython 3.11.15
+uv pip install --python <tmp>/cleanenv/... <wheel>
+<tmp>/cleanenv/Scripts/python.exe -c "from graph_skill_runtime.integrations.catalog import PackagedMoiraiAssets; ..."
+→ integration_id: moirai
+→ asset_version: 1.1.0
+→ inventory (roles, skills, knowledge) = (4, 8, 16)
+→ knowledge[-1]: KB-15-working-discipline.md
+```
+
+该环境只装了这一个 wheel 及其依赖闭包,不含仓库源码树;`graph_skill_runtime.__file__` 指向该环境自己的 `site-packages`。
+
+**第四步,用这个环境的 `gskill` 向一个空的临时目录投影 Claude 目标,先 dry-run 再真装。**
+
+```
+gskill integrations install moirai --targets claude --scope project --dry-run
+→ can_apply: True | conflicts: [] | changes: 62 (file 61 + json_entry 1,全部 action=create) | applied_changes: 0
+
+gskill integrations install moirai --targets claude --scope project
+→ status: installed | plan.asset_version: 1.1.0 | can_apply: True | conflicts: [] | applied_changes: 62
+```
+
+落地结果:临时目录下共 63 个文件 = 61 个投影文件(`.claude/skills/` 下 8 个技能目录含 8 份 `SKILL.md` 与 49 份 reference、`.claude/agents/` 下 4 份 `*.md`)+ 1 个承载 `mcp:gskill` 条目的 `.mcp.json` + 1 份 installer 自己的 `.gskill/integrations/moirai/claude/install-manifest.json`。该 manifest 自报 `schema_version = gskill.install-manifest.v1`、`asset_version = 1.1.0`、`target = claude`、`scope = project`、`entries = 62`。`.claude/skills/moirai/references/` 下 16 个知识文件,含 `KB-15-working-discipline.md`。临时目录与临时环境在取证结束后删除。
+
+**结论**:构建产物在 `1.1.0` 上重新成立。相对 1.0.0 的差量恰是内容变更本身——成员 28 → 29,清单 `4/8/15` → `4/8/16`,增加的一项是 `KB-15-working-discipline.md`。
+
+### 10.3 真宿主
+
+**客户端与其看到的服务端。**
+
+```
+claude --version         → 2.1.250 (Claude Code)
+
+claude mcp get gskill
+→ gskill:
+→   Scope: User config (available in all your projects)
+→   Status: ✔ Connected
+
+claude mcp list
+→ Checking MCP server health…
+→ gskill: C:\Users\test\AppData\Roaming\uv\tools\graph-skill-runtime\Scripts\python.exe -m graph_skill_runtime mcp - ✔ Connected
+```
+
+**这个被报为 Connected 的服务端带的是哪一份资产,由 digest 而不是由路径名论证。** 对三处 bundle 目录用 §7-3 的同一套算法各算一次树 digest:
+
+| bundle 所在 | tree digest | 文件数 |
+|---|---|---|
+| 仓库源码树 `src/graph_skill_runtime/integrations/assets/moirai` | `94c9c1fc…d81c061` | 29 |
+| 干净环境安装出的 `site-packages/...` | `94c9c1fc…d81c061` | 29 |
+| 全局 `uv tool` 安装出的 `%APPDATA%/uv/tools/graph-skill-runtime/Lib/site-packages/...` | `94c9c1fc…d81c061` | 29 |
+
+三者与 `tests/integrations/moirai-asset-lock.json` 的登记值逐字符相同。该全局安装自报 `importlib.metadata.version("graph-skill-runtime") = 0.1.0a1`、`asset_version = 1.1.0`、清单 `(4, 8, 16)`,而 `claude mcp list` 打印的命令行正是这个安装的解释器。
+
+**用户级投影与它的 ownership manifest。** manifest 落在 `%APPDATA%/graph-skill-runtime/integrations/moirai/claude/install-manifest.json`(mtime 2026-09-01 23:15),关键字段:
+
+```
+schema_version: gskill.install-manifest.v1
+integration_id: moirai
+asset_version: 1.1.0
+target: claude | scope: user
+entries: 62   (resource_kind: file 61 + json_entry 1)
+```
+
+条目形状(逐字引一条 file 与那条唯一的 json_entry):
+
+```
+{ "resource_id": "skill:moirai:SKILL.md", "resource_kind": "file",
+  "path": "C:\\Users\\test\\.claude\\skills\\moirai\\SKILL.md", "selector": [],
+  "content_sha256": "7835b999185937f39c2b7e79f35a7d54c2b0a102d9cb0448f03859ca6dcea971",
+  "container_created": false, "created_json_parents": [] }
+
+{ "resource_id": "mcp:gskill", "resource_kind": "json_entry",
+  "path": "C:\\Users\\test\\.claude.json", "selector": ["mcpServers", "gskill"],
+  "content_sha256": "b6ea84112093cd294ca3ad58459aed250c27f76825375829466ef0a8d3596ae9",
+  "container_created": false, "created_json_parents": [] }
+```
+
+**磁盘现状与 manifest 逐条核对,不止步于计数。** 对 61 个 file 条目各读盘算一次 sha256 与 `content_sha256` 比对:`file entries verified identical: 61`,`missing: []`,`mismatch: []`。那条 json_entry 按 installer 自己的规范化规则(`json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"))` 后取 sha256,见 `installer.py:132`)重算 `~/.claude.json` 里 `mcpServers.gskill` 的值,得 `b6ea8411…3596ae9`,与 manifest 相等;该值为 `{"command": "…\\uv\\tools\\graph-skill-runtime\\Scripts\\python.exe", "args": ["-m", "graph_skill_runtime", "mcp"]}`。
+
+计数与目录清单:
+
+```
+ls ~/.claude/skills  | grep moirai   → 8   (moirai, moirai-agent-prompt-design, moirai-brainstorming,
+                                            moirai-compile-repair, moirai-domain-analysis,
+                                            moirai-eval-judgement, moirai-graph-design, moirai-web-research)
+ls ~/.claude/agents  | grep moirai   → 4   (moirai.md, moirai-atropos.md, moirai-clotho.md, moirai-lachesis.md)
+ls ~/.claude/skills/moirai/references → 16 (KB-00 … KB-15)
+```
+
+**新增那一份知识文件的因果链闭合。** `~/.claude/skills/moirai/references/KB-15-working-discipline.md`(3871 字节)与本次现场所打 wheel 内的 `knowledge/KB-15-working-discipline.md` 字节相同,两侧 sha256 同为 `675f7b52d027c3b2ac4b6e39eeac6187997412c17024089a06367474fa90c52e`。
+
+**结论**:真宿主一层在 `1.1.0` 上重新成立的部分是——Claude Code `2.1.250` 把 `gskill` MCP 服务端报为 `Connected`,且该服务端所载 bundle 与本仓 `main`、与本次现场所打 wheel 三者 digest 相同;用户级投影的 62 个受管资源与 ownership manifest 逐条一致,清单为 8 技能 / 4 profile / 16 知识文件。**未重新成立的部分见 §10.5**,不得由本段推广。
+
+### 10.4 与 1.0.0 验收的逐项对照
+
+| 结论 | 1.0.0 那次的观测 | `1.1.0` 本次的观测 | 判定 |
+|---|---|---|---|
+| Ruff | 通过 | `All checks passed!` | 重新成立 |
+| 严格类型检查 | 149 个源文件通过 | `no issues found in 149 source files` | 重新成立 |
+| 契约清单校验器 | 通过 | `EXIT=0` | 重新成立 |
+| 全量测试 | `1715 passed, 1 skipped in 83.51s` | `1807 passed, 1 skipped in 130.51s` | 重新成立(用例总数随此后各 PR 增长) |
+| 依赖审计 | 已解析发行版无已知漏洞,跳过未发布的本地项目 | 同一结论、同一跳过项 | 重新成立(结论性质不变:既非源码安全审计,也非发布证据) |
+| 六 renderer 快照 | 快照钉住六宿主形状 | 快照仍绿,但由替身驱动;覆盖真实 `1.1.0` 内容的是六宿主全量投影断言 | 重新成立,且**证据来源在本次被说清** |
+| wheel 内 MoirAI 闭集 | 28 个成员 = 1 + 4 + 8 + 15,无 `graph.yaml`、无额外成员 | 29 个成员 = 1 + 4 + 8 + 16,无 `graph.yaml`、无额外成员 | 重新成立(差量即本次内容变更) |
+| 干净 3.11 环境读清单 | `4/8/15` | `4/8/16`,`asset_version = 1.1.0` | 重新成立 |
+| 用该 wheel 的 `gskill` 投影临时项目 | 成功 | dry-run `can_apply=True` / 0 conflict,真装 `applied_changes=62` | 重新成立 |
+| Claude 侧 MCP 连接 | `2.1.222` 曾报 `-32022`;升级到 `2.1.250` 后 `mcp get` / `mcp list` 均 `Connected` | `2.1.250`,两条命令均 `✔ Connected` | 重新成立 |
+| Claude 侧发现八技能 / 四 profile | 由客户端 `2.1.222` 在项目作用域自报发现 | **本次未取客户端自报**;本次取的是用户级投影的磁盘现状 + ownership manifest 逐条哈希核对 | **证据种类不同,不等值**,见 §10.5 |
+| 已认证的 Claude 模型执行 / 默认工具调用 | 未验(OAuth 会话过期) | 未验(本次验收明令不得发起消耗用户 OAuth 会话的调用) | 仍未验 |
+| Codex 供给 `$moirai` 与 `gskill.inspect` 调用 | `0.144.1` 成功,含全局装 wheel 后的默认审批路径 | 未复验 | 仍未验于 `1.1.0`,见 §10.5 |
+| Codex 自定义 agent 调用 | 未验 | 未验 | 仍未验 |
+
+**环境变化(版本号照抄命令输出)**:Claude Code `2.1.222` → `2.1.250`(1.0.0 那次末尾已升到 `2.1.250`,本次与之相同);Codex CLI `0.144.1` → 本机现为 `codex-cli 0.152.1`,本次**未运行**除 `--version` 外的任何 codex 命令。
+
+### 10.5 本次未验的、以及观测到的偏差
+
+**未验(不得由 §10.3 推广)**:
+
+1. **Claude 客户端自身对技能与 profile 的发现**。本次证据是磁盘投影与 ownership manifest 的逐条哈希一致,属于"投影正确落地",不等于"客户端把它们列了出来"。1.0.0 那次有客户端自报的发现记录,本次没有。
+2. **已认证的 Claude 模型执行与默认工具调用**。本次验收的约束是不发起任何消耗用户 OAuth 会话或触发模型调用的命令,因此这一层与 1.0.0 那次同样停在连接层。
+3. **Codex 宿主的任何运行时行为**。本次未运行 `codex exec`,故 `1.0.0` 那次的 `gskill.inspect` 默认审批调用结论**不迁移**到 `1.1.0`。
+
+**观测到的偏差(照记不判)。观测时刻早于 2026-09-02 04:11:40 -0700**——该时刻是承载本节初稿的提交 `87f1f628` 的作者时间,本段的取证命令全部执行于它之前;时刻必须写明,因为这台机器的宿主目录随后被改动过(见下一段),没有时刻的话这段观测无法被复核。当时的观测是:本机 `~/.codex/` 下存在四份 MoirAI profile 投影(`moirai.toml`、`moirai_atropos.toml`、`moirai_clotho.toml`、`moirai_lachesis.toml`,mtime 均为 2026-08-28),而 `%APPDATA%/graph-skill-runtime/integrations/moirai/` 下**只有 `claude` 一个目录**,没有 codex 的 ownership manifest。这四份文件的 `developer_instructions` 不含 `1.1.0` 才引入的 Identity 段落(§3 U5),`~/.codex/config.toml` 的 `[mcp_servers.gskill]` 指向 `C:\Users\test\AppData\Local\graph-skill-runtime\runtimes\1.0.0a1\.venv\Scripts\python.exe`。即:当时这台机器上的 codex 投影是一份**早于本次内容变更、且不在任何 installer manifest 管辖之下**的残留。
+
+**该残留的后续处置(2026-09-02 04:26)**:协调方已按 Claude 侧的同一配方处置——摘除无主的 `~/.agents/skills/moirai*`(8 个)、`~/.codex/agents/moirai*.toml`(4 个)与 `~/.codex/config.toml` 里孤悬的 `graph-skill-runtime:moirai:gskill-mcp` 闭标记,再执行 `gskill integrations install moirai --targets codex --scope user` 重装,结果 `installed` / `applied 62`;`%APPDATA%/graph-skill-runtime/integrations/moirai/` 现有 `claude` 与 `codex` 两份 manifest。**这是一次投影重装的记录,不是 Codex 宿主的运行时证据**:本节上文第 3 条「Codex 宿主的任何运行时行为未验」不因此改变,`1.0.0` 那次的 `gskill.inspect` 默认审批调用结论仍不迁移到 `1.1.0`。

@@ -5,7 +5,7 @@ role: alignment
 status: drafted
 binds_baseline: ./baseline.md
 aligns_with: ../mvp1/INDEX.md
-updated: 2026-08-28
+updated: 2026-09-02
 ---
 
 # Graph Skill Runtime v1 目标设计
@@ -24,7 +24,7 @@ updated: 2026-08-28
 | Section 6 至 Section 7：host-native durable handoff | **Phase 3 当前范围已实现** | 支持 root DAG 内串行可定位的 Agent wait point：图 checkpoint 与 `AgentTask` 先后持久化后返回 `agent_required`；SDK/MCP/CLI submit 校验结果并继续同一 run；跨进程、非法输出纠正、精确重试、checkpoint-to-task 与 graph-commit-to-response 两个 crash window 均有因果测试 |
 | Phase 3b：host-native 扩展 | **drafted；未实现** | registry subgraph、graph/phase iterate、不可比较并行 wait point、普通 human/breakpoint typed resume，以及宿主 dispatched/started acknowledgment 与 capability negotiation 尚未完成 |
 | Phase 4：direct vendor CLI executors | **已实现于当前受限范围** | Claude、Codex、Copilot、Cursor、Gemini、OpenCode 的 capability-probed adapter、fresh top-level process、资源 materialization、schema validation、attempt lifecycle 与全进程树清理已落地；仅 Codex CLI `0.144.1` / Windows `10.0.26200` x64 有成功实机 smoke，其他组合不能由 fake tests 或动态 probe 推导为支持 |
-| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | 验收取自 asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply（当前 bundle 已收敛为单一 owner 的 `1.1.0` / `KB-00..15`，内容变更后需新一轮验收证据）；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
+| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | 验收取自 asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply（当前 bundle 已收敛为单一 owner 的 `1.1.0` / `KB-00..15`，该次内容变更已于 2026-09-02 完成同形状的三层再验收，命令与原始输出见[单一 owner 收敛决议](./moirai-asset-single-owner-2026-09-01.md) §10，其中 §10.5 逐条列明未重新成立的项）；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
 | Phase 6：跨平台 package/release acceptance | **已验收于定义范围** | 一个 manifest-bound wheel/sdist 候选已在 Ubuntu、Windows、macOS 分别通过 pip-wheel、uv-wheel、pip-sdist 安装验收；CLI/MCP、host-native reopen/submit、SQLite、路径与 MoirAI lifecycle 的可观察行为一致。该范围是发布前候选验收，不是 registry publication，也不扩大 direct-vendor 支持矩阵 |
 | Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
