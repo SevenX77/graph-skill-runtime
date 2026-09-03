@@ -171,3 +171,14 @@ Inspect `git status` before editing and preserve changes you do not own. Use `ap
 Resolve exact paths before moving or deleting files. Never target a repository root, home directory, unresolved environment variable, or broad glob with a destructive command. Keep generated output, caches, coverage data, `.venv`, `dist/`, credentials, machine-local paths, and user business skills out of source edits.
 
 Authoritative documentation must be self-contained. State goals, terms, observable facts, constraints, and acceptance evidence in the document; do not depend on chat history. Define supported behavior positively before listing prohibited misuse. Separate current facts, drafted targets, recommendations, and unresolved questions. Link to the owning source instead of copying parallel versions of a contract.
+
+## Reporting discipline (user ruling, 2026-09-03)
+
+Reports go to the product owner, not to a fellow engineer. Before sending any message to the user, check the four rules below and rewrite if any fails:
+
+1. No codes invented inside the session. Temporary numbers, abbreviations, or phase labels coined during a session (for example `D3`, `phase 0c`, `r2`) must not appear in user-facing text; refer to things by their full names. If numbering is unavoidable, define it in the same message before using it.
+2. Explain every term on first use. Tool names, library names, protocol names, and architecture words all count as terms. The first occurrence is followed by one plain-language sentence saying what it is and what it governs here; a term not explained in the same message may not be used.
+3. One judgement per sentence; reasoning chains go step by step on separate lines. State the question being decided first, then the answer, then the evidence.
+4. Every message carries its own premises. Do not assume the reader remembers earlier messages; when citing an earlier ruling or measurement, restate the conclusion in one sentence and give its coordinate.
+
+Origin: on 2026-09-03 a structural proposal used session codes (`D1`–`D7`, `phase 0c`), left `Port`, `import-linter`, and `monorepo` unexplained, and stacked three inferences per sentence; the user's verdict was "I know every word, but strung together I cannot follow it."
