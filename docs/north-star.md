@@ -145,7 +145,7 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 - **E-EXE-2 真跑按编译出来的图执行到底,并返回结构化结果。** 用户观察到:一条命令跑完整个流程,拿到一份可被程序读的结果对象,不是一段自由文本。贡献北极星-1。引擎实现:`gskill run`,`application/service.py:65`,`core/runner.py`。平行实现:工作台的 Run 按钮(同一条路径的界面投影)。
 - **E-EXE-3 LOGIC 相位执行注册好的 Python 动作与校验器。** 用户观察到:确定性的步骤由代码做,不交给模型即兴发挥。贡献北极星-1。引擎实现:`core/actions.py`、`core/validators/`;能力条目 `spec/features.yaml` 的 `F-logic-action-execution`。平行实现:暂无。
 - **E-EXE-4 子图按声明的父子输入输出边界执行,不串味。** 用户观察到:子图只看得到父图交给它的那部分数据。贡献北极星-1、北极星-2。引擎实现:`spec/features.yaml` 的 `F-subgraph-delegation`,装配在 `core/graph_assembler.py`。平行实现:暂无。
-- **E-EXE-5 批量、循环与并行按声明执行。** 用户观察到:声明"对这批数据每条跑一次"就真的每条跑一次,次数与顺序可预期;两个互不依赖的相位真的并排跑,各写各的字段而不互相踩;两个并排的相位要写同一个字段,在编译期就被拒绝,而不是运行时随机谁后写谁赢。贡献北极星-1。引擎实现:批量与循环是 `spec/features.yaml` 的 `F-iterate-runtime`;并行是 2026-08-15 的并行扇出决定——`core/state.py:283-291` 把 `data` 通道改成折叠增量的 reducer 通道(注释原话说明这正是它不再是 LastValue 通道的原因),`core/loader.py:3356` 的 `_validate_parallel_writers` 在编译期用 `[F-v3-parallel-write-conflict]` 拒绝并排相位写同名字段(`core/error_registry.py:153` 登记为编译期 FATAL),回归测试在 `tests/core/test_parallel_fanout_state_channels.py`。平行实现:暂无。
+- **E-EXE-5 批量、循环与并行按声明执行。** 用户观察到:声明"对这批数据每条跑一次"就真的每条跑一次,次数与顺序可预期;两个互不依赖的相位真的并排跑,各写各的字段而不互相踩;两个并排的相位要写同一个字段,在编译期就被拒绝,而不是运行时随机谁后写谁赢。贡献北极星-1。引擎实现:批量与循环是 `spec/features.yaml` 的 `F-iterate-runtime`;并行是 2026-08-15 的并行扇出决定——`core/state.py:283-291` 改掉了业务数据的写回方式:各分支只提交自己的数据增量,由运行时合并,不再让最后返回的完整状态覆盖其他分支;`core/loader.py:3356` 的 `_validate_parallel_writers` 在编译期用 `[F-v3-parallel-write-conflict]` 拒绝并排相位写同名字段(`core/error_registry.py:153` 登记为编译期 FATAL),回归测试在 `tests/core/test_parallel_fanout_state_channels.py`。平行实现:暂无。
 
 ### 3.4 G-AGT · AGENT 相位的执行者供给
 
@@ -190,8 +190,8 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 - **E-OBS-3 失败带稳定原因码,并给出它能给到的最细位置。** 用户观察到:报错是一个可被程序断言的编号加位置,不是一句自由文本。**位置分三档,一档比一档细,这三档就是这条承诺的完整真值**:
   1. **编译期**——定位到文件与行。实跑核实:往 `graph.yaml` 加一行 `executor: cli`,得到 `[F-v3-graph-schema-unknown-field]`,指到 `graph.yaml` 第 20 行、字段 `executor`。这一档失败时结果里 `error.phase` 与 `error.source_path` 都是 `None`,错误码是 `GSKILL_COMPILE_FAILED`,细节在结果的 `diagnostics` 里。
   2. **运行请求校验期**——已经进入 `mode=run`,但还没轮到任何相位执行。这一档**没有相位可指**。实跑核实:对编译通过的 `hello-world` 请求一个不存在的产物,得到 `status=failed`、`mode=run`、`GSKILL_INVALID_REQUEST`、`phase=None`、`source_path=None`、`trace_path=None`,消息是"artifact request references undeclared artifact ids: no-such-artifact";这个分支由 `adapters/engine.py:151-164` 构造。
-  3. **相位执行期**——定位到出事的那个相位。
-  **所以"失败一定能指到相位"是不成立的**:相位还没开始执行时,前两档只能给到文件与行,或者只给错误码。贡献北极星-5、北极星-1。引擎实现:`core/error_registry.py` 的 `ERROR_REGISTRY`(99 条,每条带严重级与所属阶段);错误信封 `domain/models.py` 的 `RuntimeErrorPayload`,字段含 `code` / `phase` / `source_path` / `details` / `retryable`。平行实现:工作台的错误提示。
+  3. **相位执行期**——**应当**定位到出事的那个相位,**但今天不成立**。实跑核实:拿一份编译通过的最小 gskill,让它 LOGIC 相位里那个已注册的 Python 动作抛一个 `ValueError`,结果是 `status=failed`、`mode=run`、`GSKILL_RUN_FAILED`、`details.engine_code=[F-v3-runtime-state-mapping-failed]`、消息就是那句 `boom from a registered LOGIC action`,而 `phase=None`、`source_path=None`——调用方拿得到"哪里错了"的码,却拿不到"哪个相位错了"。**原因**:`runtime/state_mapper.py:619-624` 把相位里逸出的异常包成致命错误时,只传了错误码和消息,没有把它手里的 `phase_id` 传给 `make_error_payload`(该函数在 `core/exceptions.py:92` 是接受 `phase_id` 的);到了 `adapters/result_mapping.py:28-39`,`runtime_error` 只能把 `result.error.phase_id` 原样投射出去,空的还是空的。**这是引擎缺陷,不是本文的措辞问题**,修法是运行时工单,不在本文范围;本文只如实登记它。
+  **所以"失败一定能指到相位"今天一档都不成立**:前两档是承诺本身的边界(相位还没开始,没有相位可指),第三档是真缺口(相位在跑,相位号却丢了)。贡献北极星-5、北极星-1。引擎实现:`core/error_registry.py` 的 `ERROR_REGISTRY`(99 条,每条带严重级与所属阶段);错误信封 `domain/models.py` 的 `RuntimeErrorPayload`,字段含 `code` / `phase` / `source_path` / `details` / `retryable`。平行实现:工作台的错误提示。
 - **E-OBS-4 检视编译产物的拓扑与调用关系。** 用户观察到:不跑也能看清这份 gskill 有哪些相位、怎么连、谁调谁。贡献北极星-5、北极星-2。引擎实现:`gskill inspect`,`core/topology_projection.py`;MCP 侧要求以 `cache=false` 编译,查询不得污染编译缓存(`AGENTS.md:42`)。平行实现:工作台的画布。
 - **E-OBS-5 正在跑的运行能被实时订阅。** 用户观察到:一次长时间运行跑到哪了,可以边跑边看,而不是等它结束再读文件。贡献北极星-5。引擎自有实现:**缺口**。证据:`grep -rn "def subscribe" src/graph_skill_runtime --include=*.py` 返回 0 行;`ports/runtime.py:54` 的 `EventSink` 只有 `emit` 一个方法,是推出口,外部无法主动订阅。上位要求:决议 `:262` 起的 §5.7——run 是长任务,需要异步任务模型,且它与实时事件订阅必须并为同一个 Port。平行实现:工作台今天用自己的 WebSocket 通道达成同样效果。
 
@@ -223,7 +223,7 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 
 - **E-ACC-1 在 Python 里 import 一个包,就能用引擎的八个运行用例加宿主投影安装。** 用户观察到:一个稳定的、写下来的公开接口清单,不必去读内部实现。(不含旧格式转换,理由见下面矩阵。)贡献北极星-3、北极星-4。引擎实现:门面 `sdk.py`(13 个公开函数),顶层契约 `graph_skill_runtime.__all__` 实测 77 个符号,文档 `docs/public-api-contract.md`(frontmatter `role: contract`,`status: living`)。平行实现:暂无。
 - **E-ACC-2 命令行 `gskill` 是覆盖面最全的那一条投影。** 用户观察到:不写 Python 也能编译、干跑、真跑、取回等待态、检视、评测、转换旧格式、装宿主投影,以及把 MCP 服务起起来。贡献北极星-2、北极星-4。引擎实现:`adapters/cli.py:166` 起注册的子命令——`compile`、`config resolve`、`predict`、`run`、`resume`、`submit`、`inspect`、`golden`、`migrate studio-skill`、`integrations detect|install|uninstall`、`mcp`。平行实现:工作台的按钮。
-- **E-ACC-3 外部 agent 通过 MCP 调用引擎的八个运行用例。** 用户观察到:在 Claude Code 或 codex 里直接把引擎当工具用。贡献北极星-3、北极星-2。引擎实现:`adapters/mcp.py:31` 起,服务名 `gskill`,恰好 8 个工具——`compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden`;每个工具必须声明状态影响标注(`AGENTS.md:42`)。平行实现:工作台的 HTTP 接口。
+- **E-ACC-3 进程外的调用方通过一条网络接口调用引擎的八个运行用例,规则只有一份。** "进程外的调用方"指不在同一个 Python 进程里的那些——外部 agent、别的程序、另一台机器上的界面。用户观察到:在 Claude Code 或 codex 里直接把引擎当工具用;换成工作台的界面点按钮,走的是同一套规则,不是另一份实现。贡献北极星-3、北极星-2。引擎自己的实现:`adapters/mcp.py:31` 起的 stdio MCP 服务,服务名 `gskill`,恰好 8 个工具——`compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden`;每个工具必须声明状态影响标注(`AGENTS.md:42`)。平行实现:工作台的 HTTP 接口(它自己怎么活着、怎么被界面调到,是它内部的事,见 3.12 对账表 G1 那行)。
 - **E-ACC-4 把 MoirAI 投影进宿主,是一次显式、冲突即拒、可回滚的操作。** 用户观察到:装之前先体检,任一目标冲突就整体不动;卸载只删自己装的那些、且内容没被改过的那些。贡献北极星-2。引擎实现:`integrations/installer.py`、`integrations/renderers.py`,规则写在 `AGENTS.md:44`;命令 `gskill integrations install moirai --targets ... --scope ...`。平行实现:暂无。
 
 **用例 × 投影覆盖矩阵。** 空格一律标"刻意"或"缺口",不留白。MoirAI 那一列的依据是:它的宿主投影注册的是同一个 `gskill` stdio MCP 服务(`AGENTS.md:40` 原句「register the same single `gskill` stdio MCP server」),所以 MoirAI 能够到的用例集合**就等于** MCP 那一列。
@@ -277,7 +277,7 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 
 | 种子域 | 报告里点名的能力 | 本文的归宿 |
 |---|---|---|
-| G1 (`a2b6b29566a8e3097_v1.md:21-24`) | E1 UI 立即可交互 / E2 sidecar 死活判定与横幅 / E3 自动恢复有上限 / E4 人按 Retry 不被预算拒绝;模块 M1 `SidecarProcess`、M2 `SidecarSupervisor`、M3 `RestartBudget`、M4 `BackendLivenessSignal`、M5 `RuntimeGate`、M8 `CorsOnEveryResponse`、M9 `ReaderFacingMessage`(`:469-470`) | 父 Effect = **E-ACC-3**(外部调用方通过 MCP 之外的接入面把引擎当工具用)。层级:E-ACC-3 的平行实现之一是工作台的 HTTP 接口,而这七项是让那个 HTTP 接入面活着、能被界面调到的**内部机制**,不另立 Effect。理由:它们只在"把引擎包成一个常驻 HTTP 服务"之后才存在,而引擎是不开 HTTP 服务的 SDK;删掉工作台,这七项一条都不剩 |
+| G1 (`a2b6b29566a8e3097_v1.md:21-24`) | E1 UI 立即可交互 / E2 sidecar 死活判定与横幅 / E3 自动恢复有上限 / E4 人按 Retry 不被预算拒绝。源报告 `:467` 把本域裁成「Level-3 模块 7 个 + 规则/机制 3 条」,与这四条 Effect 相关的是:**模块** M1 `SidecarProcess`、M2 `SidecarSupervisor`、M3 `RestartBudget`、M4 `BackendLivenessSignal`(`:469`);**改判为规则/机制**的 M5 `RuntimeGate`(呈现机制)、M8 `CorsOnEveryResponse`(规则+中间件机制)、M9 `ReaderFacingMessage`(规则+门禁)(`:470`) | 父 Effect = **E-ACC-3**(进程外的调用方通过一条网络接口调用引擎的八个运行用例)。层级:E-ACC-3 的平行实现之一就是工作台的 HTTP 接口,这四个模块与三条规则/机制是让那条 HTTP 接口活着、能被界面调到的**内部构造**,比 Effect 低两层,不另立 Effect。理由:它们只在"把引擎包成一个常驻 HTTP 服务"之后才存在,而引擎自己是不开 HTTP 服务的 SDK;删掉工作台,这七项一条都不剩。注意源报告已把 M5 / M8 / M9 排除出模块之列,本文照转,不把它们当成有独立生命周期的模块 |
 | G1 (`:25`) | E5 任何失败响应都是同一个信封,带机器码 + 结构化 details;模块 M6 `ErrorEnvelope` | 归 **E-OBS-3**。引擎侧的信封是 `RuntimeErrorPayload`(`code` / `phase` / `source_path` / `details` / `retryable`);HTTP 状态码怎么映射是工作台那一侧的事 |
 | G1 (`:26`) | E6 每个原因码入册(唯一定义处 + HTTP 投射 + 重试策略 + 读者文案);模块 M7 `ReasonCodeRegistry` | 归 **E-OBS-3**。引擎侧的册子是 `core/error_registry.py` 的 `ERROR_REGISTRY`,99 条;HTTP 投射与读者文案归工作台 |
 | G1 (`:454`, `:469`) | M10 `ApiContractCodegen`(从契约生成前端类型并设门禁) | 归 **E-ACC-1**。引擎侧的唯一契约源是 `__all__` 加 `docs/public-api-contract.md`;从它生成别的语言的类型,是消费方的事 |
@@ -369,7 +369,7 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 | E-STA-4 | `gskill submit` 同一份结果两次,第二次返回同一个结果;换内容则冲突报错 | 可达成 |
 | E-OBS-1 | 挂上自己的接收端接事件 | 部分 + 缺口:默认落下的 `trace.jsonl` 与 `metrics.json` 可读;但公开 `run` 没有回调或 `EventSink` 参数,默认组合也不注入(`docs/public-api-contract.md:166`),外部接不上自己的接收端 |
 | E-OBS-2 | 跑一次后读运行结果里 `trace_path` 指的那份 `trace.jsonl` | 可达成(编译阶段就失败的运行没有轨迹,这是承诺本身的边界,不是缺口) |
-| E-OBS-3 | 三档各制造一次:编译失败(诊断指到文件与行)、运行请求校验失败(`mode=run` 但 `phase` 为空,只给错误码)、相位执行失败(错误指到相位) | 可达成 |
+| E-OBS-3 | 三档各制造一次:编译失败(诊断指到文件与行)、运行请求校验失败(`mode=run` 但 `phase` 为空,只给错误码)、相位执行失败(错误应当指到相位) | 部分 + 缺口:前两档可达成;第三档不成立——让一个已注册的 LOGIC 动作抛异常,拿到 `GSKILL_RUN_FAILED` 与 `engine_code=[F-v3-runtime-state-mapping-failed]`,但 `phase=None`。`runtime/state_mapper.py:619-624` 包装异常时没把 `phase_id` 传给 `make_error_payload`,`adapters/result_mapping.py:28-39` 只能原样投射空值 |
 | E-OBS-4 | `gskill inspect <skill_root> --call-graph` 返回拓扑与调用图 | 可达成 |
 | E-OBS-5 | 运行进行中从外部订阅事件流 | 未覆盖 + 原因:没有订阅接口,`grep -rn "def subscribe" src/graph_skill_runtime --include=*.py` 返回 0 行,`EventSink` 只有 `emit`;决议 `:262` 要求的异步任务模型与订阅同一个 Port 尚未落地 |
 | E-EVA-1 | `gskill golden <skill_root> <baseline_id> --state-root <dir>`(MCP 侧 `evaluate_golden`)给出结论 | 可达成 |
@@ -382,12 +382,14 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 | E-ACC-2 | `gskill --help` 列出全部子命令 | 可达成 |
 | E-ACC-3 | 起 `gskill mcp`,从客户端枚举出恰好 8 个带标注的工具 | 可达成 |
 | E-ACC-4 | `gskill integrations install moirai …` 遇冲突时整体不动;`gskill integrations uninstall` 只删自己装的、且内容未被改过的 | 可达成 |
-| E-SHP-1 | 装完后 `python -c "import graph_skill_runtime, pathlib; print(list(pathlib.Path(graph_skill_runtime.__file__).parent.rglob('graph.yaml')))"` 返回空列表 | 可达成 |
+| E-SHP-1 | 三项都要过。①**能力齐全**:`gskill --help` 列出全部子命令、`python -c "import graph_skill_runtime as g; print(len(g.__all__))"` 输出 `77`、起 `gskill mcp` 枚举出八个工具、`gskill integrations detect` 可用。②**包内没有业务 gskill**:`python -c "import graph_skill_runtime, pathlib; print(list(pathlib.Path(graph_skill_runtime.__file__).parent.rglob('graph.yaml')))"` 返回空列表。③**包外零副作用**:装包与 `import` 前后,包外一个用户技能目录逐字节不变(前后哈希相同),且用户 home 下没有引擎新写的技能注册文件 | 可达成 |
 | E-SHP-2 | 在自己的 Windows / macOS / Linux 上装完这个包,`gskill compile` 与 `gskill run` 跑通 | 部分 + 缺口:从本地构建的 wheel 装能跑;没有正式发布的包可装,三平台验收也只到候选产物这一级(`AGENTS.md:78-82`) |
 | E-SHP-3 | 发布一次,拿到按内容取址、版本锁定、不带源文件也能跑的资产;再从公共包仓库按锁定版本装引擎,在服务端跑同一份 gskill,走出同一条相位序列 | 未覆盖 + 原因:决议 `:74` 记「**未实现**」;`AGENTS.md:20` 记项目未发布到 PyPI 或 TestPyPI,没有可锁定的发布版本,四件事一件都还观察不到 |
 
 
-**汇总**:40 条域级 Effect 中,31 条可达成、4 条部分达成、5 条未覆盖。**未覆盖的 5 条**是 `E-AGT-2`(起跑前逐相位核对)、`E-MDL-1`(角色到模型的解析)、`E-STA-3`(运行产物的落盘与引用)、`E-OBS-5`(实时订阅)、`E-SHP-3`(锁定版本、服务端复现)。**部分达成的 4 条**是 `E-AGT-1`(执行者闭集未收敛、相位级覆盖缺字段)、`E-STA-2`(只能取回等待态)、`E-OBS-1`(事件发得出但外部接不上)、`E-SHP-2`(装得上跑得起,但还没有一份正式发布)。这 9 条集中在三处:AGENT 相位的供给链、运行侧的产物与实时可观察性、发布与服务端复现。它们分别对应决议 §5.3/§5.4(执行模型)、§5.7(异步任务模型与实时订阅)与北极星-4 的未实现现状,都是已裁定、待执行的工单,不是本文新提的需求。
+**汇总**:40 条域级 Effect 中,**30 条可达成、5 条部分达成、5 条未覆盖**。**未覆盖的 5 条**是 `E-AGT-2`(起跑前逐相位核对)、`E-MDL-1`(角色到模型的解析)、`E-STA-3`(运行产物的落盘与引用)、`E-OBS-5`(实时订阅)、`E-SHP-3`(发布资产与服务端复现)。**部分达成的 5 条**是 `E-AGT-1`(执行者闭集未收敛、相位级覆盖缺字段)、`E-STA-2`(只能取回等待态)、`E-OBS-1`(事件发得出但外部接不上)、`E-OBS-3`(失败指不到相位)、`E-SHP-2`(装得上跑得起,但还没有一份正式发布)。
+
+这 10 条里,9 条对应已裁定、待执行的工单——决议 §5.3/§5.4(执行模型)、§5.7(异步任务模型与实时订阅),以及北极星-4 的未实现现状——不是本文新提的需求。**只有 `E-OBS-3` 是例外:它是写本文、逐条核对承诺的过程中新查出来的引擎缺陷**(相位在跑、相位号却在错误信封里丢了),坐标与复现写在第 3 节 E-OBS-3 的第三档里。**它的修法是一张运行时工单,不在本文范围**——本文是权威文档,只负责如实登记它,不改代码。
 
 ---
 
@@ -429,7 +431,7 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 
 **必须先纠正本文首版的一个假前提。** 首版在这里写的理由是"它今天说不出自己贡献哪条北极星",这句话**不成立**:旧仓 G3 报告 `ac08659a6d5b556a3_v1.md:249` 已经给出了它的 Effect——「媒体生成 provider 的凭据、探测、模型设置，与模型供给域**同等诚实** —— 即：录入凭据 → 真实、可解释的可用性判定 → 可用模型物化为可消费能力；判定失败钉到真因；不误伤用户数据。」;`:256` 还逐条挂了北极星——「*流程可靠可重现*：媒体生成是图流程的一等公民；*去黑盒*：花钱前知道花多少、参数合不合法；*本地=服务端*：同一 catalog」。所以待裁的不是"它有没有理由",而是下面这个。
 
-**真正的问题**:这三条挂钩成立的前提是"媒体生成是图流程的一等公民"。这个前提今天在引擎里**不成立**——`src/graph_skill_runtime/models/` 下只有 `reasoning_patch.py`,没有任何媒体供给的实现;`spec/features.yaml` 的 45 条 feature 里也没有一条讲媒体。按 2.2 规则②,引擎要为每条域级 Effect 提供第一个实现,所以立这条 Effect 等于同时决定"引擎要做媒体生成的 0 到 1"。这是一项要不要做的决定,属目标层。
+**真正的问题**:这三条挂钩成立的前提是"媒体生成是图流程的一等公民"。这个前提今天在引擎里**不成立**——`src/graph_skill_runtime/models/` 下除包初始化文件 `__init__.py` 外只有 `reasoning_patch.py`,没有媒体供给实现;`spec/features.yaml` 的 45 条 feature 里也没有一条讲媒体。按 2.2 规则②,引擎要为每条域级 Effect 提供第一个实现,所以立这条 Effect 等于同时决定"引擎要做媒体生成的 0 到 1"。这是一项要不要做的决定,属目标层。
 
 **建议**:暂不立为域级 Effect,理由**不是**它没有价值,而是它今天没有对应的用户旅程压着——种子报告里那三条北极星挂钩描述的是"如果媒体生成是一等公民会怎样",而不是"今天有用户在这条路上被卡住"。等出现明确的用户旅程再补;补的时候按 2.2 规则③,先在引擎补这条 Effect 与它的第一个实现,再谈网关那一侧。
 
@@ -444,3 +446,4 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 | 2026-09-03 | 首版(本 PR 的第一个提交)。确立五条北极星的引用基准、核心与辅助的三句规则、十个域共 40 条域级 Effect、四条缺口、五条引擎特有公理。 | 旧仓决议 `docs/design/gskill-restructure-decision-2026-08-31.md` §1/§2/§3/§5/§7;用户 2026-09-03 关于模块化推进、0 到 1 与 1 到 10、MoirAI 归属、层级写法的四段裁定。 |
 | 2026-09-03 | 交叉审 r1 返修。①把五条写宽了的承诺按真实契约收窄(E-FMT-3 注册表范围、E-CFG-4 只拒结构上像密钥的键、E-OBS-2 只有进入执行阶段的运行有轨迹、E-OBS-3 位置分编译期与运行期两档、E-STA-2 只取回等待态);②三条从"有实现"改判为缺口或部分(E-STA-3 产物、E-OBS-1 公开接线口、E-AGT-1 相位级执行者);③从 G-AGT 拆出新域 **G-MDL**,原 E-AGT-4 改编号 E-MDL-1;④G-ACC 不变量改为"同一用例的规则只有一份",新增用例 × 投影覆盖矩阵;⑤E-SHP-2 改写为用户可观察的结果;⑥第 5 节只准写装完包就有的检验,列名改"按坐标判定的状态"并声明它尚未实跑;⑦3.12 新增按旧仓域报告逐条对账的种子能力表;⑧7.3 的依据推翻重写——原写"媒体供给说不出贡献哪条北极星"是假前提。 | 交叉审 r1 的 13 条 P1 + 3 条 P2(每条附实跑证据),加协调方两条;逐条坐标已由执笔席重新打开核实。 |
 | 2026-09-03 | 交叉审 r2 返修。①第 1 轮未闭环的四条补齐:2.4 删掉"同一套用例的四种投影"旧断言;E-OBS-3 的位置由两档改三档,补"运行请求校验期"(`mode=run` 但相位未开始,无相位可指);E-SHP-2 的验收改成只用包内内容;3.12 每一行都给出父 Effect 编号。②E-FMT-2 承认 `field_path` 可空。③矩阵里"启动 MCP 服务"的 SDK 格裁为"刻意无"。④E-FMT-3 与 7.3 的三段引文按源文全角标点逐字重取。⑤E-EXE-5 扩为"批量、循环与并行",依据是 2026-08-15 的并行扇出决定与编译期 `[F-v3-parallel-write-conflict]` 守卫。⑥E-SHP-3 扩为完整发布承诺(内容寻址 + 版本锁定 + 脱离源文件运行 + 服务端复现)。⑦"每次发布随附三平台验收记录"由 Effect 改写进 4.4 第 4 条公理。⑧术语补 LangGraph、sidecar、CORS、catalog、Gitea。 | 交叉审 r2 的 11 条(10 条 P1 + 1 条 P2),坐标逐条重开核实;E-OBS-3 第二档与 E-FMT-2 的空 `field_path` 由执笔席亲自实跑复现。 |
+| 2026-09-03 | 交叉审 r3 返修。①**E-OBS-3 第三档被实跑反证,改判"部分 + 缺口"**:相位在跑时相位号仍会丢,原因在 `runtime/state_mapper.py:619-624` 包装异常时没传 `phase_id`。**这是本文写作过程中新查出的引擎缺陷**,修法是运行时工单,不在本文范围;汇总计数随之改为 30 可达成 / 5 部分 / 5 未覆盖。②E-ACC-3 的正式承诺扩写为"进程外的调用方通过一条网络接口调用八个运行用例",工作台 HTTP 接口是它的平行实现;3.12 的 G1 行不再反向改义。③G1 行按源报告 `:467-470` 逐字转录——7 个模块 + 3 条被改判为规则/机制的项,不把 M5 / M8 / M9 写进模块清单。④E-SHP-1 验收由一项扩为三项(能力齐全 / 包内无业务 gskill / 包外零副作用),第三项在全新 venv 里实跑过。⑤"reducer 通道 / LastValue 通道"改成人话。⑥7.3 的 `models/` 陈述补上 `__init__.py`。 | 交叉审 r3 的 4 条 P1 + 2 条 P2;E-OBS-3 的最小夹具与 E-SHP-1 第三项由执笔席亲自复现,坐标逐条重开核实。 |
