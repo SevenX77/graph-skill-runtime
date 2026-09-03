@@ -53,15 +53,6 @@ SOURCE_TREES = ("src", "scripts", "tools")
 # explicitly disowned.
 CONTRACT_DOC_STATUSES = frozenset({"living", "FROZEN"})
 
-# Until F-T3 seals it, `01-PORTABLE-GSKILL-V1.md` is `audited-ready`: audited,
-# but not yet hash-locked. It owns almost every code, so demanding `FROZEN` of
-# it today would be demanding something that is not yet true. The allowance is
-# therefore pinned to that ONE file rather than to the status word — no other
-# `audited-ready` document may own a code, and widening it again would mean
-# editing this line in a diff a reviewer reads. **Delete this constant when
-# F-T3 lands**: the file is `FROZEN` at that point and the exception is dead
-# weight.
-AUDITED_READY_OWNER_EXCEPTION = "01-PORTABLE-GSKILL-V1.md"
 
 # The fixed text a row carries INSTEAD of a link when the code is registered
 # in §10. A gap cell must equal it exactly — not merely contain it — because a
@@ -480,10 +471,7 @@ def _owning_link_violations(code: str, link: str, catalog: Path) -> list[str]:
         ]
     if not target.is_file():
         return [f"{code} -> {link}: no such document"]
-    allowed = CONTRACT_DOC_STATUSES
-    if target.name == AUDITED_READY_OWNER_EXCEPTION:
-        allowed = CONTRACT_DOC_STATUSES | {"audited-ready"}
-    status_violation = _contract_status_violation(target, link, allowed=allowed)
+    status_violation = _contract_status_violation(target, link)
     if status_violation is not None:
         return [f"{code} -> {status_violation}"]
     if not anchor:

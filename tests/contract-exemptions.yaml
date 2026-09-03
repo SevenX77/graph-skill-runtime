@@ -1,32 +1,35 @@
 # DO NOT EDIT without PM approval. Contract exemptions are governance records for
-# intentional, reviewed drift from frozen API/spec/hash baselines.
+# intentional, reviewed retirement of a feature from the round-28 manifest set:
+# which features go away, which ones replace them, who approved it and when the
+# record itself should be cleaned up.
+#
+# The authoritative shape is `$defs.contract_exemptions` in
+# `spec/round28-manifest-schema.yaml`, and
+# `tests/test_round28_contract_manifests.py` validates THIS file against it — not
+# only the fixtures beside it. That is what makes the schema this path's single
+# owner.
+#
+# Byte seals over FROZEN documents are a different concept and live in
+# `tests/contract-seals.yaml`, owned by `tests/test_contract_hash_lock.py`. They
+# shared this path until F-T3, and the cost was exactly what a second owner
+# costs: the real file stopped satisfying the authoritative schema while every
+# test stayed green.
 #
 # Schema example:
 # version: "1"
 # exemptions:
-#   - pr: "PR-123"
-#     pm_approval: "PM approved this compatibility exception."
-#     reason: "Why the drift is allowed."
-#     symbols:
-#       - SomeSymbol
-#     fields:
-#       - some_field
-#     hashes:
-#       - docs/skill-spec/example.md
-#     expires_or_cleanup: "Remove after PR-124 migration lands."
+#   - exemption_id: EX-0001-example
+#     pr: "PR-123"
+#     pm_approval: "PM approved this exception, with date."
+#     reason: "Why this retirement is allowed."
+#     symbols: []
+#     fields: []
+#     hashes: []
+#     affected_features:
+#       - F-old-feature
+#     replacement_feature_ids:
+#       - F-replacement-feature
+#     expires_or_cleanup: "Remove once the replacement ships."
 
 version: "1"
-exemptions:
-  - exemption_id: EX-0031-round-31-public-api-contract
-    pr: "round-31 PR-A + PR-B"
-    pm_approval: "PM 2026-05-30 显式批准 ('同意'): 更新 public-api-contract.md (PR-A Errors 24→5 + PR-B run_skill workspace_dir 必传) 并重锁指纹。"
-    reason: "Errors 公共异常目录从 24 leaf 浓缩到 5 family (PR-A 已 ship), run_skill 签名改 workspace_dir 必传 + 删 trace_dir (PR-B)。文档跟随已批准的 API 变更同步。"
-    symbols: []
-    fields: []
-    hashes:
-      - docs/public-api-contract.md
-    affected_features:
-      - F-public-api-contract
-    replacement_feature_ids:
-      - F-public-api-contract
-    expires_or_cleanup: "round-31 全部 PR ship 后此条作为永久治理记录保留。"
+exemptions: []

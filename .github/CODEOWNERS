@@ -6,5 +6,6 @@
 /docs/skill-spec/ @SevenX77
 /spec/ @SevenX77
 /tests/contract-exemptions.yaml @SevenX77
+/tests/contract-seals.yaml @SevenX77
 /tests/test_public_api_contract.py @SevenX77
 /docs/feature-compliance-checklist.md @SevenX77

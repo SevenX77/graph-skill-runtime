@@ -1,0 +1,145 @@
+# DO NOT EDIT without owner approval. This file is the SINGLE carrier of every
+# byte seal this repository holds: a `FROZEN` document's current pinned digest IS
+# the last `seals` record naming it. There is no second table anywhere in the
+# test suite — a digest that lives only in Python is a governance record nobody
+# has to file, and `.github/CODEOWNERS` covers this path but not the test file,
+# so "just re-pin the constant" used to be a way around owner review.
+#
+# This file holds byte seals and NOTHING else. Feature-retirement exemptions live
+# in `tests/contract-exemptions.yaml`, whose shape is owned by the
+# `$defs.contract_exemptions` schema in `spec/round28-manifest-schema.yaml`. The
+# two concepts shared one path until F-T3, which meant that path had two schema
+# owners: validating the real file against the authoritative schema failed while
+# the whole suite stayed green, because only fixtures were ever validated. One
+# concept, one file, one owner.
+#
+# Revising a FROZEN document = edit the document AND append one record here, in
+# the same pull request. List order is time order; the LAST record for a file is
+# its current seal. Earlier records stay as the audit trail of what was approved
+# when, and nothing is ever rewritten in place.
+#
+# Every record carries exactly these keys — a missing, misspelled or extra key is
+# a hard failure, never a silently skipped record:
+#
+#   exemption_id  EX-NNNN-<lowercase-slug>, unique across this file
+#   file          repository-relative path of the sealed document
+#   sha256        digest of the approved bytes: CRLF/CR normalised to LF, then
+#                 SHA-256 over the UTF-8 encoding
+#   reason        what changed and on what ruling or evidence
+#   pr            the pull request (or pre-extraction commit) carrying the change
+#   pm_approval   the owner sign-off this record rests on
+#
+# One optional key is allowed: `expires_or_cleanup`, for a seal that is meant to
+# be superseded by a named follow-up.
+#
+# `version` names the record format this file is written in; the loader accepts
+# exactly the versions it knows how to read.
+#
+# The lock is enforced by tests/test_contract_hash_lock.py, which also asserts
+# both directions of the bijection: every document declaring `status: FROZEN`
+# has a record here, and no record names a document declaring some other status.
+
+version: "1"
+seals:
+  - exemption_id: EX-0001-mvp0-format-ground-truth
+    file: "docs/mvp0/skill-spec/00-FORMAT-GROUND-TRUTH.md"
+    sha256: "083f158bdb4c6ae3bea7b5b66ce1d57e1897a668c81dac757a2ddb2bf067af0e"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit d96127a4; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit d96127a4"
+    pm_approval: "Approved by the merge of pre-extraction commit d96127a4 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0002-mvp0-physical-layout
+    file: "docs/mvp0/skill-spec/01-physical-layout.md"
+    sha256: "9478f81d9d8552227c82c440f6b047dc587652fcaa21200b0f38e3a93dcd8cc4"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit d96127a4; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit d96127a4"
+    pm_approval: "Approved by the merge of pre-extraction commit d96127a4 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0003-mvp0-graph-md-spec
+    file: "docs/mvp0/skill-spec/02-graph-md-spec.md"
+    sha256: "d9202117a473cf055a58bcff29e454e7551a1438d1cecdd90ccac50e28646b6c"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0004-mvp0-logic-md-spec
+    file: "docs/mvp0/skill-spec/03-logic-md-spec.md"
+    sha256: "f979921e9076b14a499d5dff257c7728afbe741b4e1d2ab642bed3fb0a369298"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0005-mvp0-subgraph-md-spec
+    file: "docs/mvp0/skill-spec/04-subgraph-md-spec.md"
+    sha256: "2440be9949793cb5717ed1cb29712896c174fa71e8c1bfc48b41099a4ac33f3e"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0006-mvp0-agent-md-spec
+    file: "docs/mvp0/skill-spec/05-agent-md-spec.md"
+    sha256: "51541ec8a805313c840c518130fe4ccf3615507614c0acf256f68102602f5b05"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0007-mvp0-cognitive-template-spec
+    file: "docs/mvp0/skill-spec/06-cognitive-template-spec.md"
+    sha256: "8e7a942df4bef5f7c95812ec4a0886ee140a55c33ce49ff1b2328158d9203090"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0008-mvp0-mention-syntax-spec
+    file: "docs/mvp0/skill-spec/07-mention-syntax-spec.md"
+    sha256: "ed8802373a1169fc0e4482f458e164d4153687b8a9123ca41da4d0284eadcc8d"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0009-mvp0-resource-mechanisms-spec
+    file: "docs/mvp0/skill-spec/08-resource-mechanisms-spec.md"
+    sha256: "b52777065d6eb5a90a4e7be99d492b4e45f36317de80428dbb48499d59c6ad3b"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0010-mvp0-builtin-modules-spec
+    file: "docs/mvp0/skill-spec/09-builtin-modules-spec.md"
+    sha256: "dac431f0a28d11448ea72193814ad4cb1c4cdb36cc1e09cc6fb9dfb7c11413d1"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0011-mvp0-skill-resolver-protocol-spec
+    file: "docs/mvp0/skill-spec/10-skill-resolver-protocol-spec.md"
+    sha256: "9cc8f9a3df095623b67c74a353838c63825fae678e77a94593a18716cded660c"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit d96127a4; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit d96127a4"
+    pm_approval: "Approved by the merge of pre-extraction commit d96127a4 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0012-mvp0-error-code-spec
+    file: "docs/mvp0/skill-spec/11-error-code-spec.md"
+    sha256: "5bcb4f70d864ae7d392fe1d4c357d0269c0b88424cc726c7f5a7762d7c024509"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 4d960c45; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "agent-harness#868"
+    pm_approval: "Approved by the merge of agent-harness#868 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0013-mvp0-compile-runtime-flow-spec
+    file: "docs/mvp0/skill-spec/12-compile-runtime-flow-spec.md"
+    sha256: "0c632cbc7edbad3e741bf4a3676d08e68852ea2311f10624503d20f84d598223"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 647b75d1; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 647b75d1"
+    pm_approval: "Approved by the merge of pre-extraction commit 647b75d1 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0014-mvp0-feature-compliance-checklist
+    file: "docs/mvp0/feature-compliance-checklist.md"
+    sha256: "77ea3efd4c6dfed5a09f496a82a1ba7ff3d2832ad1dc92ba9ac1f5cb759dc5c7"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 5cc81c59; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "pre-extraction commit 5cc81c59"
+    pm_approval: "Approved by the merge of pre-extraction commit 5cc81c59 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0015-round28-manifest-schema
+    file: "spec/round28-manifest-schema.yaml"
+    sha256: "de27d0d2909f907fcd94ccfa14a282ca19f52fb8207e5f99a1eafb80fa72db81"
+    reason: "Backfill of a historical seal: this digest was already the enforced pin, introduced by commit 1e1a3540; moving it out of the test constant and into this file makes the pin itself a governance record."
+    pr: "#5"
+    pm_approval: "Approved by the merge of #5 into main, which is what put this digest under enforcement."
+  - exemption_id: EX-0016-feature-compliance-checklist
+    file: "docs/feature-compliance-checklist.md"
+    sha256: "2e9e7efb52756e46373d98804da8c2785b54c2bb4ce2901db3a7ecd42eee60dc"
+    reason: "First seal for a document that has declared `status: FROZEN` since round 28 (tests/test_round28_contract_manifests.py::test_task6_codeowners_and_frozen_checklist_are_concrete asserts that status) but had never been pinned. The repository-wide bijection added in this PR is what surfaced the unbacked claim."
+    pr: "#22"
+    pm_approval: "Owner sign-off carried by the merge of #22; the FROZEN status it backs is the round-28 task-6 decision."
+  - exemption_id: EX-0017-portable-gskill-v1-seal
+    file: "docs/skill-spec/01-PORTABLE-GSKILL-V1.md"
+    sha256: "2dcf05e239103ded2e6be996f30020c382de6f91f123fa0d1b90b22a736ee404"
+    reason: "F-T3: the current portable format contract moves `audited-ready` -> `FROZEN`. Unlike the mvp0 entries this is not an archive but the live contract the production reader implements; sealing it is the gate for handing single engine ownership to this repository, and it was only sealable once D-T1 (#14) and D-T3 (#18) had landed."
+    pr: "#22"
+    pm_approval: "Owner sign-off carried by the merge of #22, on the F-T3 work order."
