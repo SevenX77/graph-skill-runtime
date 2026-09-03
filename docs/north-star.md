@@ -212,9 +212,9 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 **贡献**:北极星-3、北极星-4、北极星-2。
 **与种子的关系**:从种子域 G7(委托 + 发布 + 平台)里分出"怎么被调用"这一半。分开的理由:接入面守"规则只有一份",发货守"别的机器装得出同一份",删掉任一方都会毁掉一个行为区分。
 
-- **E-ACC-1 在 Python 里 import 一个包就能用全部用例。** 用户观察到:一个稳定的、写下来的公开接口清单,不必去读内部实现。贡献北极星-3、北极星-4。引擎实现:门面 `sdk.py`(13 个公开函数),顶层契约 `graph_skill_runtime.__all__` 实测 77 个符号,文档 `docs/public-api-contract.md`(frontmatter `role: contract`,`status: living`)。平行实现:暂无。
-- **E-ACC-2 命令行 `gskill` 覆盖同一套用例。** 用户观察到:不写 Python 也能编译、干跑、真跑、续跑、检视、评测、转换、装宿主投影。贡献北极星-2、北极星-4。引擎实现:`adapters/cli.py:166` 起注册的子命令——`compile`、`config resolve`、`predict`、`run`、`resume`、`submit`、`inspect`、`golden`、`migrate studio-skill`、`integrations detect|install|uninstall`、`mcp`。平行实现:工作台的按钮。
-- **E-ACC-3 外部 agent 通过 MCP 调用同一套用例。** 用户观察到:在 Claude Code 或 codex 里直接把引擎当工具用。贡献北极星-3、北极星-2。引擎实现:`adapters/mcp.py:31` 起,服务名 `gskill`,恰好 8 个工具——`compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden`;每个工具必须声明状态影响标注(`AGENTS.md:42`)。平行实现:工作台的 HTTP 接口。
+- **E-ACC-1 在 Python 里 import 一个包,就能用引擎的八个运行用例加宿主投影安装。** 用户观察到:一个稳定的、写下来的公开接口清单,不必去读内部实现。(不含旧格式转换,理由见下面矩阵。)贡献北极星-3、北极星-4。引擎实现:门面 `sdk.py`(13 个公开函数),顶层契约 `graph_skill_runtime.__all__` 实测 77 个符号,文档 `docs/public-api-contract.md`(frontmatter `role: contract`,`status: living`)。平行实现:暂无。
+- **E-ACC-2 命令行 `gskill` 是覆盖面最全的那一条投影。** 用户观察到:不写 Python 也能编译、干跑、真跑、取回等待态、检视、评测、转换旧格式、装宿主投影,以及把 MCP 服务起起来。贡献北极星-2、北极星-4。引擎实现:`adapters/cli.py:166` 起注册的子命令——`compile`、`config resolve`、`predict`、`run`、`resume`、`submit`、`inspect`、`golden`、`migrate studio-skill`、`integrations detect|install|uninstall`、`mcp`。平行实现:工作台的按钮。
+- **E-ACC-3 外部 agent 通过 MCP 调用引擎的八个运行用例。** 用户观察到:在 Claude Code 或 codex 里直接把引擎当工具用。贡献北极星-3、北极星-2。引擎实现:`adapters/mcp.py:31` 起,服务名 `gskill`,恰好 8 个工具——`compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden`;每个工具必须声明状态影响标注(`AGENTS.md:42`)。平行实现:工作台的 HTTP 接口。
 - **E-ACC-4 把 MoirAI 投影进宿主,是一次显式、冲突即拒、可回滚的操作。** 用户观察到:装之前先体检,任一目标冲突就整体不动;卸载只删自己装的那些、且内容没被改过的那些。贡献北极星-2。引擎实现:`integrations/installer.py`、`integrations/renderers.py`,规则写在 `AGENTS.md:44`;命令 `gskill integrations install moirai --targets ... --scope ...`。平行实现:暂无。
 
 **用例 × 投影覆盖矩阵。** 空格一律标"刻意"或"缺口",不留白。MoirAI 那一列的依据是:它的宿主投影注册的是同一个 `gskill` stdio MCP 服务(`AGENTS.md:40` 原句「register the same single `gskill` stdio MCP server」),所以 MoirAI 能够到的用例集合**就等于** MCP 那一列。
@@ -233,7 +233,7 @@ MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——
 | 宿主投影安装 | 有(5 个函数) | 有(`integrations detect/install/uninstall`) | 刻意无 | 刻意无 |
 | 启动 MCP 服务 | 不在公开契约内 | 有(`mcp`) | 不适用 | 不适用 |
 
-三处"刻意"各有依据,不是遗漏:
+矩阵里没有一格是遗漏,逐格依据如下:
 
 - **旧格式转换只留在命令行**:`docs/public-api-contract.md:26` 原句「Legacy parsing is confined to the explicit `gskill migrate studio-skill` converter.」旧格式的读法被关进这一个显式边界;少一个入口,就少一处让它变成"编译失败后自动兜底"的机会。这正是 E-FMT-4 那条承诺的另一面。
 - **MCP 恰好八个用例**:`AGENTS.md:42` 原句「The `gskill` MCP server exposes exactly `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`.」"exactly"是闭集声明,不是当前进度。
