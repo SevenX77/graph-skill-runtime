@@ -1041,8 +1041,11 @@ def test_owning_spec_rows_are_owned_or_registered_gaps_and_nothing_else(tmp_path
     assert not failed("[F-v3-good]"), violations
     assert not failed("[F-v3-gap]"), violations
 
-    # The `audited-ready` allowance is pinned to ONE file name, not to the
-    # status word: another audited-but-unsealed document cannot own a code.
+    # No allowance survives F-T3: the closed set is exactly {living, FROZEN},
+    # so an audited-but-unsealed document cannot own a code at all. While
+    # `01-PORTABLE-GSKILL-V1.md` was `audited-ready`, one file name was
+    # excepted here by constant; sealing it deleted the constant and this
+    # assertion stopped needing to work around anything.
     assert [v for v in failed("[F-v3-unsealed]") if "audited-ready" in v], violations
 
     # Mutation 1: a code registered as a gap that points back at a disowned

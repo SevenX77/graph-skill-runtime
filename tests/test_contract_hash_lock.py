@@ -328,7 +328,7 @@ def _good_record(digest: str, **overrides: object) -> dict[str, object]:
 def test_seal_schema_rejects_the_path_keyed_shape_and_malformed_records(tmp_path: Path) -> None:
     """Every schema failure is loud. Silence is the defect being removed here."""
     _document, digest = _seal_fixture(tmp_path)
-    seals_path = tmp_path / "contract-exemptions.yaml"
+    seals_path = tmp_path / "contract-seals.yaml"
 
     def write(body: str) -> Path:
         seals_path.write_text(body, encoding="utf-8")
