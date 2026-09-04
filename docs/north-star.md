@@ -66,7 +66,7 @@ The five stand side by side with no priority order. The source is the old reposi
 
 **North star 2 · simpler, less prone to drift, and faster than writing LangGraph directly**
 - What it wants (`:60`): 「用户用**文档**描述流程即可,不必手写框架代码。」 (*the user describes the flow in documents and writes no framework code by hand*)
-- Reverse criterion (`:62`): 「任何功能,如果它让用户**比裸写 langgraph 还累**,那这个功能就是错的——不论它多"完备"。」 (*any feature that makes the user work harder than writing bare LangGraph is a wrong feature, however "complete" it is*) This criterion carries a veto. A new configuration option, a new required field, and a new convention to remember each passes this question first.
+- Reverse criterion (`:62`): 「任何功能,如果它让用户**比裸写 langgraph 还累**,那这个功能就是错的——不论它多"完备"。」 (*any feature that makes the user work harder than writing bare LangGraph is a wrong feature, however "complete" it is*) This criterion carries a veto. A new configuration option, a new required field, and a new convention to remember must first be tested against this criterion.
 
 **North star 3 · the engine and the gskill AST are the core, and everything else is efficiency support**
 - What it wants (`:66`): 「核心资产只有两样——engine(编译与执行)和 gskill 的 AST(格式与它的结构化表示)。」 (*there are exactly two core assets: the engine, meaning compilation and execution, and the gskill AST, meaning the format and its structured representation*) AST stands for abstract syntax tree, the structured intermediate representation parsed out of the gskill text the user writes.
@@ -461,3 +461,4 @@ Three items are pending the user's ruling. Each states the problem, a recommenda
 | 2026-09-03 | Seventh cross-review rework: E-FMT-2 scoped to detectable defects; document count pinned to `main` `96019595`; three wording fixes; revision-row cross-reference corrected. | Cross-review round 7: 2 P1 + 4 P2 accepted. |
 | 2026-09-03 | Eighth cross-review rework: E-SHP-2 process requirement stated positively under axiom 4; two "empty" wordings changed to "gap"; lead paragraphs made consistent. | Cross-review round 8: 1 P1 + 1 P2 accepted. |
 | 2026-09-03 | Axiom 4 closing sentence stated positively. | Cross-review round 8, remaining P1. |
+| 2026-09-03 | North star 2 veto sentence: obligation stated explicitly. | Cross-review round 9, remaining P2. |
