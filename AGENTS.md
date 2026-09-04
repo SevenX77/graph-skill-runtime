@@ -177,6 +177,14 @@ Authoritative documentation must be self-contained. State goals, terms, observab
 - **Authoritative documents are written in English.** This covers rule files, design, specification, contract, decision, ledger, work-order, and acceptance documents: anything an agent or a gate reads as a source of truth. Verbatim quotations keep their source language, with an English gloss beside them. The rule applies to every document written or substantially revised from now on; existing documents are converted the next time they are substantially revised, and no work order is opened only to translate.
 - **Reports to the user are written in Chinese**, in plain language, following the reporting discipline below.
 
+## Authoritative-document authoring (user ruling, 2026-09-03)
+
+- **Clean context, self-contained brief.** The body of an authoritative document is written in one pass by a writer agent that has inherited no session history, from a brief that carries everything it needs: goal, scope, terms, verified facts with coordinates, output path, boundaries, acceptance criteria. The coordinator does not write the body and does not stitch fragments from several agents into one.
+- **Rework instructions say what the body must state, never what happened.** The writer must not narrate the rework into the body. After the second rework round the document is rewritten by a *fresh* writer from the updated brief, so one seat does not drift into meeting minutes.
+- **Positive statements only.** Every sentence in the body says what X is, what it owns, how it is used. A sentence that only makes sense to someone who knows a prior discussion, an earlier draft, or a review round ("…is a requirement but does not get a north-star seat", "the first version numbered this E-AGT-4, now moved…", "the first version's premise must be corrected") is a **context leak**: rewrite it as a positive statement or move it to the revision log. When an upstream document is itself written as a rebuttal, take its conclusion, not its framing.
+- **Mechanical scan before shipping.** Scan the body for rebuttal markers (`but not`, `not … but`, `first version`, `originally`, `corrected`, `moved to`, `no longer`, and their Chinese counterparts `但不`, `首版`, `原先`, `纠正`, `现移`, `不再`); every hit is either rewritten or justified line by line in the report.
+- Origin: on 2026-09-03 the engine north-star document carried both the upstream decision's "exclusions" framing and its own four rework rounds into the body; a reader of "is a requirement but does not get a north-star seat" cannot tell whom the sentence is arguing with.
+
 ## Reporting discipline (user ruling, 2026-09-03)
 
 Reports go to the product owner, not to a fellow engineer. Before sending any message to the user, check the four rules below and rewrite if any fails:
