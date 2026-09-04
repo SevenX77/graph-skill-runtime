@@ -5,446 +5,451 @@ status: living
 updated: 2026-09-03
 ---
 
-# 引擎的北极星、判据、公理与域级 Effect 树
+# North stars, acceptance criteria, axioms, and the domain-level Effect tree
 
-> **本文是什么**:`graph-skill-runtime` 这个仓库(下称"引擎仓")的最高层依据。它回答三个问题:①这个仓库存在的目的是什么、怎样检验目的达到了;②遇到问题按什么公理与原则推理;③引擎向用户承诺的可观察结果有哪些、每一条今天由哪段代码兑现、哪一条还是空的。
+> **What this document is**: the top-level basis of the `graph-skill-runtime` repository, called "the engine repository" below. It answers three questions. First, why this repository exists and how anyone checks that the purpose is met. Second, which axioms and principles a question is reasoned from. Third, which observable results the engine promises the user, which code delivers each of them today, and which of them are still empty.
 >
-> **本文不是什么**:①不是进度状态;②不是任何模块的接口契约本身;③不是实施计划。它只写"目的、判据、承诺清单"。
+> **What this document is not**: it is not a progress report; it is not the interface contract of any module; it is not an implementation plan. It carries purpose, acceptance criteria, and the list of promises.
 >
-> **怎么读**:先读第 1 节(目的)与第 2 节(核心与辅助的分界),它们决定后面每一条的取舍方向;再读第 3 节(承诺清单)。第 4 节是推理规则,第 5 节是验收清单,第 6 节说明它与仓里其它文档的关系。
+> **How to read it**: read §1 (purpose) and §2 (the line between core and auxiliary) first, because they set the direction of every judgement that follows. Then read §3, the list of promises. §4 holds the reasoning rules, §5 the acceptance table, §6 the relation between this document and the other documents in the repository.
 >
-> **本文的事实基准**:引擎仓 `main` 为提交 `96019595`;上位决议所在的旧仓 `agent-harness` `main` 为提交 `dcb12e40`。文中每个"现在的实现是 X"都给出文件路径与行号,每个"设计意图是 X"都给出权威文件坐标与原句。
+> **The fact baseline of this document**: the engine repository's `main` is commit `96019595`; the old repository `agent-harness`, which holds the upstream decision, is at commit `dcb12e40` on `main`. Every "the implementation is X" below carries a file path and a line number. Every "the design says X" carries a coordinate in the authoritative file plus the source sentence itself.
 
 ---
 
-## 0. 术语
+## 0. Glossary
 
-每个词只有一个含义,后文一律用这里的名字,不另起简称。
+Each word carries one meaning. The rest of this document uses the names defined here and coins no shorter forms.
 
-- **北极星**:最高层的目的判据。任何取舍最终都要回答"它服务哪条北极星、服务到什么程度"。本仓的北极星有五条,见第 1 节。
-- **判据**:一句能拿去检验的话,说清"做到什么样才算达到"。没有判据的目标不算目标。
-- **gskill**:本项目的技能包格式,以及按这个格式写出来的一个目录。用户在里面用文档描述"这个流程有哪些步骤、步骤之间怎么连、每步读写什么数据"。用户写的就是它,引擎读的也是它。
-- **相位(phase)**:流程里的一个步骤节点。一个 gskill 由若干相位和相位之间的连线组成。
-- **域**:一组围绕同一批不变量组织的能力。"不变量"指这组能力共同守着的、任何时候都不许被打破的那句话。域不由目录形状决定。
-- **域级 Effect**:一个域对用户承诺的可观察结果——做成功时用户能观察到什么。它写的是承诺,不是内部实现。本文用 `E-<域缩写>-<序号>` 给每条承诺一个稳定编号,后续文档一律引这个编号。
-- **平行实现**:同一条域级 Effect 的另一种做法,与引擎自己的做法同级,而不是它的上级。网关与工作台的每个模块都是某条域级 Effect 下的平行实现。
-- **0 到 1**:把一条承诺从"根本做不到"变成"能做到",哪怕做得笨。这是引擎的责任。
-- **1 到 10**:一条承诺已经能做到,再把它做得更好用、更好管。这是辅助模块的责任。
-- **Port**:一个稳定的抽象接口,领域逻辑只依赖它,具体外部环境的差异由实现它的适配器承担。本仓的 Port 都在 `src/graph_skill_runtime/ports/runtime.py`。
-- **执行者(executor)**:真正去跑一个 AGENT 相位的那一方。AGENT 相位需要一个能自主挑工具、自主行动的 agent 才能完成,执行者就是提供这个 agent 的实现。
-- **MoirAI**:引擎自带的一组代理人资产——角色说明、技能说明和知识库文本。它被投影进用户手边的 agent 宿主里,带着用户设计、修复、评测 gskill。它是文本资产,不是四个常驻进程。
-- **宿主(host)**:开发者此刻正在用的那个交互式 agent 工具,例如 Claude Code 或 codex。宿主是驾驶员:它调用引擎、读回结果、改源文件。
-- **轨迹(trace)**:一次运行留下的逐条记录——每个相位收到什么、模型被怎么提问、返回什么、写回了什么。它落成文件,事后可以逐步复核。
-- **编译**:把一个 gskill 目录读成结构化表示、逐条校验、生成可执行的图的那一步。它不调用模型。
-- **SDK(软件开发工具包)**:一个供别的程序直接调用的代码库,自己不开网络服务。本仓就是一个 Python SDK。
-- **MCP(模型上下文协议)**:一套约定,让外部的 agent 工具把别的程序的能力当成"工具"来调用。引擎按这套约定开一个名叫 `gskill` 的服务。
-- **JSON Schema**:用一份 JSON 文档描述"另一份 JSON 应该长什么样"的写法。引擎用它校验相位的输入与输出。
-- **preflight(起跑前核对)**:真正开跑之前,先把"这次需要的能力,选中的执行者做不做得到"逐项对一遍,不合就当场拒绝。
-- **golden(基线)**:一次被人认可的运行,存下来当尺子;以后每次改动都拿新结果和它比,判断变好还是变坏。
-- **SQLite**:一种把整个数据库存成一个文件的轻量数据库。引擎用它存图的检查点。
-- **WebSocket**:浏览器与服务端之间一条一直开着的双向通道,用来把"正在发生的事"实时推给界面。
-- **ah(agent-hypervisor)**:一个专管"起厂商命令行 agent、盯着它跑、崩了收拾干净"的受监督进程管理器。决议把它定为两个受支持执行者之一。
-- **LangGraph**:一个把"多步骤的模型流程"表达成图并执行的开源框架。引擎用它作为图的执行底座,所以北极星-2 拿"直接写 LangGraph 代码"当对照物。
-- **sidecar(边车进程)**:桌面应用为了用引擎而在旁边起的那个后台 Python 进程。引擎自己不需要它,是工作台把引擎包成 HTTP 服务时才有的东西。
-- **CORS(跨源资源共享)**:浏览器的一条安全规则,决定一个网页能不能读另一个地址返回的响应。它只在"有网页、有 HTTP 服务"时才存在。
-- **catalog(目录)**:一张记着"有哪些模型、各自接受什么参数、多少钱"的清单。它是数据,不是代码分支。
-- **Gitea**:一个可以自己架的 Git 服务器。工作台用它做团队之间存取与评审 gskill 的地方。
-- **stdio(标准输入输出)**:进程之间最朴素的一条通道——一方往自己的输出写,另一方从自己的输入读,不经过网络端口。引擎的 MCP 服务就用它和宿主对话,所以它不占端口,也不开 HTTP 服务。
-
----
-
-## 1. 引擎的目的:五条北极星
-
-五条并列,不排优先级。原文在旧仓 `docs/design/gskill-restructure-decision-2026-08-31.md` 第 48 至 89 行,以下逐条原样引用。
-
-**北极星-1 · 流程可靠、可重现**
-- 要什么(`:54`):「用 langgraph 把流程**钉成一张图**,跑一百次就是同样的一百次。」
-- 判据(`:56`):「同一个 gskill、同一份输入,应当走出同一条相位序列;差异只允许出现在相位内部的模型输出,不允许出现在流程结构上。」
-
-**北极星-2 · 比直接写 langgraph 更简单、更不跑偏、更快**
-- 要什么(`:60`):「用户用**文档**描述流程即可,不必手写框架代码。」
-- 反向判据(`:62`):「任何功能,如果它让用户**比裸写 langgraph 还累**,那这个功能就是错的——不论它多"完备"。」这一条带否决权:新增配置项、新增必填字段、新增要记住的约定,都先过这一问。
-
-**北极星-3 · engine 与 gskill 的 AST 是核心,其余都是提效辅助**
-- 要什么(`:66`):「核心资产只有两样——engine(编译与执行)和 gskill 的 AST(格式与它的结构化表示)。」AST 即抽象语法树,是把用户写的 gskill 文本解析成的结构化中间表示。
-- 判据(`:68`):「engine 与 AST 权重最高;**studio 迁就 engine,不许反向**。」
-
-**北极星-4 · 本地开发的 gskill 原样复用于服务端**
-- 要什么(`:72`):「开发者在本地(桌面应用里)做出来的那个 gskill,**原样**就能在服务端跑,靠的是"锁定版本的 engine SDK"加"锁定版本的 gskill 格式"来编译。」
-- 这一条在原文里没有单列"判据",只列了"现状(如实标注)"(`:74`):「**未实现**。」所以它今天的作用是约束设计,不是宣称能力已具备。
-
-**北极星-5 · 去黑盒**
-- 要什么(`:78`):「开发者必须能看清 gskill 运行的**每一个细节**。tracing 信息要**完整**(不缺环节)、**准确**(记的就是实际发生的)、**高效**(采集与查看的代价不压垮运行本身)。」
-- 判据(`:80`):「凡是"发生了但外部看不见"的环节,都是缺陷候选;修法是把它暴露出来,不是解释它为什么不必看见。」
-
-**两条明确排除项**(`:86-87`):「界面状态必须真实」与「失败时对用户数据零副作用」是要求,但不占北极星席位,它们属于任何严肃工程的底线,由验收清单逐条强制。
-
-**这五条在本仓怎么落地。** 北极星-1 落在"格式把流程钉死、模型只在相位内部发挥"这条实现路线上:相位与连线写在 `graph.yaml` 里,编译期就定死。北极星-2 落在"用户写的是文档,不是框架代码"上:当前格式契约是 `docs/skill-spec/01-PORTABLE-GSKILL-V1.md`(其 frontmatter `status: FROZEN`,即已上机器哈希锁、不可随手改)。北极星-3 落在仓边界上:`AGENTS.md:36` 写死「Core and application code must not import Studio or Gateway modules」——引擎代码里不允许出现工作台或网关的名字。北极星-4 今天只落到"约束设计"这一层,证据见第 3 节 `E-SHP-3`。北极星-5 落在事件、轨迹与检视三件事上,见第 3 节 G-OBS 域;其中"实时看正在跑的运行"这一条今天是空的。
+- **North star**: a top-level criterion of purpose. Every judgement ends by answering "which north star does it serve, and how far". This repository has five, listed in §1.
+- **Acceptance criterion**: one sentence that can be taken away and checked, saying what counts as achieved. A goal without one is not a goal.
+- **gskill**: this project's skill-package format, and a directory written in that format. Inside it the user describes, in documents, which steps a flow has, how the steps connect, and what data each step reads and writes. It is what the user writes and what the engine reads.
+- **Phase**: one step node inside a flow. A gskill is made of phases and the edges between them.
+- **Domain**: a group of capabilities organised around one set of invariants. An "invariant" is the sentence that this group of capabilities keeps true at all times. Directory shape does not decide a domain.
+- **Domain-level Effect**: the observable result a domain promises the user, meaning what the user can observe when it works. It states a promise, not an internal mechanism. This document gives each promise a stable id of the form `E-<domain abbreviation>-<number>`, and later documents cite that id.
+- **Parallel implementation**: another way of delivering the same domain-level Effect, on the same level as the engine's own way and not above it. Every module of the gateway and of the studio is a parallel implementation under some domain-level Effect.
+- **Zero to one**: turning a promise from "impossible" into "possible", even clumsily. This is the engine's responsibility.
+- **One to ten**: taking a promise that already works and making it easier to use and easier to manage. This is the responsibility of the auxiliary modules.
+- **Port**: a stable abstract interface. Domain logic depends only on the Port, and the adapters that implement it absorb the differences between concrete external environments. Every Port in this repository lives in `src/graph_skill_runtime/ports/runtime.py`.
+- **Executor**: the party that actually runs an AGENT phase. An AGENT phase needs an agent that picks its own tools and acts on its own, and the executor is the implementation that supplies that agent.
+- **MoirAI**: a set of agent assets shipped with the engine, made of role descriptions, skill descriptions and knowledge-base text. It is projected into the agent host the user already has, and it walks the user through designing, repairing and evaluating a gskill. It is text assets, and it is not four resident processes.
+- **Host**: the interactive agent tool the developer is using at the moment, for example Claude Code or codex. The host is the driver: it calls the engine, reads results back, and edits source files.
+- **Trace**: the step-by-step record left by one run, saying what each phase received, how the model was asked, what came back, and what was written back. It lands as a file and can be reviewed step by step afterwards.
+- **Compile**: the step that reads a gskill directory into a structured representation, checks it item by item, and produces the runnable graph. It calls no model.
+- **SDK (software development kit)**: a code library that other programs call directly and that opens no network service of its own. This repository is a Python SDK.
+- **MCP (Model Context Protocol)**: a convention that lets an external agent tool call another program's capabilities as "tools". The engine opens one service named `gskill` under this convention.
+- **JSON Schema**: a way of describing, in one JSON document, what another JSON document should look like. The engine uses it to check a phase's inputs and outputs.
+- **Preflight**: before a run actually starts, checking item by item whether the chosen executor can do what this run needs, and refusing on the spot when it cannot.
+- **Golden (baseline)**: one run that a person has accepted, stored to serve as a ruler; every later change is compared against it to judge better or worse.
+- **SQLite**: a lightweight database that stores an entire database as a single file. The engine uses it for graph checkpoints.
+- **WebSocket**: a channel held open in both directions between a browser and a server, used to push what is happening to the interface as it happens.
+- **ah (agent-hypervisor)**: a supervised process manager whose single job is starting a vendor command-line agent, watching it run, and cleaning up after a crash. The decision names it one of the two supported executors.
+- **LangGraph**: an open-source framework that expresses a multi-step model flow as a graph and executes it. The engine uses it as the execution base for graphs, which is why north star 2 measures itself against writing LangGraph code directly.
+- **Sidecar**: the background Python process a desktop application starts beside itself in order to use the engine. The engine itself needs none; a sidecar exists once the studio wraps the engine as an HTTP service.
+- **CORS (cross-origin resource sharing)**: a browser security rule deciding whether one web page may read the response returned from another address. It exists only where there is a web page and an HTTP service.
+- **Catalog**: a list recording which models exist, what parameters each of them accepts, and what they cost. It is data, and it is not a code branch.
+- **Gitea**: a Git server that can be self-hosted. The studio uses it as the place where a team stores, retrieves and reviews gskills.
+- **stdio (standard input and output)**: the plainest channel between processes, where one side writes to its own output and the other reads from its own input, with no network port in between. The engine's MCP service talks to the host this way, so it occupies no port and opens no HTTP service.
 
 ---
 
-## 2. 核心与辅助的分界
+## 1. The purpose of the engine: five north stars
 
-### 2.1 用户 2026-09-03 的裁定(逐字)
+The five stand side by side with no priority order. The source is the old repository's `docs/design/gskill-restructure-decision-2026-08-31.md`, lines 48 to 89. Each is quoted below in its source language, with an English gloss beside it.
+
+**North star 1 · a reliable, reproducible flow**
+- What it wants (`:54`): 「用 langgraph 把流程**钉成一张图**,跑一百次就是同样的一百次。」 (*pin the flow into one graph with LangGraph; a hundred runs are the same hundred runs*)
+- Acceptance criterion (`:56`): 「同一个 gskill、同一份输入,应当走出同一条相位序列;差异只允许出现在相位内部的模型输出,不允许出现在流程结构上。」 (*the same gskill with the same input walks the same phase sequence; difference is allowed in the model output inside a phase and is disallowed in the structure of the flow*)
+
+**North star 2 · simpler, less prone to drift, and faster than writing LangGraph directly**
+- What it wants (`:60`): 「用户用**文档**描述流程即可,不必手写框架代码。」 (*the user describes the flow in documents and writes no framework code by hand*)
+- Reverse criterion (`:62`): 「任何功能,如果它让用户**比裸写 langgraph 还累**,那这个功能就是错的——不论它多"完备"。」 (*any feature that makes the user work harder than writing bare LangGraph is a wrong feature, however "complete" it is*) This criterion carries a veto. A new configuration option, a new required field, and a new convention to remember each passes this question first.
+
+**North star 3 · the engine and the gskill AST are the core, and everything else is efficiency support**
+- What it wants (`:66`): 「核心资产只有两样——engine(编译与执行)和 gskill 的 AST(格式与它的结构化表示)。」 (*there are exactly two core assets: the engine, meaning compilation and execution, and the gskill AST, meaning the format and its structured representation*) AST stands for abstract syntax tree, the structured intermediate representation parsed out of the gskill text the user writes.
+- Acceptance criterion (`:68`): 「engine 与 AST 权重最高;**studio 迁就 engine,不许反向**。」 (*the engine and the AST carry the highest weight; the studio accommodates the engine, and the reverse direction is forbidden*)
+
+**North star 4 · a gskill developed locally is reused on the server unchanged**
+- What it wants (`:72`): 「开发者在本地(桌面应用里)做出来的那个 gskill,**原样**就能在服务端跑,靠的是"锁定版本的 engine SDK"加"锁定版本的 gskill 格式"来编译。」 (*the gskill a developer builds locally, inside the desktop application, runs on the server unchanged, compiled by a version-locked engine SDK plus a version-locked gskill format*)
+- The decision records this north star's status at `:74` as 「**未实现**」 (*not implemented*). Its role today is to constrain design.
+
+**North star 5 · no black boxes**
+- What it wants (`:78`): 「开发者必须能看清 gskill 运行的**每一个细节**。tracing 信息要**完整**(不缺环节)、**准确**(记的就是实际发生的)、**高效**(采集与查看的代价不压垮运行本身)。」 (*the developer must be able to see every detail of a gskill run; tracing information must be complete, meaning no link is missing, accurate, meaning it records what actually happened, and efficient, meaning collecting and reading it does not crush the run itself*)
+- Acceptance criterion (`:80`): 「凡是"发生了但外部看不见"的环节,都是缺陷候选;修法是把它暴露出来,不是解释它为什么不必看见。」 (*every link that happens while staying invisible from outside is a defect candidate, and the fix is to expose it*)
+
+**Two engineering baselines.** The decision at `:84-89` states two further requirements: 「界面状态必须真实」 (*the state an interface shows is the system's real state, and a failure state is pinned to a real reason code*) and 「失败时对用户数据零副作用」 (*a failed operation leaves no half-written artifact behind and damages no existing data*). `:89` states how they are enforced: 「由验收清单逐模块强制」 (*enforced by the acceptance checklist, module by module*). The north stars are the five above.
+
+**How the five land in this repository.** North star 1 lands on one implementation line: the format pins the flow, and the model works inside a phase. Phases and edges are written in `graph.yaml` and fixed at compile time. North star 2 lands on the fact that what the user writes is a document. The current format contract is `docs/skill-spec/01-PORTABLE-GSKILL-V1.md`, whose frontmatter reads `status: FROZEN`, meaning it sits under a machine hash lock and is not edited casually. North star 3 lands on the repository boundary: `AGENTS.md:36` fixes it as 「Core and application code must not import Studio or Gateway modules」, so the name of the studio or of the gateway does not appear in engine code. North star 4 lands today on the level of constraining design, and the evidence is `E-SHP-3` in §3. North star 5 lands on three things, events, traces and inspection, held by domain G-OBS in §3; inside that domain, watching a running run live is empty today.
+
+---
+
+## 2. The line between core and auxiliary
+
+### 2.1 The user's rulings of 2026-09-03, verbatim
+
+Four rulings, each quoted in the language it was spoken in and followed by an English gloss.
 
 - 「要遵循模块化推进,一个模块做完就是一个完整的可验证的模块,充分解耦;别把屎山一股脑搬过去,屎上雕花还是屎。runtime 引擎和 gateway 理论上是可以完全解耦互不影响,可以并行推。studio 里面也有很多前端部分也是可以并行推的。当然 runtime 应该先完成,gateway 和 studio 只是 runtime 的辅助功能」
+  Gloss: advance module by module, where a finished module is one complete, verifiable, well-decoupled module; do not haul a pile of mud across in one go, because flowers carved on mud are still mud. The runtime engine and the gateway can in principle be fully decoupled from each other and advanced in parallel. Many frontend parts inside the studio can also be advanced in parallel. The runtime is finished first, and the gateway and the studio are auxiliary functions of the runtime.
 - 「看一下最一开始的 graph-agent 是如何实现 gateway 的,一个 .env 管 api-key,一个 role.yaml 记录角色和 fallback 顺序,一个 llm_manager 组件调用这两个文件,就能满足这个功能。gateway 是能够更好的管理,从 1 到 10,而不是 0 到 1。Studio 也是同理,没有 studio,engine 也要输出 tracing,也要让用户看到这些"去黑盒"的信息,studio 只是把这件事从 1 做到 10,更方便。」
-- 关于 MoirAI 算不算引擎的一部分:「算,没有 gateway 和 studio,也需要 moirai,这就是判断原则」
-- 关于层级:「"可以直接用 canvas 拖拽、新建节点"也是 studio 的 effect,他的上级模块的 effect 是"可以观察 graph 节点图,可以不手动敲代码建构用户设计的节点图",engine 实现这个 effect 的子模块的 effect 是用 moirai agent 来实现,studio 提供了另一个实现方法,是和"用 moirai agent 来实现"的模块同级的模块。」
+  Gloss: look at how the earliest graph-agent implemented the gateway. One `.env` holding the API key, one `role.yaml` recording roles and the fallback order, and one `llm_manager` component reading those two files were enough to satisfy the function. The gateway manages the same thing better, which is one to ten and not zero to one. The studio is the same case: without the studio the engine still emits tracing and still shows the user this no-black-box information, and the studio takes that from one to ten, more conveniently.
+- On whether MoirAI counts as part of the engine: 「算,没有 gateway 和 studio,也需要 moirai,这就是判断原则」
+  Gloss: it does count. Without the gateway and the studio you still need MoirAI, and that is the deciding principle.
+- On levels: 「"可以直接用 canvas 拖拽、新建节点"也是 studio 的 effect,他的上级模块的 effect 是"可以观察 graph 节点图,可以不手动敲代码建构用户设计的节点图",engine 实现这个 effect 的子模块的 effect 是用 moirai agent 来实现,studio 提供了另一个实现方法,是和"用 moirai agent 来实现"的模块同级的模块。」
+  Gloss: "dragging on a canvas and creating nodes" is also a studio effect. Its parent module's effect is "you can observe the graph node diagram, and you can build the node diagram the user designed without typing code by hand". The engine's submodule that delivers this effect delivers it through the MoirAI agent. The studio supplies another implementation method, a module on the same level as the module that delivers it through the MoirAI agent.
 
-### 2.2 由此定下的三句规则
+### 2.2 The three rules this settles
 
-1. **域级 Effect 树只有一份,归引擎所有。** 网关与工作台不得往这棵树上加条目。
-2. **引擎对每条域级 Effect 至少提供一个自己的实现。** 这就是"0 到 1"。
-3. **网关与工作台的每个模块都是某条既有域级 Effect 下的平行实现**,与引擎自己的实现同级。它的设计文档必须写明自己挂在哪条 Effect 下。找不到父节点只有两种归宿:要么域级表漏了一条(那就先在引擎补上这条和它的第一个实现),要么这个模块不该存在。
+1. **There is exactly one domain-level Effect tree, and the engine owns it.** The gateway and the studio add no entries to this tree.
+2. **The engine supplies at least one implementation of its own for every domain-level Effect.** This is "zero to one".
+3. **Every module of the gateway and of the studio is a parallel implementation under an existing domain-level Effect**, on the same level as the engine's own implementation. Its design document states which Effect it hangs under. A module that finds no parent has two possible homes: either the domain-level table is missing an entry, in which case that entry and its first implementation are added to the engine first, or the module should not exist.
 
-### 2.3 完整性判据
+### 2.3 The completeness criterion
 
-**干净环境里只装引擎这一个包,第 3 节列出的每条域级 Effect 都能达成。** "干净环境"指一台没有装工作台、没有装网关、没有本仓源码树的机器。达不成的条目必须在第 5 节写明"未覆盖 + 原因",不允许留白。
+**In a clean environment holding only the engine package, every domain-level Effect listed in §3 can be achieved.** "Clean environment" means a machine with no studio, no gateway, and no source tree of this repository. An entry that cannot be achieved is written into §5 as "uncovered + reason", and no cell is left blank.
 
-### 2.4 MoirAI 的位置
+### 2.4 Where MoirAI sits
 
-MoirAI 是引擎的一个接入面,与 Python SDK、命令行、MCP 同级——四者都是引擎的接入面,谁也不是谁的下级。判断依据是用户原话:没有网关和工作台,也需要 MoirAI。**同级不等于覆盖面相同**:各投影各自覆盖哪些用例,以 3.10 的覆盖矩阵为准。资产坐标 `src/graph_skill_runtime/integrations/assets/moirai/integration.json`:`asset_version` 为 `1.1.0`,`roles` 4 条、`skills` 8 条、`knowledge` 16 条。
+MoirAI is one of the engine's access surfaces, on the same level as the Python SDK, the command line and MCP. All four are access surfaces of the engine, and none of them is below another. The basis is the user's own words: without the gateway and the studio you still need MoirAI. **Same level carries a separate question from same coverage**: which use cases each projection covers is settled cell by cell by the coverage matrix in §3.10. Asset coordinate `src/graph_skill_runtime/integrations/assets/moirai/integration.json`: `asset_version` is `1.1.0`, with 4 `roles`, 8 `skills` and 16 `knowledge` entries.
 
 ---
 
-## 3. 域级 Effect 树
+## 3. The domain-level Effect tree
 
-**这棵树怎么来的。** 按决议第 321 行起的盘点方法:域按不变量聚类,现有文件与目录怎么摆不构成判据。2026-08-31 盘点出的七个种子域(旧仓 `docs/design/gskill-restructure-inventory-2026-08-31/domain-reports/MANIFEST.md:9-15`:G1 运行时底座 + 契约基建、G2 gskill 格式 + 编译诊断、G3 模型 + 媒体供给、G4 执行 + 观测、G5 评测 + 工作台、G6 创作、G7 委托 + 发布 + 平台)只作种子,不作答案。本文推导出十一个域,与种子的每一处差异都在各域小节里写了理由,汇总在 3.12(含一张按旧仓域报告逐条对账的表)。
+**Where this tree comes from.** The inventory method is the one the decision states from line 321 on: domains cluster by invariant, and the shape of current files and directories is no criterion. The seven seed domains inventoried on 2026-08-31 (old repository `docs/design/gskill-restructure-inventory-2026-08-31/domain-reports/MANIFEST.md:9-15`: G1 runtime base plus contract infrastructure, G2 gskill format plus compile diagnostics, G3 model plus media supply, G4 execution plus observation, G5 evaluation plus studio, G6 authoring, G7 delegation plus publishing plus platform) serve as seeds, and the answer is derived from them. This document derives eleven domains. Every difference from a seed is explained in the subsection of the domain that holds it, and summarised in §3.12, which includes a table reconciling the old repository's domain reports capability by capability.
 
-每条 Effect 写四件事:用户能观察到什么、贡献哪条北极星、引擎自己的实现在哪、已知的平行实现是谁。
+Each Effect states four things: what the user can observe, which north stars it serves, where the engine's own implementation is, and which parallel implementations are known.
 
-### 3.1 G-FMT · 格式与编译诊断
+### 3.1 G-FMT · format and compile diagnostics
 
-**不变量**:一份 gskill 合不合法只由格式规范判定;一次编译返回它当时能查出的全部缺陷,不是第一条。
-**贡献**:北极星-2、北极星-1、北极星-3、北极星-4。
-**与种子的关系**:等于种子域 G2,不改。
+**Invariant**: whether a gskill is legal is decided by the format specification alone; one compile returns every defect it can find at that moment, and not the first one.
+**Serves**: north star 2, north star 1, north star 3, north star 4.
+**Relation to the seeds**: equal to seed domain G2, unchanged.
 
-- **E-FMT-1 用文档描述流程就能编译成一张可运行的图。** 用户观察到:写好 `SKILL.md` + `graph.yaml` + 各相位目录,跑一次编译就得到可执行的图,不必写框架代码。贡献北极星-2、北极星-1。引擎实现:格式契约 `docs/skill-spec/01-PORTABLE-GSKILL-V1.md`(`status: FROZEN`),读取与校验 `src/graph_skill_runtime/core/loader.py`、`src/graph_skill_runtime/core/compiler.py`,入口 `gskill compile`。平行实现:工作台的 Compile 按钮。
-- **E-FMT-2 一次编译拿到全部缺陷,每条带原因码并给出它能给到的定位轴。** 用户观察到:一次编译列出这份 gskill 当时能查出的所有缺陷,每条带一个稳定的原因码,而不是修好一个才冒出下一个。**定位轴有三根——文件、行、字段路径——但不是每条诊断都填得满**:整份文件缺失这类诊断只有文件与行,没有字段路径可指。实跑核实:对一个空目录编译,`[F-v3-skill-entry-missing]` 与 `[F-v3-graph-root-missing]` 两条的 `field_path` 都是 `None`;`domain/models.py:516` 也把 `field_path` 定义为可空(`str | None = None`)。贡献北极星-2、北极星-5。引擎实现:`core/compiler.py:47` 的 `CompileIssue` 带 `source_path` / `line` / `field_path` 三根定位轴;原因码表 `core/error_registry.py` 的 `ERROR_REGISTRY`,实测 99 条(`uv run python -c "from graph_skill_runtime.core.error_registry import ERROR_REGISTRY; print(len(ERROR_REGISTRY))"`)。平行实现:工作台把同一份诊断投影到画布徽章、字段提示与 Compile 抽屉。
-- **E-FMT-3 同一份 gskill 里的子图写一次,包内多个调用方复用。** 用户观察到:把一个子图放进 `graphs/<graph_id>/`,这份 gskill 里任何相位都能按编号调它,不必复制一份。**范围到这份 gskill 为止**:注册表属于单个业务 gSkill,跨两份业务 gskill 引用同一个编号不受支持。贡献北极星-2。引擎实现:格式契约 `docs/skill-spec/01-PORTABLE-GSKILL-V1.md:450` 原句「所有 registry graph 都直接位于 skill root 的 `graphs/` 下，且 graph id 在整个业务 gSkill 内唯一。」,`:452` 原句「同一 registry graph 可以被多个 caller 复用」;拓扑读取 `core/topology_projection.py:42` 与 `:102`。平行实现:暂无。
-- **E-FMT-4 旧格式一次性转换成当前格式,转换器绝不当兜底。** 用户观察到:一条显式命令把旧 skill 转过来;转换失败就是失败,不会在正常路径上悄悄回落到旧读法。贡献北极星-4、北极星-1。引擎实现:`gskill migrate studio-skill`,`src/graph_skill_runtime/migration/studio_v030.py`;边界由 `AGENTS.md:90` 写死。平行实现:暂无。
+- **E-FMT-1 Describing a flow in documents compiles into a runnable graph.** The user observes: write `SKILL.md` plus `graph.yaml` plus the phase directories, run one compile, and receive an executable graph, with no framework code to write. Serves north star 2 and north star 1. Engine implementation: format contract `docs/skill-spec/01-PORTABLE-GSKILL-V1.md` (`status: FROZEN`), reading and validation in `src/graph_skill_runtime/core/loader.py` and `src/graph_skill_runtime/core/compiler.py`, entry point `gskill compile`. Parallel implementation: the studio's Compile button.
+- **E-FMT-2 One compile returns every defect, each with a reason code and the location axes it can fill.** The user observes: one compile lists every defect this gskill has at that moment, each carrying a stable reason code, so that fixing one defect does not reveal the next one of the same stage. **There are three location axes, file, line and field path, and each diagnostic fills the axes it can**: a diagnostic about a whole missing file has a file and a line, with no field path to point at. Verified by running: compiling an empty directory returns `[F-v3-skill-entry-missing]` and `[F-v3-graph-root-missing]`, both with `field_path` set to `None`; `domain/models.py:516` also declares `field_path` as nullable (`str | None = None`). Serves north star 2 and north star 5. Engine implementation: `CompileIssue` at `core/compiler.py:47` carries the three axes `source_path`, `line` and `field_path`; the reason-code table is `ERROR_REGISTRY` in `core/error_registry.py`, measured at 99 entries (`uv run python -c "from graph_skill_runtime.core.error_registry import ERROR_REGISTRY; print(len(ERROR_REGISTRY))"`). Parallel implementation: the studio projects the same diagnostics set onto canvas badges, field tooltips and the Compile drawer.
+- **E-FMT-3 A subgraph inside one gskill is written once and reused by several callers in that package.** The user observes: put a subgraph under `graphs/<graph_id>/` and any phase in this gskill can call it by id, with no copy to make. **The scope reaches the boundary of this gskill**: the registry belongs to a single business gSkill, and referencing one id across two business gskills is unsupported. Serves north star 2. Engine implementation: the format contract `docs/skill-spec/01-PORTABLE-GSKILL-V1.md:450` states 「所有 registry graph 都直接位于 skill root 的 `graphs/` 下，且 graph id 在整个业务 gSkill 内唯一。」 (*every registry graph sits directly under the skill root's `graphs/`, and a graph id is unique within one business gSkill*), and `:452` states 「同一 registry graph 可以被多个 caller 复用」 (*one registry graph can be reused by several callers*); topology reading is in `core/topology_projection.py:42` and `:102`. Parallel implementation: none today.
+- **E-FMT-4 A legacy format is converted into the current format by one explicit command, and the converter never serves as a fallback.** The user observes: one explicit command converts a legacy skill; a failed conversion is a failure, and the normal path silently falls back to no legacy reader. Serves north star 4 and north star 1. Engine implementation: `gskill migrate studio-skill`, `src/graph_skill_runtime/migration/studio_v030.py`; the boundary is fixed by `AGENTS.md:90`. Parallel implementation: none today.
 
-### 3.2 G-CFG · 运行请求的解析与快照
+### 3.2 G-CFG · resolving and snapshotting a run request
 
-**不变量**:一次运行的全部参数在起跑前解析成一份不可变的请求,每个字段说得出它来自哪一层。
-**贡献**:北极星-1、北极星-4、北极星-5。
-**与种子的关系**:从种子域 G1(运行时底座 + 契约基建)里分出来。理由:G1 把"配置解析"和"图执行底座"混在一起,但两者守的不变量不同——前者守"解析确定且可追溯",后者守"执行忠于图"。按决议第 338 行的反事实检验,把配置解析并进执行,会毁掉"起跑前就能看清这次到底会怎么跑"这个行为区分。
+**Invariant**: every parameter of one run is resolved into one immutable request before the run starts, and every field can say which layer it came from.
+**Serves**: north star 1, north star 4, north star 5.
+**Relation to the seeds**: split out of seed domain G1 (runtime base plus contract infrastructure). Reason: G1 mixes configuration resolution with the graph execution base, and the two keep different invariants. The first keeps resolution deterministic and traceable; the second keeps execution faithful to the graph. Under the counterfactual test at decision line 338, folding configuration resolution into execution destroys one behavioural distinction: seeing exactly how this run will go before it starts.
 
-- **E-CFG-1 配置优先级固定,每个字段带出处。** 用户观察到:同一次运行的每个参数,都能查到它来自命令行、项目配置、用户机器配置还是内置默认值。贡献北极星-1、北极星-5。引擎实现:`src/graph_skill_runtime/application/config.py`,优先级顺序写在 `AGENTS.md:50`;出处记在 `ValueOrigin`;入口 `gskill config resolve`。平行实现:工作台的设置界面。
-- **E-CFG-2 每次运行先落一份不可变的请求快照,同一个运行编号内容不同绝不覆盖。** 用户观察到:每次运行在状态目录下留一份 `request.json`,事后能照它复现这次运行的输入。贡献北极星-1、北极星-4。引擎实现:Port `ports/runtime.py:66` 的 `RunSnapshotStore`,落盘 `adapters/snapshots.py`,语义写在 `AGENTS.md:54`。平行实现:工作台的运行列表。
-- **E-CFG-3 执行者只出现在运行时配置里,永不进可移植源。** 用户观察到:把 gskill 目录拷给别人,里面找不到"用哪个执行者"这种绑死宿主的信息。贡献北极星-4。引擎实现:格式契约里 `executor` 一次都没出现;实跑核实——把一行 `executor: cli` 加进 `graph.yaml`,`gskill compile` 从 `passed` 变成 `failed`,诊断是 `[F-v3-graph-schema-unknown-field]`「Extra inputs are not permitted」,定位到 `graph.yaml` 第 20 行、字段 `executor`。配置侧的执行者联合类型在 `domain/models.py:295`。上位依据:决议 `:221`。平行实现:暂无。
-- **E-CFG-4 名字一看就是凭据的字段,不许直接写明文值。** 用户观察到:往 `api_key` 这类结构上像密钥的键里写明文,契约当场拒绝,只接受 `SecretReference` 这种引用形式。**边界要说清**:引擎判不出任意一个业务字符串是不是密钥,所以名字看不出来的键(例如 `opaque`)里写什么,由调用方自己负责分类——`AGENTS.md:52` 原句「A runtime cannot infer whether every arbitrary business string is secret, so callers must classify values that do not have secret-shaped keys.」实跑核实:`RunInvocation(inputs={"api_key": "sk-…"})` 构造失败,`RunInvocation(inputs={"opaque": "sk-…"})` 构造成功。贡献北极星-4(可移植)与"失败时对用户数据零副作用"这条工程底线。引擎实现:`domain/models.py:239` 的 `SecretBinding` 与它引用的 `SecretReference`。平行实现:网关的凭据真相存储。
+- **E-CFG-1 Configuration precedence is fixed, and every field carries its origin.** The user observes: for every parameter of one run, they can find whether it came from the invocation, the project configuration, the operating-system user configuration, or a built-in default. Serves north star 1 and north star 5. Engine implementation: `src/graph_skill_runtime/application/config.py`, with the precedence order written in `AGENTS.md:50`; origins are recorded in `ValueOrigin`; entry point `gskill config resolve`. Parallel implementation: the studio's settings screen.
+- **E-CFG-2 Every run first persists one immutable request snapshot, and one run id with different content is never overwritten.** The user observes: each run leaves a `request.json` under the state directory, from which the inputs of that run can be reproduced afterwards. Serves north star 1 and north star 4. Engine implementation: the `RunSnapshotStore` Port at `ports/runtime.py:66`, persistence in `adapters/snapshots.py`, semantics written in `AGENTS.md:54`. Parallel implementation: the studio's run list.
+- **E-CFG-3 The executor appears only in runtime configuration and never in the portable source.** The user observes: hand the gskill directory to someone else and it holds no host-binding information such as which executor to use. Serves north star 4. Engine implementation: the word `executor` appears nowhere in the format contract. Verified by running: adding one line `executor: cli` to `graph.yaml` turns `gskill compile` from `passed` to `failed`, with diagnostic `[F-v3-graph-schema-unknown-field]` 「Extra inputs are not permitted」, located at `graph.yaml` line 20, field `executor`. The executor union type on the configuration side is at `domain/models.py:295`. Upstream basis: decision `:221`. Parallel implementation: none today.
+- **E-CFG-4 A field whose name reads as a credential rejects a plaintext value.** The user observes: writing plaintext into a structurally secret-shaped key such as `api_key` is refused by the contract on the spot, which accepts only a reference form such as `SecretReference`. **The boundary is stated**: the engine cannot decide whether an arbitrary business string is a secret, so the caller classifies values under keys whose names do not show it, for example `opaque`. `AGENTS.md:52` states 「A runtime cannot infer whether every arbitrary business string is secret, so callers must classify values that do not have secret-shaped keys.」 Verified by running: `RunInvocation(inputs={"api_key": "sk-…"})` fails to construct, and `RunInvocation(inputs={"opaque": "sk-…"})` constructs successfully. Serves north star 4 (portability) and the engineering baseline "a failure leaves user data untouched". Engine implementation: `SecretBinding` at `domain/models.py:239` and the `SecretReference` it points at. Parallel implementation: the gateway's credential truth store.
 
-### 3.3 G-EXE · 图执行与流程保真
+### 3.3 G-EXE · graph execution and fidelity to the flow
 
-**不变量**:走哪些相位、按什么顺序,由图决定,不由模型临场决定。
-**贡献**:北极星-1、北极星-2。
-**与种子的关系**:是种子域 G4(执行 + 观测)的前半。拆开的理由:执行守的是"忠于图",观测守的是"发生的都看得见",两者可以各自单独失败,合在一起会让"跑对了但看不见"和"看得见但跑错了"共用一个格子。
+**Invariant**: which phases run and in what order is decided by the graph, and not by the model on the spot.
+**Serves**: north star 1, north star 2.
+**Relation to the seeds**: the first half of seed domain G4 (execution plus observation). Reason for the split: execution keeps fidelity to the graph, and observation keeps everything that happens visible; each can fail on its own, and one shared cell would let "it ran correctly and nobody could see it" and "it was visible and it ran wrongly" share one status.
 
-- **E-EXE-1 不调用模型也能看清这次会走哪条相位序列。** 用户观察到:干跑一次(predict),拿到确定性的路径与每步的占位输出,不花模型调用的钱。贡献北极星-1、北极星-2、北极星-5。引擎实现:`gskill predict`,`application/service.py:60`,内部在 `core/_predict_internal/`。平行实现:工作台的 Predict 按钮。
-- **E-EXE-2 真跑按编译出来的图执行到底,并返回结构化结果。** 用户观察到:一条命令跑完整个流程,拿到一份可被程序读的结果对象,不是一段自由文本。贡献北极星-1。引擎实现:`gskill run`,`application/service.py:65`,`core/runner.py`。平行实现:工作台的 Run 按钮(同一条路径的界面投影)。
-- **E-EXE-3 LOGIC 相位执行注册好的 Python 动作与校验器。** 用户观察到:确定性的步骤由代码做,不交给模型即兴发挥。贡献北极星-1。引擎实现:`core/actions.py`、`core/validators/`;能力条目 `spec/features.yaml` 的 `F-logic-action-execution`。平行实现:暂无。
-- **E-EXE-4 子图按声明的父子输入输出边界执行,不串味。** 用户观察到:子图只看得到父图交给它的那部分数据。贡献北极星-1、北极星-2。引擎实现:`spec/features.yaml` 的 `F-subgraph-delegation`,装配在 `core/graph_assembler.py`。平行实现:暂无。
-- **E-EXE-5 批量、循环与并行按声明执行。** 用户观察到:声明"对这批数据每条跑一次"就真的每条跑一次,次数与顺序可预期;两个互不依赖的相位真的并排跑,各写各的字段而不互相踩;两个并排的相位要写同一个字段,在编译期就被拒绝,而不是运行时随机谁后写谁赢。贡献北极星-1。引擎实现:批量与循环是 `spec/features.yaml` 的 `F-iterate-runtime`;并行是 2026-08-15 的并行扇出决定——`core/state.py:283-291` 改掉了业务数据的写回方式:各分支只提交自己的数据增量,由运行时合并,不再让最后返回的完整状态覆盖其他分支;`core/loader.py:3356` 的 `_validate_parallel_writers` 在编译期用 `[F-v3-parallel-write-conflict]` 拒绝并排相位写同名字段(`core/error_registry.py:153` 登记为编译期 FATAL),回归测试在 `tests/core/test_parallel_fanout_state_channels.py`。平行实现:暂无。
+- **E-EXE-1 The phase sequence of a run is visible without calling a model.** The user observes: one dry run (predict) yields a deterministic path plus placeholder outputs per step, at no model-call cost. Serves north star 1, north star 2 and north star 5. Engine implementation: `gskill predict`, `application/service.py:60`, internals in `core/_predict_internal/`. Parallel implementation: the studio's Predict button.
+- **E-EXE-2 A real run executes the compiled graph to the end and returns a structured result.** The user observes: one command runs the whole flow and yields a result object a program can read, in place of free text. Serves north star 1. Engine implementation: `gskill run`, `application/service.py:65`, `core/runner.py`. Parallel implementation: the studio's Run button, an interface projection of the same path.
+- **E-EXE-3 A LOGIC phase executes registered Python actions and validators.** The user observes: deterministic steps are done by code, with no model improvisation. Serves north star 1. Engine implementation: `core/actions.py` and `core/validators/`; the capability entry is `F-logic-action-execution` in `spec/features.yaml`. Parallel implementation: none today.
+- **E-EXE-4 A subgraph executes within the declared parent-child input and output boundary.** The user observes: a subgraph sees only the part of the data its parent hands it. Serves north star 1 and north star 2. Engine implementation: `F-subgraph-delegation` in `spec/features.yaml`, assembled in `core/graph_assembler.py`. Parallel implementation: none today.
+- **E-EXE-5 Batching, iteration and parallelism execute as declared.** The user observes: declaring "run once per item over this batch" runs once per item, with a predictable count and order; two phases that do not depend on each other truly run side by side, each writing its own fields without stepping on the other; two side-by-side phases that would write the same field are refused at compile time, in place of a runtime race where the last writer wins. Serves north star 1. Engine implementation: batching and iteration are `F-iterate-runtime` in `spec/features.yaml`; parallelism comes from the parallel fan-out decision of 2026-08-15, where `core/state.py:283-291` defines how business data is written back, with each branch committing only its own data delta and the runtime merging the deltas, so one branch's return leaves the other branches' fields intact; `_validate_parallel_writers` at `core/loader.py:3356` refuses side-by-side phases writing the same field at compile time with `[F-v3-parallel-write-conflict]` (registered as a compile-time FATAL at `core/error_registry.py:153`), and the regression test is `tests/core/test_parallel_fanout_state_channels.py`. Parallel implementation: none today.
 
-### 3.4 G-AGT · AGENT 相位的执行者供给
+### 3.4 G-AGT · supplying an executor for AGENT phases
 
-**不变量**:AGENT 相位交给谁执行,是一次运行的配置;执行者做不到的形状在起跑前就拒绝,不中途炸。
-**贡献**:北极星-1、北极星-4、北极星-2。
-**与种子的关系**:是种子域 G4(执行 + 观测)里"谁来跑 AGENT 相位"这一支。**不含**"把角色解析成模型":那一支单独立为 3.5 的 G-MDL,理由写在那一节。依据是决议 `:210` 原句「差异**只**落在新仓已有的 `AgentExecutor` Port 上,**不新增任何机制**」——分叉点是执行者,而角色到模型的解析在决议 `:235` 是另一个 Port。
+**Invariant**: who executes an AGENT phase is configuration of one run; a shape the executor cannot handle is refused before the run starts, in place of blowing up midway.
+**Serves**: north star 1, north star 4, north star 2.
+**Relation to the seeds**: the branch of seed domain G4 (execution plus observation) that asks who runs an AGENT phase. **Scope**: resolving a role into a model is a separate domain, G-MDL in §3.5, for the reason given in that section. The basis is decision `:210`, 「差异**只**落在新仓已有的 `AgentExecutor` Port 上,**不新增任何机制**」 (*the difference lands only on the `AgentExecutor` Port that already exists in the new repository, and adds no mechanism*), which makes the executor the branching point, while role-to-model resolution is a second Port at decision `:235`.
 
-- **E-AGT-1 AGENT 相位能由一个能自主用工具的执行者跑完,结果写回同一次运行。** 用户观察到:流程跑到需要 agent 的那一步不会停死。贡献北极星-1。引擎实现:Port `ports/runtime.py:31` 的 `AgentExecutor`;今天有三种执行者配置——`HostNativeExecutorConfig`(`domain/models.py:248`)、`CliExecutorConfig`(`:253`)、`EmbeddedExecutorConfig`(`:287`)。**已裁定但尚未执行的差异**:决议 `:230` 把执行者闭集裁为 `embedded` 与 `ah` 两个,`:256` 要求删除 `host-native` 本体;而本仓今天的默认执行者仍是 `host-native`(`AGENTS.md:54`)。这是一条未执行的工单,不是本文新裁的事;实施顺序由决议 `:270` 起的 §5.9 给定。**第二处已裁未执行的差异**:决议 `:227-228` 要求执行者的解析链有两级——`RunRequest.executor` 是本次运行的全局默认,`RunPreset.node_overrides[<相位>].executor` 是相位级覆盖;而 `domain/models.py:404-409` 的 `NodeOverride` 今天只有 `address`、`timeout_seconds`、`custom_params` 三个字段,**没有 `executor`**。后果是:一份 gskill 里两个 AGENT 相位要用不同执行者,今天表达不出来。平行实现:暂无。
-- **E-AGT-2 起跑前逐相位核对执行者的支持面,不支持就以原因码拒绝。** 用户观察到:执行者做不到的能力,在没花任何模型调用钱之前就被告知。贡献北极星-1、北极星-5。引擎自有实现:**缺口**。今天有一件相邻但不同的事:命令行执行者路径在创建交接件之前探测可执行文件、版本、必需参数与登录状态(`AGENTS.md:62`)——那是"这个工具装没装好",不是"这个相位要的能力它支不支持"。决议 `:242` 起要求的"在 `resolve_run` 阶段逐相位核对工具、子 agent、上下文访问、迭代与并行形状"尚未存在。平行实现:暂无。
-- **E-AGT-3 AGENT 的输出按 JSON Schema 校验,不合格就不消费这次任务。** 用户观察到:agent 返回的结构不对时,流程报错,而不是把坏数据写进图状态。贡献北极星-1。引擎实现:`AGENTS.md:58` 与 `:68` 定语义;能力条目 `F-finish-task-validation`。平行实现:暂无。
-- **E-AGT-5 没设角色就编译报错,不悄悄套一个默认角色。** 用户观察到:漏配角色时编译红,并被告知去哪里配。贡献北极星-1、北极星-5。引擎实现:已落地——`core/loader.py:381` 抛 `[F-v3-agent-llm-role-missing]`,`core/error_registry.py:113` 登记它为编译期 FATAL;`grep -rn "DEFAULT_LLM_ROLE" src/ --include=*.py` 返回 0 行,说明旧的兜底已删净。平行实现:工作台的角色配置提示。
+- **E-AGT-1 An AGENT phase is run to completion by an executor that uses tools on its own, and the result is written back into the same run.** The user observes: a flow reaching a step that needs an agent keeps going. Serves north star 1. Engine implementation: the `AgentExecutor` Port at `ports/runtime.py:31`; three executor configurations exist today, `HostNativeExecutorConfig` (`domain/models.py:248`), `CliExecutorConfig` (`:253`) and `EmbeddedExecutorConfig` (`:287`). **A ruled work order awaiting execution**: decision `:230` narrows the executor closed set to `embedded` and `ah`, and `:256` requires deleting the `host-native` implementation itself, while this repository's default executor today is `host-native` (`AGENTS.md:54`). The implementation order is given by the decision's §5.9 from `:270`. **A second ruled work order awaiting execution**: decision `:227-228` requires a two-level resolution chain for the executor, where `RunRequest.executor` is the run-wide default and `RunPreset.node_overrides[<phase>].executor` is the per-phase override, while `NodeOverride` at `domain/models.py:404-409` holds three fields today, `address`, `timeout_seconds` and `custom_params`, **with no `executor`**. The consequence is that a gskill whose two AGENT phases need different executors has no way to express it today. Parallel implementation: none today.
+- **E-AGT-2 Before a run starts, the executor's support surface is checked phase by phase, and an unsupported phase is refused with a reason code.** The user observes: a capability the executor lacks is reported before any model-call money is spent. Serves north star 1 and north star 5. The engine's own implementation: **gap**. What exists today is adjacent: the command-line executor path probes the selected executable, its version, required flags and any authentication status the vendor exposes before creating a durable handoff (`AGENTS.md:62`), which answers whether the tool is installed and usable. The per-phase capability check the decision requires from `:242`, checking tools, subagents, context access, iteration and parallel shapes phase by phase during `resolve_run`, does not exist yet. Parallel implementation: none today.
+- **E-AGT-3 An AGENT's output is checked against a JSON Schema, and a non-conforming result does not consume the task.** The user observes: when the agent returns the wrong structure the flow reports an error, in place of writing bad data into the graph state. Serves north star 1. Engine implementation: `AGENTS.md:58` and `:68` define the semantics; the capability entry is `F-finish-task-validation`. Parallel implementation: none today.
+- **E-AGT-4 A missing role fails the compile, and no default role is substituted silently.** The user observes: a missing role configuration turns the compile red and says where to configure it. Serves north star 1 and north star 5. Engine implementation: in place today. `core/loader.py:381` raises `[F-v3-agent-llm-role-missing]`, and `core/error_registry.py:113` registers it as a compile-time FATAL; `grep -rn "DEFAULT_LLM_ROLE" src/ --include=*.py` returns 0 lines, showing the fallback path is gone. Parallel implementation: the studio's role-configuration hint.
 
-本域没有 `E-AGT-4`:原先编在这个号下的"角色到模型的解析"已移入 3.5 的 G-MDL,新编号是 `E-MDL-1`。这里不重排其余编号,以免同一条承诺出现两个号。
+### 3.5 G-MDL · resolving a role into a model, and credentials
 
-### 3.5 G-MDL · 角色到模型的解析与凭据
+**Invariant**: resolving a role name into a callable model is deterministic and falls back in the declared order, and a credential appears along the whole path only as a reference and never as plaintext.
+**Serves**: north star 1, north star 2, north star 4.
+**Relation to the seeds**: equal to the first half of seed domain G3 (model plus media supply), namely model supply. The old repository's G3 report gives this branch a one-sentence Effect at `ac08659a6d5b556a3_v1.md:11`: turning 「用户手里的一把 key + 一个 URL」 (*a key and a URL in the user's hand*) into 「可被角色消费的、带证据的可用模型」 (*an available model, backed by evidence, that a role can consume*), where every judgement can say what it rests on. **Why it stands apart from G-AGT**: the two can fail independently, since role resolution can succeed while the executor lacks a capability, and the executor can be entirely fine while some role has no available model; one merged domain would let the two gaps hide each other and would blur the owner. The upstream basis is that the decision writes them as two Ports: `:210` states 「差异**只**落在新仓已有的 `AgentExecutor` Port 上,**不新增任何机制**」 (*the difference lands only on the `AgentExecutor` Port that already exists in the new repository, and adds no mechanism*), making execution the single branching point, while `:235` establishes a second Port, 「其中"角色 → 模型"的解析经 **`ModelResolver` Port** 完成,**gateway 包是该 Port 的权威实现**」 (*the resolution from role to model happens through the `ModelResolver` Port, and the gateway package is that Port's authoritative implementation*). The second half of seed domain G3, media supply, is a pending ruling in §7.3.
 
-**不变量**:把一个角色名解析成一个可调用的模型,这件事是确定的、按声明顺序回退的,而且凭据一路只以引用形式出现、不落明文。
-**贡献**:北极星-1、北极星-2、北极星-4。
-**与种子的关系**:等于种子域 G3(模型 + 媒体供给)的前半——"模型供给"。旧仓 G3 报告 `ac08659a6d5b556a3_v1.md:11` 给这一支的一句话 Effect,原文是:把「用户手里的一把 key + 一个 URL」变成「可被角色消费的、带证据的可用模型」,且每一次判定都能说出它凭什么这么判。**它为什么不并进 G-AGT**:两者能各自单独失败——角色解析对了而执行者不支持某项能力,或执行者一切正常而某个角色没有可用模型;合成一个域会让两处缺口互相遮蔽,owner 也说不清。上位依据是决议把它们写成两个 Port:`:210` 原句「差异**只**落在新仓已有的 `AgentExecutor` Port 上,**不新增任何机制**」把执行定为唯一分叉点,而 `:235` 另立一个 Port——「其中"角色 → 模型"的解析经 **`ModelResolver` Port** 完成,**gateway 包是该 Port 的权威实现**」。种子域 G3 的后半"媒体供给"没有并进来,理由见 7.3 的待裁项。
+- **E-MDL-1 A role resolves into a callable model.** The user observes: a gskill saying "this step uses the balanced role" causes a concrete model to be called at run time; when one model is unavailable the resolution falls back in the declared order; the credential appears from end to end only as a reference. Serves north star 1 and north star 2. The engine's own implementation: **gap**. Three pieces of evidence: first, `grep -rn "ModelResolver" src/graph_skill_runtime --include=*.py` returns 0 lines; second, the parameter at `core/graph_assembler.py:213` is `model_resolver: Any = None`, injected from outside; third, `:2427` reads `if model_resolver is None: return None`, so without an injection there is no model. **The zero-to-one reference point**: in the old repository's **historical commit** `c7405b7e`, `config/llm_roles.yaml`, `config/multimodal_roles.yaml` and `src/core/graph_agent/config/llm_config.py`, which is what the user described as one YAML recording roles and the fallback order plus one component reading it. These three are read at that historical commit: the old repository's current working tree (`main` at `dcb12e40`) still holds `config/llm_roles.yaml`, and the other two are absent from the tree. Parallel implementation: the gateway (old repository `packages/graph-agent-gateway`, holding `registry`, `resolve`, `role`, `probing`, `call`, `dialect` and `media` modules) is the one-to-ten of this Effect, and decision `:235` names it the authoritative implementation of the `ModelResolver` Port.
 
-- **E-MDL-1 把一个"角色"解析成一个可调用的模型。**(本文首版编在 `E-AGT-4`,现移到本域,编号以此处为准。)用户观察到:gskill 里写"这一步用 balanced 角色",运行时就有一个具体模型被调用;某个模型不可用时按声明的顺序退到下一个;凭据从头到尾只以引用形式出现。贡献北极星-1、北极星-2。引擎自有实现:**缺口**。三处证据:①`grep -rn "ModelResolver" src/graph_skill_runtime --include=*.py` 返回 0 行;②`core/graph_assembler.py:213` 的参数是 `model_resolver: Any = None`,靠外部注入;③`:2427` 处 `if model_resolver is None: return None`——没有注入就没有模型。**0 到 1 的参照物**:旧仓**历史提交** `c7405b7e` 里的 `config/llm_roles.yaml`、`config/multimodal_roles.yaml` 与 `src/core/graph_agent/config/llm_config.py`,即用户说的"一份 YAML 记角色和退让顺序,一个组件读它"。这三份要按历史提交读:旧仓当前工作树(`main` `dcb12e40`)只还留着 `config/llm_roles.yaml`,另外两份已不在树里。平行实现:网关(旧仓 `packages/graph-agent-gateway`,含 `registry` / `resolve` / `role` / `probing` / `call` / `dialect` / `media` 等模块)是这条 Effect 的 1 到 10;决议 `:235` 已把它定为 `ModelResolver` Port 的权威实现。
+### 3.6 G-STA · persisting run state and resuming
 
-### 3.6 G-STA · 运行状态的持久与续跑
+**Invariant**: the state of one run has exactly one owner, and resuming reads that one copy.
+**Serves**: north star 1, north star 4, north star 5.
+**Relation to the seeds**: split out of seed domain G1, for the same reason as §3.2: persistence keeps state unique and recoverable, which is a different invariant from deterministic configuration resolution.
 
-**不变量**:一次运行的状态只有一个所有者;续跑读的就是那一份,不是复制品。
-**贡献**:北极星-1、北极星-4、北极星-5。
-**与种子的关系**:从种子域 G1 分出。理由同 3.2:持久化守的是"状态唯一且可恢复",与"配置解析确定"是两回事。
+- **E-STA-1 Graph state is persisted generation by generation.** The user observes: the machine dies halfway through a flow and the state is still there. Serves north star 1. Engine implementation: the `CheckpointStore` Port at `ports/runtime.py:40`, implemented in `core/checkpointer.py`. Parallel implementation: none today.
+- **E-STA-2 After an interruption, the current waiting state of that run can be retrieved.** The user observes: `gskill resume` with the run id and a checkpoint reference returns, as it stands, where this run stopped and what it is waiting for. **Scope**: this Effect retrieves the waiting state. `adapters/host_native_runtime.py:266-292` returns, for an existing checkpoint, the response it has already recorded or the request it is waiting on; calling it without a checkpoint reference returns `GSKILL_NOT_IMPLEMENTED` (`:293-298`, with the message 「resume without a host-native checkpoint_ref is not implemented yet」). The entry point that moves a run forward is `gskill submit`, on the MCP side `submit_agent_result`, described in E-STA-4. **A second gap**: `AGENTS.md:58` states 「Standalone typed human/breakpoint resume is not complete.」, so a standalone typed human answer and breakpoint resume are still open. Serves north star 1 and north star 5. Parallel implementation: the studio's resume button.
+- **E-STA-3 Run artifacts are persisted, and the run result carries a stable reference to them.** The user observes: files produced by a flow have a fixed reference address, and the run result is enough to find them again. Serves north star 5. The engine's own implementation: **gap**. Three pieces of evidence: first, `ArtifactStore` at `ports/runtime.py:48` is a Port with no implementation shipped in the package; second, `create_application` in the default composition at `composition.py:14-26` injects the configuration resolver, the engine and the request snapshot store, and injects no `ArtifactStore`; third, the `RunResult` fields at `domain/models.py:626-637` are `status`, `run_id`, `mode`, `request`, `outputs`, `trace_path`, `error`, `agent_required` and `diagnostics`, **with no artifact reference**. `build_compiled_artifact_manifest` at `core/artifacts.py:58` builds a **compile-time** artifact manifest, which is a separate thing from storing run artifacts. `core/runner.py:473` holds an internal `artifact_saver` injection point that public use cases cannot reach. Parallel implementation: the studio's artifact panel.
+- **E-STA-4 Submitting the same result twice is idempotent.** The user observes: submitting one agent result twice returns the same answer, while different content raises a conflict in place of an overwrite. Serves north star 1. Engine implementation: the semantics are written in `AGENTS.md:58`; entry points are `gskill submit` and the MCP tool `submit_agent_result`. Parallel implementation: none today.
 
-- **E-STA-1 图状态按代落盘。** 用户观察到:流程跑到一半机器断了,状态还在。贡献北极星-1。引擎实现:Port `ports/runtime.py:40` 的 `CheckpointStore`,实现在 `core/checkpointer.py`。平行实现:暂无。
-- **E-STA-2 中断之后,拿得回那次运行的当前等待态。** 用户观察到:`gskill resume` 带上运行编号与检查点引用,把"这次运行停在哪、在等什么"原样再取一次。**这条不等于"接着往下跑"**——`adapters/host_native_runtime.py:266-292` 对一个已有的检查点只返回它已记下的响应,或它正在等的那个请求;不带检查点引用调用则返回 `GSKILL_NOT_IMPLEMENTED`(`:293-298`,消息原句「resume without a host-native checkpoint_ref is not implemented yet」)。真正让运行往前走的入口是 `gskill submit`(MCP 侧 `submit_agent_result`),见 E-STA-4。**另一处缺口**:`AGENTS.md:58` 原句「Standalone typed human/breakpoint resume is not complete.」——独立的人工应答与断点续跑尚未完成。贡献北极星-1、北极星-5。平行实现:工作台的续跑按钮。
-- **E-STA-3 运行产物落盘,并在运行结果里给出稳定引用。** 用户观察到:流程产出的文件有固定的引用地址,拿着运行结果就能找回来。贡献北极星-5。引擎自有实现:**缺口**。三处证据:①`ports/runtime.py:48` 的 `ArtifactStore` 只有 Port,包里没有随附实现;②默认组合 `composition.py:14-26` 的 `create_application` 只注入配置解析器、引擎与请求快照存储,不注入 `ArtifactStore`;③`domain/models.py:626-637` 的 `RunResult` 字段是 `status` / `run_id` / `mode` / `request` / `outputs` / `trace_path` / `error` / `agent_required` / `diagnostics`,**没有产物引用**。`core/artifacts.py:58` 的 `build_compiled_artifact_manifest` 建的是**编译期**产物清单,不是运行产物的存储。`core/runner.py:473` 有一个内部的 `artifact_saver` 注入点,公开用例够不着它。平行实现:工作台的产物面板。
-- **E-STA-4 重复提交同一个结果是幂等的。** 用户观察到:同一份 agent 结果提交两次,拿到同一个答案;换成不同内容则冲突报错,而不是覆盖。贡献北极星-1。引擎实现:语义写在 `AGENTS.md:58`;入口 `gskill submit` 与 MCP 工具 `submit_agent_result`。平行实现:暂无。
+### 3.7 G-OBS · no black boxes: events, traces and inspection
 
-### 3.7 G-OBS · 去黑盒:事件、轨迹与检视
+**Invariant**: what happened is visible from outside, item by item; an invisible link is a defect candidate.
+**Serves**: north star 5.
+**Relation to the seeds**: the second half of seed domain G4 standing as its own domain, for the reason given in §3.3.
 
-**不变量**:发生了的事必须能被外部逐条看到;看不见的环节是缺陷候选。
-**贡献**:北极星-5。
-**与种子的关系**:是种子域 G4 的后半独立成域,理由见 3.3。
+- **E-OBS-1 Every step emits a typed event, and an outside party can attach its own receiver.** The user observes: they can follow, event by event, where the flow is and what happened; attaching their own receiver changes no execution semantics. Serves north star 5. Engine implementation: **partial**. The internals are complete: the `EventSink` Port at `ports/runtime.py:54`, the event models in `callbacks/events.py`, the contracts in `core/event_contracts.py`, and the ready-made callbacks `LoggingCallback`, `MetricsCallback` and `TracingCallback` exported at `callbacks/__init__.py:10`; `spec/features.yaml` registers 54 distinct event classes; a default run drops `trace.jsonl` and `metrics.json` automatically (verified by running). **The public surface has no attachment point**: `run(invocation, *, application)` at `sdk.py:62` takes no callback or `EventSink` parameter, and the default composition injects none. `docs/public-api-contract.md:166` states 「The default composition does not inject an `EventSink`.」, and `event_subscriber` at `core/runner.py:472` is an internal parameter that public use cases cannot reach. So events are emitted and land as files, while an outside receiver has no attachment point. Parallel implementation: the studio's run-log panel.
+- **E-OBS-2 Every run that enters the execution stage leaves a readable trace file.** The user observes: after a run, `trace_path` in the result points at a `trace.jsonl` that allows step-by-step review of what each phase received, how the model was asked and what came back. **Boundary**: a run that fails during compilation has diagnostics and no trace. Verified by running: pointing `gskill run` at a directory with no `SKILL.md` returns `status=failed`, `trace_path=None` and the error code `GSKILL_COMPILE_FAILED`, while a normal `hello-world` run has `trace_path` pointing at `<state_root>/runs/<run_id>/trace.jsonl`. Serves north star 5. Engine implementation: `trace_path` in the result (`adapters/result_mapping.py:65`), reading and accumulation in `callbacks/emit.py:114-135`, the step model in `tracing/steps.py`. Parallel implementation: the studio's trace view.
+- **E-OBS-3 A failure carries a stable reason code and the finest location it can give.** The user observes: an error is a machine-assertable code plus a location, in place of free text. **The location comes in three tiers, each finer than the last, and the three together are the full truth of this promise**:
+  1. **Compile time** — located to a file and a line. Verified by running: adding one line `executor: cli` to `graph.yaml` yields `[F-v3-graph-schema-unknown-field]`, pointing at `graph.yaml` line 20, field `executor`. A failure in this tier carries `error.phase` and `error.source_path` both set to `None`, the error code `GSKILL_COMPILE_FAILED`, and the detail inside the result's `diagnostics`.
+  2. **Run-request validation** — already inside `mode=run`, with no phase executing yet. This tier **has no phase to point at**. Verified by running: asking the compiled `hello-world` for a nonexistent artifact yields `status=failed`, `mode=run`, `GSKILL_INVALID_REQUEST`, `phase=None`, `source_path=None`, `trace_path=None`, and the message "artifact request references undeclared artifact ids: no-such-artifact"; this branch is constructed at `adapters/engine.py:151-164`.
+  3. **Phase execution** — the promise is to locate the phase that failed, and today the engine falls short of it. Verified by running: take a minimal gskill that compiles, make the registered Python action inside its LOGIC phase raise a `ValueError`, and the result is `status=failed`, `mode=run`, `GSKILL_RUN_FAILED`, `details.engine_code=[F-v3-runtime-state-mapping-failed]`, with the message `boom from a registered LOGIC action`, while `phase=None` and `source_path=None`. The caller receives the code for what went wrong and no phase id for where it went wrong. **Cause**: `runtime/state_mapper.py:619-624` wraps an exception escaping a phase into a fatal error and passes only the error code and the message, without handing the `phase_id` it holds to `make_error_payload` (a function that accepts `phase_id`, at `core/exceptions.py:92`); at `adapters/result_mapping.py:28-39`, `runtime_error` projects `result.error.phase_id` as it stands, and an empty value stays empty. **This is an engine defect.** The fix is a runtime work order outside the scope of this document, and this document records it.
+  **So a failure today does not always point at a phase.** In the first two tiers no phase has started, so having no phase to point at is the boundary of the promise itself. In the third tier a phase is running while its id is lost, which is the gap. Serves north star 5 and north star 1. Engine implementation: `ERROR_REGISTRY` in `core/error_registry.py` (99 entries, each with a severity and an owning stage); the error envelope is `RuntimeErrorPayload` in `domain/models.py`, with the fields `code`, `phase`, `source_path`, `details` and `retryable`. Parallel implementation: the studio's error hints.
+- **E-OBS-4 The topology and call relations of a compiled artifact can be inspected.** The user observes: without running anything, they can see which phases this gskill has, how they connect and who calls whom. Serves north star 5 and north star 2. Engine implementation: `gskill inspect`, `core/topology_projection.py`; on the MCP side the compile must use `cache=false`, so a query leaves the compile cache clean (`AGENTS.md:42`). Parallel implementation: the studio's canvas.
+- **E-OBS-5 A running run can be subscribed to live.** The user observes: how far a long run has got is visible while it runs, in place of reading a file after it ends. Serves north star 5. The engine's own implementation: **gap**. Evidence: `grep -rn "def subscribe" src/graph_skill_runtime --include=*.py` returns 0 lines; the `EventSink` at `ports/runtime.py:54` holds one method, `emit`, which is a push outlet that an outside party cannot subscribe to. Upstream requirement: the decision's §5.7 from `:262` states that a run is a long task needing an asynchronous task model, and that this model and live event subscription belong to one and the same Port. Parallel implementation: the studio reaches the same result today over its own WebSocket channel.
 
-- **E-OBS-1 每个环节发出带类型的事件,外部能接上自己的接收端。** 用户观察到:能按事件逐条知道流程走到哪、发生了什么;挂上自己的接收端不改变执行语义。贡献北极星-5。引擎实现:**部分**。内部齐备:Port `ports/runtime.py:54` 的 `EventSink`、事件模型 `callbacks/events.py`、契约 `core/event_contracts.py`、现成回调 `callbacks/__init__.py:10` 导出的 `LoggingCallback` / `MetricsCallback` / `TracingCallback`;`spec/features.yaml` 登记了 54 个不重复的事件类;默认跑一次会自动落下 `trace.jsonl` 与 `metrics.json` 两份文件(本次实跑核实)。**公开面没有接线口**:`sdk.py:62` 的 `run(invocation, *, application)` 没有回调或 `EventSink` 参数,默认组合也不注入——`docs/public-api-contract.md:166` 原句「The default composition does not inject an `EventSink`.」;`core/runner.py:472` 的 `event_subscriber` 是内部参数,公开用例够不着。所以"事件被发出并落成文件"成立,"外部挂自己的接收端"不成立。平行实现:工作台的运行日志面板。
-- **E-OBS-2 每次进入执行阶段的运行,留一份可回读的轨迹文件。** 用户观察到:跑完之后运行结果里的 `trace_path` 指向一份 `trace.jsonl`,能逐步复核每个相位收到什么、模型被怎么提问、返回了什么。**边界**:编译阶段就失败的运行没有轨迹,只有诊断——本次实跑核实,把 `gskill run` 指向一个没有 `SKILL.md` 的目录,结果是 `status=failed`、`trace_path=None`、错误码 `GSKILL_COMPILE_FAILED`;而正常跑通 `hello-world` 时 `trace_path` 指向 `<state_root>/runs/<run_id>/trace.jsonl`。贡献北极星-5。引擎实现:结果里的 `trace_path`(`adapters/result_mapping.py:65`),读取与累计在 `callbacks/emit.py:114-135`,步骤模型 `tracing/steps.py`。平行实现:工作台的 trace 视图。
-- **E-OBS-3 失败带稳定原因码,并给出它能给到的最细位置。** 用户观察到:报错是一个可被程序断言的编号加位置,不是一句自由文本。**位置分三档,一档比一档细,这三档就是这条承诺的完整真值**:
-  1. **编译期**——定位到文件与行。实跑核实:往 `graph.yaml` 加一行 `executor: cli`,得到 `[F-v3-graph-schema-unknown-field]`,指到 `graph.yaml` 第 20 行、字段 `executor`。这一档失败时结果里 `error.phase` 与 `error.source_path` 都是 `None`,错误码是 `GSKILL_COMPILE_FAILED`,细节在结果的 `diagnostics` 里。
-  2. **运行请求校验期**——已经进入 `mode=run`,但还没轮到任何相位执行。这一档**没有相位可指**。实跑核实:对编译通过的 `hello-world` 请求一个不存在的产物,得到 `status=failed`、`mode=run`、`GSKILL_INVALID_REQUEST`、`phase=None`、`source_path=None`、`trace_path=None`,消息是"artifact request references undeclared artifact ids: no-such-artifact";这个分支由 `adapters/engine.py:151-164` 构造。
-  3. **相位执行期**——**应当**定位到出事的那个相位,**但今天不成立**。实跑核实:拿一份编译通过的最小 gskill,让它 LOGIC 相位里那个已注册的 Python 动作抛一个 `ValueError`,结果是 `status=failed`、`mode=run`、`GSKILL_RUN_FAILED`、`details.engine_code=[F-v3-runtime-state-mapping-failed]`、消息就是那句 `boom from a registered LOGIC action`,而 `phase=None`、`source_path=None`——调用方拿得到"哪里错了"的码,却拿不到"哪个相位错了"。**原因**:`runtime/state_mapper.py:619-624` 把相位里逸出的异常包成致命错误时,只传了错误码和消息,没有把它手里的 `phase_id` 传给 `make_error_payload`(该函数在 `core/exceptions.py:92` 是接受 `phase_id` 的);到了 `adapters/result_mapping.py:28-39`,`runtime_error` 只能把 `result.error.phase_id` 原样投射出去,空的还是空的。**这是引擎缺陷,不是本文的措辞问题**,修法是运行时工单,不在本文范围;本文只如实登记它。
-  **所以"失败一定能指到相位"今天一档都不成立**:前两档是承诺本身的边界(相位还没开始,没有相位可指),第三档是真缺口(相位在跑,相位号却丢了)。贡献北极星-5、北极星-1。引擎实现:`core/error_registry.py` 的 `ERROR_REGISTRY`(99 条,每条带严重级与所属阶段);错误信封 `domain/models.py` 的 `RuntimeErrorPayload`,字段含 `code` / `phase` / `source_path` / `details` / `retryable`。平行实现:工作台的错误提示。
-- **E-OBS-4 检视编译产物的拓扑与调用关系。** 用户观察到:不跑也能看清这份 gskill 有哪些相位、怎么连、谁调谁。贡献北极星-5、北极星-2。引擎实现:`gskill inspect`,`core/topology_projection.py`;MCP 侧要求以 `cache=false` 编译,查询不得污染编译缓存(`AGENTS.md:42`)。平行实现:工作台的画布。
-- **E-OBS-5 正在跑的运行能被实时订阅。** 用户观察到:一次长时间运行跑到哪了,可以边跑边看,而不是等它结束再读文件。贡献北极星-5。引擎自有实现:**缺口**。证据:`grep -rn "def subscribe" src/graph_skill_runtime --include=*.py` 返回 0 行;`ports/runtime.py:54` 的 `EventSink` 只有 `emit` 一个方法,是推出口,外部无法主动订阅。上位要求:决议 `:262` 起的 §5.7——run 是长任务,需要异步任务模型,且它与实时事件订阅必须并为同一个 Port。平行实现:工作台今天用自己的 WebSocket 通道达成同样效果。
+### 3.8 G-EVA · evaluation
 
-### 3.8 G-EVA · 评测
+**Invariant**: whether a gskill is right is decided by reviewable criteria, and not by one impression.
+**Serves**: north star 1, north star 5.
+**Relation to the seeds**: the first half of seed domain G5 (evaluation plus studio). The second half, the studio, is a parallel implementation under several Effects of G-OBS and G-ACC by rule 1 in §2.2, so it sits outside the domain-level table.
 
-**不变量**:一个 gskill 做得对不对,由可复核的判据说了算,不由一次观感。
-**贡献**:北极星-1、北极星-5。
-**与种子的关系**:是种子域 G5(评测 + 工作台)的前半。后半"工作台"按 2.2 的规则不是域级 Effect,它是 G-OBS 与 G-ACC 若干条 Effect 下的平行实现,所以从域级表里移出。
+- **E-EVA-1 A golden baseline drives one evaluation run with a reviewable conclusion.** The user observes: an accepted run is stored as a baseline, and every later change is judged better or worse against it. Serves north star 1 and north star 5. Engine implementation: `gskill golden`, `application/service.py:90`, implemented in `core/_predict_internal/golden_eval.py:193`; the MCP tool name is `evaluate_golden`. Parallel implementation: the studio's evaluation panel.
+- **E-EVA-2 A deterministic stub makes comparable results reachable offline.** The user observes: a machine with no network and no model credentials still runs the tests and reaches a stable conclusion. Serves north star 1. Engine implementation: `F-predict-internal-mocking` in `spec/features.yaml`, with the stub in `core/_predict_internal/stub.py`. Parallel implementation: none today.
 
-- **E-EVA-1 用 golden 基线跑一次评测,得到一个可复核的结论。** 用户观察到:把一次认可的运行存成基线,以后每次改动都能对着它判"变好还是变坏"。贡献北极星-1、北极星-5。引擎实现:`gskill golden`,`application/service.py:90`,实现在 `core/_predict_internal/golden_eval.py:193`;MCP 工具名 `evaluate_golden`。平行实现:工作台的评测面板。
-- **E-EVA-2 确定性替身让离线也能跑出可比的结果。** 用户观察到:没有网络、没有模型凭据的机器上也能跑测试,并得到稳定结论。贡献北极星-1。引擎实现:`spec/features.yaml` 的 `F-predict-internal-mocking`,替身在 `core/_predict_internal/stub.py`。平行实现:暂无。
+### 3.9 G-AUT · authoring and understanding
 
-### 3.9 G-AUT · 创作与理解
+**Invariant**: the user produces a correct gskill without first learning the framework, and understands what they produced.
+**Serves**: north star 2.
+**Relation to the seeds**: equal to seed domain G6 (authoring), with its content arranged by levels according to the user's words of 2026-09-03 quoted in §2.1: the parent promise is observing the node diagram and building it without typing code, the engine's implementation is the MoirAI agent, and the studio's canvas is another implementation on the same level.
 
-**不变量**:用户不必先学框架,就能做出一份正确的 gskill,并看懂自己做出来的是什么。
-**贡献**:北极星-2。
-**与种子的关系**:等于种子域 G6(创作),但内容按用户 2026-09-03 关于层级的原话重排:上级承诺写"能观察节点图、能不手敲代码建出节点图",引擎的实现是 MoirAI 代理人,工作台画布是与它同级的另一种实现。
+- **E-AUT-1 An agent walks the user from an intention to a gskill that compiles.** The user observes: inside the agent tool they already have, a role asks them for the domain concepts, settles the topology and the data contracts, and produces compilable source. Serves north star 2. Engine implementation: the `moirai` and `moirai-clotho` roles in the MoirAI assets at `integrations/assets/moirai/integration.json`, plus the four skills `moirai-domain-analysis`, `moirai-graph-design`, `moirai-agent-prompt-design` and `moirai-brainstorming`. Parallel implementation: the studio's new-skill wizard.
+- **E-AUT-2 When a compile fails, someone locates the smallest authoritative source and fixes it.** The user observes: holding a complete diagnostics set, a role tells them which single place to change and why that place. Serves north star 2 and north star 5. Engine implementation: the MoirAI `moirai-lachesis` role and the `moirai-compile-repair` skill, with the knowledge-base entry `KB-07-compile-diagnostics.md`. Parallel implementation: the studio marks the diagnostics directly on the canvas nodes.
+- **E-AUT-3 The graph node diagram can be observed.** The user observes: they can see what this gskill looks like, which nodes it has and how they connect. Serves north star 2 and north star 5. Engine implementation: **this domain adds no implementation of its own and reuses the one under `E-OBS-4`**, the topology projection of `gskill inspect` (`core/topology_projection.py`); the MoirAI knowledge-base entry `KB-05-subgraph.md` teaches the agent how to read it. One implementation, two uses. Parallel implementation: the studio canvas.
+- **E-AUT-4 The designed node diagram is built without typing code by hand.** The user observes: describing the flow they want yields the corresponding nodes and edges, with no `graph.yaml` to write word by word. Serves north star 2. Engine implementation: the MoirAI `moirai-clotho` role and the `moirai-graph-design` skill. Parallel implementation: dragging to create nodes on the studio canvas, which in the user's words 「是和"用 moirai agent 来实现"的模块同级的模块」 (*is a module on the same level as the module that delivers it through the MoirAI agent*).
 
-- **E-AUT-1 有一个代理人带着用户从"想做什么"走到一份能编译的 gskill。** 用户观察到:在自己手边的 agent 工具里,有一个角色会问清领域概念、定出拓扑与数据契约,并给出可编译的源。贡献北极星-2。引擎实现:MoirAI 资产 `integrations/assets/moirai/integration.json` 里的 `moirai` 与 `moirai-clotho` 角色,以及 `moirai-domain-analysis` / `moirai-graph-design` / `moirai-agent-prompt-design` / `moirai-brainstorming` 四个技能。平行实现:工作台的新建向导。
-- **E-AUT-2 编译失败时,有人能定位到最小的权威源并修好。** 用户观察到:拿着一份完整诊断,有角色告诉他改哪一处、为什么是那一处。贡献北极星-2、北极星-5。引擎实现:MoirAI 的 `moirai-lachesis` 角色与 `moirai-compile-repair` 技能,知识库 `KB-07-compile-diagnostics.md`。平行实现:工作台把诊断直接标在画布节点上。
-- **E-AUT-3 能观察 graph 节点图。** 用户观察到:看得见这份 gskill 长什么样——有哪些节点、怎么连。贡献北极星-2、北极星-5。引擎实现:**本域不另有实现,复用 `E-OBS-4` 的那一条**——`gskill inspect` 的拓扑投影(`core/topology_projection.py`);MoirAI 知识库 `KB-05-subgraph.md` 只负责教会代理人怎么读它。所以这里是同一处实现的第二个用途,不是第二处实现。平行实现:工作台画布。
-- **E-AUT-4 不手动敲代码就能把设计好的节点图建出来。** 用户观察到:说清想要的流程,就得到对应的节点与连线,不必逐字写 `graph.yaml`。贡献北极星-2。引擎实现:MoirAI 的 `moirai-clotho` 角色与 `moirai-graph-design` 技能。平行实现:工作台画布的拖拽新建节点——按用户原话,它「是和"用 moirai agent 来实现"的模块同级的模块」。
+### 3.10 G-ACC · access surfaces
 
-### 3.10 G-ACC · 接入面
+**Invariant**: **for one use case there is exactly one set of rules across the projections**, because a projection translates and implements no rules of its own. The invariant governs the rules; which use case appears on which access surface is a deliberate choice per surface, written cell by cell in the coverage matrix below.
+**Serves**: north star 3, north star 4, north star 2.
+**Relation to the seeds**: the half of seed domain G7 (delegation plus publishing plus platform) that answers how the engine is called. Reason for the split: an access surface keeps one set of rules, and shipping keeps another machine able to install the same copy; deleting either destroys one behavioural distinction.
 
-**不变量**:**同一个用例在各投影里的规则只有一份**——投影只做翻译,不各自实现规则。注意这条**没有**说四条接入面覆盖同一套用例:哪个用例出现在哪几条接入面上,是各自的刻意选择,下面的覆盖矩阵逐格写明。
-**贡献**:北极星-3、北极星-4、北极星-2。
-**与种子的关系**:从种子域 G7(委托 + 发布 + 平台)里分出"怎么被调用"这一半。分开的理由:接入面守"规则只有一份",发货守"别的机器装得出同一份",删掉任一方都会毁掉一个行为区分。
+- **E-ACC-1 Importing one package in Python gives the engine's eight run use cases plus host-projection installation.** The user observes: a stable, written list of public interfaces, with no internal implementation to read. Legacy-format conversion sits outside it, for the reason given under the matrix. Serves north star 3 and north star 4. Engine implementation: the facade `sdk.py` (13 public functions), the top-level contract `graph_skill_runtime.__all__` measured at 77 symbols, and the document `docs/public-api-contract.md` (frontmatter `role: contract`, `status: living`). Parallel implementation: none today.
+- **E-ACC-2 The `gskill` command line is the projection with the widest coverage.** The user observes: without writing Python they can compile, dry-run, run, retrieve a waiting state, inspect, evaluate, convert a legacy format, install a host projection, and start the MCP service. Serves north star 2 and north star 4. Engine implementation: the subcommands registered from `adapters/cli.py:166` — `compile`, `config resolve`, `predict`, `run`, `resume`, `submit`, `inspect`, `golden`, `migrate studio-skill`, `integrations detect|install|uninstall`, and `mcp`. Parallel implementation: the studio's buttons.
+- **E-ACC-3 An out-of-process caller reaches the engine's eight run use cases over one network interface, under one set of rules.** "Out-of-process caller" means anyone outside the same Python process: an external agent, another program, or an interface on another machine. The user observes: using the engine directly as a tool inside Claude Code or codex; switching to the studio's interface and pressing buttons goes through the same rules and not a second implementation. Serves north star 3 and north star 2. The engine's own implementation: the stdio MCP service from `adapters/mcp.py:31`, service name `gskill`, holding exactly 8 tools — `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect` and `evaluate_golden`; every tool declares its state-impact annotations (`AGENTS.md:42`). Parallel implementation: the studio's HTTP interface, whose own liveness and whose reachability from the interface are its internal business, described in the G1 row of the reconciliation table in §3.12.
+- **E-ACC-4 Projecting MoirAI into a host is one explicit operation that refuses on conflict and can be rolled back.** The user observes: a health check runs before installation, and any conflicting target leaves everything untouched; uninstalling removes only what it installed and only what has kept its content. Serves north star 2. Engine implementation: `integrations/installer.py` and `integrations/renderers.py`, with the rules written in `AGENTS.md:44`; the command is `gskill integrations install moirai --targets ... --scope ...`. Parallel implementation: none today.
 
-- **E-ACC-1 在 Python 里 import 一个包,就能用引擎的八个运行用例加宿主投影安装。** 用户观察到:一个稳定的、写下来的公开接口清单,不必去读内部实现。(不含旧格式转换,理由见下面矩阵。)贡献北极星-3、北极星-4。引擎实现:门面 `sdk.py`(13 个公开函数),顶层契约 `graph_skill_runtime.__all__` 实测 77 个符号,文档 `docs/public-api-contract.md`(frontmatter `role: contract`,`status: living`)。平行实现:暂无。
-- **E-ACC-2 命令行 `gskill` 是覆盖面最全的那一条投影。** 用户观察到:不写 Python 也能编译、干跑、真跑、取回等待态、检视、评测、转换旧格式、装宿主投影,以及把 MCP 服务起起来。贡献北极星-2、北极星-4。引擎实现:`adapters/cli.py:166` 起注册的子命令——`compile`、`config resolve`、`predict`、`run`、`resume`、`submit`、`inspect`、`golden`、`migrate studio-skill`、`integrations detect|install|uninstall`、`mcp`。平行实现:工作台的按钮。
-- **E-ACC-3 进程外的调用方通过一条网络接口调用引擎的八个运行用例,规则只有一份。** "进程外的调用方"指不在同一个 Python 进程里的那些——外部 agent、别的程序、另一台机器上的界面。用户观察到:在 Claude Code 或 codex 里直接把引擎当工具用;换成工作台的界面点按钮,走的是同一套规则,不是另一份实现。贡献北极星-3、北极星-2。引擎自己的实现:`adapters/mcp.py:31` 起的 stdio MCP 服务,服务名 `gskill`,恰好 8 个工具——`compile`、`resolve_run`、`predict`、`run`、`resume`、`submit_agent_result`、`inspect`、`evaluate_golden`;每个工具必须声明状态影响标注(`AGENTS.md:42`)。平行实现:工作台的 HTTP 接口(它自己怎么活着、怎么被界面调到,是它内部的事,见 3.12 对账表 G1 那行)。
-- **E-ACC-4 把 MoirAI 投影进宿主,是一次显式、冲突即拒、可回滚的操作。** 用户观察到:装之前先体检,任一目标冲突就整体不动;卸载只删自己装的那些、且内容没被改过的那些。贡献北极星-2。引擎实现:`integrations/installer.py`、`integrations/renderers.py`,规则写在 `AGENTS.md:44`;命令 `gskill integrations install moirai --targets ... --scope ...`。平行实现:暂无。
+**Use case by projection coverage matrix.** Every cell is marked either "deliberately absent" or "gap", and no cell is blank. The MoirAI column rests on this fact: its host projection registers the same `gskill` stdio MCP service (`AGENTS.md:40` states 「register the same single `gskill` stdio MCP server」), so the set of use cases MoirAI can reach **equals** the MCP column.
 
-**用例 × 投影覆盖矩阵。** 空格一律标"刻意"或"缺口",不留白。MoirAI 那一列的依据是:它的宿主投影注册的是同一个 `gskill` stdio MCP 服务(`AGENTS.md:40` 原句「register the same single `gskill` stdio MCP server」),所以 MoirAI 能够到的用例集合**就等于** MCP 那一列。
-
-| 用例 | Python SDK | 命令行 `gskill` | MCP | MoirAI |
+| Use case | Python SDK | Command line `gskill` | MCP | MoirAI |
 |---|---|---|---|---|
-| 编译 | 有 | 有(`compile`) | 有 | 有 |
-| 解析运行请求 | 有 | 有(`config resolve`) | 有 | 有 |
-| 干跑 | 有 | 有(`predict`) | 有 | 有 |
-| 真跑 | 有 | 有(`run`) | 有 | 有 |
-| 取回等待态 | 有 | 有(`resume`) | 有 | 有 |
-| 提交 agent 结果 | 有 | 有(`submit`) | 有 | 有 |
-| 检视拓扑 | 有 | 有(`inspect`) | 有 | 有 |
-| golden 评测 | 有 | 有(`golden`) | 有 | 有 |
-| 旧格式转换 | 刻意无 | 有(`migrate studio-skill`) | 刻意无 | 刻意无 |
-| 宿主投影安装 | 有(5 个函数) | 有(`integrations detect/install/uninstall`) | 刻意无 | 刻意无 |
-| 启动 MCP 服务 | 刻意无 | 有(`mcp`) | 不适用 | 不适用 |
+| Compile | Yes | Yes (`compile`) | Yes | Yes |
+| Resolve a run request | Yes | Yes (`config resolve`) | Yes | Yes |
+| Dry run | Yes | Yes (`predict`) | Yes | Yes |
+| Real run | Yes | Yes (`run`) | Yes | Yes |
+| Retrieve a waiting state | Yes | Yes (`resume`) | Yes | Yes |
+| Submit an agent result | Yes | Yes (`submit`) | Yes | Yes |
+| Inspect the topology | Yes | Yes (`inspect`) | Yes | Yes |
+| Golden evaluation | Yes | Yes (`golden`) | Yes | Yes |
+| Legacy-format conversion | Deliberately absent | Yes (`migrate studio-skill`) | Deliberately absent | Deliberately absent |
+| Host-projection installation | Yes (5 functions) | Yes (`integrations detect/install/uninstall`) | Deliberately absent | Deliberately absent |
+| Start the MCP service | Deliberately absent | Yes (`mcp`) | Not applicable | Not applicable |
 
-矩阵里没有一格是遗漏,逐格依据如下:
+Each cell above carries a basis:
 
-- **旧格式转换只留在命令行**:`docs/public-api-contract.md:26` 原句「Legacy parsing is confined to the explicit `gskill migrate studio-skill` converter.」旧格式的读法被关进这一个显式边界;少一个入口,就少一处让它变成"编译失败后自动兜底"的机会。这正是 E-FMT-4 那条承诺的另一面。
-- **MCP 恰好八个用例**:`AGENTS.md:42` 原句「The `gskill` MCP server exposes exactly `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`.」"exactly"是闭集声明,不是当前进度。
-- **宿主投影安装不进 MCP**:安装会写用户宿主的配置文件,而 MCP 工具是被外部 agent 自动调起的。`AGENTS.md:44` 原句「Detection is evidence, not authorization.」授权被限定在显式的命令行或 SDK 调用上。
-- **"启动 MCP 服务"在 SDK 侧是刻意无**:`adapters/mcp.py:26` 确实有 `create_server`,但它不在 `__all__` 的 77 个符号里,这是刻意的。理由:Python SDK 服务的是进程内的调用方,而进程内调用方已经直接拿到全部八个用例,不需要绕一圈 MCP;把一个 stdio 服务起起来是进程入口的事,归命令行 `gskill mcp`。今天没有任何进程内调用方需要从 Python 拉起 MCP 服务,按"只为当下已确认的需求写代码"这条,它不进公开契约。
+- **Legacy-format conversion stays on the command line**: `docs/public-api-contract.md:26` states 「Legacy parsing is confined to the explicit `gskill migrate studio-skill` converter.」 Reading the legacy format is confined inside this one explicit boundary; one entry point fewer is one fewer chance for it to become an automatic fallback after a failed compile. This is the other face of the promise in E-FMT-4.
+- **MCP holds exactly eight use cases**: `AGENTS.md:42` states 「The `gskill` MCP server exposes exactly `compile`, `resolve_run`, `predict`, `run`, `resume`, `submit_agent_result`, `inspect`, and `evaluate_golden`.」 The word "exactly" declares a closed set, and it describes the closed set, not a progress point.
+- **Host-projection installation stays out of MCP**: installation writes the user's host configuration files, while an MCP tool is invoked automatically by an external agent. `AGENTS.md:44` states 「Detection is evidence, not authorization.」, confining authorization to an explicit command-line or SDK call.
+- **"Start the MCP service" is deliberately absent on the SDK side**: `create_server` does exist at `adapters/mcp.py:26`, and it stays outside the 77 symbols of `__all__` by choice. The reason: the Python SDK serves in-process callers, and an in-process caller already holds all eight use cases directly, so it has no need to route through MCP; starting a stdio service is a process-entry concern owned by the command line `gskill mcp`. No in-process caller today needs to start an MCP service from Python, so under the rule "write code only for a need confirmed today" it stays outside the public contract.
 
-### 3.11 G-SHP · 发货与环境复现
+### 3.11 G-SHP · shipping and environment reproduction
 
-**不变量**:本地做出来的东西,能在别的机器上装出同样的一份。
-**贡献**:北极星-4。
-**与种子的关系**:种子域 G7 的另一半,理由见 3.10。
+**Invariant**: what was built locally can be installed as the same copy on another machine.
+**Serves**: north star 4.
+**Relation to the seeds**: the other half of seed domain G7, for the reason given in §3.10.
 
-- **E-SHP-1 装一个包就有全部能力,用户的业务 gskill 不随包发。** 用户观察到:安装包里没有别人的业务技能,也不会有人偷偷注册或改写他自己的技能目录。贡献北极星-4、北极星-3。引擎实现:边界写在 `AGENTS.md:38`;打包内容由 `scripts/accept_release_artifacts.py` 的 `validate` 逐条断言(`AGENTS.md:78`)。平行实现:暂无。
-- **E-SHP-2 我在自己的平台上装得上、跑得起来。** 用户观察到:在 Windows、macOS、Linux 三者中的任一台机器上装完这个包,`gskill` 命令能用,能编译、能跑。贡献北极星-4。**这条承诺不包含"随附三平台验收证据"**:那不是用户装完包能观察到的结果,而是让这条承诺可信的过程规则,已写进 4.4 第 4 条公理。引擎实现:跨平台行为约束在 `docs/CROSS_PLATFORM.md`;三平台验收的取证手段是 `scripts/accept_release_artifacts.py` 的 `accept`,范围写在 `AGENTS.md:80`——它是仓内脚本,不随包发,所以它本身不是这条承诺的一部分。**缺口**:今天只能从本地构建的 wheel 装,没有正式发布的包可装,三平台验收也只发生在候选产物这一级(`AGENTS.md:78-82`)。平行实现:暂无。
-- **E-SHP-3 一次发布产出内容寻址、版本锁定、可脱离源文件独立运行的资产;本地做的 gskill 原样在服务端跑。** 用户观察到四件事:发布出来的资产按内容取址(拿哈希就能确认拿到的是同一份东西)、版本被锁死、不带源文件也能跑、同一份 gskill 交给服务端跑出同一条相位序列。靠的是锁定版本的引擎加锁定版本的格式。贡献北极星-4。引擎自有实现:**缺口**。证据两处:决议 `:74` 原话「**未实现**」;`AGENTS.md:20`「The project is not published on PyPI or TestPyPI.」——没有发布,"锁定版本"就没有可锁的对象。平行实现:暂无。
+- **E-SHP-1 Installing one package gives every capability, and the user's business gskills stay outside the package.** The user observes: the installation package holds nobody else's business skills, and nothing registers or rewrites their own skill directory behind their back. Serves north star 4 and north star 3. Engine implementation: the boundary is written in `AGENTS.md:38`; the packaged content is asserted item by item by `validate` in `scripts/accept_release_artifacts.py` (`AGENTS.md:78`). Parallel implementation: none today.
+- **E-SHP-2 The package installs and runs on my own platform.** The user observes: on any one of Windows, macOS and Linux, installing this package makes the `gskill` command work, able to compile and to run. Serves north star 4. **This promise leaves three-platform acceptance evidence to a separate rule**: that evidence is not something the user observes after installing, and it is the process rule that makes this promise trustworthy, written as axiom 4 in §4.4. Engine implementation: cross-platform behaviour is constrained by `docs/CROSS_PLATFORM.md`; the evidence-gathering instrument for three-platform acceptance is `accept` in `scripts/accept_release_artifacts.py`, whose scope is written in `AGENTS.md:80`, and it is a repository script that ships with no package, so it stands outside this promise. **Gap**: today the only installable thing is a locally built wheel, there is no officially published package to install, and three-platform acceptance happens at the candidate-artifact level (`AGENTS.md:78-82`). Parallel implementation: none today.
+- **E-SHP-3 One release produces content-addressed, version-locked assets that run without the source files, and a locally built gskill runs on the server unchanged.** The user observes four things: released assets are addressed by content, so a hash confirms the same copy; versions are locked; the assets run without the source files; and the same gskill handed to the server walks the same phase sequence. This rests on a version-locked engine plus a version-locked format. Serves north star 4. The engine's own implementation: **gap**. Two pieces of evidence: the decision at `:74` records 「**未实现**」 (*not implemented*); `AGENTS.md:20` states 「The project is not published on PyPI or TestPyPI.」, so with no publication there is nothing for "version-locked" to lock onto. Parallel implementation: none today.
 
-### 3.12 与七个种子域的差异汇总
+### 3.12 Summary of the differences from the seven seed domains
 
-下面两张表回答同一个问题的两个层次:第一张说每个种子**域**去了哪里,第二张说种子域里点过名的每项**能力**去了哪里。第二张之所以必要,是因为 2026-08-31 的域报告里,域的名字和它实际点名的能力并不总是一回事——G1 叫"运行时底座 + 契约基建",但它报告里列的六条 Effect 讲的是桌面应用的 sidecar 生死、横幅、重启预算、错误信封与原因码册。只对着域名对账会漏掉这些。
+The two tables below answer the same question at two levels. The first says where each seed **domain** went. The second says where each **capability** named inside a seed domain went. The second table is needed because in the domain reports of 2026-08-31 a domain's name and the capabilities its report actually names differ: G1 is called "runtime base plus contract infrastructure", while the six Effects listed in its report describe the desktop application's sidecar liveness, banner, restart budget, error envelope and reason-code registry. Reconciling by domain name alone reaches the names, and reconciling capability by capability reaches these six as well.
 
-| 种子域 | 本文的归宿 | 理由 |
+| Seed domain | Where it goes in this document | Reason |
 |---|---|---|
-| G1 运行时底座 + 契约基建 | 这个**域名**下的引擎侧内容拆成 G-CFG(解析与快照)与 G-STA(状态与续跑);而 G1 报告实际点名的六条 Effect 大多是工作台侧能力,逐条归宿见下面第二张表 | 前两者守的不变量不同(解析确定可追溯 / 状态唯一可恢复),可以各自单独失败;而 sidecar 生死、横幅、CORS 这些只在"把引擎包成 HTTP 服务"之后才存在,引擎自己是不开 HTTP 服务的 SDK(决议 `:25` 原句「纯软件开发工具包(SDK,即被别的程序调用的代码库,自己不开 HTTP 服务)」) |
-| G2 gskill 格式 + 编译诊断 | 原样成为 G-FMT | 不变量一致,无需改动 |
-| G3 模型 + 媒体供给 | "模型供给"单独立为 **G-MDL**;"媒体供给"未立域级 Effect | 模型供给与执行者供给能各自单独失败,合并会让两处缺口互相遮蔽,而决议 `:210` 与 `:235` 本来就把它们写成两个 Port;媒体供给一侧引擎无实现,是否立为域级承诺属目标层,见 7.3 待裁项 |
-| G4 执行 + 观测 | 拆成 G-EXE、G-AGT、G-OBS | 忠于图、有人能跑 AGENT、发生的都看得见,是三个可以分别失败的承诺 |
-| G5 评测 + 工作台 | 评测成为 G-EVA;工作台移出域级表 | 按 2.2 规则①,工作台不是域,它的每个模块是既有 Effect 下的平行实现 |
-| G6 创作 | 成为 G-AUT,并按 2.1 第四段原话重排层级 | 上级承诺是"能观察、能不敲代码建图",MoirAI 与画布是它下面两个同级实现 |
-| G7 委托 + 发布 + 平台 | 拆成 G-ACC(接入面)与 G-SHP(发货) | 规则只有一份,与别的机器装得出同一份,是两个不同的承诺 |
+| G1 runtime base + contract infrastructure | The engine-side content under this **domain name** splits into G-CFG (resolution and snapshot) and G-STA (state and resume); the six Effects the G1 report actually names are mostly studio-side capabilities, and each of their homes is given in the second table below | The first two keep different invariants (resolution deterministic and traceable, versus state unique and recoverable) and can fail independently; sidecar liveness, banners and CORS exist only once the engine is wrapped as an HTTP service, and the engine itself is an SDK that opens no HTTP service (decision `:25` states 「纯软件开发工具包(SDK,即被别的程序调用的代码库,自己不开 HTTP 服务)」, *a pure software development kit, meaning a code library other programs call that opens no HTTP service of its own*) |
+| G2 gskill format + compile diagnostics | Becomes G-FMT unchanged | The invariants agree, so nothing changes |
+| G3 model + media supply | "Model supply" becomes **G-MDL**; "media supply" has no domain-level Effect | Model supply and executor supply can fail independently, and merging them would let two gaps hide each other, while decision `:210` and `:235` already write them as two Ports; on the media supply side the engine has no implementation, and whether to make it a domain-level promise belongs to the goal layer, treated as pending ruling §7.3 |
+| G4 execution + observation | Splits into G-EXE, G-AGT and G-OBS | Fidelity to the graph, having someone to run AGENT phases, and everything that happens being visible are three promises that can fail separately |
+| G5 evaluation + studio | Evaluation becomes G-EVA; the studio sits outside the domain-level table | By rule 1 in §2.2 the studio is no domain, and each of its modules is a parallel implementation under an existing Effect |
+| G6 authoring | Becomes G-AUT, with its levels arranged by the fourth ruling quoted in §2.1 | The parent promise is observing the diagram and building it without typing code, with MoirAI and the canvas as two same-level implementations under it |
+| G7 delegation + publishing + platform | Splits into G-ACC (access surfaces) and G-SHP (shipping) | One set of rules, and another machine installing the same copy, are two different promises |
 
-**种子能力逐条对账。** 只列种子域报告里点过名的能力。**每一行都必须给出父 Effect 编号**——按 2.2 规则③,一个模块只有两种归宿:挂到某条既有 Effect 下,或者它不该存在;"归工作台"不是第三种归宿。所以下面凡是写"工作台(或宿主)侧平行实现的内部子模块"的行,都同时写明它挂在哪条 Effect 下:那条 Effect 的平行实现是工作台的某个模块,而这项能力是那个模块内部的机制,层级比 Effect 低两层,不占 Effect 树的位置。
+**Seed capabilities reconciled one by one.** Only capabilities named in the seed domain reports are listed. **Every row gives a parent Effect id**, because by rule 3 in §2.2 a module has exactly two possible homes: hanging under an existing Effect, or not existing. "It belongs to the studio" is no third home. So every row below that reads "an internal submodule of a studio-side or host-side parallel implementation" also names the Effect it hangs under: that Effect's parallel implementation is some studio module, and this capability is a mechanism inside that module, two levels below the Effect, holding no seat in the Effect tree.
 
-| 种子域 | 报告里点名的能力 | 本文的归宿 |
+| Seed domain | Capability named in the report | Where it goes in this document |
 |---|---|---|
-| G1 (`a2b6b29566a8e3097_v1.md:21-24`) | E1 UI 立即可交互 / E2 sidecar 死活判定与横幅 / E3 自动恢复有上限 / E4 人按 Retry 不被预算拒绝。源报告 `:467` 把本域裁成「Level-3 模块 7 个 + 规则/机制 3 条」,与这四条 Effect 相关的是:**模块** M1 `SidecarProcess`、M2 `SidecarSupervisor`、M3 `RestartBudget`、M4 `BackendLivenessSignal`(`:469`);**改判为规则/机制**的 M5 `RuntimeGate`(呈现机制)、M8 `CorsOnEveryResponse`(规则+中间件机制)、M9 `ReaderFacingMessage`(规则+门禁)(`:470`) | 父 Effect = **E-ACC-3**(进程外的调用方通过一条网络接口调用引擎的八个运行用例)。层级:E-ACC-3 的平行实现之一就是工作台的 HTTP 接口,这四个模块与三条规则/机制是让那条 HTTP 接口活着、能被界面调到的**内部构造**,比 Effect 低两层,不另立 Effect。理由:它们只在"把引擎包成一个常驻 HTTP 服务"之后才存在,而引擎自己是不开 HTTP 服务的 SDK;删掉工作台,这七项一条都不剩。注意源报告已把 M5 / M8 / M9 排除出模块之列,本文照转,不把它们当成有独立生命周期的模块 |
-| G1 (`:25`) | E5 任何失败响应都是同一个信封,带机器码 + 结构化 details;模块 M6 `ErrorEnvelope` | 归 **E-OBS-3**。引擎侧的信封是 `RuntimeErrorPayload`(`code` / `phase` / `source_path` / `details` / `retryable`);HTTP 状态码怎么映射是工作台那一侧的事 |
-| G1 (`:26`) | E6 每个原因码入册(唯一定义处 + HTTP 投射 + 重试策略 + 读者文案);模块 M7 `ReasonCodeRegistry` | 归 **E-OBS-3**。引擎侧的册子是 `core/error_registry.py` 的 `ERROR_REGISTRY`,99 条;HTTP 投射与读者文案归工作台 |
-| G1 (`:454`, `:469`) | M10 `ApiContractCodegen`(从契约生成前端类型并设门禁) | 归 **E-ACC-1**。引擎侧的唯一契约源是 `__all__` 加 `docs/public-api-contract.md`;从它生成别的语言的类型,是消费方的事 |
-| G3 域一 (`ac08659a6d5b556a3_v1.md:11,15`) | 把一把 key 加一个 URL 变成可被角色消费、带证据的可用模型;own endpoint 身份与凭据、route、每条 route 最近一次真实询问的证据、role→FallbackChain | 归 **E-MDL-1**(引擎侧是缺口);网关是这条 Effect 的平行实现,并被决议 `:235` 定为 `ModelResolver` Port 的权威实现 |
-| G3 域二 (`:249-257`) | 媒体 provider 的凭据、探测、catalog、模型设置 | **未立域级 Effect**,列为待裁项 7.3 |
-| G4 域一 (`aeed340fbc0847f26_v1.md:21`) | `predict` 不花钱预演路径;`run` 按图确定性编排 | 归 **E-EXE-1**、**E-EXE-2** |
-| G4 域一 (`:21`) | 可暂停 / 断点 / HITL(人工介入应答)/ 续跑 | 归 **E-STA-1**、**E-STA-2**;其中"独立的人工应答与断点续跑"是 E-STA-2 里已登记的缺口(`AGENTS.md:58`) |
-| G4 域一 (`:21`) | AGENT 执行者是运行时参数:闭集、相位级可覆盖、preflight 兼容检查、无自动 fallback | 归 **E-AGT-1**(闭集与相位级覆盖两处缺口都已登记)与 **E-AGT-2**(preflight 缺口);"无自动 fallback"对应待裁项 7.1 |
-| G4 域一 (`:21`) | 批跑 / 迭代 / 并行受控 | 归 **E-EXE-5** |
-| G4 域二 (`:179`) | 运行中每个细节可见;事件完整 / 准确 / 高效 | 归 **E-OBS-1**(公开接线口是缺口) |
-| G4 域二 (`:179`) | 投影为 trace、运行报告、实时流 | trace 归 **E-OBS-2**(运行目录里同时落 `result.json` 与 `metrics.json`,这就是引擎侧的"运行报告");实时流归 **E-OBS-5**,是缺口 |
-| G7 域一 (`a66fac8a014fefd6b_v1.md:27`) | 用户不必手写 gskill 源文件,让 agent 代写;三工位分工可编排 | 归 **E-AUT-1**、**E-AUT-2**、**E-AUT-4**;引擎侧的实现就是 MoirAI 的四个角色与八个技能 |
-| G7 域一 (`:27`) | 落盘前用户看得见改了什么并能否决;关掉重开接着聊 | 父 Effect = **E-AUT-1**(代理人带着用户走到一份能编译的 gskill),并及于 **E-AUT-4**。层级:引擎侧这条 Effect 的实现是 MoirAI 投影进宿主,所以"改动前先确认"和"会话续接"由宿主(Claude Code / codex)自己的机制承担;工作台是同一条 Effect 的另一侧平行实现,它用自己的面板做同样两件事。两者都是 Effect 之下的内部机制,不另立 Effect |
-| G7 域二 (`:133`) | 一次 publish 产出内容寻址、版本锁定、可脱离源文件独立运行的资产 | 整条归 **E-SHP-3**——该 Effect 已按这条种子能力扩写为内容寻址、版本锁定、脱离源文件独立运行、服务端原样复现四件事,今天整条是缺口 |
-| G7 域二 (`:133`) | 团队三动作(存 / 取 / 评审)走 Gitea | 父 Effect = **E-SHP-3**。层级:Gitea 是把一份 gskill 送到另一台机器的**传输方式**,是工作台侧平行实现的内部子模块;换成别的传输方式,E-SHP-3 的承诺不变 |
-| G7 域二 (`:151`) | 社区目录上下行 verified 能力事实 | 父 Effect = **E-MDL-1**。层级:核实过它上下行的是**模型**能力事实,不是 gskill——`community_catalog_sync.py:145` 下行、`community_catalog_upload.py` 上行,触发点是 `llm.py:181-253` 的探测后自动分享。所以它是网关侧 catalog(模型目录)的内部子模块,挂在角色到模型的解析这条 Effect 下 |
-| G7 域三 (`:217`) | 用户装完包看到的行为 = 开发者验过的行为;三个 OS 都能装 | "三个 OS 都能装"归 **E-SHP-1**、**E-SHP-2**;"装完的行为 = 验过的行为"是 4.4 第 4 条公理(证据环境 = 发货环境)管的过程规则,不是一条 Effect |
-| G7 域三 (`:217`) | 偏好 / 语言 / 主题记得住 | 父 Effect = **E-CFG-1**(每个配置字段说得出它来自哪一层)。层级:界面偏好落在"用户机器配置"这一层,是工作台侧平行实现的内部子模块 |
-| G7 域三 (`:217`) | 升级、卸载、换机器各有说得出的行为 | 父 Effect = **E-SHP-1**(装一个包就有全部能力、不碰用户的业务技能)与 **E-SHP-2**(自己平台上装得上跑得起)。层级:桌面安装器的升级与卸载流程是这两条 Effect 在工作台侧平行实现的内部子模块;引擎侧对应的是 `gskill integrations uninstall` 那条只删自己装的、内容未被改过的规则(E-ACC-4) |
+| G1 (`a2b6b29566a8e3097_v1.md:21-24`) | E1 the UI is interactive immediately / E2 sidecar liveness judgement and its banner / E3 automatic recovery has a ceiling / E4 a human pressing Retry is not refused by the budget. The source report at `:467` divides this domain into 「Level-3 模块 7 个 + 规则/机制 3 条」 (*7 level-3 modules plus 3 rules or mechanisms*); related to these four Effects are the **modules** M1 `SidecarProcess`, M2 `SidecarSupervisor`, M3 `RestartBudget` and M4 `BackendLivenessSignal` (`:469`), plus the three classified as **rules or mechanisms**, M5 `RuntimeGate` (a presentation mechanism), M8 `CorsOnEveryResponse` (a rule plus a middleware mechanism) and M9 `ReaderFacingMessage` (a rule plus a gate) (`:470`) | Parent Effect = **E-ACC-3** (an out-of-process caller reaches the engine's eight run use cases over one network interface). Levels: one parallel implementation of E-ACC-3 is the studio's HTTP interface, and these four modules plus three rules or mechanisms are the **internal construction** that keeps that HTTP interface alive and reachable from the interface, two levels below the Effect, holding no Effect of their own. Reason: they exist only once the engine is wrapped as a resident HTTP service, while the engine itself is an SDK that opens no HTTP service; delete the studio and none of the seven remains. The source report classifies M5, M8 and M9 as rules or mechanisms outside the module list, and this table carries that classification forward, treating them as mechanisms without an independent lifecycle |
+| G1 (`:25`) | E5 every failure response is one envelope with a machine code plus structured details; module M6 `ErrorEnvelope` | Goes to **E-OBS-3**. The engine-side envelope is `RuntimeErrorPayload` (`code` / `phase` / `source_path` / `details` / `retryable`); how it maps onto HTTP status codes is the studio side's business |
+| G1 (`:26`) | E6 every reason code is registered (one defining place, HTTP projection, retry policy, reader-facing wording); module M7 `ReasonCodeRegistry` | Goes to **E-OBS-3**. The engine-side registry is `ERROR_REGISTRY` in `core/error_registry.py`, 99 entries; HTTP projection and reader-facing wording belong to the studio |
+| G1 (`:454`, `:469`) | M10 `ApiContractCodegen` (generating frontend types from the contract and gating on them) | Goes to **E-ACC-1**. The one contract source on the engine side is `__all__` plus `docs/public-api-contract.md`; generating another language's types from it is the consumer's business |
+| G3 domain one (`ac08659a6d5b556a3_v1.md:11,15`) | Turning one key plus one URL into an available model, backed by evidence, that a role can consume; owning endpoint identity and credentials, routes, the evidence of the last real probe per route, and role-to-FallbackChain | Goes to **E-MDL-1** (a gap on the engine side); the gateway is that Effect's parallel implementation, and decision `:235` names it the authoritative implementation of the `ModelResolver` Port |
+| G3 domain two (`:249-257`) | Credentials, probing, catalog and model settings for media providers | **No domain-level Effect**, listed as pending ruling §7.3 |
+| G4 domain one (`aeed340fbc0847f26_v1.md:21`) | `predict` rehearses the path at no cost; `run` orchestrates deterministically along the graph | Goes to **E-EXE-1** and **E-EXE-2** |
+| G4 domain one (`:21`) | Pausing / breakpoints / HITL (human-in-the-loop answers) / resuming | Goes to **E-STA-1** and **E-STA-2**; within them, standalone typed human answer and breakpoint resume is the gap already registered under E-STA-2 (`AGENTS.md:58`) |
+| G4 domain one (`:21`) | The AGENT executor is a runtime parameter: a closed set, overridable per phase, preflight compatibility checks, no automatic fallback | Goes to **E-AGT-1** (both gaps, the closed set and the per-phase override, are registered there) and **E-AGT-2** (the preflight gap); "no automatic fallback" corresponds to pending ruling §7.1 |
+| G4 domain one (`:21`) | Batching / iteration / controlled parallelism | Goes to **E-EXE-5** |
+| G4 domain two (`:179`) | Every detail during a run is visible; events are complete, accurate and efficient | Goes to **E-OBS-1** (the public attachment point is the gap) |
+| G4 domain two (`:179`) | Projected as a trace, a run report and a live stream | The trace goes to **E-OBS-2** (the run directory also holds `result.json` and `metrics.json`, which is the engine-side "run report"); the live stream goes to **E-OBS-5**, which is a gap |
+| G7 domain one (`a66fac8a014fefd6b_v1.md:27`) | The user writes no gskill source files by hand and lets an agent write them; three working roles can be orchestrated | Goes to **E-AUT-1**, **E-AUT-2** and **E-AUT-4**; the engine-side implementation is MoirAI's four roles and eight skills |
+| G7 domain one (`:27`) | The user sees what changed before it lands and can veto it; closing and reopening continues the conversation | Parent Effect = **E-AUT-1** (an agent walks the user to a gskill that compiles), reaching **E-AUT-4** as well. Levels: on the engine side this Effect is delivered by projecting MoirAI into the host, so "confirm before changing" and "continue a session" are carried by the host's own mechanisms (Claude Code or codex); the studio is the other parallel implementation of the same Effect and does the same two things with its own panels. Both are mechanisms below the Effect and hold no Effect of their own |
+| G7 domain two (`:133`) | One publish produces content-addressed, version-locked assets that run without the source files | The whole line goes to **E-SHP-3**, an Effect written out along this seed capability as four things — content addressing, version locking, running without source files, and server-side reproduction — and a gap in full today |
+| G7 domain two (`:133`) | The three team actions (store / retrieve / review) go through Gitea | Parent Effect = **E-SHP-3**. Levels: Gitea is the **transport** that carries one gskill to another machine, an internal submodule of the studio-side parallel implementation; swap the transport and the promise of E-SHP-3 stands unchanged |
+| G7 domain two (`:151`) | The community catalog carries verified capability facts up and down | Parent Effect = **E-MDL-1**. Levels: what it carries up and down, verified, is **model** capability facts and not gskills — `community_catalog_sync.py:145` downward, `community_catalog_upload.py` upward, triggered by the automatic share after probing at `llm.py:181-253`. So it is an internal submodule of the gateway-side catalog (the model catalog), hanging under the role-to-model resolution Effect |
+| G7 domain three (`:217`) | What the user sees after installing the package equals what the developer verified; all three operating systems can install it | "All three operating systems can install it" goes to **E-SHP-1** and **E-SHP-2**; "what is installed equals what was verified" is the process rule held by axiom 4 in §4.4 (evidence environment equals shipping environment), and it holds no Effect |
+| G7 domain three (`:217`) | Preferences / language / theme are remembered | Parent Effect = **E-CFG-1** (every configuration field can say which layer it came from). Levels: interface preferences land in the operating-system user configuration layer, as an internal submodule of the studio-side parallel implementation |
+| G7 domain three (`:217`) | Upgrade, uninstall and machine change each have describable behaviour | Parent Effect = **E-SHP-1** (one package gives every capability and leaves the user's business skills alone) and **E-SHP-2** (it installs and runs on my platform). Levels: the desktop installer's upgrade and uninstall flows are internal submodules of these two Effects' studio-side parallel implementation; the engine-side counterpart is the rule under `gskill integrations uninstall` that removes only what it installed and only what has kept its content (E-ACC-4) |
 
 ---
 
-## 4. 公理与原则
+## 4. Axioms and principles
 
-### 4.1 权威链:四层,自上而下
+### 4.1 The authority chain: four layers, top down
 
-决议 `:95-104` 定的链条是:北极星 → 域级 Effect → 模块级 Effect → 膜契约与实现。说人话:最上面是"我们为什么要有这个东西",往下是"每个域对用户承诺什么",再往下是"每个公开能力成功时承诺什么、失败时暴露什么",最底下才是"函数签名、字段、原因码怎么写"。每一层都必须向上挂钩:一条域级 Effect 说不出它贡献哪条北极星,就必须显式写"不贡献"并解释它为什么还留着(决议 `:101`)。本文第 3 节的每条 Effect 都写了它贡献哪条北极星,没有出现"不贡献"的条目。
+The chain the decision fixes at `:95-104` is: north star, then domain-level Effect, then module-level Effect, then membrane contract and implementation. In plain language: the top says why this thing exists at all; below it, what each domain promises the user; below that, what each public capability promises on success and exposes on failure; and only at the bottom, how function signatures, fields and reason codes are written. Every layer hooks upward: a domain-level Effect that cannot say which north star it serves must state explicitly that it serves none and explain why it remains (decision `:101`). Every Effect in §3 of this document states which north stars it serves, and no entry reads "serves none".
 
-### 4.2 三条裁决规则
+### 4.2 The three ruling rules
 
-- **设计有歧义时自上而下裁**(决议 `:110-114`):先问上一层的 Effect 是什么,再看哪种读法服务它;两种读法都不服务时,结论是"设定本身错了",该改的是设定,不是在两个错读法里挑一个。
-- **事实有争议时走三道检验**(决议 `:116-124`):先比日期,再找原话(权威文档的修订记录、引入该实现的提交、用户本人的话——不认自己写的旧摘要),最后回第一性原理推一遍;三道同向才动手。
-- **自我声明不作证据**(决议 `:126-130`):文档写的"已完成"、注释写的"已支持"、报告写的"已验证",都不算目标已达成。**这条对本文同样生效:本文写下的每一条 Effect 都还只是承诺。**
+- **A design ambiguity is ruled top down** (decision `:110-114`): ask first what the Effect one layer up is, then see which reading serves it; when neither reading serves it, the conclusion is that the setting itself is wrong, and the setting is what changes, in place of picking one of two wrong readings.
+- **A disputed fact goes through three tests** (decision `:116-124`): compare dates first; then find the original words (the revision record of an authoritative document, the commit that introduced the implementation, or the user's own words, and never one's own older summary); then reason it through from first principles. Act when all three point the same way.
+- **A self-declaration is not evidence** (decision `:126-130`): "done" written in a document, "supported" written in a comment, and "verified" written in a report do not establish that the goal is met. **This rule applies to this document as well: every Effect written here is still a promise.**
 
-### 4.3 八条行为原则在引擎仓怎么用
+### 4.3 How the eight behavioural principles apply in the engine repository
 
-原文在决议 `:134-145`,这里逐条说它在本仓落到哪。
+The source is the decision at `:134-145`; each is stated below with where it lands in this repository.
 
-1. **原则高于载体。** 本文、`AGENTS.md`、代码,都只是当下的权威读数。读数与原则冲突,改读数。
-2. **修缺陷先问设定是否本来就错。** 例:`E-AGT-5` 那条"没设角色就报错",修的不是某次报错,而是"允许悄悄套默认角色"这个设定。
-3. **根因定性到原则,并当场做同族全量排查。** 修完一处,要在同一条原则约束下的全部同类位置扫一遍,而不是只修被报出来的那一处。
-4. **门禁量化在封闭域上,不写事故实例补丁。** 例:原因码要针对"全部原因码"这个可枚举集合做断言,不给某一条特判。
-5. **约束一律下沉为机器强制。** 能做成持续集成门禁的就做成门禁;不能的就做成交付物里的必填栏。只写在文档里靠人记得的约束,在本项目已被实证证明不成立。
-6. **证据环境 = 发货环境。** 见 `E-SHP-2`:验收证据必须出自打包版。
-7. **一个概念一处实现一个 owner。** 见 2.2 规则①:域级 Effect 树只有一份。
-8. **覆盖按域计量,不按步计量。** 见第 5 节:覆盖不到的格子必须显式写"未覆盖 + 原因",不留白。
+1. **A principle outranks its carrier.** This document, `AGENTS.md` and the code are all readings of authority at this moment. When a reading and a principle conflict, the reading changes.
+2. **Fixing a defect starts by asking whether the setting was wrong to begin with.** Example: `E-AGT-4`, the promise that a missing role fails the compile, fixes the setting that allowed a default role to be substituted silently, in place of fixing one error message.
+3. **Root cause is characterised down to a principle, and the whole family is swept on the spot.** After a fix, every position under the same principle is scanned, in place of only the position that was reported.
+4. **Gates quantify over a closed domain, with no per-incident patch.** Example: reason codes are asserted over the enumerable set of all reason codes, with no special case for one of them.
+5. **A constraint is pushed down into machine enforcement.** What can become a continuous-integration gate becomes one; what cannot becomes a required field in a deliverable. A constraint that lives in a document and relies on people remembering it has been shown by experience in this project to fail.
+6. **Evidence environment equals shipping environment.** See `E-SHP-2`: acceptance evidence comes from the packaged build.
+7. **One concept, one implementation, one owner.** See rule 1 in §2.2: there is exactly one domain-level Effect tree.
+8. **Coverage is measured by domain, not by step.** See §5: an uncovered cell states "uncovered + reason", and no cell is blank.
 
-### 4.4 引擎仓特有的五条公理
+### 4.4 Five axioms specific to the engine repository
 
-1. **引擎不知道辅助模块的存在。** `AGENTS.md:36` 原句:「Core and application code must not import Studio or Gateway modules」。工作台的界面、原生文件行为、HTTP 路由,网关的凭据与路由真相,宿主会话状态,厂商进程,操作系统集成,网络行为——全部只能待在显式的适配器或集成层后面。
-2. **业务 gskill 是用户资产。** `AGENTS.md:38` 原句:「A business gSkill is a user-owned asset.」安装包里可以带运行时自己的资源,但绝不打包、注册、全局发现、复制或改写用户的业务技能;技能路径永远由调用方显式给出。
-3. **执行者是运行时配置,永不进可移植源。** 依据决议 `:221`。今天成立,证据见 `E-CFG-3`。
-4. **证据环境 = 发货环境,每次发布随附三平台验收记录。** 依据决议 `:143`。开发模式下跑绿只是参考信号,不是验收证据;验收证据必须出自打包出来的那一份。落到发布上就是一条过程规则:每一次发布都要附上同一对产物在 Windows、macOS、Linux 三个平台的验收记录(取证手段 `scripts/accept_release_artifacts.py` 的 `accept`,范围 `AGENTS.md:80`,记录落在 `docs/CROSS_PLATFORM.md`)。这是**对发布过程的要求**,不是用户装完包能观察到的结果,所以它是公理不是 Effect。
-5. **域级 Effect 树的唯一所有权在引擎。** 依据 2.1 的用户原话与 2.2 规则①。任何辅助模块的设计文档必须写明自己挂在哪条 Effect 下;写不出来就走 2.2 规则③的两种归宿。
+1. **The engine does not know the auxiliary modules exist.** `AGENTS.md:36` states 「Core and application code must not import Studio or Gateway modules」. The studio's interface, native filesystem behaviour and HTTP routes; the gateway's credential and route truth; host session state; vendor processes; operating-system integration; and network behaviour all stay behind an explicit adapter or integration layer.
+2. **A business gskill is a user asset.** `AGENTS.md:38` states 「A business gSkill is a user-owned asset.」 The installation package may carry the runtime's own resources, and it never bundles, registers, globally discovers, copies or rewrites a user's business skills; the skill path is always given explicitly by the caller.
+3. **The executor is runtime configuration and never enters the portable source.** Basis: decision `:221`. It holds today, and the evidence is `E-CFG-3`.
+4. **Evidence environment equals shipping environment, and every release carries three-platform acceptance records.** Basis: decision `:143`. A green run in development mode is a reference signal, and acceptance evidence comes from the packaged build. On the release side this becomes one process rule: every release carries acceptance records for the same pair of artifacts on Windows, macOS and Linux (the evidence-gathering instrument is `accept` in `scripts/accept_release_artifacts.py`, scope in `AGENTS.md:80`, records landing in `docs/CROSS_PLATFORM.md`). This is **a requirement on the release process** and describes nothing the user observes after installing, which is why it is an axiom and holds no Effect.
+5. **Sole ownership of the domain-level Effect tree lies with the engine.** Basis: the user's words in §2.1 and rule 1 in §2.2. Any auxiliary module's design document states which Effect it hangs under; a module that cannot state one takes one of the two homes in rule 3 of §2.2.
 
 ---
 
-## 5. 验收判据总表
+## 5. The acceptance table
 
-判据统一是 2.3 那一句:**干净环境里只装引擎这一个包,这条 Effect 能不能达成。** 所以中间那一列只写**装完这个包就有的东西**——`gskill` 命令、Python SDK、MCP 服务、装好的 MoirAI 技能——不写仓内脚本,也不写对仓内文件的检索:`pyproject.toml:59-60` 规定这个包只装 `src/graph_skill_runtime`,拿到包的人手里没有仓库。
+The criterion is the single sentence in §2.3: **in a clean environment holding only the engine package, can this Effect be achieved.** So the middle column names only what the installed package brings — the `gskill` command, the Python SDK, the MCP service, and the installed MoirAI skills. It names no repository script and no search over repository files: `pyproject.toml:59-60` installs `src/graph_skill_runtime` alone, and whoever holds the package holds no repository.
 
-状态取三个值:**可达成**、**部分 + 缺口**、**未覆盖 + 原因**。
+The status takes three values: **achievable**, **partial + gap**, **uncovered + reason**.
 
-**这一列今天是按代码坐标判出来的,不是跑出来的。** 首次在干净环境里逐条实跑这张表,是一张独立工单;在那之前,这里的每一行都还只是承诺,不是证据(依据 4.2 第三条"自我声明不作证据")。
+**This column is judged today from code coordinates.** Running this table item by item in a clean environment for the first time is a separate work order. Until that happens every row here is a promise and no row is evidence, by the third rule in §4.2, a self-declaration is not evidence.
 
-| 编号 | 只装引擎怎么达成 | 按坐标判定的状态 |
+| Id | How it is achieved with only the engine installed | Status judged from coordinates |
 |---|---|---|
-| E-FMT-1 | 自己写一份最小 gskill,`gskill compile <skill_root>` 返回 `status=passed`、诊断为空 | 可达成 |
-| E-FMT-2 | 把一份有多处缺陷的 gskill 编译一次,诊断一次列全,每条带原因码与它能给到的定位轴;整份文件缺失那类诊断只有文件与行,`field_path` 为空是正确行为,不算失败 | 可达成 |
-| E-FMT-3 | 在同一份 gskill 里放一个 `graphs/<graph_id>/`,让包内两个相位都引用它,`gskill compile` 通过 | 可达成 |
-| E-FMT-4 | `gskill migrate studio-skill SOURCE DESTINATION` | 可达成 |
-| E-CFG-1 | `gskill config resolve <skill_root>` 的输出里每个字段带 `value_origins` | 可达成 |
-| E-CFG-2 | 跑一次后 `<state_dir>/runs/<run_id>/request.json` 存在;同一个 run_id 换内容再落,拒绝覆盖 | 可达成 |
-| E-CFG-3 | 往自己的 `graph.yaml` 加一行 `executor: cli`,`gskill compile` 报 `[F-v3-graph-schema-unknown-field]` 并指到那一行那个字段 | 可达成 |
-| E-CFG-4 | 构造 `RunInvocation(inputs={"api_key": "…"})` 被拒绝;换成 `opaque` 键构造成功——两个结果合起来才是这条承诺的完整真值 | 可达成 |
-| E-EXE-1 | `gskill predict <skill_root> --state-dir <dir>` 返回相位序列,且没有发生模型调用 | 可达成 |
-| E-EXE-2 | `gskill run <skill_root> --state-dir <dir>` 对一份只有 LOGIC 相位的 gskill 跑到 `status=completed` | 可达成 |
-| E-EXE-3 | 同上,自己注册的 Python 动作与校验器被执行 | 可达成 |
-| E-EXE-4 | 带子图的 gskill 跑通,父子输入输出边界被保持 | 可达成 |
-| E-EXE-5 | 带 iterate 的 gskill 跑通,次数与顺序符合声明;再写一份两个互不依赖的相位并排跑的 gskill,两条分支各写各的字段都跑通;把这两个相位改成写同一个字段,`gskill compile` 以 `[F-v3-parallel-write-conflict]` 拒绝 | 可达成 |
-| E-AGT-1 | `gskill run --executor host-native`(或 `--executor cli --vendor codex`)对带 AGENT 相位的 gskill 走到执行者并回写结果 | 部分 + 缺口:①决议 `:230` / `:256` 已把闭集裁为 `embedded` 与 `ah` 并要求删除 `host-native`,本仓默认仍是 `host-native`;②`NodeOverride` 没有 `executor` 字段,相位级覆盖(决议 `:227-228`)表达不出来 |
-| E-AGT-2 | `gskill config resolve` 时逐相位核对执行者支持面,不支持就以原因码拒绝 | 未覆盖 + 原因:只有命令行执行者在创建交接件之前探测(`AGENTS.md:62`),决议 `:242` 要求的 `resolve_run` 阶段逐相位 preflight 不存在 |
-| E-AGT-3 | `gskill submit --result-json` 交一份 schema 不合格的结果,任务不被消费 | 可达成 |
-| E-AGT-5 | 对一份漏配 `llm_role` 的 AGENT gskill 编译,得到 `[F-v3-agent-llm-role-missing]` | 可达成 |
-| E-MDL-1 | 只装引擎、不注入任何解析器,跑一个 AGENT 相位 | 未覆盖 + 原因:包里没有角色到模型的解析实现,`grep -rn "ModelResolver" src/graph_skill_runtime --include=*.py` 返回 0 行,`core/graph_assembler.py:2427` 无注入即返回 `None` |
-| E-STA-1 | 用 SQLite 检查点存储跑一次,检查点按代写入那个文件 | 可达成 |
-| E-STA-2 | `gskill resume <skill_root> <run_id> --state-root <dir> --checkpoint-ref <ref>` 取回当前等待态 | 部分 + 缺口:取回等待态可达成;不带检查点引用返回 `GSKILL_NOT_IMPLEMENTED`,且 `AGENTS.md:58` 记独立的人工应答与断点续跑未完成 |
-| E-STA-3 | 从运行结果里拿到产物引用并据此取回产物 | 未覆盖 + 原因:包里没有 `ArtifactStore` 的实现,默认组合不注入它,`RunResult` 也没有产物引用字段 |
-| E-STA-4 | `gskill submit` 同一份结果两次,第二次返回同一个结果;换内容则冲突报错 | 可达成 |
-| E-OBS-1 | 挂上自己的接收端接事件 | 部分 + 缺口:默认落下的 `trace.jsonl` 与 `metrics.json` 可读;但公开 `run` 没有回调或 `EventSink` 参数,默认组合也不注入(`docs/public-api-contract.md:166`),外部接不上自己的接收端 |
-| E-OBS-2 | 跑一次后读运行结果里 `trace_path` 指的那份 `trace.jsonl` | 可达成(编译阶段就失败的运行没有轨迹,这是承诺本身的边界,不是缺口) |
-| E-OBS-3 | 三档各制造一次:编译失败(诊断指到文件与行)、运行请求校验失败(`mode=run` 但 `phase` 为空,只给错误码)、相位执行失败(错误应当指到相位) | 部分 + 缺口:前两档可达成;第三档不成立——让一个已注册的 LOGIC 动作抛异常,拿到 `GSKILL_RUN_FAILED` 与 `engine_code=[F-v3-runtime-state-mapping-failed]`,但 `phase=None`。`runtime/state_mapper.py:619-624` 包装异常时没把 `phase_id` 传给 `make_error_payload`,`adapters/result_mapping.py:28-39` 只能原样投射空值 |
-| E-OBS-4 | `gskill inspect <skill_root> --call-graph` 返回拓扑与调用图 | 可达成 |
-| E-OBS-5 | 运行进行中从外部订阅事件流 | 未覆盖 + 原因:没有订阅接口,`grep -rn "def subscribe" src/graph_skill_runtime --include=*.py` 返回 0 行,`EventSink` 只有 `emit`;决议 `:262` 要求的异步任务模型与订阅同一个 Port 尚未落地 |
-| E-EVA-1 | `gskill golden <skill_root> <baseline_id> --state-root <dir>`(MCP 侧 `evaluate_golden`)给出结论 | 可达成 |
-| E-EVA-2 | 在没有网络、没有模型凭据的机器上 `gskill predict` 得到稳定结果 | 可达成 |
-| E-AUT-1 | `gskill integrations install moirai --targets <host> --scope project` 后,宿主里可用 `moirai` / `moirai-clotho` 角色与 `moirai-domain-analysis`、`moirai-graph-design`、`moirai-agent-prompt-design`、`moirai-brainstorming` 技能 | 可达成 |
-| E-AUT-2 | 同上,`moirai-lachesis` 角色与 `moirai-compile-repair` 技能可用 | 可达成 |
-| E-AUT-3 | `gskill inspect` 的拓扑输出,配合装好的知识库 `KB-05-subgraph.md` | 可达成 |
-| E-AUT-4 | 用 `moirai-graph-design` 技能产出的 `graph.yaml`,`gskill compile` 通过 | 可达成 |
-| E-ACC-1 | `python -c "import graph_skill_runtime as g; print(len(g.__all__))"` 输出 `77` | 可达成 |
-| E-ACC-2 | `gskill --help` 列出全部子命令 | 可达成 |
-| E-ACC-3 | 起 `gskill mcp`,从客户端枚举出恰好 8 个带标注的工具 | 可达成 |
-| E-ACC-4 | `gskill integrations install moirai …` 遇冲突时整体不动;`gskill integrations uninstall` 只删自己装的、且内容未被改过的 | 可达成 |
-| E-SHP-1 | 三项都要过。①**能力齐全**:`gskill --help` 列出全部子命令、`python -c "import graph_skill_runtime as g; print(len(g.__all__))"` 输出 `77`、起 `gskill mcp` 枚举出八个工具、`gskill integrations detect` 可用。②**包内没有业务 gskill**:`python -c "import graph_skill_runtime, pathlib; print(list(pathlib.Path(graph_skill_runtime.__file__).parent.rglob('graph.yaml')))"` 返回空列表。③**包外零副作用**:装包与 `import` 前后,包外一个用户技能目录逐字节不变(前后哈希相同),且用户 home 下没有引擎新写的技能注册文件 | 可达成 |
-| E-SHP-2 | 在自己的 Windows / macOS / Linux 上装完这个包,`gskill compile` 与 `gskill run` 跑通 | 部分 + 缺口:从本地构建的 wheel 装能跑;没有正式发布的包可装,三平台验收也只到候选产物这一级(`AGENTS.md:78-82`) |
-| E-SHP-3 | 发布一次,拿到按内容取址、版本锁定、不带源文件也能跑的资产;再从公共包仓库按锁定版本装引擎,在服务端跑同一份 gskill,走出同一条相位序列 | 未覆盖 + 原因:决议 `:74` 记「**未实现**」;`AGENTS.md:20` 记项目未发布到 PyPI 或 TestPyPI,没有可锁定的发布版本,四件事一件都还观察不到 |
+| E-FMT-1 | Write a minimal gskill of your own; `gskill compile <skill_root>` returns `status=passed` with empty diagnostics | Achievable |
+| E-FMT-2 | Compile a gskill holding several defects once; the diagnostics list them all at once, each with a reason code and the location axes it can fill; for a whole missing file the diagnostic has a file and a line and an empty `field_path`, which is correct behaviour and no failure | Achievable |
+| E-FMT-3 | Put a `graphs/<graph_id>/` inside one gskill, have two phases of that package reference it, and `gskill compile` passes | Achievable |
+| E-FMT-4 | `gskill migrate studio-skill SOURCE DESTINATION` | Achievable |
+| E-CFG-1 | The output of `gskill config resolve <skill_root>` carries `value_origins` on every field | Achievable |
+| E-CFG-2 | After one run, `<state_dir>/runs/<run_id>/request.json` exists; writing the same run id again with different content is refused | Achievable |
+| E-CFG-3 | Add one line `executor: cli` to your own `graph.yaml`; `gskill compile` reports `[F-v3-graph-schema-unknown-field]` pointing at that line and that field | Achievable |
+| E-CFG-4 | Constructing `RunInvocation(inputs={"api_key": "…"})` is refused; constructing it with an `opaque` key succeeds — the two results together are the full truth of this promise | Achievable |
+| E-EXE-1 | `gskill predict <skill_root> --state-dir <dir>` returns the phase sequence with no model call made | Achievable |
+| E-EXE-2 | `gskill run <skill_root> --state-dir <dir>` reaches `status=completed` on a gskill holding only LOGIC phases | Achievable |
+| E-EXE-3 | As above, with the Python actions and validators you registered executed | Achievable |
+| E-EXE-4 | A gskill with a subgraph runs through, and the parent-child input and output boundary holds | Achievable |
+| E-EXE-5 | A gskill with iterate runs through, with the count and order matching the declaration; a second gskill with two independent phases side by side runs through with each branch writing its own fields; changing those two phases to write the same field makes `gskill compile` refuse with `[F-v3-parallel-write-conflict]` | Achievable |
+| E-AGT-1 | `gskill run --executor host-native` (or `--executor cli --vendor codex`) on a gskill with an AGENT phase reaches the executor and writes the result back | Partial + gap: first, decision `:230` and `:256` narrow the closed set to `embedded` and `ah` and require deleting `host-native`, while this repository still defaults to `host-native`; second, `NodeOverride` holds no `executor` field, so the per-phase override of decision `:227-228` cannot be expressed |
+| E-AGT-2 | During `gskill config resolve`, the executor's support surface is checked phase by phase and an unsupported phase is refused with a reason code | Uncovered + reason: only the command-line executor probes before creating a handoff (`AGENTS.md:62`), and the per-phase preflight at the `resolve_run` stage required by decision `:242` does not exist |
+| E-AGT-3 | `gskill submit --result-json` with a schema-invalid result leaves the task unconsumed | Achievable |
+| E-AGT-4 | Compiling an AGENT gskill with `llm_role` missing yields `[F-v3-agent-llm-role-missing]` | Achievable |
+| E-MDL-1 | With only the engine installed and no resolver injected, run an AGENT phase | Uncovered + reason: the package holds no role-to-model resolution implementation, `grep -rn "ModelResolver" src/graph_skill_runtime --include=*.py` returns 0 lines, and `core/graph_assembler.py:2427` returns `None` without an injection |
+| E-STA-1 | Run once with the SQLite checkpoint store and checkpoints are written generation by generation into that file | Achievable |
+| E-STA-2 | `gskill resume <skill_root> <run_id> --state-root <dir> --checkpoint-ref <ref>` retrieves the current waiting state | Partial + gap: retrieving the waiting state is achievable; calling without a checkpoint reference returns `GSKILL_NOT_IMPLEMENTED`, and `AGENTS.md:58` records standalone typed human answer and breakpoint resume as incomplete |
+| E-STA-3 | Take an artifact reference from the run result and retrieve the artifact with it | Uncovered + reason: the package holds no `ArtifactStore` implementation, the default composition injects none, and `RunResult` holds no artifact-reference field |
+| E-STA-4 | `gskill submit` with the same result twice returns the same result the second time; different content raises a conflict | Achievable |
+| E-OBS-1 | Attach your own receiver and take events | Partial + gap: the `trace.jsonl` and `metrics.json` dropped by default are readable; the public `run` takes no callback or `EventSink` parameter and the default composition injects none (`docs/public-api-contract.md:166`), so an outside receiver has no attachment point |
+| E-OBS-2 | After one run, read the `trace.jsonl` that `trace_path` in the result points at | Achievable (a run failing during compilation has no trace, which is the boundary of the promise and no gap) |
+| E-OBS-3 | Produce one failure in each tier: a compile failure (the diagnostic points at a file and a line), a run-request validation failure (`mode=run` with an empty `phase`, giving only the error code), and a phase-execution failure (the error is meant to point at the phase) | Partial + gap: the first two tiers are achievable; the third falls short — making a registered LOGIC action raise yields `GSKILL_RUN_FAILED` with `engine_code=[F-v3-runtime-state-mapping-failed]` and `phase=None`. `runtime/state_mapper.py:619-624` wraps the exception without handing `phase_id` to `make_error_payload`, and `adapters/result_mapping.py:28-39` projects the empty value as it stands |
+| E-OBS-4 | `gskill inspect <skill_root> --call-graph` returns the topology and the call graph | Achievable |
+| E-OBS-5 | Subscribe to the event stream from outside while a run is in progress | Uncovered + reason: there is no subscription interface, `grep -rn "def subscribe" src/graph_skill_runtime --include=*.py` returns 0 lines, and `EventSink` holds only `emit`; the asynchronous task model and subscription on one Port required by decision `:262` are not in place |
+| E-EVA-1 | `gskill golden <skill_root> <baseline_id> --state-root <dir>` (on the MCP side `evaluate_golden`) gives a conclusion | Achievable |
+| E-EVA-2 | `gskill predict` gives a stable result on a machine with no network and no model credentials | Achievable |
+| E-AUT-1 | After `gskill integrations install moirai --targets <host> --scope project`, the host offers the `moirai` and `moirai-clotho` roles and the `moirai-domain-analysis`, `moirai-graph-design`, `moirai-agent-prompt-design` and `moirai-brainstorming` skills | Achievable |
+| E-AUT-2 | As above, with the `moirai-lachesis` role and the `moirai-compile-repair` skill available | Achievable |
+| E-AUT-3 | The topology output of `gskill inspect`, together with the installed knowledge-base entry `KB-05-subgraph.md` | Achievable |
+| E-AUT-4 | A `graph.yaml` produced with the `moirai-graph-design` skill passes `gskill compile` | Achievable |
+| E-ACC-1 | `python -c "import graph_skill_runtime as g; print(len(g.__all__))"` prints `77` | Achievable |
+| E-ACC-2 | `gskill --help` lists every subcommand | Achievable |
+| E-ACC-3 | Start `gskill mcp` and enumerate exactly 8 annotated tools from a client | Achievable |
+| E-ACC-4 | `gskill integrations install moirai …` leaves everything untouched on a conflict; `gskill integrations uninstall` removes only what it installed and only what has kept its content | Achievable |
+| E-SHP-1 | Three checks must pass. First, **capabilities are complete**: `gskill --help` lists every subcommand, `python -c "import graph_skill_runtime as g; print(len(g.__all__))"` prints `77`, starting `gskill mcp` enumerates eight tools, and `gskill integrations detect` works. Second, **no business gskill inside the package**: `python -c "import graph_skill_runtime, pathlib; print(list(pathlib.Path(graph_skill_runtime.__file__).parent.rglob('graph.yaml')))"` returns an empty list. Third, **zero side effects outside the package**: across installing and importing, one user skill directory outside the package stays byte-identical (the same hash before and after), and the user's home holds no skill registration file newly written by the engine | Achievable |
+| E-SHP-2 | Install this package on your own Windows, macOS or Linux machine, and `gskill compile` and `gskill run` work | Partial + gap: installing from a locally built wheel runs; there is no officially published package to install, and three-platform acceptance reaches only the candidate-artifact level (`AGENTS.md:78-82`) |
+| E-SHP-3 | Publish once and obtain content-addressed, version-locked assets that run without the source files; then install the engine from a public package index at the locked version and run the same gskill on the server, walking the same phase sequence | Uncovered + reason: decision `:74` records 「**未实现**」 (*not implemented*); `AGENTS.md:20` records that the project is unpublished on PyPI and TestPyPI, so there is no released version to lock onto and none of the four things is observable yet |
 
 
-**汇总**:40 条域级 Effect 中,**30 条可达成、5 条部分达成、5 条未覆盖**。**未覆盖的 5 条**是 `E-AGT-2`(起跑前逐相位核对)、`E-MDL-1`(角色到模型的解析)、`E-STA-3`(运行产物的落盘与引用)、`E-OBS-5`(实时订阅)、`E-SHP-3`(发布资产与服务端复现)。**部分达成的 5 条**是 `E-AGT-1`(执行者闭集未收敛、相位级覆盖缺字段)、`E-STA-2`(只能取回等待态)、`E-OBS-1`(事件发得出但外部接不上)、`E-OBS-3`(失败指不到相位)、`E-SHP-2`(装得上跑得起,但还没有一份正式发布)。
+**Summary**: of the 40 domain-level Effects, **30 are achievable, 5 are partial and 5 are uncovered**. **The 5 uncovered** are `E-AGT-2` (per-phase checks before a run starts), `E-MDL-1` (resolving a role into a model), `E-STA-3` (persisting run artifacts and referencing them), `E-OBS-5` (live subscription) and `E-SHP-3` (release assets and server-side reproduction). **The 5 partial** are `E-AGT-1` (the executor closed set has yet to converge, and the per-phase override lacks a field), `E-STA-2` (retrieval of the waiting state only), `E-OBS-1` (events are emitted and an outside receiver has no attachment point), `E-OBS-3` (a failure that cannot point at the phase) and `E-SHP-2` (it installs and runs, with no official release yet).
 
-这 10 条里,9 条对应已裁定、待执行的工单——决议 §5.3/§5.4(执行模型)、§5.7(异步任务模型与实时订阅),以及北极星-4 的未实现现状——不是本文新提的需求。**只有 `E-OBS-3` 是例外:它是写本文、逐条核对承诺的过程中新查出来的引擎缺陷**(相位在跑、相位号却在错误信封里丢了),坐标与复现写在第 3 节 E-OBS-3 的第三档里。**它的修法是一张运行时工单,不在本文范围**——本文是权威文档,只负责如实登记它,不改代码。
-
----
-
-## 6. 与既有文档的关系
-
-- **本文的上位依据**:旧仓 `docs/design/gskill-restructure-decision-2026-08-31.md` 的 §1(北极星)、§2(权威链)、§3(行为原则)、§5(执行模型)、§7(盘点方法)。本文是它在引擎仓里的落地。
-- **该决议的 §4.3(gateway 与 studio 整体迁入本仓、先搬后整、冻结旧引擎随迁)已于 2026-09-03 被用户推翻。** 本文不引用它作依据,也不依赖它成立。本文成立的前提只是 §4.2——引擎的唯一所有权在本仓(决议 `:160-164`)。
-- **`AGENTS.md`(仓根)**:本仓的规则入口,今天是自下而上写成的实况描述——它记的是"现在实现成什么样"。按 4.1 的权威链,它应当从本文推导:每条规则说得出自己服务哪条 Effect。**这是一条后续工单,本文只登记,不执行。**
-- **`docs/public-api-contract.md`**(`role: contract`,`status: living`):本文的下游,它是 `E-ACC-1` 那条承诺的可执行清单。
-- **`docs/skill-spec/01-PORTABLE-GSKILL-V1.md`**(`role: contract`,`status: FROZEN`):本文的下游,是 G-FMT 域的契约载体。同目录的 `00-FORMAT-GROUND-TRUTH.md` 为 `superseded`,只作转换器输入与历史证据(`AGENTS.md:16`)。
-- **`docs/design/v1-alignment.md`**(`status: drafted`):本文的下游,是实现阶段的对齐目标,不承载北极星。`docs/design/README.md`(`role: index`,`status: living`)负责路由现况与目标;`docs/design/baseline.md`(`status: drafted`)是抽仓之前的历史证据,不是当前路径地图。
-- **`docs/mvp0`(36 份)与 `docs/mvp1`(61 份)**:旧引擎时代的文档,今天仍在仓里。按本 PR 的 head 实测:`git ls-files docs | wc -l` 为 **120**,其中 `docs/mvp0` 36、`docs/mvp1` 61、`docs/skill-spec` 15、`docs/design` 4、根下 **4**(`CROSS_PLATFORM.md`、`feature-compliance-checklist.md`、`public-api-contract.md`,加上本文自己)。它们会把读到的 agent 带偏。同时有三处测试耦合着它们:`tests/contract-seals.yaml` 的 17 条封印里 14 条指向 `docs/mvp0`;`tests/test_doc_hash_lock.py:13` 的 `DOCS_ROOT` 指向 `docs/mvp1`;`tests/test_doc_pointer_liveness.py:54` 的 `CONTRACT_DOC_STATUSES` 只认 `living` 与 `FROZEN`。**清理是独立工单,本文只登记这个事实,不执行。**
+Nine of these ten gaps are work orders the decision has already ruled on: §5.3 and §5.4 (the execution model), §5.7 (the asynchronous task model and live subscription), and north star 4's recorded status 「**未实现**」 (*not implemented*). The tenth is `E-OBS-3`: while a phase is running its id is lost from the error envelope, an engine defect found while verifying this document's promises against the code, tracked as a runtime work order. Its coordinates and reproduction are in §3.7 under `E-OBS-3`, third tier. This document is an authoritative document, and it records the defect without changing code.
 
 ---
 
-## 7. 待裁项
+## 6. Relation to the existing documents
 
-以下三条本文不替用户裁,只写清问题、建议与依据。
-
-### 7.1 `fallback_executors` 是一个没有消费者的公开字段
-
-**问题**:配置与契约里可以声明"主执行者不可用时退到哪些执行者"(`application/config.py:96`、`domain/models.py:337` 与 `:357`,并有校验拒绝重复项),但全仓没有任何地方读它来真的换执行者——`grep -rn "fallback_executors" src/graph_skill_runtime --include=*.py` 的 12 处命中全部落在配置搬运与校验里。而决议 `:248` 已明确「**绝不静默换执行者**:**没有自动 executor fallback**」,`AGENTS.md:50` 也只说它是一个"声明"。
-
-**建议**:删掉这个字段及其校验,同一次变更删净,不留双路径。
-
-**依据**:决议 `:248`(没有自动 fallback)+ 行为原则第七条"一个概念一处实现一个 owner"(决议 `:144`)+ 本仓无向后兼容义务(`AGENTS.md:88`)。它今天是一个用户能填、填了没有任何效果的旋钮,按北极星-2 的反向判据,这类旋钮本身就是负担。
-
-### 7.2 六个直连厂商命令行执行者的删除代价
-
-**问题**:决议 `:274` 要求「删除六个直连厂商命令行 adapter」,由 `ah` 统一承担进程监督;而本仓的 Phase 4 刚把这六个(Claude、Codex、GitHub Copilot、Cursor、Gemini、OpenCode)做完并写进已验收范围(`AGENTS.md:64`),其中 Codex CLI `0.144.1` 在 Windows 上有真实操作证据(`AGENTS.md:72`)。按决议执行等于把这批已验收的能力与证据一并作废。
-
-**建议**:按决议删。理由是进程监督、沙箱、崩溃恢复不该在引擎里重造第二份(决议 `:240`),而"少一条执行者路径"直接服务北极星-1(可重现)与北极星-4(服务端也成立)。但因为代价是可见的已交付能力作废,呈请用户确认这个代价仍然接受。
-
-**依据**:决议 `:274`(实施顺序第三步)与 `:240`(ah 承担监督层);代价一侧的事实是 `AGENTS.md:64` 与 `:72`。
-
-### 7.3 "媒体供给"要不要成为一条域级 Effect
-
-**问题**:2026-08-31 的种子域 G3 叫"模型 + 媒体供给"。本文把它的前半"模型供给"立成了 G-MDL,但没有为后半"媒体供给"(用模型生成图片、视频这类媒体)立任何域级 Effect。
-
-**必须先纠正本文首版的一个假前提。** 首版在这里写的理由是"它今天说不出自己贡献哪条北极星",这句话**不成立**:旧仓 G3 报告 `ac08659a6d5b556a3_v1.md:249` 已经给出了它的 Effect——「媒体生成 provider 的凭据、探测、模型设置，与模型供给域**同等诚实** —— 即：录入凭据 → 真实、可解释的可用性判定 → 可用模型物化为可消费能力；判定失败钉到真因；不误伤用户数据。」;`:256` 还逐条挂了北极星——「*流程可靠可重现*：媒体生成是图流程的一等公民；*去黑盒*：花钱前知道花多少、参数合不合法；*本地=服务端*：同一 catalog」。所以待裁的不是"它有没有理由",而是下面这个。
-
-**真正的问题**:这三条挂钩成立的前提是"媒体生成是图流程的一等公民"。这个前提今天在引擎里**不成立**——`src/graph_skill_runtime/models/` 下除包初始化文件 `__init__.py` 外只有 `reasoning_patch.py`,没有媒体供给实现;`spec/features.yaml` 的 45 条 feature 里也没有一条讲媒体。按 2.2 规则②,引擎要为每条域级 Effect 提供第一个实现,所以立这条 Effect 等于同时决定"引擎要做媒体生成的 0 到 1"。这是一项要不要做的决定,属目标层。
-
-**建议**:暂不立为域级 Effect,理由**不是**它没有价值,而是它今天没有对应的用户旅程压着——种子报告里那三条北极星挂钩描述的是"如果媒体生成是一等公民会怎样",而不是"今天有用户在这条路上被卡住"。等出现明确的用户旅程再补;补的时候按 2.2 规则③,先在引擎补这条 Effect 与它的第一个实现,再谈网关那一侧。
-
-**依据**:2.2 规则②(每条域级 Effect 引擎都要有自己的实现)加决议 `:353` 的执行顺序规则(执行顺序从依赖序推导,问题密度只用于同层平票裁决)——一条今天没有旅程压着、且要从零起一个 0 到 1 的承诺,排不进当前这一轮。呈请用户裁的正是这一句:媒体生成现在算不算引擎必须承诺的能力。
+- **The upstream basis of this document**: the old repository's `docs/design/gskill-restructure-decision-2026-08-31.md`, §1 (north stars), §2 (the authority chain), §3 (behavioural principles), §5 (the execution model) and §7 (the inventory method). This document is that decision landing inside the engine repository.
+- **That decision's §4.3 (moving the gateway and the studio wholesale into this repository, hauling first and tidying later, freezing the old engine and migrating it along) was overturned by the user on 2026-09-03.** This document cites it as no basis and depends on none of it. The premise this document rests on is §4.2 alone: sole ownership of the engine lies in this repository (decision `:160-164`).
+- **`AGENTS.md` (repository root)**: the rule entry point of this repository, written today bottom up as a description of the running state, recording how things are implemented now. Under the authority chain in §4.1 it should be derived from this document, with every rule able to say which Effect it serves. **That is a follow-up work order; this document registers it and does not execute it.**
+- **`docs/public-api-contract.md`** (`role: contract`, `status: living`): downstream of this document, the executable list behind the promise `E-ACC-1`.
+- **`docs/skill-spec/01-PORTABLE-GSKILL-V1.md`** (`role: contract`, `status: FROZEN`): downstream of this document, the contract carrier of domain G-FMT. In the same directory, `00-FORMAT-GROUND-TRUTH.md` is `superseded` and serves as converter input and historical evidence (`AGENTS.md:16`).
+- **`docs/design/v1-alignment.md`** (`status: drafted`): downstream of this document, the alignment target of the implementation stage, carrying no north star. `docs/design/README.md` (`role: index`, `status: living`) routes between the current state and the target; `docs/design/baseline.md` (`status: drafted`) is historical evidence from before the repository split and is no map of the current path.
+- **`docs/mvp0` (36 files) and `docs/mvp1` (61 files)**: documents from the era of the old engine, still in the repository today. Measured at this PR's head, `git ls-files docs | wc -l` is **120**, of which `docs/mvp0` holds 36, `docs/mvp1` holds 61, `docs/skill-spec` holds 15, `docs/design` holds 4, and the root holds **4** (`CROSS_PLATFORM.md`, `feature-compliance-checklist.md`, `public-api-contract.md`, and this document). They lead a reading agent astray. Three tests are coupled to them at the same time: 14 of the 17 seals in `tests/contract-seals.yaml` point at `docs/mvp0`; `DOCS_ROOT` at `tests/test_doc_hash_lock.py:13` points at `docs/mvp1`; `CONTRACT_DOC_STATUSES` at `tests/test_doc_pointer_liveness.py:54` accepts only `living` and `FROZEN`. **Cleanup is a separate work order; this document registers the fact and does not execute it.**
 
 ---
 
-## 8. 修订记录
+## 7. Pending rulings
 
-| 日期 | 变更 | 依据 |
+Three items are pending the user's ruling. Each states the problem, a recommendation and its basis.
+
+### 7.1 `fallback_executors` is a public field with no consumer
+
+**Problem**: the configuration and the contract allow declaring which executors to fall back to when the main executor is unavailable (`application/config.py:96`, `domain/models.py:337` and `:357`, with validation refusing duplicates), while nowhere in the repository reads it to actually switch executors — all 12 hits of `grep -rn "fallback_executors" src/graph_skill_runtime --include=*.py` land in configuration transport and validation. Decision `:248` states 「**绝不静默换执行者**:**没有自动 executor fallback**」 (*never switch executors silently: there is no automatic executor fallback*), and `AGENTS.md:50` describes it as a declaration.
+
+**Recommendation**: delete this field and its validation, in one change, leaving no second path.
+
+**Basis**: decision `:248` (no automatic fallback), plus behavioural principle 7, one concept, one implementation, one owner (decision `:144`), plus this repository's freedom from backward-compatibility obligations (`AGENTS.md:88`). Today it is a knob the user can set that changes nothing, and under the reverse criterion of north star 2 such a knob is itself a burden.
+
+### 7.2 The cost of deleting the six direct vendor command-line executors
+
+**Problem**: decision `:274` requires 「删除六个直连厂商命令行 adapter」 (*delete the six direct vendor command-line adapters*), with `ah` carrying process supervision for all of them; meanwhile this repository's Phase 4 has just finished those six (Claude, Codex, GitHub Copilot, Cursor, Gemini, OpenCode) and written them into the accepted scope (`AGENTS.md:64`), with Codex CLI `0.144.1` on Windows carrying real operational evidence (`AGENTS.md:72`). Executing the decision voids this batch of accepted capabilities together with their evidence.
+
+**Recommendation**: delete them as the decision requires. The reason is that process supervision, sandboxing and crash recovery should not be rebuilt a second time inside the engine (decision `:240`), and one executor path fewer directly serves north star 1 (reproducibility) and north star 4 (it holds on the server too). Because the cost is the voiding of visible delivered capability, this asks the user to confirm that the cost is still acceptable.
+
+**Basis**: decision `:274` (step three of the implementation order) and `:240` (ah carries the supervision layer); the facts on the cost side are `AGENTS.md:64` and `:72`.
+
+### 7.3 Whether "media supply" becomes a domain-level Effect
+
+**Problem**: seed domain G3 of 2026-08-31 is called "model plus media supply". This document makes its first half, model supply, into G-MDL, and creates no domain-level Effect for its second half, media supply, meaning generating images, video and similar media with a model.
+
+**What the seed report already states.** The old repository's G3 report states this domain's Effect at `ac08659a6d5b556a3_v1.md:249`: 「媒体生成 provider 的凭据、探测、模型设置，与模型供给域**同等诚实** —— 即：录入凭据 → 真实、可解释的可用性判定 → 可用模型物化为可消费能力；判定失败钉到真因；不误伤用户数据。」 (*credentials, probing and model settings for media-generation providers are as honest as the model-supply domain: enter a credential, reach a real and explainable availability judgement, materialise available models into consumable capability, pin a failed judgement to its true cause, and damage no user data*). `:256` ties it to three north stars: 「*流程可靠可重现*：媒体生成是图流程的一等公民；*去黑盒*：花钱前知道花多少、参数合不合法；*本地=服务端*：同一 catalog」 (*reliable and reproducible flow: media generation is a first-class citizen of the graph flow; no black boxes: you know the cost and the parameter validity before spending; local equals server: one catalog*).
+
+**The open question**: whether the engine must promise media generation now. The premise behind those three north-star links is that media generation is a first-class citizen of the graph flow, and that premise stands outside the engine today: `src/graph_skill_runtime/models/` holds the package initialiser `__init__.py` and `reasoning_patch.py` and no media supply implementation, and none of the 45 features in `spec/features.yaml` covers media. Under rule 2 in §2.2 the engine supplies the first implementation of every domain-level Effect, so creating this Effect decides at the same time that the engine takes on the zero-to-one of media generation. That is a decision about what to build, and it belongs to the goal layer.
+
+**Recommendation**: leave media supply without a domain-level Effect for now. The basis is that no user journey depends on it today: the three north-star links in the seed report describe what follows once media generation is a first-class citizen, and no user is blocked on that path today. Create the Effect when a clear user journey appears, and at that point follow rule 3 in §2.2, adding the Effect and its first implementation to the engine first and taking up the gateway side after that.
+
+**Basis**: rule 2 in §2.2 (the engine holds an implementation of its own for every domain-level Effect) plus the ordering rule at decision `:353` (execution order is derived from the dependency order, and problem density only breaks ties within one layer). A promise with no journey behind it today, requiring a zero-to-one from nothing, does not fit into the current round. The sentence put to the user is exactly this: whether media generation counts today as a capability the engine must promise.
+
+---
+
+## 8. Revision log
+
+| Date | Change | Basis |
 |---|---|---|
-| 2026-09-03 | 首版(本 PR 的第一个提交)。确立五条北极星的引用基准、核心与辅助的三句规则、十个域共 40 条域级 Effect、四条缺口、五条引擎特有公理。 | 旧仓决议 `docs/design/gskill-restructure-decision-2026-08-31.md` §1/§2/§3/§5/§7;用户 2026-09-03 关于模块化推进、0 到 1 与 1 到 10、MoirAI 归属、层级写法的四段裁定。 |
-| 2026-09-03 | 交叉审 r1 返修。①把五条写宽了的承诺按真实契约收窄(E-FMT-3 注册表范围、E-CFG-4 只拒结构上像密钥的键、E-OBS-2 只有进入执行阶段的运行有轨迹、E-OBS-3 位置分编译期与运行期两档、E-STA-2 只取回等待态);②三条从"有实现"改判为缺口或部分(E-STA-3 产物、E-OBS-1 公开接线口、E-AGT-1 相位级执行者);③从 G-AGT 拆出新域 **G-MDL**,原 E-AGT-4 改编号 E-MDL-1;④G-ACC 不变量改为"同一用例的规则只有一份",新增用例 × 投影覆盖矩阵;⑤E-SHP-2 改写为用户可观察的结果;⑥第 5 节只准写装完包就有的检验,列名改"按坐标判定的状态"并声明它尚未实跑;⑦3.12 新增按旧仓域报告逐条对账的种子能力表;⑧7.3 的依据推翻重写——原写"媒体供给说不出贡献哪条北极星"是假前提。 | 交叉审 r1 的 13 条 P1 + 3 条 P2(每条附实跑证据),加协调方两条;逐条坐标已由执笔席重新打开核实。 |
-| 2026-09-03 | 交叉审 r2 返修。①第 1 轮未闭环的四条补齐:2.4 删掉"同一套用例的四种投影"旧断言;E-OBS-3 的位置由两档改三档,补"运行请求校验期"(`mode=run` 但相位未开始,无相位可指);E-SHP-2 的验收改成只用包内内容;3.12 每一行都给出父 Effect 编号。②E-FMT-2 承认 `field_path` 可空。③矩阵里"启动 MCP 服务"的 SDK 格裁为"刻意无"。④E-FMT-3 与 7.3 的三段引文按源文全角标点逐字重取。⑤E-EXE-5 扩为"批量、循环与并行",依据是 2026-08-15 的并行扇出决定与编译期 `[F-v3-parallel-write-conflict]` 守卫。⑥E-SHP-3 扩为完整发布承诺(内容寻址 + 版本锁定 + 脱离源文件运行 + 服务端复现)。⑦"每次发布随附三平台验收记录"由 Effect 改写进 4.4 第 4 条公理。⑧术语补 LangGraph、sidecar、CORS、catalog、Gitea。 | 交叉审 r2 的 11 条(10 条 P1 + 1 条 P2),坐标逐条重开核实;E-OBS-3 第二档与 E-FMT-2 的空 `field_path` 由执笔席亲自实跑复现。 |
-| 2026-09-03 | 交叉审 r3 返修。①**E-OBS-3 第三档被实跑反证,改判"部分 + 缺口"**:相位在跑时相位号仍会丢,原因在 `runtime/state_mapper.py:619-624` 包装异常时没传 `phase_id`。**这是本文写作过程中新查出的引擎缺陷**,修法是运行时工单,不在本文范围;汇总计数随之改为 30 可达成 / 5 部分 / 5 未覆盖。②E-ACC-3 的正式承诺扩写为"进程外的调用方通过一条网络接口调用八个运行用例",工作台 HTTP 接口是它的平行实现;3.12 的 G1 行不再反向改义。③G1 行按源报告 `:467-470` 逐字转录——7 个模块 + 3 条被改判为规则/机制的项,不把 M5 / M8 / M9 写进模块清单。④E-SHP-1 验收由一项扩为三项(能力齐全 / 包内无业务 gskill / 包外零副作用),第三项在全新 venv 里实跑过。⑤"reducer 通道 / LastValue 通道"改成人话。⑥7.3 的 `models/` 陈述补上 `__init__.py`。 | 交叉审 r3 的 4 条 P1 + 2 条 P2;E-OBS-3 的最小夹具与 E-SHP-1 第三项由执笔席亲自复现,坐标逐条重开核实。 |
+| 2026-09-03 | First version (the first commit of this PR). Established the citation baseline for the five north stars, the three rules dividing core from auxiliary, ten domains carrying 40 domain-level Effects, four gaps, and five axioms specific to the engine. | The old repository's decision `docs/design/gskill-restructure-decision-2026-08-31.md` §1/§2/§3/§5/§7; the user's four rulings of 2026-09-03 on modular advance, zero-to-one versus one-to-ten, where MoirAI belongs, and how levels are written. |
+| 2026-09-03 | Cross-review round 1 rework. First, five promises written too broadly were narrowed to the real contracts (the registry scope of E-FMT-3, E-CFG-4 refusing only structurally secret-shaped keys, E-OBS-2 giving a trace only for runs that enter execution, E-OBS-3 splitting location into a compile-time and a run-time tier, E-STA-2 retrieving the waiting state only). Second, three entries were re-judged from "implemented" to gap or partial (E-STA-3 artifacts, E-OBS-1 the public attachment point, E-AGT-1 the per-phase executor). Third, a new domain **G-MDL** was split out of G-AGT, and the role-to-model Effect, which carried the id `E-AGT-4` at that time, was renumbered `E-MDL-1`. Fourth, the G-ACC invariant became "one set of rules per use case", with a new use-case by projection coverage matrix. Fifth, E-SHP-2 was rewritten as a user-observable result. Sixth, §5 was restricted to checks available from the installed package, with the column renamed "status judged from coordinates" and declared not yet run. Seventh, §3.12 gained a table reconciling the old repository's domain reports capability by capability. Eighth, the basis of §7.3 was rewritten. | Cross-review round 1: 13 P1 items and 3 P2 items, each with evidence from a real run, plus two items from the coordinator; every coordinate reopened and verified by the writer. |
+| 2026-09-03 | Cross-review round 2 rework. First, the four items left open in round 1 were closed: §2.4 dropped the claim that four projections cover one use-case set; E-OBS-3's location went from two tiers to three with run-request validation added (`mode=run` with no phase started and no phase to point at); E-SHP-2's acceptance uses package content only; every row in §3.12 gives a parent Effect id. Second, E-FMT-2 acknowledges that `field_path` can be empty. Third, the SDK cell for "start the MCP service" in the matrix was ruled "deliberately absent". Fourth, three quotations in E-FMT-3 and §7.3 were re-taken character by character with the source's full-width punctuation. Fifth, E-EXE-5 was widened to batching, iteration and parallelism, on the basis of the parallel fan-out decision of 2026-08-15 and the compile-time `[F-v3-parallel-write-conflict]` guard. Sixth, E-SHP-3 was widened into the full release promise (content addressing plus version locking plus running without source files plus server-side reproduction). Seventh, "every release carries three-platform acceptance records" became axiom 4 in §4.4 in place of an Effect. Eighth, the glossary gained LangGraph, sidecar, CORS, catalog and Gitea. | Cross-review round 2: 11 items (10 P1 and 1 P2), every coordinate reopened; the second tier of E-OBS-3 and the empty `field_path` of E-FMT-2 reproduced by the writer in real runs. |
+| 2026-09-03 | Cross-review round 3 rework. First, **the third tier of E-OBS-3 was disproved by a real run and re-judged "partial + gap"**: the phase id is still lost while a phase runs, because `runtime/state_mapper.py:619-624` omits `phase_id` when wrapping the exception. **This is an engine defect found while writing this document**; the fix is a runtime work order outside this document's scope, and the summary counts became 30 achievable / 5 partial / 5 uncovered. Second, the formal promise of E-ACC-3 was widened to "an out-of-process caller reaches the eight run use cases over one network interface", with the studio's HTTP interface as its parallel implementation, and the G1 row of §3.12 stopped redefining it in reverse. Third, the G1 row transcribes the source report at `:467-470` word for word, listing 7 modules plus 3 items reclassified as rules or mechanisms, keeping M5, M8 and M9 out of the module list. Fourth, E-SHP-1's acceptance grew from one check to three (capabilities complete, no business gskill inside the package, zero side effects outside the package), with the third run in a fresh virtual environment. Fifth, "reducer channel / LastValue channel" was rewritten in plain language. Sixth, the statement about `models/` in §7.3 gained `__init__.py`. | Cross-review round 3: 4 P1 items and 2 P2 items; the minimal fixture for E-OBS-3 and the third check of E-SHP-1 reproduced by the writer, every coordinate reopened. |
+| 2026-09-03 | Rewritten in English per the language policy; context-leak sentences removed; `E-AGT-5` renumbered `E-AGT-4`. | The engine repository's `AGENTS.md` language policy and authoritative-document authoring rules (user rulings, 2026-09-03). |
