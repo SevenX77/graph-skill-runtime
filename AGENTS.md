@@ -172,6 +172,11 @@ Resolve exact paths before moving or deleting files. Never target a repository r
 
 Authoritative documentation must be self-contained. State goals, terms, observable facts, constraints, and acceptance evidence in the document; do not depend on chat history. Define supported behavior positively before listing prohibited misuse. Separate current facts, drafted targets, recommendations, and unresolved questions. Link to the owning source instead of copying parallel versions of a contract.
 
+## Language policy (user ruling, 2026-09-03)
+
+- **Authoritative documents are written in English.** This covers rule files, design, specification, contract, decision, ledger, work-order, and acceptance documents: anything an agent or a gate reads as a source of truth. Verbatim quotations keep their source language, with an English gloss beside them. The rule applies to every document written or substantially revised from now on; existing documents are converted the next time they are substantially revised, and no work order is opened only to translate.
+- **Reports to the user are written in Chinese**, in plain language, following the reporting discipline below.
+
 ## Reporting discipline (user ruling, 2026-09-03)
 
 Reports go to the product owner, not to a fellow engineer. Before sending any message to the user, check the four rules below and rewrite if any fails:
