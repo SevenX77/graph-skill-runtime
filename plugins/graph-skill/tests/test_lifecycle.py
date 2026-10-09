@@ -38,7 +38,8 @@ class LifecycleTests(unittest.TestCase):
 
     def test_cleanup_preserves_active_executing_unknown_and_modified_directories(self):
         with tempfile.TemporaryDirectory() as temporary:
-            state = Path(temporary)
+            # macOS exposes its temp directory through the system /var symlink.
+            state = Path(temporary).resolve()
             versions = state / "versions"
             versions.mkdir()
             active = versions / "0.3.0-aaaaaaaaaaaaaaaa"
