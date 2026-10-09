@@ -1215,6 +1215,8 @@ features:
   non_functional_contracts: []
   targeted_tests:
   - tests/core/test_portable_gskill_v1.py::test_missing_root_entry_and_graph_are_reported_in_one_compile
+  - tests/core/test_portable_gskill_v1.py::test_graphs_directory_is_not_a_subgraph_registry_alias
+  - tests/core/test_portable_gskill_v1.py::test_cache_from_graphs_directory_rules_cannot_bypass_subgraphs_discovery
 - id: F-studio-skill-migration
   description: Convert one legacy Studio v0.3 skill into the portable v1 layout
     through an explicit, deterministic, no-overwrite CLI operation.

@@ -20,11 +20,11 @@ updated: 2026-09-02
 | Section 2：产品命名 | **已实现于源码与仓库** | distribution/import/command 是 `graph-skill-runtime` / `graph_skill_runtime` / `gskill`，当前版本 `0.1.0a1`；release workflow 已实现单次 build、三平台 acceptance 与 OIDC publish gate，但 PyPI project/publisher 尚未配置，也没有实际发布 |
 | Section 3 与 Section 8 的 typed facade、配置、SDK/CLI/MCP 边界 | **已实现并由 Phase 4/5 扩展** | 顶层 77-symbol contract、closed/frozen/versioned runtime 与 integration models、五层 resolver、immutable `RunRequest`、单一 `RuntimeApplication` 已落地；顶层 Python function 为 14 个：`create_application` 加八个 runtime use cases，以及五个 integration functions；MCP 仍只有八个 runtime tools；Phase 4 增加 `AgentResource`，Phase 5 增加 18 个 integration exports |
 | Current engine bridge | **已实现于当前范围** | `CurrentEngineAdapter` 已用真实 portable `LOGIC` skill 验证显式 embedded compile/run，并把 bounded host-native run/resume/submit 接入同一 core；provider clients 仍只位于 optional `embedded` extra |
-| Section 4 至 Section 5：portable 格式与 flat graph registry | **Phase 2 已实现** | Production compile/run/SDK/CLI/MCP 只接受显式 root `SKILL.md` + `graph.yaml` bundle；内部 agent phase 使用 `AGENT.md`；graph registry 为单层 `graphs/<graph_id>/`；legacy v0.3 读取只存在于显式 converter 边界 |
+| Section 4 至 Section 5：portable 格式与 flat graph registry | **Phase 2 已实现** | Production compile/run/SDK/CLI/MCP 只接受显式 root `SKILL.md` + `graph.yaml` bundle；内部 agent phase 使用 `AGENT.md`；graph registry 为单层 `subgraphs/<graph_id>/`；legacy v0.3 读取只存在于显式 converter 边界 |
 | Section 6 至 Section 7：host-native durable handoff | **Phase 3 当前范围已实现** | 支持 root DAG 内串行可定位的 Agent wait point：图 checkpoint 与 `AgentTask` 先后持久化后返回 `agent_required`；SDK/MCP/CLI submit 校验结果并继续同一 run；跨进程、非法输出纠正、精确重试、checkpoint-to-task 与 graph-commit-to-response 两个 crash window 均有因果测试 |
 | Phase 3b：host-native 扩展 | **drafted；未实现** | registry subgraph、graph/phase iterate、不可比较并行 wait point、普通 human/breakpoint typed resume，以及宿主 dispatched/started acknowledgment 与 capability negotiation 尚未完成 |
 | Phase 4：direct vendor CLI executors | **已实现于当前受限范围** | Claude、Codex、Copilot、Cursor、Gemini、OpenCode 的 capability-probed adapter、fresh top-level process、资源 materialization、schema validation、attempt lifecycle 与全进程树清理已落地；仅 Codex CLI `0.144.1` / Windows `10.0.26200` x64 有成功实机 smoke，其他组合不能由 fake tests 或动态 probe 推导为支持 |
-| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | 验收取自 asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply（当前 bundle 已收敛为单一 owner 的 `1.1.0` / `KB-00..15`，该次内容变更已于 2026-09-02 完成同形状的三层再验收，命令与原始输出见[单一 owner 收敛决议](./moirai-asset-single-owner-2026-09-01.md) §10，其中 §10.5 逐条列明未重新成立的项）；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
+| Phase 5：MoirAI canonical assets 与 installer | **已验收于定义范围** | 验收取自 asset version `1.0.0` 的 4 roles、8 Agent Skills、`KB-00..14`、六宿主 renderer、显式 detect/plan/install/uninstall 与 ownership-safe apply（2026-09-02 验收的 bundle 为单一 owner 的 `1.1.0` / `KB-00..15`，该次内容变更已于 2026-09-02 完成同形状的三层再验收，命令与原始输出见[单一 owner 收敛决议](./moirai-asset-single-owner-2026-09-01.md) §10，其中 §10.5 逐条列明未重新成立的项）；renderer snapshots、built-wheel inventory/install smoke 与 Claude skill/agent/MCP discovery 加 Codex skill/MCP 交叉实证满足本阶段退出判据，但不证明六个宿主产品均 operational |
 | Phase 6：跨平台 package/release acceptance | **已验收于定义范围** | 一个 manifest-bound wheel/sdist 候选已在 Ubuntu、Windows、macOS 分别通过 pip-wheel、uv-wheel、pip-sdist 安装验收；CLI/MCP、host-native reopen/submit、SQLite、路径与 MoirAI lifecycle 的可观察行为一致。该范围是发布前候选验收，不是 registry publication，也不扩大 direct-vendor 支持矩阵 |
 | Gateway/Studio integration | **不属于本轮 release** | 只保留未来外部 Port/Adapter 的 owner 边界；不以 plugin、product cutover 或真机旅程作为本轮完成项 |
 
@@ -130,7 +130,7 @@ Python SDK、`gskill` CLI 与 `gskill` MCP server 均是薄 adapter：
 
 ## 4. Portable gSkill 格式
 
-**当前实现边界**：Phase 2 已把本节设计落实为 production reader。当前 core 只接受显式 skill root 下的根 `SKILL.md`、`graph.yaml`、phase `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 和单层 `graphs/<graph_id>/` registry；没有 dual reader。字段级格式与 converter 的当前权威是 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)，本节说明完整 v1 设计中的职责与动机，不另建平行 schema。
+**当前实现边界**：Phase 2 已把本节设计落实为 production reader。当前 core 只接受显式 skill root 下的根 `SKILL.md`、`graph.yaml`、phase `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 和单层 `subgraphs/<graph_id>/` registry；没有 dual reader。字段级格式与 converter 的当前权威是 [`../skill-spec/01-PORTABLE-GSKILL-V1.md`](../skill-spec/01-PORTABLE-GSKILL-V1.md)，本节说明完整 v1 设计中的职责与动机，不另建平行 schema。
 
 ### 4.1 目录布局
 
@@ -143,7 +143,7 @@ my-skill/
 ├── phases/
 │   └── <phase_id>/
 │       └── LOGIC.md | AGENT.md | SUBGRAPH.md
-├── graphs/
+├── subgraphs/                          # reusable subgraph definitions
 │   └── <graph_id>/
 │       ├── graph.yaml
 │       └── phases/
@@ -185,7 +185,7 @@ portable declaration 包括根 `SKILL.md`、所有 `graph.yaml` 与 phase 文件
 
 ### 5.1 目标决定
 
-v1 使用 root `graphs/<graph_id>/` 单层 registry。`graph_id` 在一个业务 gSkill 内全局唯一；phase id 只需在所属 graph 内唯一。root `graph.yaml` 也声明一个不与 registry 冲突的 graph id。
+v1 使用 root `subgraphs/<graph_id>/` 单层 registry。`graph_id` 在一个业务 gSkill 内全局唯一；phase id 只需在所属 graph 内唯一。root `graph.yaml` 也声明一个不与 registry 冲突的 graph id。
 
 `SUBGRAPH.md` 通过显式引用调用 registry 中的 graph：
 
@@ -404,9 +404,9 @@ artifact id 不能使用旧数组位置，因为增删或排序会改变身份�
 
 ### 10.1 资产边界与安装模型
 
-MoirAI 是可选 agentic front door：它帮助当前宿主设计、修复、执行与评估一个**由用户显式提供路径**的业务 gSkill。业务 gSkill 的 root 仍是根 `SKILL.md` + `graph.yaml`，每个 phase 恰有 `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 之一；reusable graph 平铺在 `graphs/<graph_id>/`。MoirAI bundle 不含 `graph.yaml`，不安装业务 workflow，不注册全局业务 skill，也不是 core runtime 的必需依赖。
+MoirAI 是可选 agentic front door：它帮助当前宿主设计、修复、执行与评估一个**由用户显式提供路径**的业务 gSkill。业务 gSkill 的 root 仍是根 `SKILL.md` + `graph.yaml`，每个 phase 恰有 `LOGIC.md` / `AGENT.md` / `SUBGRAPH.md` 之一；reusable graph 平铺在 `subgraphs/<graph_id>/`。MoirAI bundle 不含 `graph.yaml`，不安装业务 workflow，不注册全局业务 skill，也不是 core runtime 的必需依赖。
 
-精确 inventory 与 reference subset 的唯一事实源是 `integration.json`，asset version 为 `1.1.0`（单一 owner 收敛的落盘记录见 [MoirAI 资产单一 owner 收敛](./moirai-asset-single-owner-2026-09-01.md)）：
+精确 inventory 与 reference subset 的唯一事实源是 `integration.json`，asset version 为 `1.1.1`（单一 owner 收敛的落盘记录见 [MoirAI 资产单一 owner 收敛](./moirai-asset-single-owner-2026-09-01.md)）：
 
 - 四个 role body：`moirai` → host name `moirai`，`clotho` → `moirai-clotho`，`lachesis` → `moirai-lachesis`，`atropos` → `moirai-atropos`；
 - 八个 Agent Skills：`moirai`、`moirai-brainstorming`、`moirai-domain-analysis`、`moirai-graph-design`、`moirai-agent-prompt-design`、`moirai-compile-repair`、`moirai-eval-judgement`、`moirai-web-research`；
@@ -500,9 +500,11 @@ Graph Skill Runtime 的独特组合是：portable Agent Skill entry、compiled t
 
 **失败出口**：停止发布新包，当前 monorepo package 继续运行；不在旧包旁增加永久兼容 facade。
 
-### Phase 2：切换新 `SKILL.md` / `graph.yaml` / `AGENT.md` / `graphs/` 格式
+### Phase 2: Portable-format cutover (2026-08-27 historical evidence)
 
-**当前状态（2026-08-27）**：已实现。Production reader 已原子切换到 portable root `SKILL.md` + `graph.yaml` + phase `AGENT.md` + flat `graphs/`；legacy v0.3 parser 只在显式 converter boundary 中可达。Windows 本地 ruff、mypy strict、1582 passed / 1 skipped、manifest validator、build、isolated-wheel CLI smoke 与第三方依赖 audit 已通过；本 PR 的远程 Ubuntu/Windows/macOS CI 尚未发生。
+The observations below describe the 2026-08-27 `graphs/` layout. The current registry is `subgraphs/`, as defined by the [portable contract](../skill-spec/01-PORTABLE-GSKILL-V1.md#2-唯一目录布局) and the [2026-10-08 naming decision](./subgraph-directory-naming-2026-10-08.md).
+
+**历史状态（2026-08-27）**：已实现。Production reader 已原子切换到 portable root `SKILL.md` + `graph.yaml` + phase `AGENT.md` + flat `graphs/`；legacy v0.3 parser 只在显式 converter boundary 中可达。Windows 本地 ruff、mypy strict、1582 passed / 1 skipped、manifest validator、build、isolated-wheel CLI smoke 与第三方依赖 audit 已通过；本 PR 的远程 Ubuntu/Windows/macOS CI 尚未发生。
 
 **已落实工作**：新 parser/compiler、扁平 registry、具名 artifact declarations、call graph 校验与一次性 Studio converter；converter 为旧 artifact definitions 生成稳定 ID，并输出 project preset、flat registry 与确定性 migration report；受控 fixtures 已迁移到 portable 格式。
 
@@ -569,12 +571,14 @@ Windows `10.0.26200` x64 / Python `3.11.15` 上，Codex CLI `0.144.1` 的真实 
 
 **已落实工作**：
 
-- `integration.json` 以 integration id `moirai` 和 asset version `1.1.0` 封闭登记 4 roles、8 Agent Skills、16 KB filenames 与每个 skill 的 reference subset；canonical assets 不含 `graph.yaml`；
+- `integration.json` 以 integration id `moirai` 和 asset version `1.1.1` 封闭登记 4 roles、8 Agent Skills、16 KB filenames 与每个 skill 的 reference subset；canonical assets 不含 `graph.yaml`；
 - 四个 provider-neutral specialist role body、八份仅含 `name` / `description` frontmatter 的 progressive-disclosure `SKILL.md`、`KB-00` routing hub 与 subject-owned `KB-01..15` 已落地；
 - Claude、Codex、Copilot、Cursor、Gemini、OpenCode 六个 renderer 把同一份 assets 投影到 native skill/agent directories，并注册现有 `gskill` MCP server；Codex 把 projected agent filename/name 中的 canonical 连字符正规化为下划线，其他宿主保留连字符；OpenCode 只 merge/own shared `.opencode/opencode.json` 中的 V2 selector `mcp.servers.gskill`，遇到 sibling JSONC 时 fail closed；
 - `IntegrationInstaller` 与五个 SDK functions、`gskill integrations detect/install/uninstall` 已落地；construction、import、MCP startup 与 detection 零写入，只有 explicit install request 授权 host/project mutation；
 - preflight 覆盖全部 requested targets；unmanaged/modified resource 形成全局 conflict；owned JSON selector 与 Codex marker block 独立 merge；apply failure 后只对仍等于本次 after-image 的路径做因果安全 rollback，并对并发改动报告 incomplete rollback；manifest/hash-safe idempotent uninstall 已在实现中闭合；
 - Gateway/Studio plugin、dedicated Claude plugin bundle 与 global business-skill registry 均不是本阶段产物，只保留未来 external Port/Adapter owner 边界。
+
+The acceptance observations below apply to historical asset version `1.0.0`. The `1.1.0` re-acceptance is recorded in [MoirAI single-owner convergence, section 10](./moirai-asset-single-owner-2026-09-01.md). The current `1.1.1` bundle has its own [directory-change validation scope](./subgraph-directory-naming-2026-10-08.md#validation-scope).
 
 **验收证据（已满足）**：
 

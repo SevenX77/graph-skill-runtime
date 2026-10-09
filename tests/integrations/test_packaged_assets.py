@@ -27,7 +27,7 @@ def test_packaged_moirai_bundle_is_closed_utf8_and_complete() -> None:
     assets = PackagedMoiraiAssets()
 
     assert assets.integration_id == "moirai"
-    assert assets.asset_version == "1.1.0"
+    assert assets.asset_version == "1.1.1"
     assert assets.role_ids() == ("moirai", "clotho", "lachesis", "atropos")
     assert assets.skill_ids() == (
         "moirai",

@@ -1,0 +1,87 @@
+#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const state = process.platform === "win32"
+  ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "GraphSkill")
+  : join(homedir(), ".local", "share", "graph-skill");
+const lifecycle = new Set(["install", "update", "uninstall", "status"]);
+
+function installed() {
+  try {
+    const value = JSON.parse(readFileSync(join(state, "install.json"), "utf8"));
+    if (value.schema !== "graph-skill.toolkit-install.v1" || !/^\d+\.\d+\.\d+-[a-f0-9]{16}$/.test(value.release)) {
+      throw new Error("Invalid toolkit installation manifest");
+    }
+    return value;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function packagedPython(source) {
+  const bundle = JSON.parse(readFileSync(join(source, "bundle.json"), "utf8"));
+  const target = `${process.platform}-${process.arch}`;
+  if (bundle.schema !== "graph-skill.toolkit-bundle.v2" || bundle.target !== target) {
+    throw new Error(`Use the ${target} Graph Skill archive. This directory is not a matching v2 bundle.`);
+  }
+  return join(source, "runtimes", "python", process.platform === "win32" ? "python.exe" : "bin/python3");
+}
+
+function run(command, args) {
+  const environment = { ...process.env };
+  delete environment.NODE_OPTIONS;
+  delete environment.NODE_PATH;
+  const result = spawnSync(command, args, {
+    stdio: "inherit", windowsHide: true,
+    env: environment,
+  });
+  if (result.error) throw result.error;
+  process.exitCode = result.status ?? 1;
+}
+
+try {
+  if (Number(process.versions.node.split(".")[0]) < 22) throw new Error("Use the Node.js executable included in the Graph Skill archive.");
+  const [operation, ...args] = process.argv.slice(2);
+  if (!operation || operation === "--help" || operation === "help") {
+    console.log(`Graph Skill toolkit
+
+  graph-skill install [BUNDLE_DIR] [--targets codex,claude] [--dry-run]
+  graph-skill update BUNDLE_DIR [--targets codex,claude] [--dry-run]
+  graph-skill status
+  graph-skill uninstall [--dry-run]
+  graph-skill <runtime command> [arguments]
+  gskill <runtime command> [arguments]
+
+Install uses the default user profiles of Codex and Claude Code Desktop.
+Business operations use the independently packaged gskill runtime.
+Node.js and Python are included in the platform archive.
+See the packaged README for installation and manual Desktop acceptance.`);
+  } else if (operation === "--version") {
+    console.log(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version);
+  } else if (lifecycle.has(operation)) {
+    if (operation === "update" && (!args[0] || args[0].startsWith("--"))) {
+      throw new Error("Provide the extracted new bundle directory: graph-skill update BUNDLE_DIR");
+    }
+    // Run the incoming bundle's installer for an update, so lifecycle fixes
+    // ship with the new release rather than depending on the old installation.
+    const source = args[0] && !args[0].startsWith("--") ? resolve(args[0]) : root;
+    const tail = source === root && (!args[0] || args[0].startsWith("--")) ? args : args.slice(1);
+    const installerRoot = (operation === "install" || operation === "update") ? source : root;
+    const script = join(installerRoot, "packaging", "entry.py");
+    run(packagedPython(installerRoot), ["-I", "-B", "-X", "utf8", script, operation, source, ...tail]);
+  } else {
+    const manifest = installed();
+    if (!manifest) throw new Error("Toolkit is not installed. Extract a release archive and run its install.cmd or install.sh.");
+    const executable = join(state, "versions", manifest.release, "runtimes", "python", process.platform === "win32" ? "python.exe" : "bin/python3");
+    run(executable, ["-I", "-B", "-X", "utf8", "-m", "graph_skill_runtime", operation, ...args]);
+  }
+} catch (error) {
+  console.error(`Graph Skill: ${error.message}`);
+  process.exitCode = 1;
+}

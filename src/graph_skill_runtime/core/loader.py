@@ -195,9 +195,9 @@ class SkillLoader:
         skill_manifest, skill_diags = _load_root_skill_manifest(root)
 
         graph_roots = [root]
-        graphs_dir = root / "graphs"
-        if graphs_dir.exists():
-            graph_roots.extend(sorted(path for path in graphs_dir.iterdir() if path.is_dir()))
+        subgraphs_dir = root / "subgraphs"
+        if subgraphs_dir.exists():
+            graph_roots.extend(sorted(path for path in subgraphs_dir.iterdir() if path.is_dir()))
         registry_slots = {path.name for path in graph_roots[1:]}
 
         graph_registry: dict[str, CompiledSkill] = {}
@@ -952,25 +952,25 @@ def _guard_portable_skill_root(skill_root: Path) -> None:
             )
             for entry in nested_entries
         )
-    graphs_dir = skill_root / "graphs"
-    if graphs_dir.exists() and not graphs_dir.is_dir():
+    subgraphs_dir = skill_root / "subgraphs"
+    if subgraphs_dir.exists() and not subgraphs_dir.is_dir():
         diags.append(
             _Diag(
-                graphs_dir,
+                subgraphs_dir,
                 1,
                 "[F-v3-graph-registry-invalid]",
-                "graphs must be a directory",
+                "subgraphs must be a directory",
             )
         )
-    elif graphs_dir.is_dir():
-        for entry in sorted(graphs_dir.iterdir()):
+    elif subgraphs_dir.is_dir():
+        for entry in sorted(subgraphs_dir.iterdir()):
             if not entry.is_dir() or entry.is_symlink():
                 diags.append(
                     _Diag(
                         entry,
                         1,
                         "[F-v3-graph-registry-invalid]",
-                        "every direct graphs/ entry must be a real registry graph directory",
+                        "every direct subgraphs/ entry must be a real registry graph directory",
                     )
                 )
                 continue
@@ -983,24 +983,24 @@ def _guard_portable_skill_root(skill_root: Path) -> None:
                         "registry graph directory names must be valid graph ids",
                     )
                 )
-            nested_registry = entry / "graphs"
+            nested_registry = entry / "subgraphs"
             if nested_registry.exists():
                 diags.append(
                     _Diag(
                         nested_registry,
                         1,
                         "[F-v3-graph-registry-invalid]",
-                        "registry graph directories cannot contain another graphs/ registry",
+                        "registry graph directories cannot contain another subgraphs/ registry",
                     )
                 )
-        for nested_graph in sorted(graphs_dir.rglob("graph.yaml")):
-            if nested_graph.parent.parent != graphs_dir:
+        for nested_graph in sorted(subgraphs_dir.rglob("graph.yaml")):
+            if nested_graph.parent.parent != subgraphs_dir:
                 diags.append(
                     _Diag(
                         nested_graph,
                         1,
                         "[F-v3-graph-registry-invalid]",
-                        "registry graphs must be flat at graphs/<graph_id>/graph.yaml",
+                        "registry graphs must be flat at subgraphs/<graph_id>/graph.yaml",
                     )
                 )
     if diags:
@@ -1118,7 +1118,7 @@ def _discover_phase_files(skill_root: Path) -> list[tuple[str, Path, str]]:
                     nested_graph,
                     1,
                     "[F-v3-graph-root-missing]",
-                    "graph.yaml is only allowed at a root or graphs/<graph_id> directory",
+                    "graph.yaml is only allowed at a root or subgraphs/<graph_id> directory",
                 )
             )
         legacy_agent = phase_dir / "SKILL.md"
@@ -1880,7 +1880,7 @@ def _route_document(file_path: Path) -> RouteKind:
             _fatal(
                 file_path,
                 1,
-                "graph.yaml is only allowed at the skill root or graphs/<graph_id>",
+                "graph.yaml is only allowed at the skill root or subgraphs/<graph_id>",
                 code="[F-v3-graph-root-missing]",
             )
         return "graph"

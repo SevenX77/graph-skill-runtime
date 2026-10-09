@@ -37,7 +37,7 @@ def _write_graph(
 ) -> None:
     """Write a portable gSkill v1 graph.
 
-    ``skill_entry`` is False for a registry graph under ``graphs/<graph_id>/``:
+    ``skill_entry`` is False for a registry graph under ``subgraphs/<graph_id>/``:
     only a skill root owns the Agent Skills entrypoint, and its ``name`` must
     equal the root directory basename.
     """
