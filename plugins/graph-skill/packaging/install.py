@@ -12,6 +12,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from discovery import discover, select_targets
 from hosts import assert_default_profiles, merge, projections
 from locking import installer_lock
 from ownership import InstallError, Transaction, digest, json_bytes, plain_path, read_bytes, read_json
@@ -26,6 +27,8 @@ def progress(message: str) -> None:
 
 
 def completion(result: dict, operation: str) -> None:
+    if operation == "detect":
+        return
     if result["status"] == "installed":
         hosts = ", ".join("Codex" if item == "codex" else "Claude Code" for item in result["targets"])
         print(f"\nGraph Skill {result['version']} is installed for {hosts}.", file=sys.stderr)
@@ -312,21 +315,18 @@ def cleanup_release(release: Path, state: Path) -> None:
     shutil.rmtree(checked)
 
 
-def selected_targets(value: str | None, previous: dict) -> list[str]:
-    targets = value.split(",") if value is not None else previous.get("targets", ["codex", "claude"])
-    if not targets or len(set(targets)) != len(targets) or not set(targets).issubset({"codex", "claude"}):
-        raise InstallError("--targets must be codex, claude, or codex,claude")
-    return targets
-
-
-def install(source: Path, target_option: str | None, dry_run: bool) -> dict:
+def install(source: Path, target_option: str, dry_run: bool, discovery_report: dict | None = None) -> dict:
     state = state_root()
     progress("Checking package integrity...")
     info, raw = package(source)
     old = load_manifest(state)
-    targets = selected_targets(target_option, old)
+    discovery_report = discover() if discovery_report is None else discovery_report
+    targets = select_targets(target_option, discovery_report, old)
     progress(f"Checking configuration and file ownership for {', '.join(targets)}...")
     assert_default_profiles(targets)
+    if old and tuple(map(int, info["version"].split("."))) < tuple(map(int, old["version"].split("."))):
+        raise InstallError(f"Incoming toolkit {info['version']} is older than installed {old['version']}; "
+                           "use a current bundle. Existing installation preserved.")
     identity = info["version"] + "-" + digest(raw)[:16]
     release = release_root(state, identity)
     node = runtime_node(release)
@@ -352,6 +352,8 @@ def install(source: Path, target_option: str | None, dry_run: bool) -> dict:
         "version": info["version"],
         "targets": targets,
         "changes": transaction.summary(),
+        "target_selection": "detected" if target_option == "auto" else "explicit",
+        "discovery": discovery_report,
         "runtime": str(runtime_python(release)),
         "restart_desktop": True,
         "native_canvas": "requires user acceptance",
@@ -465,14 +467,24 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Install the Graph Skill toolkit for local Codex and Claude Code Desktop"
     )
-    parser.add_argument("operation", choices=("install", "update", "uninstall", "status", "cleanup"))
+    parser.add_argument("operation", choices=("install", "update", "uninstall", "status", "cleanup", "detect"))
     parser.add_argument("source", nargs="?", type=Path, default=ROOT)
-    parser.add_argument("--targets")
+    parser.add_argument("--targets", default="auto", help="auto, codex, claude, or codex,claude")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true", help="Print the structured result even in an interactive terminal")
     args = parser.parse_args()
+    discovery_report = None
     try:
-        if args.operation == "status":
+        if args.operation in {"install", "update", "detect"}:
+            discovery_report = discover()
+        if args.operation in {"install", "update"}:
+            # Reject discovery/profile uncertainty before the lock creates state.
+            # Installation rechecks the previous target set while holding the lock.
+            targets = select_targets(args.targets, discovery_report, load_manifest(state_root()))
+            assert_default_profiles(targets)
+        if args.operation == "detect":
+            result = discovery_report
+        elif args.operation == "status":
             result = status()
         elif args.dry_run:
             if args.operation == "cleanup":
@@ -480,7 +492,7 @@ def main() -> int:
             else:
                 result = (
                     uninstall(True) if args.operation == "uninstall"
-                    else install(args.source.resolve(), args.targets, True)
+                    else install(args.source.resolve(), args.targets, True, discovery_report)
                 )
         else:
             with installer_lock(state_root(), progress):
@@ -489,14 +501,17 @@ def main() -> int:
                 else:
                     result = (
                         uninstall(False) if args.operation == "uninstall"
-                        else install(args.source.resolve(), args.targets, False)
+                        else install(args.source.resolve(), args.targets, False, discovery_report)
                     )
         completion(result, args.operation)
-        if args.json or not sys.stdout.isatty():
+        if args.operation == "detect" or args.json or not sys.stdout.isatty():
             print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, InstallError) as exc:
-        print(json.dumps({"status": "error", "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        result = {"status": "error", "message": str(exc)}
+        if discovery_report is not None:
+            result["discovery"] = discovery_report
+        print(json.dumps(result, ensure_ascii=False), file=sys.stderr)
         print("Installation was not completed. Resolve the reported problem, then retry the same command.", file=sys.stderr)
         return 1
 

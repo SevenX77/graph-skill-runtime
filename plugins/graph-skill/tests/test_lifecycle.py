@@ -23,7 +23,9 @@ class LifecycleTests(unittest.TestCase):
         stdout, stderr = io.StringIO(), io.StringIO()
         with patch.object(sys, "argv", ["entry.py", "install", "--dry-run"]), patch.object(
             install, "install", return_value=result
-        ), redirect_stdout(stdout), redirect_stderr(stderr):
+        ), patch.object(install, "discover", return_value={"clients": [{"target": "codex", "status": "detected"}]}), \
+                patch.object(install, "load_manifest", return_value={}), \
+                patch.object(install, "assert_default_profiles"), redirect_stdout(stdout), redirect_stderr(stderr):
             self.assertEqual(install.main(), 0)
         self.assertEqual(json.loads(stdout.getvalue()), result)
         self.assertIn("0.3.1 is installed for Codex", stderr.getvalue())
@@ -44,12 +46,15 @@ class LifecycleTests(unittest.TestCase):
             if json_requested:
                 self.assertEqual(json.loads(stdout.getvalue()), result)
 
-    def test_upgrade_preserves_selection_and_explicit_change_wins(self):
-        self.assertEqual(install.selected_targets(None, {"targets": ["codex"]}), ["codex"])
-        self.assertEqual(install.selected_targets(None, {}), ["codex", "claude"])
-        self.assertEqual(install.selected_targets("claude", {"targets": ["codex"]}), ["claude"])
+    def test_upgrade_redetects_and_requires_explicit_removal(self):
+        report = {"clients": [{"target": "codex", "status": "detected"}]}
+        self.assertEqual(install.select_targets("auto", report, {"targets": ["codex"]}), ["codex"])
+        self.assertEqual(install.select_targets("auto", report, {}), ["codex"])
+        with self.assertRaisesRegex(InstallError, "not rediscovered"):
+            install.select_targets("auto", report, {"targets": ["codex", "claude"]})
+        self.assertEqual(install.select_targets("claude", report, {"targets": ["codex"]}), ["claude"])
         with self.assertRaises(InstallError):
-            install.selected_targets("codex,codex", {})
+            install.select_targets("codex,codex", report, {})
 
     def test_cleanup_summary_preserves_reasons_and_distinguishes_preview(self):
         for status, action in [("planned", "Would remove"), ("cleaned", "Removed")]:

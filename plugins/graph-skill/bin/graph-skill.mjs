@@ -10,7 +10,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const state = process.platform === "win32"
   ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "GraphSkill")
   : join(homedir(), ".local", "share", "graph-skill");
-const lifecycle = new Set(["install", "update", "uninstall", "status", "cleanup"]);
+const lifecycle = new Set(["install", "update", "uninstall", "status", "cleanup", "detect"]);
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 
 function installed() {
@@ -53,8 +53,9 @@ try {
   if (!operation || operation === "--help" || operation === "help") {
     console.log(`Graph Skill toolkit
 
-  graph-skill install [BUNDLE_DIR] [--targets codex,claude] [--dry-run]
-  graph-skill update [BUNDLE_DIR] [--targets codex,claude] [--dry-run]
+  graph-skill install [BUNDLE_DIR] [--targets auto|codex|claude|codex,claude] [--dry-run]
+  graph-skill update [BUNDLE_DIR] [--targets auto|codex|claude|codex,claude] [--dry-run]
+  graph-skill detect
   graph-skill status
   graph-skill uninstall [--dry-run]
   graph-skill cleanup [--dry-run]
@@ -63,7 +64,8 @@ try {
 
 Lifecycle commands accept --json for structured output in an interactive terminal.
 
-Install uses the default user profiles of Codex and Claude Code Desktop.
+Install detects local Codex and Claude Code clients and configures their default user profiles.
+Detect reports client evidence and configuration destinations without changing them.
 Business operations use the independently packaged gskill runtime.
 Node.js and Python are included in the platform archive.
 The npm entry downloads the matching archive. Update without a directory downloads the newest toolkit release.

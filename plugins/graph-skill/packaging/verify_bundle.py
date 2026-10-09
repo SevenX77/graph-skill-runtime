@@ -92,7 +92,25 @@ def native_smoke(source: zipfile.ZipFile, prefix: str, manifest: dict) -> dict:
             results.append(subprocess.check_output(
                 command, cwd=destination, env=environment, text=True, encoding="utf-8"
             ).strip())
-        return {"commands": len(commands), "output": results}
+        def profile_snapshot() -> dict[str, bytes]:
+            return {
+                str(path.relative_to(destination)): path.read_bytes()
+                for name in ("home", "local", "roaming", "config", "data")
+                for path in (destination / name).rglob("*") if path.is_file()
+            }
+
+        before = profile_snapshot()
+        discovery = json.loads(subprocess.check_output(
+            [node, str(payload / "bin/graph-skill.mjs"), "detect"],
+            cwd=destination, env=environment, text=True, encoding="utf-8"
+        ))
+        if discovery.get("schema") != "graph-skill.client-discovery.v1" or {
+            client["target"] for client in discovery["clients"]
+        } != {"codex", "claude"}:
+            raise InstallError("Packaged client discovery did not return the required inventory")
+        if profile_snapshot() != before:
+            raise InstallError("Packaged discovery changed host or product files")
+        return {"commands": len(commands) + 1, "output": results, "discovery": discovery}
 
 
 def inspect(archive: Path, expected_source: str, native: bool) -> dict:

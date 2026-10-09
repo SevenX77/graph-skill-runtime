@@ -2,7 +2,9 @@
 
 Graph Skill toolkit supplies global runtime commands, shared agent instructions and a graph canvas for Codex Desktop and Claude Code Desktop. It uses the host's normal file tools for source browsing and editing. The canvas is an MCP App: an HTML view attached to a tool result through the Model Context Protocol (MCP). The Python runtime remains independently installable, and business skills stay in the directories the user selects.
 
-Version `0.3.1` improves installation progress, completion guidance and recovery after an interrupted installer. It is a patch to the `0.3.0` installation workflow; the independently versioned Python runtime remains `0.1.0a1`. Complete archives target Windows x64, Apple Silicon macOS, Linux x64 and Linux ARM64. The [installation decision](INSTALLATION-DECISIONS.md) explains the behavior and version choice; the [0.3.1 validation record](VALIDATION.md#version-031-installation-patch-evidence-2026-10-09) distinguishes observed results from pending release and Desktop checks.
+Version `0.3.2` detects installed Codex and Claude clients and selects their corresponding host adapters by default. An adapter supplies the host's Skills, canvas-server registration and follow-up hook. The release retains `0.3.1` progress, retry guidance, interrupted-installer recovery, automatic downloads, updates and explicit cleanup. The independently versioned Python runtime remains `0.1.0a1`. Complete archives target Windows x64, Apple Silicon macOS, Linux x64 and Linux ARM64. The [installation decision](INSTALLATION-DECISIONS.md#version-032-client-discovery-decision) explains selection; the [current validation record](VALIDATION.md#current-baseline-version-032-client-discovery-release-2026-10-09) separates release evidence from Desktop acceptance.
+
+**Known Windows Claude limitation:** a `0.3.1` probe found that one Claude package context could not see or launch the private Node executable under `%LOCALAPPDATA%/GraphSkill`; identical files started from a location outside AppData. Version `0.3.2` retains that installation path, so the observed canvas-server and hook launch limitation remains unresolved. Client detection establishes presence; connection, visible canvas and automatic follow-up require separate host observations. The validation record preserves the probe's scope and evidence identity.
 
 ## Install
 
@@ -29,11 +31,15 @@ Use the version shown on the [published toolkit release](https://github.com/Seve
 
 Extract the matching ZIP, preserving executable permissions on macOS/Linux. On Windows, run `install.cmd`; on macOS/Linux, run `sh install.sh` from the extracted directory. Keep the extracted payload together. An unbuilt source checkout is not an installer archive.
 
-Add `--targets codex` or `--targets claude` to install for one host, and `--dry-run` to preview the operation. First installation defaults to both hosts. An upgrade without `--targets` retains the target list in the existing installation manifest. Only selected hosts' configuration overrides are checked: `CODEX_HOME` for Codex and `CLAUDE_CONFIG_DIR` for Claude must resolve to their respective default user profiles. Custom selected profiles remain unsupported.
+Installation and update default to `--targets auto`, which selects detected clients. Discovery checks executable commands in PATH, the command search list, and supported native installation locations. On Windows it also checks exact registered package families and their manifest-listed, visible application executables. On macOS it checks application metadata and executable files in `/Applications` and `~/Applications`. Configuration folders alone supply no client evidence.
+
+Each host receives `detected`, `not-detected` or `unknown`, with evidence, diagnostics and configuration destinations. `not-detected` means the inspected locations supplied no evidence; `unknown` means a diagnostic prevented a conclusion. Positive executable evidence can establish `detected` while retaining diagnostics from another probe. An unknown result or no detected clients stops automatic installation before toolkit state is created. On update, a previously configured client missing from automatic selection also stops the operation and preserves its adapter.
+
+Use `--targets codex`, `--targets claude` or `--targets codex,claude` to choose an explicit set, including a verified nonstandard client location or an intentional target removal. Add `--dry-run` to preview the operation. Only selected hosts' configuration overrides are checked: `CODEX_HOME` for Codex and `CLAUDE_CONFIG_DIR` for Claude must resolve to their respective default user profiles. Custom selected profiles remain unsupported. An incoming toolkit version lower than the installed version is rejected.
 
 If Codex has the earlier `graph-skill-canvas@graph-skill-local` plugin enabled, disable it through Desktop before installation. The installer preserves conflicting configuration and stops. It also preserves unmanaged collisions and edited toolkit-owned resources; resolve the reported conflict before retrying.
 
-The completion message gives an absolute `status` command that works immediately in the current terminal. Open a fresh terminal to use `graph-skill` and `gskill` through the updated PATH, the command search list. Restart the selected host to discover the Skills, canvas server and hook. A Skill is a discoverable instruction file that guides the agent; the hook supplies follow-up guidance after tool use. The host retains its normal trust and approval decisions. Ask the agent to open a Graph Skill folder and show its graph, then verify the displayed root and canvas in that host.
+The completion message gives an absolute `status` command that works immediately in the current terminal. Open a fresh terminal to use `graph-skill` and `gskill` through the updated PATH. Restart the selected host to discover the Skills, canvas server and hook. A Skill is a discoverable instruction file that guides the agent; the hook supplies follow-up guidance after tool use. The host retains its normal trust and approval decisions. Ask the agent to open a Graph Skill folder and show its graph, then verify the displayed root and canvas in that host.
 
 If installation fails or is interrupted, resolve the reported problem and retry the same command, retaining any `--targets` and `--dry-run` options. The installer recovers an abandoned process record only after confirming that its process has exited. A running or inaccessible process, or an unreadable ownership record, keeps installation blocked with a diagnostic. Leave the lock files in place and follow that diagnostic; file age is not a recovery criterion.
 
@@ -44,13 +50,16 @@ The bundled Node.js prerequisites include Windows 10/Server 2016 or later, macOS
 ```text
 graph-skill update
 graph-skill update "EXTRACTED_DIR"
+graph-skill detect
 graph-skill status
 graph-skill cleanup --dry-run
 graph-skill cleanup
 graph-skill uninstall
 ```
 
-`graph-skill update` finds the newest published toolkit release, including toolkit previews, downloads the matching archive, verifies its checksum and runs the incoming installer. Supplying an absolute extracted release directory selects the offline route. Install/update accept `--targets codex,claude` and `--dry-run`. To upgrade an older toolkit that lacks automatic updates, use the new npm entry or the new ZIP's installer.
+`graph-skill update` finds the newest published toolkit release, including toolkit previews, downloads the matching archive, verifies its checksum and runs the incoming installer. Supplying an absolute extracted release directory selects the offline route. Install/update accept `--targets auto|codex|claude|codex,claude` and `--dry-run`; choose one value after `--targets`. To upgrade an older toolkit that lacks automatic updates, use the new npm entry or the new ZIP's installer.
+
+`graph-skill detect` reads client evidence and reports configuration destinations without creating toolkit state, changing host configuration or launching clients. It always prints JSON, including in an interactive terminal. The npm entry delegates detection to an existing installed payload; that payload must support the command. On first use without an installed or complete extracted payload, npm `detect` returns `not-installed`. Run the explicit `install` command to acquire the complete payload and perform its preflight discovery.
 
 Lifecycle commands show concise progress and results on standard error, the terminal's diagnostic stream. Redirected or piped standard output retains the structured JSON result for scripts. Add `--json` to display that result in an interactive terminal, including the detailed plan from `--dry-run`.
 
@@ -85,7 +94,7 @@ Select a business root containing `SKILL.md` and `graph.yaml`. The agent uses na
 
 An explicit call uses the `graph-skill-canvas` server's `show_graph` tool with the verified absolute `skill_root`. Omitting the root displays a labeled three-node demonstration. The tool returns `structuredContent.graph`, `structuredContent.skillRoot` and `ui://graph-skill/canvas-v2.html`.
 
-The canvas displays root inputs, phases, dependencies and outputs, with each subgraph phase represented as one node. Runtime compilation owns full format validation. Presentation reads do not import business Python; runtime compilation or inspection of trusted skills can load their declared code. Complete property and option editing remains in the [broader design](https://github.com/SevenX77/graph-skill-runtime/blob/graph-skill-toolkit-v0.3.1/docs/design/graph-skill-agent-plugin.md).
+The canvas displays root inputs, phases, dependencies and outputs, with each subgraph phase represented as one node. Runtime compilation owns full format validation. Presentation reads do not import business Python; runtime compilation or inspection of trusted skills can load their declared code. Complete property and option editing remains in the [broader design](https://github.com/SevenX77/graph-skill-runtime/blob/graph-skill-toolkit-v0.3.2/docs/design/graph-skill-agent-plugin.md).
 
 The top-left path button requests native folder opening through `openai/files/open` when the host advertises that capability. If the request is absent or rejected, it asks the host agent to browse the root; a file-only host can show `SKILL.md`. The [OpenAI UI contract](https://developers.openai.com/plugins/build/chatgpt-ui) defines the file bridge. Successful dispatch and an actual visible folder view are separate observations.
 
@@ -123,13 +132,13 @@ python -B plugins/graph-skill/packaging/bundle.py --runtime-wheel plugins/graph-
 
 Choose another declared target with `--platform`. [`packaging/runtime-lock.json`](packaging/runtime-lock.json) owns pinned interpreter inputs. The builder exports `uv.lock` with `uv --locked` and installs hash-checked binary wheels for the selected platform. Missing compatible inputs stop assembly. Intel-only native compilation is removed from this release path.
 
-The output is `release/graph-skill-0.3.1-TARGET.zip` with an adjacent JSON receipt binding its source, archive, runtime wheel and dependency inputs. Generate the lightweight npm package from the same clean source after the JavaScript build:
+The output is `release/graph-skill-0.3.2-TARGET.zip` with an adjacent JSON receipt binding its source, archive, runtime wheel and dependency inputs. Generate the lightweight npm package from the same clean source after the JavaScript build:
 
 ```text
 npm run pack:installer --prefix plugins/graph-skill
 ```
 
-The packer derives the package version from the product module and records `sourceCommit`; its output is `release/graph-skill-toolkit-0.3.1.tgz`. The product build module remains private. The generated distribution contains the command entry and bundled installer, with no postinstall host mutation. The release contains the tarball, four ZIPs and `SHA256SUMS.txt`. Final hashes and post-build evidence remain outside packaged documents; changing an input requires rebuilding and verifying the affected artifacts.
+The packer derives the package version from the product module and records `sourceCommit`; its output is `release/graph-skill-toolkit-0.3.2.tgz`. The product build module remains private. The generated distribution contains the command entry and bundled installer, with no postinstall host mutation. The release contains the tarball, four ZIPs and `SHA256SUMS.txt`. Final hashes and post-build evidence remain outside packaged documents; changing an input requires rebuilding and verifying the affected artifacts.
 
 ## Manual Desktop acceptance
 

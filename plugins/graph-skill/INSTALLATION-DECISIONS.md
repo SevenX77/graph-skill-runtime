@@ -1,6 +1,40 @@
-# Installation patch decision: 0.3.1
+# Installation decisions
 
-## Result, sources and scope
+## Version 0.3.2 client discovery decision
+
+Toolkit `0.3.2` selects host adapters from observable client installations. An adapter supplies a host's shared Skills, canvas-server registration and follow-up hook. The user requested “识别Claude code和codex客户端，根据有哪些客户端，安装对应的适配器” (“identify Claude Code and Codex clients and install their corresponding adapters”), then “发布新版本0.3.2” (“publish new version 0.3.2”). The coordinator's retained release brief transcribes those instructions; the [current validation baseline](VALIDATION.md#current-baseline-version-032-client-discovery-release-2026-10-09) owns result requirements, authority, evidence and remaining acceptance work.
+
+The release starts from published `0.3.1`, commit `e8434fc1ad82c52e379fefec531d0a75de05eabd`, preserving download/update behavior, progress, retry guidance, operating-system locking and explicit cleanup. The Python runtime remains `0.1.0a1`. The user selected toolkit version `0.3.2`. That explicit release identity governs this delivery; the historical `0.3.1` versioning rationale remains below with its original scope.
+
+### Discovery and selection contract
+
+[`packaging/discovery.py`](packaging/discovery.py) owns read-only evidence gathering and pure target selection. It examines command executables in PATH, the command search list, and supported native installation paths. Windows discovery reads the current user's exact Codex and Claude package families, parses each registered application's manifest and requires an accessible, visible application executable within the registered location. It also checks conventional Desktop executable paths. macOS discovery reads `Codex.app` and `Claude.app` metadata and executable files in `/Applications` and the user's `Applications` directory. Linux discovery uses command and native CLI locations. A CLI is a program invoked through a terminal. Configuration destinations are reported separately from evidence of client presence.
+
+Each host has one of three results. `detected` has positive executable evidence. `not-detected` has no evidence or diagnostic in the inspected locations. `unknown` has diagnostics and no positive evidence. A successful probe can therefore establish `detected` while retaining another probe's diagnostic. These results describe the inspected installations; they supply no authentication or service-loading evidence. Package and application names alone, configuration-folder existence and unreadable executable paths cannot establish presence.
+
+[`packaging/install.py`](packaging/install.py) defaults install/update to `--targets auto`. Any `unknown` result, empty selection or automatically omitted previously owned target stops before installer state creation. The lifecycle rechecks the previous target set while holding its installer lock. An explicit `--targets codex`, `--targets claude` or `--targets codex,claude` selects the intended set, including a verified nonstandard installation or deliberate removal of an owned adapter. Only selected profile overrides are checked. `CODEX_HOME` and `CLAUDE_CONFIG_DIR` must resolve to their selected hosts' default user profiles; custom profiles remain unsupported. An incoming lower toolkit version is rejected before provisioning.
+
+`graph-skill detect` always prints the structured discovery report, including in an interactive terminal. It reads evidence and configuration destinations while leaving toolkit and host state unchanged. [`bin/graph-skill.mjs`](bin/graph-skill.mjs) dispatches this operation through a complete payload. The npm bootstrap can reuse an installed payload that supports detection; without a complete payload it returns `not-installed`. The explicit first-use `install` acquires the archive and invokes its preflight discovery. This keeps the small Node-based bootstrap's deployment boundary intact.
+
+### Basis, alternatives and limits
+
+The required result is selecting adapters for the clients present on the computer. Installing both adapters unconditionally can create unrelated host resources. Configuration directories can survive uninstall or be created by independent tooling, so directory presence cannot satisfy that requirement. Executable and native-package evidence provides a reviewable boundary, while explicit target selection handles intentional choices outside that boundary. An unknown result stops automatic mutation because failure to inspect a client provides insufficient grounds for adding or removing its adapter.
+
+| Approach | Feasibility, tradeoff and disposition |
+| --- | --- |
+| Port bounded discovery into published `0.3.1` | `0.95`: the source and previous native delivery are identified, and discovery fits the existing preflight boundary. Adopted. Integrated lifecycle tests, native path cases and command dispatch must establish the changed behavior. Regressed lifecycle checks or false selection would require correction. |
+| Build from the older `0.2.0` working checkout | `0.30`: that checkout precedes verified download/update, locking and installation guidance. Rejected because a version bump there would lose required existing behavior. A proven complete reconciliation would change feasibility, while adding unnecessary recovery work to this release. |
+| Require explicit targets for every installation | `0.99` for deterministic selection through the existing option. Retained as an override, insufficient as the default because the user requested client-based selection. A user decision to prefer manual-only selection would change this disposition. |
+
+The four existing platform archives and npm package remain the delivery channels. All payloads must derive from the same clean committed inputs. A renamed older archive would carry the wrong source and version identity, so release assembly requires newly built and inspected bytes. Candidate checks and public read-back remain necessary regardless of the feasibility judgments above.
+
+The known Windows Claude package-context launch gap remains open. On 2026-10-09, a `0.3.1` probe found that the private Node executable was accessible normally and inaccessible under one Claude package identity; identical copied files outside AppData started. The probe established a path-access condition and left actual Desktop rendering untested. This release retains `%LOCALAPPDATA%/GraphSkill`; a formal runtime-path migration is separate work. The [validation record](VALIDATION.md#current-baseline-version-032-client-discovery-release-2026-10-09) identifies the retained raw summary and limits. Discovery acceptance therefore covers client presence and adapter selection, while host connection, rendering and natural follow-up retain their own evidence requirements.
+
+The coordinator owns implementation, test results, exact-source builds and publication. The clean-context writer owns these documents. Source documents freeze before the clean-source build; subsequent native, remote and channel observations belong in external release notes and receipts. The historical decision below preserves the `0.3.1` rationale and observations.
+
+## Historical installation patch decision: 0.3.1
+
+### Result, sources and scope
 
 The installation patch makes the existing npm and ZIP routes understandable during execution and safely recoverable after an installer exits. The user requested “优化后发布新包” (“improve it, then publish a new package”) and asked whether a small change without new functionality should increment “第三位” (“the third version component”). The adopted result is toolkit `0.3.1`, followed by verification through the public npm entry. The [validation record](VALIDATION.md#version-031-installation-patch-evidence-2026-10-09) owns observations and remaining acceptance work.
 
@@ -10,7 +44,7 @@ The [official Lark installation guide](https://github.com/larksuite/cli/blob/mai
 
 The patch retains four platform targets, private interpreter versions, runtime operations, host-resource ownership and rollback rules. The toolkit's [package version](package.json) changes from `0.3.0` to `0.3.1`; the Python runtime remains `0.1.0a1`. Toolkit versions use a patch increment, the third numeric component, for compatible fixes and installation-experience improvements. New compatible capabilities use a minor increment, the second component. An incompatible contract change requires an explicit migration statement. This release follows the patch rule because it repairs the existing installation workflow. npm publication and matching GitHub assets remain subject to the candidate's checks and read-back verification.
 
-## Process ownership and recovery
+### Process ownership and recovery
 
 [`packaging/locking.py`](packaging/locking.py) owns installer serialization. An OS advisory lock is a lock held through an open file handle and enforced among cooperating processes. The installer holds it on `installer.guard` for the entire mutating operation. The operating system releases ownership when that handle closes or its process exits. Windows uses a byte-range lock; POSIX systems use `flock`.
 
@@ -25,7 +59,7 @@ While holding the guard, the installer also creates `installer.lock` with its PI
 
 The selected approach adds one persistent coordination file and platform-specific lock calls while keeping mutations inside the existing installer. The PID marker provides mixed-version coordination through the earlier exclusive-create protocol. This scope covers cooperating toolkit installers on the local state directory. Host configuration rollback and protection against concurrent resource edits remain owned by [`packaging/ownership.py`](packaging/ownership.py) and the lifecycle transaction.
 
-## Progress and command output
+### Progress and command output
 
 [`src/install/download.mjs`](https://github.com/SevenX77/graph-skill-runtime/blob/graph-skill-toolkit-v0.3.1/plugins/graph-skill/src/install/download.mjs) owns release selection, transfer reporting, checksum verification and extraction feedback. It reports the chosen version and platform, bounds progress updates to percentage buckets, and provides retry guidance when acquisition fails. The guidance preserves the user's original command, including `--targets` and `--dry-run`, after the reported problem is resolved. [`packaging/install.py`](packaging/install.py) owns package checks, target preflight, provisioning and completion guidance. Completion identifies selected hosts, gives an absolute `status` command for the current terminal, and directs the user to open a new terminal and restart the host.
 
@@ -33,7 +67,7 @@ Human guidance uses standard error, the diagnostic output stream. Noninteractive
 
 The completion boundary is installed local files and configuration. The restarted host supplies separate evidence of Skill loading and native canvas rendering. The guide gives that next action explicitly. The same patch removes a redundant installed-inventory verification during `status`; the remaining verification still checks the installed manifest and its file inventory.
 
-## Verification and remaining evidence
+### Verification and remaining evidence
 
 [`tests/test_locking.py`](https://github.com/SevenX77/graph-skill-runtime/blob/graph-skill-toolkit-v0.3.1/plugins/graph-skill/tests/test_locking.py) exercises real subprocess contention and termination, exited legacy PID recovery, normal release, and preservation of live, inaccessible, malformed or changed records. [`tests/installer.test.mjs`](https://github.com/SevenX77/graph-skill-runtime/blob/graph-skill-toolkit-v0.3.1/plugins/graph-skill/tests/installer.test.mjs) checks progress bounds, verification before dispatch, temporary-download cleanup and retry guidance. [`tests/test_lifecycle.py`](https://github.com/SevenX77/graph-skill-runtime/blob/graph-skill-toolkit-v0.3.1/plugins/graph-skill/tests/test_lifecycle.py) checks completion instructions, unchanged machine results and the interactive `--json` choice alongside existing lifecycle boundaries.
 
