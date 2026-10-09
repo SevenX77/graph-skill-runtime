@@ -15,6 +15,7 @@ import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 
+import native_build
 from ownership import InstallError, digest, json_bytes, plain_path
 from runtime_layout import executable_paths
 
@@ -146,12 +147,15 @@ def extract_node(archive: Path, destination: Path, target: str, version: str, bl
     return records
 
 
-def run_build(argv: list[str], repository: Path) -> None:
-    environment = {**os.environ, "UV_COMPILE_BYTECODE": "false", "PYTHONDONTWRITEBYTECODE": "1"}
+def run_build(argv: list[str], repository: Path, build_environment: dict | None = None) -> None:
+    environment = {**(build_environment or os.environ), "UV_COMPILE_BYTECODE": "false", "PYTHONDONTWRITEBYTECODE": "1"}
     subprocess.run(argv, cwd=repository, env=environment, check=True, stdout=subprocess.DEVNULL)
 
 
-def install_dependencies(stage: Path, repository: Path, target: dict, version: str, wheel: Path) -> tuple[dict, set]:
+def install_dependencies(
+    stage: Path, repository: Path, target: dict, version: str, wheel: Path,
+    build_environment: dict | None = None, native_provenance: dict | None = None,
+) -> tuple[dict, set]:
     """uv is a builder prerequisite; it is never invoked by the user installer."""
     uv = shutil.which("uv")
     if uv is None:
@@ -191,21 +195,33 @@ def install_dependencies(stage: Path, repository: Path, target: dict, version: s
         "--link-mode",
         "copy",
     ]
+    if native_provenance is not None:
+        # The named exception overrides :all: only for this hash-locked sdist.
+        # Native execution and static linkage are checked before archiving.
+        common.extend([
+            "--no-binary", native_provenance["package"], "--no-cache",
+            "--python", str(stage / "runtimes/python/bin/python3"),
+        ])
     wheel_input = stage / "runtime/local-wheel.txt"
     wheel_input.write_text(f"{wheel.as_uri()} --hash=sha256:{digest(wheel.read_bytes())}\n", encoding="utf-8")
     try:
         # Resolve the wheel's declared requirements against the complete hash-
         # pinned export. A stale/incompatible supplied wheel must fail here,
         # rather than silently producing an incomplete offline environment.
-        run_build([*common, "-r", str(requirements), "-r", str(wheel_input)], repository)
+        run_build([*common, "-r", str(requirements), "-r", str(wheel_input)], repository, build_environment)
     finally:
         wheel_input.unlink()
     # Entry points always use python -m. Remove build-machine script paths and
     # local-wheel URLs rather than carrying non-relocatable launchers in a release.
     removed = clean_build_metadata(site, stage)
+    if native_provenance is not None:
+        native_provenance["inspection"] = native_build.inspect_extension(
+            site, stage / "runtimes/python/bin/python3", native_provenance
+        )
     return {
         "requirements_sha256": digest(requirements.read_bytes()),
         "uv_lock_sha256": digest((repository / "uv.lock").read_bytes()),
+        **({"native_build": native_provenance} if native_provenance is not None else {}),
     }, removed
 
 
@@ -232,6 +248,9 @@ def clean_build_metadata(site: Path, stage: Path) -> set[Path]:
 def assemble(stage: Path, repository: Path, target_name: str, wheel: Path, cache: Path) -> tuple[dict, dict]:
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
     target = lock["targets"][target_name]
+    recipe = target.get("native_build")
+    if recipe:
+        native_build.require_native_target(target_name, recipe)
     node = fetch(target["node"], cache)
     python = fetch(target["python"], cache)
     blobs = stage.parent / "archive-members"
@@ -240,7 +259,15 @@ def assemble(stage: Path, repository: Path, target_name: str, wheel: Path, cache
     members = {"runtimes/node/" + name: path for name, path in node_files.items()}
     members.update({"runtimes/python/" + name: path for name, path in python_files.items()})
     (stage / "runtime").mkdir(exist_ok=True)
-    dependencies, removed = install_dependencies(stage, repository, target, lock["python_version"], wheel)
+    build_environment = native_provenance = None
+    if recipe:
+        openssl = fetch(recipe["openssl"], cache)
+        source = stage.parent / "openssl-source"
+        extract_tar(openssl, source, f"openssl-{recipe['openssl']['version']}", blobs)
+        build_environment, native_provenance = native_build.prepare(source, stage, repository, recipe)
+    dependencies, removed = install_dependencies(
+        stage, repository, target, lock["python_version"], wheel, build_environment, native_provenance
+    )
     members = {name: path for name, path in members.items() if path not in removed}
     executables = executable_paths(target_name)
     for name in executables.values():

@@ -32,6 +32,15 @@
     },
     "darwin-x64": {
       "python_platform": "x86_64-apple-darwin",
+      "native_build": {
+        "package": "cryptography",
+        "deployment_target": "13.5",
+        "openssl": {
+          "version": "4.0.3",
+          "url": "https://github.com/openssl/openssl/releases/download/openssl-4.0.3/openssl-4.0.3.tar.gz",
+          "sha256": "325b5c806167c13b40b1ffeadfe0248197c00eccc4cf123ec1e28d2d2fd216d9"
+        }
+      },
       "node": {
         "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-x64.tar.gz",
         "sha256": "1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097"

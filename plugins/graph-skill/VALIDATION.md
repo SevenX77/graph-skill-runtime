@@ -2,7 +2,61 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format.
 
-## Current baseline: version 0.2.1 dependency repair, 2026-10-09
+## Current baseline: version 0.2.2 Intel Mac delivery, 2026-10-09
+
+The adopted release result is Graph Skill toolkit `0.2.2` with five complete, source-bound installer archives: Windows x64, macOS Intel x64, macOS Apple Silicon ARM64, Linux x64 and Linux ARM64. This expands delivery within the stable `shared-graph-ui-feasibility` goal. The parent goal remains a shared graph canvas in Codex Desktop and Claude Code Desktop, supplied through a globally installed toolkit with private runtimes, shared Skills and a minimal MCP App. The Python runtime retains independent deployment, business directories remain user-owned, and the user owns native Desktop acceptance.
+
+The coordinator's 2026-10-09 handoff transcribes the latest user request, “还需要mac intel芯片的包” (“also need an Intel Mac package”). It carries forward the release-upload and committed-source authorization in [the source-publication decision](../../docs/design/toolkit-source-publication-2026-10-09.md), together with the subsequent user instruction to expose installers and `SHA256SUMS.txt` as release attachments. GitHub's automatic source archives remain available. Detailed JSON reports belong in retained build evidence. The coordinator owns comparison with the original conversation, implementation, checks, committed builds and publication; the clean-context writer owns this documentation. Protected-branch merging, Python registry publication and host configuration changes remain outside this delivery responsibility.
+
+Version `0.2.2` gives the changed build behavior and payloads a new identity. Existing `0.2.1` download bytes remain preserved. Node.js `24.21.0`, CPython `3.13.16`, independent runtime `0.1.0a1` and the repaired Python dependency lock retain their versions. Windows ARM64 remains outside the available release targets. The new build exception changes only Intel Mac assembly; end users continue to receive complete archives without compilation, compiler installation, Homebrew or dependency downloads during installation.
+
+### Decision basis and bounded build exception
+
+The writer read the prior compact baseline, matching the coordinator's supplied file identity, and the repository's [`uv.lock`](../../uv.lock) on 2026-10-09. The lock supplies `cryptography==50.0.1`, its source-distribution hash and an ARM64-only macOS wheel inventory. Cryptography is the Python package that provides cryptographic operations. Its [official changelog](https://cryptography.io/en/latest/changelog/#v49-0-0), read on the same date, states that version `49.0.0` removed macOS x86_64 support. The same changelog records the security fix for CVE-2026-69247 in `50.0.0`. The coordinator's package-index inspection found universal2 wheels in `48.0.1`; universal2 packages contain both Intel and Apple Silicon code. That older version predates the fix.
+
+The selected approach compiles the same locked `cryptography==50.0.1` source on a native Intel Mac using the toolkit's private CPython and a pinned OpenSSL `4.0.3` source build. OpenSSL is the native cryptographic library incorporated into the resulting extension. Static linking puts that library inside the extension rather than requiring an external OpenSSL installation. Cryptography's [macOS build instructions](https://cryptography.io/en/latest/installation/#building-cryptography-on-macos) describe `OPENSSL_STATIC=1` and build-time C/Rust tools. [GitHub's runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories) identifies `macos-15-intel` as an Intel machine. These sources establish a feasible experiment; the toolkit owns validation of its custom build on a platform outside upstream cryptography support.
+
+Only cryptography receives this explicit source-build exception. Its source must match the locked hash, OpenSSL must match its pinned source hash, all other runtime dependencies remain binary-only, and the extension must be independent of external Homebrew or build-directory libraries. The macOS deployment target is `13.5`, a compiler setting aligned with the private Node.js prerequisite. Successful execution on the actual Intel runner establishes that measured environment. The complete toolkit's lowest working macOS version remains unverified.
+
+The target recipe lives in [`packaging/runtime-lock.json`](packaging/runtime-lock.json); [`packaging/native_build.py`](packaging/native_build.py) owns native build preparation and extension inspection, and [`packaging/runtime_payload.py`](packaging/runtime_payload.py) applies the recipe during dependency assembly. These implementation references connect the decision to its owner. Their execution evidence remains separate from the source review.
+
+| Candidate approach | Judgment and disposition |
+| --- | --- |
+| Native Intel build of the locked cryptography version | Feasibility `0.80`: pinned source, documented static building and an available Intel runner support trying it. Upstream's removal of Intel support leaves compilation, linking and native imports unresolved. Adopted for source implementation and native validation; those observations determine release eligibility. |
+| Retain only the existing four targets | Feasibility `1.0` for retaining the already available files; effectiveness `0.0` for the new Intel delivery requirement. Rejected because it leaves the direct request unmet. |
+| Downgrade cryptography to `48.0.1` for its universal2 wheel | Assembly feasibility is **unassessed** because that dependency set has not been built or checked here. The upstream security fix supplies counterevidence against returning to that version. Rejected as the dependency choice for this release. |
+
+A target name or successful ZIP creation could leave an unusable Intel package. Therefore native runtime imports, an actual compile operation and linkage inspection are necessary alongside archive identity checks. Keeping the exact current dependency version addresses the wheel gap without reopening the repaired lock. A source-build, linkage or native-operation failure stops publication of this candidate and returns the technical choice to review. Changing the version, suppressing the failed check or adding an installation-time compiler requirement would require an explicit replacement decision.
+
+### Necessary results and review
+
+The coordinator performs the following work in dependency order. These results jointly establish the release delivery; the user-operated Desktop observations remain a separate part of the parent goal.
+
+| Necessary result | Owner, inputs, acceptance and remaining boundary |
+| --- | --- |
+| Complete Intel runtime payload | The coordinator implements the scoped build from the pinned source inputs, then assembles on the Intel runner. Inspect native architecture and dynamic-library references, import the packaged runtime and its native dependencies through the private Python, and complete a representative runtime compile operation. Preserve full build and failure evidence. Native Desktop loading remains outside this runner check. |
+| Five archives with exact source correspondence | After documentation and source checks, the coordinator commits all inputs and builds all five archives from that clean source. Inspect member sets, manifest hashes, runtime/wheel identities and packaged-source correspondence. Any source or payload mismatch stops dependent publication. Existing `0.2.1` archives remain unchanged. |
+| Required checks and verified public downloads | The coordinator obtains the required local gates and repository continuous-integration checks for the candidate, publishes `graph-skill-toolkit-v0.2.2` at the exact source commit, and reads back release assets. Confirm the five ZIP hashes against `SHA256SUMS.txt`, the attached-asset inventory and downloadable source contents. A skipped check or an uploaded filename alone leaves acceptance open. |
+| Accurate user guidance and manual host evidence | The writer documents Intel/Apple Silicon selection, private-runtime installation and the build's verified limits. The user follows [the Desktop guide](README.md#manual-desktop-acceptance) for installation, Skills, connection, graph identity, natural follow-up, viewport and actual folder opening. Those observations determine the complete shared-host result. |
+
+| Judgment for this delivery expansion | Value | Basis, gap and observation that changes it |
+| --- | --- | --- |
+| Source support | 1.0 | The latest direct request adds Intel Mac delivery to the authorized release. A conflict with the original conversation or a later user instruction changes the affected boundary. |
+| Interpretation | 0.98 | A complete Intel archive, four retained targets and unchanged user installation requirements cover the stated expansion. A further processor or deployment requirement would expose a missing condition. |
+| Effectiveness | 0.95 | A source-bound Intel archive that runs its packaged runtime addresses the delivery gap. A hidden external dependency or failure on the user's supported environment would defeat that result; Desktop acceptance remains independently necessary for the parent goal. |
+| Decomposition sufficiency | 0.95 | Native assembly and execution, exact-source inspection, required checks, verified publication and user guidance cover delivery. Missing native-library coverage, a stale archive or an incomplete release inventory would expose a gap. |
+
+For the result rows above, source/interpretation/effectiveness/decomposition judgments are respectively `1.0/0.98/0.96/0.94` for the Intel payload, `1.0/0.99/0.98/0.96` for exact-source archives, `1.0/0.98/0.98/0.96` for checked publication, and `1.0/0.97/0.95/0.93` for guidance and manual host evidence. Each judgment relies on its row's stated criterion and is challenged by a missing or contradictory observation there. These values express engineering judgment, separately from approach feasibility and actual achievement.
+
+### Evidence at documentation freeze
+
+The new Intel build, native imports and compile operation, five `0.2.2` archive inspections, required checks and remote publication verification are **unverified** at this freeze. The sources above support the decision and define its acceptance; they supply no completed-build claim. The delivery expansion therefore remains **unverified**, while the parent shared-view goal retains its previously **partially attained** status and historical evidence below.
+
+Final committed-source identifiers, target observations, archive hashes and upload verification belong to adjacent local receipts, retained workflow evidence and official release metadata. They are recorded after the source-bound build, outside packaged documentation, to avoid requiring an archive to contain its own final identity. The coordinator reads those results before accepting and publishing the release. The user remains the acceptance owner for installation lifecycle and native Desktop behavior.
+
+## Historical version 0.2.1 dependency repair baseline, 2026-10-09
+
+This section preserves the prior dependency-repair decision and its documentation-freeze evidence. The Intel delivery baseline above replaces its target set and release version. Current public attachments follow the installer-and-checksum boundary above; historical receipt references identify retained evidence.
 
 The adopted release result is Graph Skill Toolkit `0.2.1` with the reported Python dependency findings repaired, complete committed source and four inspected installers bound to that source. It serves the existing `shared-graph-ui-feasibility` goal. The shared native-view goal remains **partially attained** because installed lifecycle and native Desktop behavior still require the user's observations. The managed-runtime delivery contract and manual guide below remain applicable; this baseline replaces the prior release version and publication boundary.
 
