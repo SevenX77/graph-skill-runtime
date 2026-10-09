@@ -61,6 +61,8 @@ try {
   graph-skill <runtime command> [arguments]
   gskill <runtime command> [arguments]
 
+Lifecycle commands accept --json for structured output in an interactive terminal.
+
 Install uses the default user profiles of Codex and Claude Code Desktop.
 Business operations use the independently packaged gskill runtime.
 Node.js and Python are included in the platform archive.
@@ -111,7 +113,7 @@ See the packaged README for installation and manual Desktop acceptance.`);
     }
   } else {
     const manifest = installed();
-    if (!manifest) throw new Error("Toolkit is not installed. Extract a release archive and run its install.cmd or install.sh.");
+    if (!manifest) throw new Error("Toolkit is not installed. Run: npx --yes graph-skill-toolkit@latest install");
     const executable = join(state, "versions", manifest.release, "runtimes", "python", process.platform === "win32" ? "python.exe" : "bin/python3");
     run(executable, ["-I", "-B", "-X", "utf8", "-m", "graph_skill_runtime", operation, ...args]);
   }

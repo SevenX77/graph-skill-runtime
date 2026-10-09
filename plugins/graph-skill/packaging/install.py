@@ -10,15 +10,54 @@ import re
 import shlex
 import shutil
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 from hosts import assert_default_profiles, merge, projections
+from locking import installer_lock
 from ownership import InstallError, Transaction, digest, json_bytes, plain_path, read_bytes, read_json
 from runtime_layout import current_target, executable_paths, runtime_node, runtime_python
 
 SCHEMA = "graph-skill.toolkit-install.v1"
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def progress(message: str) -> None:
+    print("  " + message, file=sys.stderr, flush=True)
+
+
+def completion(result: dict, operation: str) -> None:
+    if result["status"] == "installed":
+        hosts = ", ".join("Codex" if item == "codex" else "Claude Code" for item in result["targets"])
+        print(f"\nGraph Skill {result['version']} is installed for {hosts}.", file=sys.stderr)
+        print("Commands, Skills, canvas connection and follow-up hook are configured.", file=sys.stderr)
+        launcher = state_root() / "bin" / ("graph-skill.cmd" if os.name == "nt" else "graph-skill")
+        immediate = "& '" + str(launcher).replace("'", "''") + "' status" if os.name == "nt" else shlex.quote(str(launcher)) + " status"
+        print(f"\nCheck now ({'PowerShell' if os.name == 'nt' else 'shell'}):\n  {immediate}", file=sys.stderr)
+        print("Open a new terminal to use graph-skill and gskill by name.", file=sys.stderr)
+        print(f"Restart {hosts} to load the Skills and canvas; review any host trust prompt.", file=sys.stderr)
+        print('Then ask your agent: "Open a Graph Skill folder and show its graph."', file=sys.stderr)
+        print("Desktop loading and rendering still need a check in the restarted host.\n", file=sys.stderr, flush=True)
+    elif operation == "cleanup":
+        preview = result["status"] == "planned"
+        action = "Would remove" if preview else "Removed"
+        progress(f"{action} {len(result['inactive_releases'])} inactive cached release(s).")
+        for entry in result["preserved"]:
+            progress(f"Kept {entry['path']}: {entry['reason']}")
+        if preview:
+            progress("No changes were applied; remove --dry-run to apply.")
+    elif result["status"] == "planned":
+        progress(f"{operation.capitalize()} preview: {len(result.get('changes', []))} planned file change(s).")
+        progress("No changes were applied; remove --dry-run to apply.")
+    elif operation == "status":
+        progress(f"Installation check: {result['status']}.")
+        if result.get("version"):
+            progress(f"Version {result['version']}; hosts: {', '.join(result['targets'])}.")
+        for problem in result.get("problems", []):
+            progress(problem)
+    elif result["status"] == "uninstalled":
+        progress("Uninstalled. Restart the selected hosts; cached releases remain available for explicit cleanup.")
+    elif result["status"] == "not-installed":
+        progress("Graph Skill is not installed; no changes were needed.")
 
 
 def state_root() -> Path:
@@ -218,26 +257,6 @@ def path_plan(state: Path, previous: dict, remove: bool) -> tuple[tuple[str, int
     return before, (";".join(parts), before[1]), owned
 
 
-@contextmanager
-def installer_lock(state: Path):
-    plain_path(state)
-    state.mkdir(parents=True, exist_ok=True)
-    plain_path(state)
-    path = state / "installer.lock"
-    try:
-        handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as exc:
-        raise InstallError(
-            f"Installer lock exists: {path}. Check that no installer is running before removing this lock."
-        ) from exc
-    try:
-        os.write(handle, str(os.getpid()).encode())
-        os.close(handle)
-        yield
-    finally:
-        path.unlink(missing_ok=True)
-
-
 def plan(resources: list[dict], old: dict, state: Path) -> tuple[Transaction, list[dict]]:
     transaction, owned = Transaction(), []
     previous = {entry["path"]: entry for entry in old.get("resources", [])}
@@ -302,9 +321,11 @@ def selected_targets(value: str | None, previous: dict) -> list[str]:
 
 def install(source: Path, target_option: str | None, dry_run: bool) -> dict:
     state = state_root()
+    progress("Checking package integrity...")
     info, raw = package(source)
     old = load_manifest(state)
     targets = selected_targets(target_option, old)
+    progress(f"Checking configuration and file ownership for {', '.join(targets)}...")
     assert_default_profiles(targets)
     identity = info["version"] + "-" + digest(raw)[:16]
     release = release_root(state, identity)
@@ -338,8 +359,10 @@ def install(source: Path, target_option: str | None, dry_run: bool) -> dict:
     }
     if dry_run:
         return report
+    progress("Installing private runtimes and validating the installed files...")
     provision(source, release, info, raw)
     try:
+        progress("Configuring commands, Skills, canvas and follow-up hooks...")
         transaction.apply()
         if os.name != "nt":
             for path in (state / "bin/gskill", state / "bin/graph-skill"):
@@ -388,6 +411,7 @@ def status() -> dict:
     if not old:
         return {"status": "not-installed", "state_root": str(state)}
     problems = []
+    progress("Checking installed configuration and package integrity...")
     for record in old["resources"]:
         try:
             merge(record, record, remove=True)
@@ -395,7 +419,9 @@ def status() -> dict:
             problems.append(str(exc))
     try:
         release = release_root(state, old["release"])
-        _, raw = package(release)
+        raw = read_bytes(release / "bundle.json")
+        if raw is None:
+            raise InstallError("Installed bundle.json is missing")
         verify_release(release, raw)
         path_plan(state, old, False)
     except (OSError, ValueError, InstallError) as exc:
@@ -443,6 +469,7 @@ def main() -> int:
     parser.add_argument("source", nargs="?", type=Path, default=ROOT)
     parser.add_argument("--targets")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--json", action="store_true", help="Print the structured result even in an interactive terminal")
     args = parser.parse_args()
     try:
         if args.operation == "status":
@@ -456,7 +483,7 @@ def main() -> int:
                     else install(args.source.resolve(), args.targets, True)
                 )
         else:
-            with installer_lock(state_root()):
+            with installer_lock(state_root(), progress):
                 if args.operation == "cleanup":
                     result = cleanup(False)
                 else:
@@ -464,10 +491,13 @@ def main() -> int:
                         uninstall(False) if args.operation == "uninstall"
                         else install(args.source.resolve(), args.targets, False)
                     )
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        completion(result, args.operation)
+        if args.json or not sys.stdout.isatty():
+            print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, InstallError) as exc:
         print(json.dumps({"status": "error", "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        print("Installation was not completed. Resolve the reported problem, then retry the same command.", file=sys.stderr)
         return 1
 
 

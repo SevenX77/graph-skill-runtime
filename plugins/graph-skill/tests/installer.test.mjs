@@ -6,7 +6,7 @@ import { crc32 } from "node:zlib";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import { extractArchive, memberPath } from "../src/install/archive.mjs";
-import { checksumFor, compareVersions, installRelease, platformTarget, releaseAssets } from "../src/install/download.mjs";
+import { checksumFor, compareVersions, downloadProgress, installRelease, platformTarget, releaseAssets } from "../src/install/download.mjs";
 
 function zipFile(name, data, mode = 0o100644) {
   const filename = Buffer.from(name), content = Buffer.from(data), hash = crc32(content);
@@ -79,15 +79,34 @@ test("online installer verifies download before dispatch and cleans staging", as
     Object.defineProperty(response, "url", { value: url });
     return response;
   });
-  const options = { version, latest: false, args: ["--targets", "codex", "--dry-run"], run: (node, args) => {
+  const messages = [];
+  const options = { version, latest: false, args: ["--targets", "codex", "--dry-run"], write: message => messages.push(message), run: (node, args) => {
     invoked++; payload = args[2];
     assert.deepEqual(args.slice(3), options.args);
     assert.ok(node.startsWith(payload));
   } };
   await installRelease(options);
   assert.equal(invoked, 1);
+  assert.ok(messages.some(message => message.includes("100%")));
+  assert.ok(messages.findIndex(message => message.includes("SHA-256 verification complete")) <
+    messages.findIndex(message => message.includes("Starting local installation")));
   await assert.rejects(access(payload));
   incorrect = true;
   await assert.rejects(installRelease(options), /checksum or size mismatch/);
   assert.equal(invoked, 1);
+});
+
+test("download progress is bounded and includes exact final size", () => {
+  const messages = [], report = downloadProgress(message => messages.push(message));
+  for (let bytes = 1; bytes <= 10000; bytes++) report(bytes, 10000);
+  assert.equal(messages.length, 11);
+  assert.match(messages.at(-1), /100%/);
+});
+
+test("release lookup failure preserves retry scope and never dispatches installation", async t => {
+  t.mock.method(globalThis, "fetch", async () => { throw new Error("network unavailable"); });
+  let invoked = false;
+  await assert.rejects(installRelease({version: "0.3.1", latest: false, args: ["--targets", "claude", "--dry-run"], write: () => {},
+    run: () => { invoked = true; }}), /network unavailable[\s\S]*retry the same command, including any --targets or --dry-run options/);
+  assert.equal(invoked, false);
 });

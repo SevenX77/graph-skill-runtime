@@ -67,39 +67,59 @@ async function releaseFor(version, latest) {
   return candidates[0];
 }
 
-async function download(asset, destination, expectedHash) {
+export function downloadProgress(write = message => console.error(message)) {
+  let last = -1;
+  return (bytes, total) => {
+    const percent = Math.floor(bytes / total * 100);
+    const bucket = Math.floor(percent / 10);
+    if (bucket === last) return;
+    last = bucket;
+    write(`  Downloading: ${percent}% (${(bytes / 1e6).toFixed(1)} / ${(total / 1e6).toFixed(1)} MB)`);
+  };
+}
+
+async function download(asset, destination, expectedHash, progress = () => {}) {
   const response = await request(asset.browser_download_url);
   const hash = createHash("sha256");
   let bytes = 0;
   const observe = new Transform({ transform(chunk, encoding, done) {
     bytes += chunk.length;
     if (bytes > asset.size) return done(new Error("Download exceeds the release asset's recorded size"));
-    hash.update(chunk); done(null, chunk);
+    hash.update(chunk); progress(bytes, asset.size); done(null, chunk);
   } });
   await pipeline(Readable.fromWeb(response.body), observe, createWriteStream(destination, { flags: "wx" }));
   if (bytes !== asset.size || (expectedHash && hash.digest("hex") !== expectedHash)) throw new Error(`Release checksum or size mismatch: ${asset.name}`);
 }
 
-export async function installRelease({ version, latest, args, run }) {
+export async function installRelease({ version, latest, args, run, write = message => console.error(message) }) {
   const target = platformTarget();
-  const selected = await releaseFor(version, latest);
-  const assets = releaseAssets(selected.release, selected.version, target);
-  const temporary = await mkdtemp(join(tmpdir(), "graph-skill-download-"));
+  write("Graph Skill setup\n  Checking the published release and your platform...");
+  let temporary;
   try {
-    console.error(`Downloading Graph Skill ${selected.version} for ${target}...`);
+    const selected = await releaseFor(version, latest);
+    const assets = releaseAssets(selected.release, selected.version, target);
+    temporary = await mkdtemp(join(tmpdir(), "graph-skill-download-"));
+    write(`  Selected Graph Skill ${selected.version} (${target}). Node.js and Python are included.`);
+    write("  Fetching checksums and downloading the package...");
     const checksumPath = join(temporary, "SHA256SUMS.txt"), archive = join(temporary, assets.archive.name);
     await download(assets.checksums, checksumPath);
     const expected = checksumFor(await readFile(checksumPath, "utf8"), assets.archive.name);
-    await download(assets.archive, archive, expected);
+    await download(assets.archive, archive, expected, downloadProgress(write));
+    write("  Download and SHA-256 verification complete. Extracting the package...");
     await extractArchive(archive, temporary, assets.prefix);
     const payload = join(temporary, assets.prefix);
     const bundle = JSON.parse(await readFile(join(payload, "bundle.json"), "utf8"));
     if (bundle.version !== selected.version || bundle.target !== target || bundle.schema !== "graph-skill.toolkit-bundle.v2") throw new Error("Downloaded bundle identity mismatch");
+    write("  Package extracted. Starting local installation...");
     const node = join(payload, "runtimes/node", process.platform === "win32" ? "node.exe" : "bin/node");
     run(node, [join(payload, "bin/graph-skill.mjs"), "install", payload, ...args]);
+  } catch (error) {
+    throw new Error(`${error.message}\nResolve the reported problem, then retry the same command, including any --targets or --dry-run options.`, { cause: error });
   } finally {
     // Only remove the fresh directory returned by this invocation's mkdtemp.
-    if (dirname(resolve(temporary)) !== resolve(tmpdir()) || !temporary.split(/[\\/]/).at(-1).startsWith("graph-skill-download-")) throw new Error("Invalid installer cleanup root");
-    await rm(temporary, { recursive: true, force: true });
+    if (temporary) {
+      if (dirname(resolve(temporary)) !== resolve(tmpdir()) || !temporary.split(/[\\/]/).at(-1).startsWith("graph-skill-download-")) throw new Error("Invalid installer cleanup root");
+      await rm(temporary, { recursive: true, force: true });
+    }
   }
 }

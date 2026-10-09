@@ -1,9 +1,11 @@
 """Offline regressions for toolkit target selection and explicit cache ownership."""
 
 import json
+import io
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,12 +18,50 @@ from ownership import InstallError, digest, json_bytes
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_install_summary_is_actionable_without_changing_machine_result(self):
+        result = {"status": "installed", "version": "0.3.1", "targets": ["codex"]}
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(sys, "argv", ["entry.py", "install", "--dry-run"]), patch.object(
+            install, "install", return_value=result
+        ), redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(install.main(), 0)
+        self.assertEqual(json.loads(stdout.getvalue()), result)
+        self.assertIn("0.3.1 is installed for Codex", stderr.getvalue())
+        self.assertIn("Check now", stderr.getvalue())
+        self.assertIn("Open a new terminal", stderr.getvalue())
+        self.assertIn("Restart Codex", stderr.getvalue())
+        self.assertNotIn("Restart Claude", stderr.getvalue())
+
+    def test_interactive_summary_and_explicit_json(self):
+        for json_requested in (False, True):
+            stdout, stderr = io.StringIO(), io.StringIO()
+            arguments = ["entry.py", "status"] + (["--json"] if json_requested else [])
+            result = {"status": "not-installed"}
+            with patch.object(sys, "argv", arguments), patch.object(install, "status", return_value=result), \
+                    patch.object(stdout, "isatty", return_value=True), redirect_stdout(stdout), redirect_stderr(stderr):
+                self.assertEqual(install.main(), 0)
+            self.assertEqual(bool(stdout.getvalue()), json_requested)
+            if json_requested:
+                self.assertEqual(json.loads(stdout.getvalue()), result)
+
     def test_upgrade_preserves_selection_and_explicit_change_wins(self):
         self.assertEqual(install.selected_targets(None, {"targets": ["codex"]}), ["codex"])
         self.assertEqual(install.selected_targets(None, {}), ["codex", "claude"])
         self.assertEqual(install.selected_targets("claude", {"targets": ["codex"]}), ["claude"])
         with self.assertRaises(InstallError):
             install.selected_targets("codex,codex", {})
+
+    def test_cleanup_summary_preserves_reasons_and_distinguishes_preview(self):
+        for status, action in [("planned", "Would remove"), ("cleaned", "Removed")]:
+            result = {"status": status, "inactive_releases": ["old"], "preserved": [
+                {"path": "current", "reason": "active release or executing installer"}
+            ]}
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                install.completion(result, "cleanup")
+            self.assertIn(f"{action} 1 inactive cached release(s)", stderr.getvalue())
+            self.assertIn("Kept current: active release or executing installer", stderr.getvalue())
+            self.assertEqual("No changes were applied" in stderr.getvalue(), status == "planned")
 
     def test_unselected_host_override_does_not_block_install(self):
         with patch.dict(hosts.os.environ, {"CLAUDE_CONFIG_DIR": "/custom/claude", "CODEX_HOME": ""}):

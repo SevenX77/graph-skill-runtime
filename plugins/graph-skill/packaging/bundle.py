@@ -75,6 +75,7 @@ def product_files(wheel: Path) -> dict[str, Path]:
         "package.json": ROOT / "package.json",
         "README.md": ROOT / "README.md",
         "VALIDATION.md": ROOT / "VALIDATION.md",
+        "INSTALLATION-DECISIONS.md": ROOT / "INSTALLATION-DECISIONS.md",
         "install.cmd": ROOT / "install.cmd",
         "install.sh": ROOT / "install.sh",
         "bin/graph-skill.mjs": ROOT / "bin/graph-skill.mjs",
@@ -82,7 +83,7 @@ def product_files(wheel: Path) -> dict[str, Path]:
         "LICENSE": REPOSITORY / "LICENSE",
         "runtime/" + wheel.name: wheel,
     }
-    for name in ("entry.py", "install.py", "hosts.py", "ownership.py", "runtime_layout.py", "runtime-lock.json"):
+    for name in ("entry.py", "install.py", "locking.py", "hosts.py", "ownership.py", "runtime_layout.py", "runtime-lock.json"):
         files["packaging/" + name] = ROOT / "packaging" / name
     for name in ("server.mjs", "after-tool.mjs", "canvas.html", "installer.mjs"):
         files["dist/" + name] = ROOT / "dist" / name
