@@ -7,6 +7,7 @@ import email
 import json
 import re
 import shutil
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -17,6 +18,18 @@ from runtime_payload import LOCK, assemble
 
 ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY = ROOT.parent.parent
+
+
+def source_identity() -> dict:
+    """Bind a release to a committed source tree before packaging any bytes."""
+    def git(*args: str) -> str:
+        return subprocess.check_output(
+            ["git", *args], cwd=REPOSITORY, text=True, encoding="utf-8"
+        ).strip()
+
+    if git("status", "--porcelain", "--untracked-files=normal"):
+        raise InstallError("Commit source changes before building a release archive")
+    return {"source_commit": git("rev-parse", "HEAD"), "source_tree": git("rev-parse", "HEAD^{tree}")}
 
 
 def wheel_metadata(path: Path) -> dict:
@@ -96,6 +109,7 @@ def write_archive(members: dict[str, Path], destination: Path, prefix: str) -> i
 
 
 def build(wheel: Path, platform: str) -> dict:
+    source_binding = source_identity()
     version = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise InstallError("Toolkit version must have three numeric components")
@@ -133,13 +147,16 @@ def build(wheel: Path, platform: str) -> dict:
             "runtime_wheel": "runtime/" + wheel.name,
             "runtime": runtime,
             "runtimes": runtimes,
-            "source_status": "local working-tree build; not a published release or accepted release candidate",
+            "source_status": "assembled from a clean committed source checkout",
+            **source_binding,
             "files": inventory,
         }
         (stage / "bundle.json").write_bytes(json_bytes(manifest))
         members["bundle.json"] = stage / "bundle.json"
         staged_archive = work / archive.name
         count = write_archive(members, staged_archive, name)
+        if source_identity() != source_binding:
+            raise InstallError("Source identity changed during archive assembly")
         shutil.copyfile(staged_archive, archive)
     result = {
         "archive": str(archive),
@@ -148,6 +165,7 @@ def build(wheel: Path, platform: str) -> dict:
         "files": count,
         "runtime": runtime,
         "runtimes": runtimes,
+        **source_binding,
     }
     receipt = output / f"{name}.json"
     plain_path(receipt)

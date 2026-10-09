@@ -2,7 +2,46 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format.
 
-## Current baseline: local toolkit delivery, 2026-10-09
+## Current baseline: version 0.2.1 dependency repair, 2026-10-09
+
+The adopted release result is Graph Skill Toolkit `0.2.1` with the reported Python dependency findings repaired, complete committed source and four inspected installers bound to that source. It serves the existing `shared-graph-ui-feasibility` goal. The shared native-view goal remains **partially attained** because installed lifecycle and native Desktop behavior still require the user's observations. The managed-runtime delivery contract and manual guide below remain applicable; this baseline replaces the prior release version and publication boundary.
+
+The coordinator's handoff transcribes the release request and source-publication correction recorded in [the source-publication decision](../../docs/design/toolkit-source-publication-2026-10-09.md), followed by “不要那么啰嗦，修复完” (“stop being verbose; finish fixing it”). The coordinator owns comparison with the original conversation and the authorized dependency repair, commit, push, checks and new toolkit release. The writer owns this documentation. Runtime registry publication remains outside this responsibility, and the user owns real installation and Desktop testing. The writer read the prior baseline on 2026-10-09 at SHA-256 `f1eae6ab9906d625a0ff4e0aa03bbe7d5f2a3a69dce1b7d55af5fb0a17c99948`; this record retains that baseline below as history.
+
+### Decision and necessary results
+
+[Continuous integration run 37913950342](https://github.com/SevenX77/graph-skill-runtime/actions/runs/37913950342) reported 26 dependency-audit records across four packages for the `0.2.0` source-recovery candidate; its dependent runtime and platform jobs were skipped. Continuous integration runs the repository's automated checks on published source. This counterevidence makes a dependency repair and fresh acceptance necessary before the next release.
+
+The selected repair refreshes only the affected dependency resolution through `uv lock --upgrade-package`. The observed lock changes are `langgraph-sdk` `0.4.3` → `0.4.6`, `pyjwt` `2.13.0` → `2.15.1`, `urllib3` `2.7.0` → `2.8.0`, `virtualenv` `21.7.5` → `21.14.6`, and its required `python-discovery` `1.5.3` → `1.6.1`. The toolkit version becomes `0.2.1`; the independent runtime remains `0.1.0a1` with Python `>=3.11`, and the private Node.js `24.21.0` and CPython `3.13.16` pins remain unchanged.
+
+A new patch release gives the changed dependency bytes their own downloadable identity while retaining the existing `0.2.0` downloads and source association. Ignoring the audit leaves the demonstrated findings in place. Replacing already downloaded `0.2.0` bytes would make one version identify different payloads. The minimal lock refresh has feasibility `0.96`: resolution and a zero-finding local audit support it, while regression checks and target assembly must still establish compatibility. A broader dependency or interpreter upgrade has feasibility **unassessed** because the present findings require no such change and its compatibility has not been evaluated.
+
+| Necessary result | Owner, sequence and acceptance |
+| --- | --- |
+| Repaired dependency resolution | The coordinator updates the lock, synchronizes the locked development environment and audits it. Zero known vulnerability records in the audited third-party distributions and passing required local checks establish this bounded result. The unpublished local runtime remains outside the dependency service's audit coverage. |
+| Exact source and payload binding | After documentation and source checks, the coordinator commits all release inputs, builds the runtime and four archives from that clean source, then inspects their contents and hashes. `packaging/bundle.py` records the source commit and tree in the bundle and receipt and checks that identity again before completing assembly. Exact source/payload correspondence is required in addition to the recorded identity. |
+| Checked public release | The coordinator pushes the committed candidate, obtains all required repository checks, publishes `graph-skill-toolkit-v0.2.1` at that exact source commit and verifies remote asset hashes against the inspected archives. The existing `0.2.0` assets remain historical downloads. |
+
+These results are jointly necessary for this repair. Source mismatch, an audit finding or regression counterevidence stops the dependent release action and returns the affected choice to review. A skipped check supplies no passing evidence. The four retained targets are `win32-x64`, `darwin-arm64`, `linux-x64` and `linux-arm64`. Windows ARM64 and macOS x64 remain unavailable under the recorded `cryptography==50.0.1` wheel findings; expanding targets needs new compatible-build evidence.
+
+| Judgment | Value | Basis and observation that changes it |
+| --- | --- | --- |
+| Source support | 1.0 | The coordinator's transcription authorizes finishing the dependency and publication repair. A conflicting original or later user instruction changes the affected boundary. |
+| Interpretation | 0.98 | Repair, committed source, checks and an identifiable new installer address the release objection. A missing required deployment result would expose a gap. |
+| Effectiveness | 0.96 | A zero-finding audited resolution plus regression and exact-payload evidence resolves the demonstrated release defect. A remaining finding or source mismatch defeats that result; Desktop operation has its separate acceptance. |
+| Decomposition sufficiency | 0.96 | Dependency repair, committed builds, required checks and remote identity verification jointly cover this release result. A missed shipped dependency or inconsistent source/archive identity exposes a gap. |
+
+These values describe engineering judgments for the repair, separately from actual achievement and the wider native-view goal.
+
+### Evidence at documentation freeze
+
+The writer read local `build/dependency-audit.json` on 2026-10-09. It records the five resolved versions above and zero vulnerability records; `graph-skill-runtime==0.1.0a1` is explicitly skipped because it is unpublished on the package index. The coordinator reports successful `uv sync --locked --extra dev`, audit exit `0`, Ruff, strict mypy over 149 source files and all nine import-boundary contracts. This is dependency-database and named-check evidence; source-security and native-platform acceptance require their own evidence.
+
+At this documentation freeze, the complete regression run, remaining local gates, required remote checks, four `0.2.1` archive inspections and remote hash verification remain **unverified**. The repair is **partially attained** through the resolved lock and local audit. Final source identifiers, check results and archive identities belong to adjacent release receipts and official release metadata, written after the committed build so packaged documentation introduces no circular identity requirement. The coordinator owns reading those actual results before accepting or publishing the release. User-operated installation, host loading, natural canvas follow-up and native rendering remain unverified by this repair.
+
+## Historical version 0.2.0 delivery baseline, 2026-10-09
+
+This section records the earlier local-build assignment and its evidence. Its limits on commits, tests and publication applied to that assignment; the current repair baseline above owns the newly authorized release work.
 
 The adopted result is a platform-specific `0.2.0` archive that installs Graph Skill for Codex Desktop and Claude Code Desktop using product-owned Node.js and Python runtimes. The complete payload supplies the runtime command, its locked base dependencies, two shared Skills and a minimal canvas server. A Skill is a discoverable instruction file that guides the host agent. The command-line interface (CLI) carries runtime operations through the host's shell tools. MCP, the Model Context Protocol, carries the canvas tool result and linked HTML view. The independently deployable Python package and the user-selected business directories retain their existing boundaries.
 
@@ -30,9 +69,9 @@ The plan is pinned input selection, contained payload assembly, verified payload
 
 These values are engineering judgments, not measured probabilities or completion scores. Result-level source/interpretation/effectiveness/decomposition judgments are `1.0/0.97/0.96/0.94` for the complete payload, `1.0/0.96/0.94/0.92` for private launch and lifecycle ownership, `1.0/0.98/0.96/0.96` for operating guidance, and `1.0/0.96/0.95/0.92` for manual Desktop acceptance. Each depends on its corresponding decisive evidence above. All result labels may pass while native rendering still fails; the complete shared-host goal therefore requires the combined user observations. The [basis record](../../docs/design/graph-skill-agent-plugin-basis.md#managed-runtime-delivery-decision-2026-10-09) owns the substantive delivery alternatives and their tradeoffs.
 
-Current `0.2.0` acceptance is **attained for source, builds and inspected archive contents within the recorded candidate scope** below. Installed lifecycle and native Desktop behavior remain **unverified**. The shared native-view goal is **partially attained**: complete local payloads and bounded historical canvas results are available, while user-operated installation and native host evidence remain necessary. Historical Python dependency-audit failures remain unresolved in their measured scope; this step makes no new security-acceptance claim.
+The recorded `0.2.0` acceptance was **attained for source, builds and inspected archive contents within the recorded candidate scope** below. Installed lifecycle and native Desktop behavior remained **unverified**. The shared native-view goal was **partially attained**: complete local payloads and bounded historical canvas results were available, while user-operated installation and native host evidence remained necessary. That stage left the dependency-audit findings unresolved for its measured versions; the `0.2.1` repair evidence above applies to the new resolution.
 
-## Version 0.2.0 build and acceptance scope
+## Historical version 0.2.0 build and acceptance scope
 
 The writer read [the managed build record](evidence/managed-build-results.json), [the static record](evidence/managed-static-results.json), [the archive inspection](evidence/managed-archive-inspection.json) and [the Ruff output](evidence/managed-ruff.txt) on 2026-10-09. The coordinator observed these builds and checks on the local dirty working tree. They concern product `0.2.0`, the freshly built independent runtime `0.1.0a1` wheel and the selected pinned interpreter/dependency inputs.
 
@@ -158,7 +197,7 @@ The coordinating agent owns integration acceptance. The [final result record](ev
 | Claude Code loading | Claude Code `2.1.273` passed strict manifest validation with zero warnings and [reported Connected](evidence/claude-mcp-list-v2.txt). The retained [authentication observation](evidence/claude-auth.json) is `loggedIn=false`. | Manifest/connectivity attained. Authenticated tool use, hook execution, and native rendering remain unverified. |
 | Python distribution boundary | The build passed; the result record reports zero plugin entries in the distributions. | Independent Python packaging retained for the inspected build. Cross-platform release acceptance is outside this work. |
 
-The [current checks](evidence/enhancement-results.json) record Ruff passed, strict mypy over 149 files passed, all 9 import contracts kept, the manifest validator passed, and `uv build --no-sources` passed. [Full pytest](evidence/pytest-v2.txt) reported **1814 passed, 1 skipped in 97.72s**. npm audit reported zero vulnerabilities. The required [Python dependency audit](evidence/pip-audit-v2.txt) still **failed** with 26 entries across four existing third-party packages; the unpublished local project was skipped and Python dependency declarations were unchanged.
+The [version 0.0.6 checks](evidence/enhancement-results.json) record Ruff passed, strict mypy over 149 files passed, all 9 import contracts kept, the manifest validator passed, and `uv build --no-sources` passed. [Full pytest](evidence/pytest-v2.txt) reported **1814 passed, 1 skipped in 97.72s**. npm audit reported zero vulnerabilities. The required [Python dependency audit](evidence/pip-audit-v2.txt) **failed** with 26 entries across four third-party packages in that measured dependency set; the unpublished local project was skipped and Python dependency declarations were unchanged.
 
 Remaining acceptance belongs to the coordinating host agent: establish actual hook discovery, observe a related operation producing a normal `show_graph` call, inspect the new native canvas, and observe the host folder view. Repeat authenticated display acceptance in Claude Code. An earlier directory request through `open_in_codex` returned `queued`, which proves request acceptance only. There is no measured macOS or Linux host result.
 

@@ -1,20 +1,20 @@
 # Graph Skill toolkit
 
-Graph Skill toolkit combines a private Python runtime, a private Node.js runtime, shared agent instructions and a graph canvas in one local package for Codex Desktop and Claude Code Desktop. Version `0.2.0` uses the host's normal file and shell tools for authoring and runtime operations. A shared MCP App provides the canvas. MCP, the Model Context Protocol, connects host tools to external services; an MCP App adds an HTML view to a tool result.
+Graph Skill toolkit combines a private Python runtime, a private Node.js runtime, shared agent instructions and a graph canvas in one local package for Codex Desktop and Claude Code Desktop. Version `0.2.1` uses the host's normal file and shell tools for authoring and runtime operations. A shared MCP App provides the canvas. MCP, the Model Context Protocol, connects host tools to external services; an MCP App adds an HTML view to a tool result.
 
 The runtime remains independently installable. The toolkit owns its user-level installation, while business skills stay in the directories the user selects. The current canvas displays root graph nodes and edges, fills its allocated viewport and provides a host folder shortcut. Complete node properties and option editing remain in the [broader design, available in the repository](../../docs/design/graph-skill-agent-plugin.md).
 
-Version `0.2.0` source, builds and archive inspection are attained for the recorded Windows x64, macOS ARM64, Linux x64 and Linux ARM64 candidates. Installation lifecycle and native Desktop behavior remain unverified. The [validation record](VALIDATION.md) owns that scope and preserves earlier canvas, host and `0.1.0` build results as history. Final archive identities belong to their adjacent receipts and external inspection evidence.
+Version `0.2.1` refreshes the Python dependency lock and requires each archive build to bind a clean source commit. The local dependency audit reports zero known vulnerability records in audited third-party packages; the unpublished runtime itself was skipped. The [validation record](VALIDATION.md) owns current acceptance and preserves prior build and host observations as history. Final archive identities and publication checks belong to their adjacent receipts and release metadata. Installation lifecycle and native Desktop behavior remain unverified.
 
 ## Install the local package
 
-Choose a `0.2.0` archive for the computer's operating system and processor architecture. Target definitions cover Windows x64/ARM64, macOS x64/ARM64 and Linux glibc x64/ARM64. A defined target becomes available only after its archive is built and inspected; [the validation record](VALIDATION.md) identifies the actual outputs. Each archive contains its own Node.js, CPython, runtime wheel and installed base dependencies. Node.js executes the toolkit and canvas; CPython executes the Python runtime. The installer uses these private copies and requires neither a preinstalled Node.js/Python command nor package-index access.
+Choose a `0.2.1` archive for the computer's operating system and processor architecture. Target definitions cover Windows x64/ARM64, macOS x64/ARM64 and Linux glibc x64/ARM64. A defined target becomes available only after its archive is built and inspected; [the validation record](VALIDATION.md) identifies the actual outputs. Each archive contains its own Node.js, CPython, runtime wheel and installed base dependencies. Node.js executes the toolkit and canvas; CPython executes the Python runtime. The installer uses these private copies and requires neither a preinstalled Node.js/Python command nor package-index access.
 
 The complete payload covers the engine's locked base dependencies. Optional embedded-provider extras and additional Python libraries required by a business skill need separate deployment planning and validation.
 
-Archive names follow `graph-skill-0.2.0-TARGET.zip`, where `TARGET` is `win32-x64`, `win32-arm64`, `darwin-x64`, `darwin-arm64`, `linux-x64` or `linux-arm64`. Here `darwin` identifies macOS. The extracted directory has the same name without `.zip`.
+Archive names follow `graph-skill-0.2.1-TARGET.zip`, where `TARGET` is `win32-x64`, `win32-arm64`, `darwin-x64`, `darwin-arm64`, `linux-x64` or `linux-arm64`. Here `darwin` identifies macOS. The extracted directory has the same name without `.zip`.
 
-The assembled candidate targets are `win32-x64`, `darwin-arm64`, `linux-x64` and `linux-arm64`. Their archives live in this module's `release/` directory. Use the adjacent receipt and the external inspection record to identify the final rebuilt bytes.
+The release targets are `win32-x64`, `darwin-arm64`, `linux-x64` and `linux-arm64`. Local builds write their archives to this module's `release/` directory. Use the published receipt and inspection evidence to identify an accepted download.
 
 Windows ARM64 and macOS x64 are unavailable for this candidate: the locked `cryptography==50.0.1` dependency has no compatible binary wheel for either target. Their target definitions remain available for a future reviewed dependency resolution. The [validation record](VALIDATION.md) retains the failed assembly evidence.
 
@@ -106,6 +106,8 @@ Service, developer and headless deployments can install the separately built `gr
 
 This directory is one private product module. The runtime wheel and source distribution retain their independent package boundary. The builder requires Node.js 22 or later, Python 3.11 or later, `uv`, and network access to the pinned upstream runtimes and dependency wheels. `uv` is the repository's Python package and build tool. These are build-machine requirements. End users receive the resulting complete archive.
 
+Prepare and commit all release source inputs before assembly. Use a clean checkout of that commit for the JavaScript build, runtime wheel and target archives. The archive builder rejects tracked changes and untracked files visible to Git, records the source commit and tree in `bundle.json` and its adjacent receipt, and verifies the same clean identity before publishing its local archive. A source change requires a new committed candidate and rebuild. Generated output stays in the repository's ignored build directories.
+
 From the repository root, prepare the JavaScript build dependencies and build the canvas:
 
 ```powershell
@@ -121,6 +123,6 @@ uv build --no-sources --wheel --out-dir plugins/graph-skill/release/runtime-buil
 python -B plugins/graph-skill/packaging/bundle.py --runtime-wheel plugins/graph-skill/release/runtime-build/graph_skill_runtime-0.1.0a1-py3-none-any.whl --platform win32-x64
 ```
 
-Here `python` selects the build machine's Python 3.11 or later. Choose another declared target with `--platform`; omission selects the builder's target. The builder writes `release/graph-skill-0.2.0-TARGET.zip` and the adjacent identity receipt `release/graph-skill-0.2.0-TARGET.json`. The receipt binds the archive, runtime wheel, interpreter provenance and dependency-lock hashes. The archive's own hash stays outside the packaged documents.
+Here `python` selects the build machine's Python 3.11 or later. Choose another declared target with `--platform`; omission selects the builder's target. The builder writes `release/graph-skill-0.2.1-TARGET.zip` and the adjacent identity receipt `release/graph-skill-0.2.1-TARGET.json`. The receipt binds the source commit and tree, archive, runtime wheel, interpreter provenance and dependency-lock hashes. The final source binding and archive hash stay outside the packaged documents.
 
 [`packaging/runtime-lock.json`](packaging/runtime-lock.json) owns upstream runtime identities. The builder exports the repository's `uv.lock` with `uv --locked` and installs binary wheels for the selected interpreter/platform with hash checking. It includes the runtime's base dependencies; optional embedded-provider and development extras remain separate. A target missing a compatible locked wheel stops assembly. [VALIDATION.md](VALIDATION.md) records actual archives and inspection scope. Successful packaging establishes its build properties; installed lifecycle and native Desktop operation require the observations above.
