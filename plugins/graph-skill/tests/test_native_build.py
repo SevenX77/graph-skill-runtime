@@ -9,10 +9,18 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
 
 import native_build
+import runtime_layout
 from ownership import InstallError
 
 
 class NativeBuildTests(unittest.TestCase):
+    def test_universal_mac_python_uses_running_architecture(self):
+        for machine, expected in [("x86_64", "darwin-x64"), ("arm64", "darwin-arm64")]:
+            with self.subTest(machine=machine), patch.object(runtime_layout.sys, "platform", "darwin"), patch.object(
+                runtime_layout.sysconfig, "get_platform", return_value="macosx-10.9-universal2"
+            ), patch.object(runtime_layout.platform, "machine", return_value=machine):
+                self.assertEqual(runtime_layout.current_target(), expected)
+
     def test_cross_platform_compilation_is_rejected(self):
         with patch.object(native_build, "current_target", return_value="win32-x64"):
             with self.assertRaisesRegex(InstallError, "Intel macOS build host"):

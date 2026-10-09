@@ -177,10 +177,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-wheel", required=True, type=Path)
     parser.add_argument(
-        "--platform", choices=tuple(json.loads(LOCK.read_text(encoding="utf-8"))["targets"]), default=current_target()
+        "--platform", choices=tuple(json.loads(LOCK.read_text(encoding="utf-8"))["targets"])
     )
     args = parser.parse_args()
-    print(json.dumps(build(args.runtime_wheel.resolve(strict=True), args.platform), indent=2))
+    print(json.dumps(build(args.runtime_wheel.resolve(strict=True), args.platform or current_target()), indent=2))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 import sys
 import sysconfig
 from pathlib import Path
@@ -10,13 +11,15 @@ from ownership import InstallError
 
 
 def current_target() -> str:
-    platform = sysconfig.get_platform().lower()
-    if platform.endswith(("arm64", "aarch64")):
+    # A macOS universal2 Python contains both slices; its build tag cannot
+    # identify the architecture of the process that is running the installer.
+    architecture = platform.machine().lower() if sys.platform == "darwin" else sysconfig.get_platform().lower()
+    if architecture.endswith(("arm64", "aarch64")):
         arch = "arm64"
-    elif platform.endswith(("x86_64", "amd64")):
+    elif architecture.endswith(("x86_64", "amd64")):
         arch = "x64"
     else:
-        raise InstallError(f"Unsupported interpreter architecture: {platform}")
+        raise InstallError(f"Unsupported interpreter architecture: {architecture}")
     if sys.platform not in {"win32", "darwin", "linux"}:
         raise InstallError(f"Unsupported platform: {sys.platform}")
     return f"{sys.platform}-{arch}"
