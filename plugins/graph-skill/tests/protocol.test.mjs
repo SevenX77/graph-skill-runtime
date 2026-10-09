@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, readFile, readdir, copyFile, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, copyFile, rm, mkdir, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,7 +53,7 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     await writeFile(join(skill, "phases", "process", "LOGIC.md"), "# Logic\n");
     const actual = await client.callTool({ name: tool.name, arguments: { skill_root: skill } });
     assert.notEqual(actual.isError, true);
-    assert.equal(actual.structuredContent.skillRoot, skill);
+    assert.equal(actual.structuredContent.skillRoot, await realpath(skill));
     assert.equal(actual.structuredContent.graph.id, "actual");
     assert.deepEqual(actual.structuredContent.graph.nodes.map(node => node.kind), ["INPUT", "LOGIC", "OUTPUT"]);
     for (const skill_root of ["relative", join(isolated, "missing"), isolated]) {

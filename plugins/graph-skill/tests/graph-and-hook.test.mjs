@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterTool } from "../src/after-tool.mjs";
@@ -26,6 +26,7 @@ test("both host hook payloads identify the owning skill and exclude recursive/un
   context.after(() => rm(sandbox, { recursive: true, force: true }));
   const root = join(sandbox, "skill");
   await mkdir(join(root, "phase"), { recursive: true });
+  const canonicalRoot = await realpath(root);
   await writeFile(join(root, "SKILL.md"), "test");
   await writeFile(join(root, "graph.yaml"), "test");
   const base = { hook_event_name: "PostToolUse", cwd: sandbox };
@@ -41,7 +42,7 @@ test("both host hook payloads identify the owning skill and exclude recursive/un
   for (const item of cases) {
     const result = await afterTool({ ...base, ...item });
     assert.equal(result.hookSpecificOutput.hookEventName, "PostToolUse");
-    assert.ok(result.hookSpecificOutput.additionalContext.includes(JSON.stringify(root)), item.tool_name);
+    assert.ok(result.hookSpecificOutput.additionalContext.includes(JSON.stringify(canonicalRoot)), item.tool_name);
   }
   for (const item of [
     { tool_name: "mcp__graph_skill_canvas__show_graph", tool_input: { skill_root: root } },
@@ -70,7 +71,7 @@ test("Skill loader rejects malformed graphs and ambiguous phase type files", asy
   await mkdir(join(root, "phases", "a"), { recursive: true });
   await writeFile(join(root, "graph.yaml"), "schema_version: gskill.graph.v1\ngraph_id: test\nphases:\n  - id: a\n    depends_on: [input]\n    output: true\n");
   await writeFile(join(root, "phases/a/LOGIC.md"), "test");
-  assert.equal((await loadSkill(root)).skillRoot, resolve(root));
+  assert.equal((await loadSkill(root)).skillRoot, await realpath(root));
   await writeFile(join(root, "phases/a/AGENT.md"), "test");
   await assert.rejects(loadSkill(root), /exactly one type file/);
 });

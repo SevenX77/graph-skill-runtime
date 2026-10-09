@@ -53,15 +53,15 @@ jobs:
           npm ci --prefix plugins/graph-skill
           npm run build --prefix plugins/graph-skill
           npm test --prefix plugins/graph-skill
-          uv run --no-project --python 3.13.16 python -B -m unittest discover -s plugins/graph-skill/tests -p 'test_*.py'
+          uv run --no-project --python 3.11 python -B -m unittest discover -s plugins/graph-skill/tests -p 'test_*.py'
       - name: Build source-bound toolkit
         run: |
           uv build --no-sources --wheel --out-dir plugins/graph-skill/release/runtime-build
-          uv run --no-project --python 3.13.16 python -B plugins/graph-skill/packaging/bundle.py --runtime-wheel plugins/graph-skill/release/runtime-build/graph_skill_runtime-0.1.0a1-py3-none-any.whl --platform '${{ matrix.target }}'
+          uv run --no-project --python 3.11 python -B plugins/graph-skill/packaging/bundle.py --runtime-wheel plugins/graph-skill/release/runtime-build/graph_skill_runtime-0.1.0a1-py3-none-any.whl --platform '${{ matrix.target }}'
       - name: Inspect archive and run private runtime smoke
         run: |
           version=$(node -p "JSON.parse(require('fs').readFileSync('plugins/graph-skill/package.json')).version")
-          uv run --no-project --python 3.13.16 python -B plugins/graph-skill/packaging/verify_bundle.py "plugins/graph-skill/release/graph-skill-${version}-${{ matrix.target }}.zip" --expected-source "$(git rev-parse HEAD)" ${{ matrix.native }}
+          uv run --no-project --python 3.11 python -B plugins/graph-skill/packaging/verify_bundle.py "plugins/graph-skill/release/graph-skill-${version}-${{ matrix.target }}.zip" --expected-source "$(git rev-parse HEAD)" ${{ matrix.native }}
       - name: Retain package and build evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
