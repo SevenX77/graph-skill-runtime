@@ -19,37 +19,6 @@
         "sha256": "ec43f1a85c29f147d7ae2d13218c52c70b24a983a82ab22d6c607c0593060e10"
       }
     },
-    "win32-arm64": {
-      "python_platform": "aarch64-pc-windows-msvc",
-      "node": {
-        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-arm64.zip",
-        "sha256": "8779b1bde1d39f8d420e3b57aa657b39891af434d3de44a919044cec06785921"
-      },
-      "python": {
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261003/cpython-3.13.16%2B20261003-aarch64-pc-windows-msvc-install_only_stripped.tar.gz",
-        "sha256": "653107de456cbb467c8057d5465655c906f0cc1e852333bc24a4477b4132aaa1"
-      }
-    },
-    "darwin-x64": {
-      "python_platform": "x86_64-apple-darwin",
-      "native_build": {
-        "package": "cryptography",
-        "deployment_target": "13.5",
-        "openssl": {
-          "version": "4.0.3",
-          "url": "https://github.com/openssl/openssl/releases/download/openssl-4.0.3/openssl-4.0.3.tar.gz",
-          "sha256": "325b5c806167c13b40b1ffeadfe0248197c00eccc4cf123ec1e28d2d2fd216d9"
-        }
-      },
-      "node": {
-        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-x64.tar.gz",
-        "sha256": "1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097"
-      },
-      "python": {
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261003/cpython-3.13.16%2B20261003-x86_64-apple-darwin-install_only_stripped.tar.gz",
-        "sha256": "b4dad38ba6a344555ccb71a1b08caad0a6c0dda88c5803658bc95bd7f04e9f5c"
-      }
-    },
     "darwin-arm64": {
       "python_platform": "aarch64-apple-darwin",
       "node": {

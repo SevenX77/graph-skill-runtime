@@ -1,64 +1,73 @@
 # Graph Skill toolkit
 
-Graph Skill toolkit combines a private Python runtime, a private Node.js runtime, shared agent instructions and a graph canvas in one local package for Codex Desktop and Claude Code Desktop. Version `0.2.2` uses the host's normal file and shell tools for authoring and runtime operations. A shared MCP App provides the canvas. MCP, the Model Context Protocol, connects host tools to external services; an MCP App adds an HTML view to a tool result.
+Graph Skill toolkit supplies global runtime commands, shared agent instructions and a graph canvas for Codex Desktop and Claude Code Desktop. It uses the host's normal file tools for source browsing and editing. The canvas is an MCP App: an HTML view attached to a tool result through the Model Context Protocol (MCP). The Python runtime remains independently installable, and business skills stay in the directories the user selects.
 
-The runtime remains independently installable. The toolkit owns its user-level installation, while business skills stay in the directories the user selects. The current canvas displays root graph nodes and edges, fills its allocated viewport and provides a host folder shortcut. Complete node properties and option editing remain in the [broader design, available in the repository](../../docs/design/graph-skill-agent-plugin.md).
+Version `0.3.0` adds an npm bootstrap installer, automatic release downloads for updates and explicit cleanup of inactive version caches. It packages Windows x64, Apple Silicon macOS, Linux x64 and Linux ARM64. Intel Mac packaging has been withdrawn at the user's request. The [validation record](VALIDATION.md) owns the current decision, publication gates and historical evidence. At documentation freeze, the new build, downloads and Desktop operation remain unverified; use the release's final evidence to identify published bytes.
 
-Version `0.2.2` prepares an Intel Mac package alongside the four existing release targets. Its build keeps the repaired Python dependency lock and binds every archive to a clean source commit. The [validation record](VALIDATION.md) owns the target-expansion decision, current acceptance and historical observations. At documentation freeze, the new archives and checks remain unverified. Final archive identities and publication checks belong to adjacent local receipts and official release metadata. Installation lifecycle and native Desktop behavior retain their separate manual acceptance.
+## Install
 
-## Install the local package
+The small npm package downloads the matching complete archive and runs its installer. This entry requires Node.js 18 or later, npm and network access. The installed toolkit uses its private Node.js `24.21.0` and CPython `3.13.16`; it does not rely on the bootstrap interpreter afterward.
 
-Choose a published `0.2.2` archive for the computer's operating system and processor architecture. Each archive contains its own Node.js, CPython, runtime wheel and installed base dependencies. Node.js executes the toolkit and canvas; CPython executes the Python runtime. The installer uses these private copies and requires neither a preinstalled Node.js/Python command nor package-index access.
-
-The complete payload covers the engine's locked base dependencies. Optional embedded-provider extras and additional Python libraries required by a business skill need separate deployment planning and validation.
-
-Archive names follow `graph-skill-0.2.2-TARGET.zip`. The extracted directory has the same name without `.zip`. Here `darwin` identifies macOS.
-
-| Computer | Archive target |
-| --- | --- |
-| Windows with an x64 processor | `win32-x64` |
-| Mac with an Intel processor | `darwin-x64` |
-| Mac with Apple Silicon | `darwin-arm64` |
-| Linux with an x64 processor and glibc | `linux-x64` |
-| Linux with an ARM64 processor and glibc | `linux-arm64` |
-
-The five targets become downloadable after build, inspection and release verification. The release's attached assets contain the installer ZIP files and `SHA256SUMS.txt`, which records their SHA-256 checksums; GitHub also provides source archives. Detailed build receipts remain with the build evidence. Version `0.2.1` retains its existing download bytes.
-
-Windows ARM64 remains unavailable because the locked `cryptography==50.0.1` dependency has no compatible binary wheel for that target. Intel Mac assembly has a dedicated source-build path for that same dependency version, described below. All compilation happens on the build machine; the delivered installer needs no compiler, Rust toolchain or Homebrew installation.
-
-The product pins Node.js `24.21.0` and CPython `3.13.16`. Those versions are product build inputs. The operating system and native libraries must satisfy the bundled runtimes and dependencies. Linux targets use glibc, the standard C library used by those selected binary builds. Native compatibility requires operation on the actual target; supported minimum operating-system versions need their own evidence. Connected agents and business operations that use a network retain their own network requirements. The installer uses default host user profiles and requires no Codex or Claude command-line executable.
-
-For the bundled Node.js version, upstream lists Windows 10/Server 2016 or later for x64, macOS 13.5 or later, and Linux kernel 4.18 or later with glibc 2.28 and libstdc++ 6.0.25 or later. libstdc++ is the C++ runtime library used by those Linux binaries. Upstream also requires an operating-system version still supported by its vendor. These are [Node.js prerequisites](https://github.com/nodejs/node/blob/v24.21.0/BUILDING.md#platform-list); full toolkit compatibility requires the separate native observations in the validation record.
-
-Before running the installer, disable an enabled `graph-skill-canvas@graph-skill-local` plugin in Codex Desktop. That earlier installation conflicts with the toolkit's canvas ownership. The installer preserves the conflicting configuration and stops until the user resolves it.
-
-1. Obtain the built archive matching the computer's operating system and architecture, then extract it to a local directory. On macOS or Linux, use an extractor that preserves executable permissions.
-2. On Windows, double-click `install.cmd` in that directory. On macOS or Linux, open a terminal in the extracted directory and run `sh install.sh`.
-3. Open a new terminal for the updated PATH, the operating system's command search list. Restart or reload the host as needed to discover the installed Skills and canvas connection.
-4. Review the installed hooks through the host's normal controls and complete the manual checks below. The host retains its trust and approval decisions.
-
-To preview the installation, run `install.cmd --dry-run` on Windows or `sh install.sh --dry-run` on macOS/Linux. Add `--targets codex` or `--targets claude` to select one host. These flags apply to the incoming installer for both first installation and upgrade.
-
-Both hosts are selected by default. A Skill is a discoverable instruction file that guides the host agent. Each selected host receives `graph-skill` and `graph-skill-canvas`, one `graph-skill-canvas` MCP server connection and a `PostToolUse` hook, a handler that supplies follow-up guidance after tool use.
-
-The installer targets `~/.codex` and `~/.claude` as their default configuration directories. A `CODEX_HOME` or `CLAUDE_CONFIG_DIR` override is accepted only when it resolves to the corresponding default. Other unmanaged collisions or edited toolkit-owned resources are preserved and block the operation; resolve the reported ownership conflict before retrying.
-
-## Commands and installed files
-
-The installed `graph-skill` command manages the toolkit. Replace `EXTRACTED_DIR` with the absolute directory containing an extracted release:
+After the `0.3.0` GitHub release has been published and verified, run:
 
 ```text
-graph-skill install "EXTRACTED_DIR"
+npx --yes --package=https://github.com/SevenX77/graph-skill-runtime/releases/download/graph-skill-toolkit-v0.3.0/graph-skill-toolkit-0.3.0.tgz graph-skill install
+```
+
+The package resolves its own version's GitHub release, selects the operating system and processor architecture, verifies the archive against `SHA256SUMS.txt`, extracts it and invokes the explicit installer. Downloading the npm package alone performs no host configuration writes. npm registry publication is pending authentication and package-ownership verification; `npx graph-skill-toolkit@latest` is not an available installation promise.
+
+Alternatively, download a complete ZIP from the release assets. This route requires no system Node.js or Python and no dependency downloads during installation:
+
+| Computer | Archive |
+| --- | --- |
+| Windows x64 | `graph-skill-0.3.0-win32-x64.zip` |
+| Mac with Apple Silicon | `graph-skill-0.3.0-darwin-arm64.zip` |
+| Linux x64 with glibc | `graph-skill-0.3.0-linux-x64.zip` |
+| Linux ARM64 with glibc | `graph-skill-0.3.0-linux-arm64.zip` |
+
+Here `darwin` means macOS, and glibc is the Linux system library used by these binaries. Intel Mac and Windows ARM64 have no `0.3.0` installer. Each ZIP contains private runtimes, the runtime wheel and its locked base dependencies. Optional embedded-provider extras and additional libraries required by business skills need separate deployment.
+
+Extract the matching ZIP, preserving executable permissions on macOS/Linux. On Windows, run `install.cmd`; on macOS/Linux, run `sh install.sh` from the extracted directory. Keep the extracted payload together. An unbuilt source checkout is not an installer archive.
+
+Add `--targets codex` or `--targets claude` to install for one host, and `--dry-run` to preview the operation. First installation defaults to both hosts. An upgrade without `--targets` retains the target list in the existing installation manifest. Only selected hosts' configuration overrides are checked: `CODEX_HOME` for Codex and `CLAUDE_CONFIG_DIR` for Claude must resolve to their respective default user profiles. Custom selected profiles remain unsupported.
+
+If Codex has the earlier `graph-skill-canvas@graph-skill-local` plugin enabled, disable it through Desktop before installation. The installer preserves conflicting configuration and stops. It also preserves unmanaged collisions and edited toolkit-owned resources; resolve the reported conflict before retrying.
+
+After installation, open a fresh terminal for the updated PATH, the command search list. Restart or reload the host to discover the Skills, canvas server and hook. A Skill is a discoverable instruction file that guides the agent; the hook supplies follow-up guidance after tool use. The host retains its normal trust and approval decisions.
+
+The bundled Node.js prerequisites include Windows 10/Server 2016 or later, macOS 13.5 or later, and Linux kernel 4.18 or later with glibc 2.28 and libstdc++ 6.0.25 or later. libstdc++ is the C++ runtime library. Upstream also requires a vendor-supported operating system. These are [Node.js prerequisites](https://github.com/nodejs/node/blob/v24.21.0/BUILDING.md#platform-list); complete toolkit compatibility still needs native evidence.
+
+## Update, inspect and remove
+
+```text
+graph-skill update
 graph-skill update "EXTRACTED_DIR"
 graph-skill status
+graph-skill cleanup --dry-run
+graph-skill cleanup
 graph-skill uninstall
 ```
 
-`install` accepts an optional bundle path. `update` requires the extracted release directory. Install and update accept `--targets codex,claude` and `--dry-run`; the target list defaults to both hosts. A dry run reports the proposed operation and conflicts before provisioning. The extracted installer is the entry point for first installation and upgrade from `0.1.0`; it runs the incoming archive's private runtimes. Keep its payload together in the extracted directory. The installer validates the target and bound file hashes before writing host configuration.
+`graph-skill update` finds the newest published toolkit release, including toolkit previews, downloads the matching archive, verifies its checksum and runs the incoming installer. Supplying an absolute extracted release directory selects the offline route. Install/update accept `--targets codex,claude` and `--dry-run`. To upgrade an older toolkit that lacks automatic updates, use the new npm entry or the new ZIP's installer.
 
-For an upgrade from `0.1.0`, extract the matching new archive and run its `install.cmd` or `sh install.sh`. The incoming installer reads the existing ownership manifest and applies the new payload only when prior owned resources remain intact. Review any reported conflict before retrying. The new private interpreter binding applies to the new installation; older version directories remain retained for possible existing references and running processes.
+`cleanup` removes only verified inactive version caches. It preserves the active version and the currently executing installer, and skips unknown or modified directories. Close hosts and other processes that may still use old payloads before cleanup, then restart them against the active installation. `--dry-run` shows the proposed cleanup first. Cleanup is an explicit operation; updating does not broadly delete old directories.
 
-The global `gskill` command runs the installed runtime. This command-line interface (CLI) accepts runtime operations and arguments through a shell. `graph-skill <runtime-command> [arguments]` forwards the same runtime command and arguments; for example, `graph-skill compile` invokes runtime compilation. For a verified business skill root:
+Uninstall removes managed host registrations, Skills, command launchers and PATH integration while retaining version caches. Business files and runtime run state remain user-owned. After uninstall removes the global command, invoke the same npm entry above with `cleanup` in place of `install` to clean verified caches. Its report identifies the executing cache that must remain; this does not promise complete removal of cached payloads. `status` describes recorded ownership; actual host loading must be observed in the host.
+
+| Location | Toolkit-owned content |
+| --- | --- |
+| Windows `%LOCALAPPDATA%/GraphSkill`; macOS/Linux `~/.local/share/graph-skill` | Product state, `install.json`, commands and `versions/<version>-<digest>` payloads. |
+| Codex `~/.agents/skills/{graph-skill,graph-skill-canvas}` | Rendered Skills and references. |
+| Codex `~/.codex/config.toml` and `~/.codex/hooks.json` | Marked canvas server block and owned hook entry. |
+| Claude `~/.claude/skills/{graph-skill,graph-skill-canvas}` | Rendered Skills and references. |
+| Claude `~/.claude.json` and `~/.claude/settings.json` | Named canvas server selector and owned hook entry. |
+| User command search path | Windows user PATH entry; marked POSIX PATH blocks in the selected Bash login profile and `.zprofile`. |
+
+The installer preflights every selected host before provisioning, merges only owned configuration content and preserves unrelated settings and independent MoirAI/runtime integrations. Updates require recorded owned content to remain intact. Rollback restores a touched file only while its bytes equal the operation's after-image; a concurrent edit is preserved and reported as incomplete rollback.
+
+## Runtime and canvas
+
+The global `gskill` command exposes runtime operations. `graph-skill <runtime-command> [arguments]` forwards the same operation, for example:
 
 ```text
 gskill compile "ABSOLUTE_SKILL_ROOT"
@@ -66,75 +75,66 @@ gskill inspect "ABSOLUTE_SKILL_ROOT" --call-graph
 graph-skill config resolve "ABSOLUTE_SKILL_ROOT"
 ```
 
-Runtime commands return structured JSON by default. Calling them from a shell preserves executor selection: the built-in default is host-native, where the host handles Agent phases. Direct execution through vendor CLI processes is a separate explicit `--executor cli` choice. Read the shared [Skill](skills/graph-skill/SKILL.md) and [CLI reference](skills/graph-skill/references/cli.md) for runtime operations and durable Agent result submission. Their source templates contain command placeholders; installation renders absolute private-interpreter, toolkit and reference paths. Python uses `-I -B -X utf8` to isolate module search, suppress bytecode writes and select UTF-8 mode. Windows PowerShell uses `&` before a rendered quoted executable; POSIX shells invoke the rendered command directly.
+Commands return structured JSON by default. Shell invocation retains the host-native executor default, where the host handles Agent phases. Vendor CLI execution is a separate explicit `--executor cli` choice. The shared [Skill](skills/graph-skill/SKILL.md) and [CLI reference](skills/graph-skill/references/cli.md) describe runtime operations and durable Agent result submission. Installation renders absolute private-interpreter and reference paths into those templates. Python runs with `-I -B -X utf8` for isolated module search, no bytecode writes and UTF-8 output.
 
-| Location | Product ownership |
-| --- | --- |
-| Windows `%LOCALAPPDATA%/GraphSkill`; macOS/Linux `~/.local/share/graph-skill` | Product state, `install.json` ownership manifest, command launchers and immutable `versions/<version>-<digest>` payload/runtime directories. |
-| Codex `~/.agents/skills/graph-skill` and `~/.agents/skills/graph-skill-canvas` | Rendered toolkit Skills and references. |
-| Codex `~/.codex/config.toml` and `~/.codex/hooks.json` | Marked canvas server block and the owned hook entry. |
-| Claude Code `~/.claude/skills/graph-skill` and `~/.claude/skills/graph-skill-canvas` | The same rendered toolkit Skills and references. |
-| Claude Code `~/.claude.json` and `~/.claude/settings.json` | Named canvas server selector and the owned hook entry. |
-| User command search path | Windows user PATH entry; on POSIX, a marked PATH block in the first existing Bash login profile, or `.profile` when none exists, and in `.zprofile`. |
+Select a business root containing `SKILL.md` and `graph.yaml`. The agent uses native file tools for authoring and calls the runtime as needed. After related authoring, reading, compilation, prediction, execution, inspection, resume, result submission or golden evaluation, the shared instructions request one normal `show_graph` call for that root. The hook supplies path evidence; the agent makes the call, and the host controls panel opening and focus. Explicit user preferences can narrow or disable the follow-up.
 
-Every requested target is checked before provisioning. The installer merges only its owned configuration content and preserves unrelated settings and independently installed MoirAI/runtime MCP integrations. Updates require the recorded owned content to remain intact. Rollback restores a touched file only while its bytes match the operation's after-image; a concurrent edit is retained and reported as incomplete rollback. This check coordinates the installer's own writes and does not lock arbitrary host writers.
+An explicit call uses the `graph-skill-canvas` server's `show_graph` tool with the verified absolute `skill_root`. Omitting the root displays a labeled three-node demonstration. The tool returns `structuredContent.graph`, `structuredContent.skillRoot` and `ui://graph-skill/canvas-v2.html`.
 
-Uninstall removes owned registrations, Skills, launchers and PATH integration. It retains the version cache explicitly. Business files and runtime run state remain user-owned. `status` reports installation ownership; actual host loading is checked in the host.
+The canvas displays root inputs, phases, dependencies and outputs, with each subgraph phase represented as one node. Runtime compilation owns full format validation. Presentation reads do not import business Python; runtime compilation or inspection of trusted skills can load their declared code. Complete property and option editing remains in the [broader design](../../docs/design/graph-skill-agent-plugin.md).
 
-## Use the graph canvas
+The top-left path button requests native folder opening through `openai/files/open` when the host advertises that capability. If the request is absent or rejected, it asks the host agent to browse the root; a file-only host can show `SKILL.md`. The [OpenAI UI contract](https://developers.openai.com/plugins/build/chatgpt-ui) defines the file bridge. Successful dispatch and an actual visible folder view are separate observations.
 
-Select a business skill directory containing `SKILL.md` and `graph.yaml`. The host agent resolves its absolute path, uses native file tools for edits and calls the installed runtime as needed. After related authoring, reading, compilation, prediction, execution or inspection, the shared instructions request one normal `show_graph` call with that root. Resume, Agent result submission and golden evaluation receive the same follow-up.
+## Run from source
 
-The hook reads path evidence and supplies agent context. The agent performs the tool call, and the host decides whether its app panel opens or receives focus. The shared Skills cover operations whose selected root cannot be inferred from tool path evidence. Guidance from both sources is deduplicated for the same operation and root. An explicit user choice can narrow or disable automatic display.
+A cloned repository or downloaded source archive can run without building a release ZIP. Install Python 3.11 or later, `uv`, Node.js 22 or later and npm, then run these commands from the repository root:
 
-An explicit canvas call uses the `graph-skill-canvas` server's `show_graph` tool with `skill_root` set to the verified absolute root. The host may namespace the tool name. Omitting that input displays the labeled three-node demonstration. The result carries `structuredContent.graph` and `structuredContent.skillRoot` and links `ui://graph-skill/canvas-v2.html`.
-
-The presentation reader shows root inputs, phases, dependencies and outputs. A subgraph phase remains one node. Full portable-format validation and execution belong to the Python runtime. The canvas reads presentation data without importing business Python; compiling or inspecting a trusted skill can load its declared code.
-
-The top-left path button requests native folder opening. Where the host advertises the OpenAI file capability, the app sends `openai/files/open` with the absolute root. If that route is absent or rejected, it asks the host agent to use native file browsing. A file-only host can show `SKILL.md` and explain the available view. The [OpenAI UI documentation](https://developers.openai.com/plugins/build/chatgpt-ui) describes the file bridge; directory support requires an actual host observation. A submitted request establishes dispatch, while a visible native folder view establishes opening.
-
-## Manual Desktop acceptance
-
-The user performs these checks separately in Codex Desktop and an authenticated Claude Code Desktop session. Record the toolkit version and host version with each result:
-
-1. Use a fresh launch environment in which system Node.js and Python are unavailable through command search. Record that condition without uninstalling or modifying the system runtimes. Keep the operating system's normal shell and native utilities available. Run the matching archive's installer and record whether installation completes without dependency downloads.
-2. Open a fresh terminal, confirm `graph-skill status` reports the expected version, and run `gskill --version` from a directory outside the source checkout. Inspect the installed Skill commands and canvas/hook configuration to confirm absolute paths into the toolkit's private version directory.
-3. Confirm both Skills are discoverable and the canvas server is connected. Ask the agent to read a known portable business skill. Observe whether it naturally calls `show_graph` afterward, and verify that the displayed graph and top-left root match that skill.
-4. If natural follow-up is absent, request `show_graph` explicitly. Record that outcome separately so an explicit repair cannot count as automatic behavior.
-5. Confirm the canvas fills the allocated panel, then click the root path and observe the host's actual folder or file view. Record a fallback message separately from successful folder opening.
-6. In a fresh host conversation, repeat the relevant discovery and display checks. Record Skill discovery, server connection, tool result delivery and visible panel rendering as separate observations. For an existing `0.1.0` installation, record the new extracted installer's upgrade result separately from a pristine installation.
-
-Native Claude Code Desktop rendering remains unverified. Hook discovery, host trust and agent follow-through each need their own observation. Lifecycle acceptance also needs controlled evidence for collision preservation, edited owned resources, rollback and uninstall. A normal installation result supplies only its observed path. If a required host capability is absent, retain the successful lower-level results and identify the specific remaining workflow gap.
-
-## Deploy the Python runtime independently
-
-Service, developer and headless deployments can install the separately built `graph-skill-runtime` wheel into their chosen Python environment. Its package requirement remains Python `>=3.11`; the toolkit's private CPython pin applies to toolkit delivery. The Python distribution keeps its own programmatic Python interface, CLI and MCP tools. Runtime-only installation is independent of the toolkit's Node.js, canvas assets and host configuration. The runtime is unpublished, so use the supplied local wheel or the repository's documented source workflow.
-
-## Build from source
-
-This directory is one private product module. The runtime wheel and source distribution retain their independent package boundary. The builder requires Node.js 22 or later, Python 3.11 or later, `uv`, and network access to the pinned upstream runtimes and dependency inputs. `uv` is the repository's Python package and build tool. Intel Mac assembly additionally runs on an Intel Mac with Apple's command-line development tools and a compatible Rust toolchain. These are build-machine requirements. End users receive the resulting complete archive.
-
-Prepare and commit all release source inputs before assembly. Use a clean checkout of that commit for the JavaScript build, runtime wheel and target archives. The archive builder rejects tracked changes and untracked files visible to Git, records the source commit and tree in `bundle.json` and its adjacent receipt, and verifies the same clean identity before publishing its local archive. A source change requires a new committed candidate and rebuild. Generated output stays in the repository's ignored build directories.
-
-From the repository root, prepare the JavaScript build dependencies and build the canvas:
-
-```powershell
-cd plugins/graph-skill
-npm ci
-npm run build
+```text
+uv sync
+npm ci --prefix plugins/graph-skill
+npm run build --prefix plugins/graph-skill
+uv run gskill compile examples/hello-world
 ```
 
-Return to the repository root, build the runtime wheel and assemble a target archive. This example selects Windows x64:
+The last command exercises the Python runtime. To launch the canvas MCP server:
+
+```text
+npm start --prefix plugins/graph-skill
+```
+
+This starts a standard-input/output server for an MCP host; it does not open a graphical application. To use it from Desktop, explicitly register an MCP server that runs Node.js with the absolute path to `plugins/graph-skill/dist/server.mjs`. Its working source tree and Node executable must remain available. Skill installation, template rendering and hook registration are separate setup steps. Downloading or building source does not discover or install those integrations automatically. Use the toolkit installer for the complete global setup.
+
+Runtime-only deployments can use the source command above or install the separately built `graph-skill-runtime` wheel into their own Python environment. The Python package retains Python `>=3.11`, its Python API, CLI and MCP tools. Its installation is independent of toolkit Node.js, canvas assets and host configuration; the runtime is not published on PyPI.
+
+## Build release archives
+
+Release assembly adds pinned-runtime downloads and payload construction to the source workflow. Prepare and commit all source inputs, then build from that clean commit. The builder rejects tracked changes and Git-visible untracked files, records source commit/tree identities and checks them again before completing assembly. Ordinary source execution above does not require a clean Git checkout.
+
+After the JavaScript build, run from the repository root:
 
 ```text
 uv build --no-sources --wheel --out-dir plugins/graph-skill/release/runtime-build
 python -B plugins/graph-skill/packaging/bundle.py --runtime-wheel plugins/graph-skill/release/runtime-build/graph_skill_runtime-0.1.0a1-py3-none-any.whl --platform win32-x64
 ```
 
-Here `python` selects the build machine's Python 3.11 or later. Choose another declared target with `--platform`; omission selects the builder's target. The builder writes `release/graph-skill-0.2.2-TARGET.zip` and the adjacent identity receipt `release/graph-skill-0.2.2-TARGET.json`. The receipt binds the source commit and tree, archive, runtime wheel, interpreter provenance and dependency-lock hashes. The final source binding and archive hash stay outside the packaged documents.
+Choose another declared target with `--platform`. [`packaging/runtime-lock.json`](packaging/runtime-lock.json) owns pinned interpreter inputs. The builder exports `uv.lock` with `uv --locked` and installs hash-checked binary wheels for the selected platform. Missing compatible inputs stop assembly. Intel-only native compilation is removed from this release path.
 
-[`packaging/runtime-lock.json`](packaging/runtime-lock.json) owns upstream runtime identities. The builder exports the repository's `uv.lock` with `uv --locked` and installs hash-checked binary wheels for the selected interpreter/platform. It includes the runtime's base dependencies; optional embedded-provider and development extras remain separate.
+The output is `release/graph-skill-0.3.0-TARGET.zip` with an adjacent JSON receipt binding its source, archive, runtime wheel and dependency inputs. Generate the lightweight npm package from the same clean source after the JavaScript build:
 
-For `darwin-x64`, the [native build adapter](packaging/native_build.py) compiles only `cryptography==50.0.1` from its hash-locked source distribution, using the packaged CPython interpreter and pinned OpenSSL `4.0.3`. Cryptography provides Python cryptographic operations; OpenSSL supplies the native cryptographic library compiled into its extension. Static linking includes that library in the extension so the result can run independently of a build machine's OpenSSL installation. The build rejects dependencies on external Homebrew or build-directory libraries. Every other dependency remains binary-only, and missing compatible inputs stop assembly. This is a toolkit-owned build for a platform that [cryptography removed from its upstream support](https://cryptography.io/en/latest/changelog/#v49-0-0).
+```text
+npm run pack:installer --prefix plugins/graph-skill
+```
 
-The Intel build sets the macOS deployment target to `13.5`, matching the bundled Node.js prerequisite. A deployment target controls compiler output compatibility; it does not establish the complete toolkit's minimum operating-system version. Native imports and a runtime compile smoke check on the Intel build runner establish only their observed operating system and execution scope. Minimum-version operation, installed lifecycle and native Desktop behavior need their own observations. [VALIDATION.md](VALIDATION.md) records the acceptance boundary and current gaps.
+The packer derives the package version from the product module and records `sourceCommit`; its output is `release/graph-skill-toolkit-0.3.0.tgz`. The product build module remains private. The generated distribution contains the command entry and bundled installer, with no postinstall host mutation. The release contains the tarball, four ZIPs and `SHA256SUMS.txt`. Final hashes and post-build evidence remain outside packaged documents; changing an input requires rebuilding and verifying the affected artifacts.
+
+## Manual Desktop acceptance
+
+The user owns these observations in Codex Desktop and an authenticated Claude Code Desktop session. Record toolkit and host versions, installation route and selected hosts.
+
+1. For the complete ZIP route, use a fresh launch environment without system Node.js or Python in command search and confirm installation completes without dependency downloads. Keep normal operating-system utilities available. For the npm route, record the bootstrap Node/npm versions and confirm the installed commands bind to private runtimes.
+2. In a fresh terminal outside the checkout, inspect `graph-skill status` and `gskill --version`. Confirm rendered Skill, canvas and hook commands use absolute installed paths. Record upgrades separately from pristine installation.
+3. Confirm Skill discovery and canvas server connection. Ask the agent to read a known business skill and observe whether it naturally calls `show_graph`. Confirm graph and root identity. If follow-up is absent, test an explicit call and record it separately.
+4. Observe the canvas filling its allocated panel and the actual host folder/file view after clicking the path. A delivered tool result, request acknowledgement or fallback message alone does not establish either result.
+5. Repeat discovery and display in a new host conversation. Record connection, result delivery, native rendering and natural follow-up separately. Controlled lifecycle checks must also cover conflicts, edited owned files, rollback, target retention, cleanup and uninstall.
+
+Build, CLI and automated checks do not establish Desktop operation. Native Claude Code Desktop rendering, hook discovery and agent follow-through retain their evidence gaps until observed on the delivered version. Keep successful lower-level results while identifying the exact remaining gap in the shared-host workflow.

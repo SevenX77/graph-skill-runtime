@@ -23,4 +23,9 @@ await build({
   bundle: true, platform: "node", format: "esm", target: "node22",
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
 });
-console.log("Built server, hook, and self-contained canvas");
+await build({
+  absWorkingDir: root, entryPoints: ["src/install/download.mjs"], outfile: "dist/installer.mjs",
+  bundle: true, platform: "node", format: "esm", target: "node18",
+  banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
+});
+console.log("Built server, hook, canvas, and npm installer");

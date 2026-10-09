@@ -236,8 +236,10 @@ def merge_hook(data: dict, resource: dict, previous: dict | None, remove: bool) 
         groups.append(copy.deepcopy(resource["value"]))
 
 
-def assert_default_profiles() -> None:
-    for name, directory in (("CODEX_HOME", ".codex"), ("CLAUDE_CONFIG_DIR", ".claude")):
+def assert_default_profiles(targets: list[str]) -> None:
+    profiles = {"codex": ("CODEX_HOME", ".codex"), "claude": ("CLAUDE_CONFIG_DIR", ".claude")}
+    for target in targets:
+        name, directory = profiles[target]
         value = os.environ.get(name)
         if value and Path(value).expanduser().resolve() != (Path.home() / directory).resolve():
             raise InstallError(

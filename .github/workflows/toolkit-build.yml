@@ -25,9 +25,6 @@ jobs:
           - target: win32-x64
             os: windows-latest
             native: '--native'
-          - target: darwin-x64
-            os: macos-15-intel
-            native: '--native'
           - target: darwin-arm64
             os: macos-15
             native: '--native'
@@ -52,6 +49,7 @@ jobs:
         run: |
           npm ci --prefix plugins/graph-skill
           npm run build --prefix plugins/graph-skill
+          npm run pack:installer --prefix plugins/graph-skill
           npm test --prefix plugins/graph-skill
           uv run --no-project --python 3.11 python -B -m unittest discover -s plugins/graph-skill/tests -p 'test_*.py'
       - name: Build source-bound toolkit
@@ -71,4 +69,5 @@ jobs:
             plugins/graph-skill/release/*.zip
             plugins/graph-skill/release/*.json
             plugins/graph-skill/release/*.log
+            plugins/graph-skill/release/*.tgz
           if-no-files-found: warn

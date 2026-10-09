@@ -84,7 +84,7 @@ def product_files(wheel: Path) -> dict[str, Path]:
     }
     for name in ("entry.py", "install.py", "hosts.py", "ownership.py", "runtime_layout.py", "runtime-lock.json"):
         files["packaging/" + name] = ROOT / "packaging" / name
-    for name in ("server.mjs", "after-tool.mjs", "canvas.html"):
+    for name in ("server.mjs", "after-tool.mjs", "canvas.html", "installer.mjs"):
         files["dist/" + name] = ROOT / "dist" / name
     for skill in ("graph-skill", "graph-skill-canvas"):
         for path in sorted((ROOT / "skills" / skill).rglob("*.md")):

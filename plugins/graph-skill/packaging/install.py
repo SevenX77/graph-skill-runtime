@@ -293,11 +293,19 @@ def cleanup_release(release: Path, state: Path) -> None:
     shutil.rmtree(checked)
 
 
-def install(source: Path, targets: list[str], dry_run: bool) -> dict:
-    assert_default_profiles()
+def selected_targets(value: str | None, previous: dict) -> list[str]:
+    targets = value.split(",") if value is not None else previous.get("targets", ["codex", "claude"])
+    if not targets or len(set(targets)) != len(targets) or not set(targets).issubset({"codex", "claude"}):
+        raise InstallError("--targets must be codex, claude, or codex,claude")
+    return targets
+
+
+def install(source: Path, target_option: str | None, dry_run: bool) -> dict:
     state = state_root()
     info, raw = package(source)
     old = load_manifest(state)
+    targets = selected_targets(target_option, old)
+    assert_default_profiles(targets)
     identity = info["version"] + "-" + digest(raw)[:16]
     release = release_root(state, identity)
     node = runtime_node(release)
@@ -402,30 +410,60 @@ def status() -> dict:
     }
 
 
+def cleanup(dry_run: bool) -> dict:
+    state = state_root()
+    old = load_manifest(state)
+    versions = state / "versions"
+    plain_path(versions)
+    removed, preserved = [], []
+    for path in sorted(versions.iterdir()) if versions.exists() else []:
+        if path.name == old.get("release") or path == ROOT:
+            preserved.append({"path": str(path), "reason": "active release or executing installer"})
+            continue
+        try:
+            checked = release_root(state, path.name)
+            info, raw = package(checked)
+            if path.name != info["version"] + "-" + digest(raw)[:16]:
+                raise InstallError("Release identity does not match its directory")
+            verify_release(checked, raw)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, InstallError) as exc:
+            preserved.append({"path": str(path), "reason": str(exc)})
+            continue
+        if not dry_run:
+            cleanup_release(checked, state)
+        removed.append(str(path))
+    return {"status": "planned" if dry_run else "cleaned", "inactive_releases": removed, "preserved": preserved}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Install the Graph Skill toolkit for local Codex and Claude Code Desktop"
     )
-    parser.add_argument("operation", choices=("install", "update", "uninstall", "status"))
+    parser.add_argument("operation", choices=("install", "update", "uninstall", "status", "cleanup"))
     parser.add_argument("source", nargs="?", type=Path, default=ROOT)
-    parser.add_argument("--targets", default="codex,claude")
+    parser.add_argument("--targets")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    targets = args.targets.split(",")
-    if not targets or len(set(targets)) != len(targets) or not set(targets).issubset({"codex", "claude"}):
-        parser.error("--targets must be codex, claude, or codex,claude")
     try:
         if args.operation == "status":
             result = status()
         elif args.dry_run:
-            result = uninstall(True) if args.operation == "uninstall" else install(args.source.resolve(), targets, True)
+            if args.operation == "cleanup":
+                result = cleanup(True)
+            else:
+                result = (
+                    uninstall(True) if args.operation == "uninstall"
+                    else install(args.source.resolve(), args.targets, True)
+                )
         else:
             with installer_lock(state_root()):
-                result = (
-                    uninstall(False)
-                    if args.operation == "uninstall"
-                    else install(args.source.resolve(), targets, False)
-                )
+                if args.operation == "cleanup":
+                    result = cleanup(False)
+                else:
+                    result = (
+                        uninstall(False) if args.operation == "uninstall"
+                        else install(args.source.resolve(), args.targets, False)
+                    )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, InstallError) as exc:
