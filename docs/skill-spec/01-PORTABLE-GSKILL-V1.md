@@ -5,7 +5,7 @@ role: contract
 status: FROZEN
 ssot: graph_skill_format_templates
 aligns_with: ../design/v1-alignment.md
-updated: 2026-09-01
+updated: 2026-10-08
 ---
 
 # Portable gSkill v1 格式规范
@@ -28,6 +28,8 @@ uv run python -c "import hashlib,pathlib;p=pathlib.Path('docs/skill-spec/01-PORT
 
 本文使用“必须”“不得”“可以”表达强制要求、禁止行为和允许行为。目标设计的架构依据见 [`v1-alignment.md`](../design/v1-alignment.md)，Agent Skills 入口遵守 [Agent Skills specification](https://github.com/agentskills/agentskills/blob/main/docs/specification.mdx)。
 
+The [2026-10-08 directory naming decision](../design/subgraph-directory-naming-2026-10-08.md) records the `subgraphs/` name, the preserved flat-storage semantics, and the validation scope for this revision.
+
 ## 1. 目标、范围与术语
 
 Portable gSkill v1 把宿主可发现的使用说明、机器可读的图拓扑和运行时配置分成独立事实源：
@@ -43,8 +45,8 @@ Portable gSkill v1 把宿主可发现的使用说明、机器可读的图拓扑�
 - **业务 gSkill**：用户拥有并显式交给 runtime 的一个目录。安装 runtime 或导入 Python package 不会注册、复制或全局发现该目录。
 - **skill root**：业务 gSkill 的顶层目录，也是唯一根 `SKILL.md` 和根 `graph.yaml` 所在目录。
 - **root graph**：skill root 的 `graph.yaml` 所声明的入口 graph。
-- **registry graph**：`graphs/<graph_id>/graph.yaml` 所声明的可复用 graph。
-- **graph directory**：root graph 的 skill root，或 registry graph 的 `graphs/<graph_id>/` 目录。
+- **registry graph**：`subgraphs/<graph_id>/graph.yaml` 所声明的可复用 graph。
+- **graph directory**：root graph 的 skill root，或 registry graph 的 `subgraphs/<graph_id>/` 目录。
 - **phase**：graph 中一个有稳定 id 的节点；其行为由同名 phase 目录中的一个类型文件声明。
 - **graph call edge**：`SUBGRAPH.md` 或 `AGENT.md` 的显式 graph 引用形成的调用关系。
 - **bundle compile**：以一个 skill root 为输入，一次发现、解析并交叉校验根入口、所有 graph 和所有 phase 的编译过程。
@@ -68,7 +70,7 @@ Runtime、SDK、CLI 和 MCP 都按调用者显式提供的 skill root 工作。P
 │       ├── actions/                    # LOGIC-local code, when declared
 │       ├── tools/                      # AGENT-local tools, visible only here
 │       └── validator.py                # optional, when validator: true
-├── graphs/
+├── subgraphs/                          # reusable subgraph definitions
 │   └── <graph_id>/
 │       ├── graph.yaml
 │       └── phases/
@@ -85,7 +87,9 @@ Runtime、SDK、CLI 和 MCP 都按调用者显式提供的 skill root 工作。P
 └── .gskill/                            # runtime state; not portable source
 ```
 
-`graphs/` 是单层 registry。一个 registry graph 的目录直接位于 `graphs/<graph_id>/`；graph directory 内没有第二个 registry。Root graph 和 registry graph 都使用本文第 4 节的同一 `graph.yaml` schema。
+`subgraphs/` 是单层 registry。一个 registry graph 的目录直接位于 `subgraphs/<graph_id>/`；graph directory 内没有第二个 registry。Root graph 和 registry graph 都使用本文第 4 节的同一 `graph.yaml` schema。
+
+`subgraphs/` stores reusable subgraph definitions. A `phases/<phase_id>/SUBGRAPH.md` file declares a call site whose `graph` field selects a definition by `graph_id`; multiple call sites can share one definition.
 
 每个 `phases/<phase_id>/` 恰好对应所属 `graph.yaml.phases[]` 的一个对象，并恰好包含 `LOGIC.md`、`AGENT.md`、`SUBGRAPH.md` 之一。文件名决定 phase 类型，目录名决定 phase id；phase frontmatter 不重复保存这两个事实。
 
@@ -188,7 +192,7 @@ artifacts:
 | `iterate` | 否 | `IterateSpec` | graph 级迭代 |
 | `artifacts` | 否，仅 root graph | `ArtifactDeclaration` list | 该业务 skill 可以物化的具名 artifact |
 
-Root `graph_id` 不需要等于根 `SKILL.md.name`。Registry graph 的 `graph_id` 必须与其 `graphs/<graph_id>/` 目录名完全相等。Root 与所有 registry graph 的 `graph_id` 在整个 bundle 内共享一个唯一命名空间。
+Root `graph_id` 不需要等于根 `SKILL.md.name`。Registry graph 的 `graph_id` 必须与其 `subgraphs/<graph_id>/` 目录名完全相等。Root 与所有 registry graph 的 `graph_id` 在整个 bundle 内共享一个唯一命名空间。
 
 ### 4.2 `GraphPhase`
 
@@ -430,7 +434,7 @@ validator: false
 ---
 ```
 
-合法 frontmatter 字段是 `name`、`graph`、`io`、`validator`、`allow_sequential_overwrite` 和 `iterate`；`name`、`graph` 与 `io` 必需。`graph` 是 registry `graph_id`，由 compiler 解析为 `graphs/<graph_id>/graph.yaml`。父 phase 和被调用 graph 通过各自的 `io` 形成显式数据边界。文件不需要 Markdown body。
+合法 frontmatter 字段是 `name`、`graph`、`io`、`validator`、`allow_sequential_overwrite` 和 `iterate`；`name`、`graph` 与 `io` 必需。`graph` 是 registry `graph_id`，由 compiler 解析为 `subgraphs/<graph_id>/graph.yaml`。父 phase 和被调用 graph 通过各自的 `io` 形成显式数据边界。文件不需要 Markdown body。
 
 ### 5.4 Validator 与顺序覆盖
 
@@ -447,7 +451,7 @@ def validate(output: dict, state_slice: dict, **kwargs) -> None | dict:
 
 ## 6. Flat graph registry、调用图与资源
 
-所有 registry graph 都直接位于 skill root 的 `graphs/` 下，且 graph id 在整个业务 gSkill 内唯一。`SUBGRAPH.md.graph` 和 `AGENT.md.subgraphs[].graph` 是 graph call edge 的唯一声明来源。
+所有 registry graph 都直接位于 skill root 的 `subgraphs/` 下，且 graph id 在整个业务 gSkill 内唯一。`SUBGRAPH.md.graph` 和 `AGENT.md.subgraphs[].graph` 是 graph call edge 的唯一声明来源。
 
 Compiler 由这些 edge 生成 call graph、`callers` 和面向人的 parent view。Portable source 不保存 `parent` 或 `callers` 字段；同一 registry graph 可以被多个 caller 复用。`gskill inspect --call-graph` 必须投影同一组 edge，不能维护第二份 topology。
 
@@ -455,7 +459,7 @@ Compiler 由这些 edge 生成 call graph、`callers` 和面向人的 parent vie
 
 1. `references/`、`examples/`、`scripts/`、`assets/` 是 skill-root resources。根 `SKILL.md` 链接和 `AGENT.md` 的 resource path 都从 skill root 解析。`scripts/` 是 Agent Skills 宿主资源，不自动进入 runtime tool registry。
 2. Skill-root `tools/` 是整个 bundle 的业务 tool owner。它注册的 tool 对 root graph 和所有 registry graph 的 AGENT phase 可见。
-3. Phase 行为实现属于 graph。Root phase 的 action、validator 和 phase-local tool 位于 `<skill_root>/phases/<phase_id>/`；registry phase 的同类文件位于 `<skill_root>/graphs/<graph_id>/phases/<phase_id>/`。Phase-local `tools/` 只允许属于 `AGENT.md` 的 phase，并且只对该 AGENT 可见；`actions/` 只允许属于 `LOGIC.md` 的 phase。
+3. Phase 行为实现属于 graph。Root phase 的 action、validator 和 phase-local tool 位于 `<skill_root>/phases/<phase_id>/`；registry phase 的同类文件位于 `<skill_root>/subgraphs/<graph_id>/phases/<phase_id>/`。Phase-local `tools/` 只允许属于 `AGENT.md` 的 phase，并且只对该 AGENT 可见；`actions/` 只允许属于 `LOGIC.md` 的 phase。
 
 两个 `tools/` scope 都通过目录内一级 `.py` 模块注册业务 tool；模块定义的可调用函数以函数名形成 tool registry entry。`AGENT.md.tools` 是显式调用清单：每个名称必须解析到一个 skill-root tool 或当前 phase-local tool，只有列出的业务 tool 才挂载到该 AGENT。Root 与当前 phase 出现同名 tool 属于歧义，不采用 shadowing；不同 phase 的 local tool 可以同名，因为其可见域不相交。Framework builtin 由 runtime contract 挂载，`context_access` 控制的 builtin 由该字段授权，两类 builtin 都不通过业务 `tools/` 目录或 `AGENT.md.tools` 重复注册。
 
@@ -536,7 +540,7 @@ Converter 先完成只读 preflight，再在同一 filesystem 的临时 sibling 
 | `phases/<id>/SKILL.md` | 同一 graph 的 `phases/<id>/AGENT.md` |
 | `phases/<id>/SUBGRAPH.md` path | `SUBGRAPH.md.graph` registry id |
 | Agent `subgraphs[].path` | `AGENT.md.subgraphs[].graph` registry id |
-| 本地、被引用的旧 subskill root | `graphs/<graph_id>/graph.yaml` 与该 graph 的 `phases/` |
+| 本地、被引用的旧 subskill root | `subgraphs/<graph_id>/graph.yaml` 与该 graph 的 `phases/` |
 | 旧 runtime artifact definitions | 根 `graph.yaml.artifacts` declarations |
 | 旧配置中已启用的 artifacts | `gskill.toml` 生成 preset 的 `artifact_requests` |
 
@@ -597,7 +601,7 @@ Converter 用 declaration 内容而不是旧数组位置生成 id：
 - Root 或 registry graph 缺文件、graph/phase id 与目录不一致、未注册目录、缺少 phase 类型文件或同目录多个类型文件均失败。
 - Phase 文件不写 `mode`、`phase_id` 或 graph id；类型和身份由文件系统与 `graph.yaml` 连接。
 - `AGENT.md` 不接受 authoring `system_prompt`、旧 `batch` 或任意 `metadata` 字段；最终 `system_prompt` 只由 compiler 派生。
-- `GRAPH.md`、phase `SKILL.md`、path-based `SUBGRAPH.md`、嵌套 `graphs/`、隐式物理 parent 和未声明 edge 都不是 v1 输入。
+- `GRAPH.md`、phase `SKILL.md`、path-based `SUBGRAPH.md`、嵌套 `subgraphs/`、隐式物理 parent 和未声明 edge 都不是 v1 输入。
 - 未知 phase dependency、未知 graph reference、phase DAG cycle 和 graph call cycle 均在执行前失败。
 - `artifacts` 出现在 registry graph 时失败。
 

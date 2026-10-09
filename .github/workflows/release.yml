@@ -12,6 +12,8 @@ env:
 
 jobs:
   build-distributions:
+    # The toolkit has its own release tags and already assembled installer assets.
+    if: startsWith(github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

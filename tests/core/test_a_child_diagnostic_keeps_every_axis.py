@@ -118,15 +118,15 @@ io:
 
 @pytest.fixture
 def nested_conflict_root(tmp_path: Path) -> Path:
-    """root → graphs/mid → graphs/leaf, with the conflict in the last graph."""
+    """root → subgraphs/mid → subgraphs/leaf, with the conflict in the last graph."""
     root = tmp_path / "diagnostic-skill"
     _write(
         root / "SKILL.md",
         "---\nname: diagnostic-skill\ndescription: Nested graph diagnostic fixture.\n---\n",
     )
     _wrapper_skill(root, "root", "mid", "mid_stage")
-    _wrapper_skill(root / "graphs" / "mid", "mid", "leaf", "leaf_stage")
-    _conflict_skill(root / "graphs" / "leaf", "leaf")
+    _wrapper_skill(root / "subgraphs" / "mid", "mid", "leaf", "leaf_stage")
+    _conflict_skill(root / "subgraphs" / "leaf", "leaf")
     return root
 
 
@@ -168,7 +168,7 @@ def test_the_rebuilt_axis_is_the_one_that_names_the_root(nested_conflict_root: P
     # against the parent's.
     issue = _overwrite_issue(nested_conflict_root)
 
-    assert issue.source_path == "graphs/leaf/phases/revise/LOGIC.md"
+    assert issue.source_path == "subgraphs/leaf/phases/revise/LOGIC.md"
 
 
 def test_every_issue_axis_is_accounted_for_at_the_child_seam() -> None:

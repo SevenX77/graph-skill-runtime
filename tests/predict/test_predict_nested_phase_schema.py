@@ -110,7 +110,7 @@ def _nested_skill(root: Path) -> Path:
     _write(parent / "SKILL.md", _SKILL_ENTRY)
     _write(parent / "graph.yaml", _PARENT_GRAPH)
     _write(parent / "phases" / "delegate" / "SUBGRAPH.md", _PARENT_SUBGRAPH)
-    child = parent / "graphs" / "child"
+    child = parent / "subgraphs" / "child"
     _write(child / "graph.yaml", _CHILD_GRAPH)
     _write(child / "phases" / "write" / "AGENT.md", _CHILD_AGENT)
     return parent
@@ -202,11 +202,11 @@ def test_same_phase_name_in_two_subgraphs_each_gets_its_own_schema(tmp_path: Pat
         parent / "phases" / "second" / "SUBGRAPH.md",
         _subgraph_md("second", "child-b", "verdict"),
     )
-    _write(parent / "graphs" / "child" / "graph.yaml", _CHILD_GRAPH)
-    _write(parent / "graphs" / "child" / "phases" / "write" / "AGENT.md", _CHILD_AGENT)
-    _write(parent / "graphs" / "child-b" / "graph.yaml", _SECOND_CHILD_GRAPH)
+    _write(parent / "subgraphs" / "child" / "graph.yaml", _CHILD_GRAPH)
+    _write(parent / "subgraphs" / "child" / "phases" / "write" / "AGENT.md", _CHILD_AGENT)
+    _write(parent / "subgraphs" / "child-b" / "graph.yaml", _SECOND_CHILD_GRAPH)
     _write(
-        parent / "graphs" / "child-b" / "phases" / "write" / "AGENT.md",
+        parent / "subgraphs" / "child-b" / "phases" / "write" / "AGENT.md",
         _SECOND_CHILD_AGENT,
     )
 

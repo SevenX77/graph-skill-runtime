@@ -120,7 +120,7 @@ Inline example.
 
 def _subgraph_parent(parent: Path) -> Path:
     root = parent / "e2e-parent"
-    child = root / "graphs" / "child"
+    child = root / "subgraphs" / "child"
     _write(
         root / "SKILL.md",
         """---

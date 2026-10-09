@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Graph Skill canvas</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; background: #f6f7f9; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    main { position: relative; width: 100%; height: 100dvh; background-image: radial-gradient(#cdd2dc 1px, transparent 1px); background-size: 20px 20px; }
+    .graph-area { position: absolute; inset: 58px 12px 12px; }
+    svg { display: block; width: 100%; height: 100%; }
+    header { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1; }
+    #skill-path { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 12px; border: 1px solid #dce1e9; border-radius: 8px; background: #ffffffed; color: #24304a; font: 12px/1.4 ui-monospace, monospace; text-align: left; cursor: pointer; }
+    #skill-path:hover:enabled { border-color: #7b77cd; }
+    #skill-path:focus-visible { outline: 2px solid #7b77cd; outline-offset: 2px; }
+    #skill-path:disabled { cursor: default; }
+    #status { margin: 6px 0 0; color: #78849a; font-size: 12px; }
+    #status:empty { display: none; }
+    .node { fill: #fff; stroke: #dce1e9; stroke-width: 1.25; }
+    .label { fill: #24304a; font-size: 19px; font-weight: 600; }
+    .kind { fill: #78849a; font-size: 10px; font-weight: 600; letter-spacing: 1.5px; }
+    .edge { fill: none; stroke: #a8b3c6; stroke-width: 1.5; }
+    .arrow { fill: #a8b3c6; }
+    .dot { fill: #7b77cd; } .input { fill: #499c84; } .output { fill: #cb9350; }
+    @media (prefers-color-scheme: dark) {
+      :root { background: #171b23; }
+      main { background-image: radial-gradient(#303746 1px, transparent 1px); }
+      .node { fill: #222936; stroke: #3a4557; }
+      .label { fill: #edf1f8; } .kind { fill: #a1adc2; }
+      .edge { stroke: #68758e; } .arrow { fill: #68758e; }
+      #skill-path { background: #222936ed; color: #edf1f8; border-color: #3a4557; }
+      #status { color: #a1adc2; }
+    }
+  </style>
+</head>
+<body>
+  <main aria-label="Graph Skill canvas">
+    <header><button id="skill-path" type="button" disabled>示例画布 · 未选择 Skill</button><p id="status" role="status" aria-live="polite"></p></header>
+    <div class="graph-area">
+    <svg viewBox="0 0 352 548" role="img" aria-labelledby="graph-title graph-description">
+      <title id="graph-title">Example graph</title>
+      <desc id="graph-description">Input connects to Process, which connects to Output.</desc>
+      <defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 8 4 L 0 8 Z" class="arrow"/></marker></defs>
+    </svg>
+    </div>
+  </main>
+  <script>/* APP_BUNDLE */</script>
+</body>
+</html>

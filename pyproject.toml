@@ -59,6 +59,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/graph_skill_runtime"]
 
+[tool.hatch.build.targets.sdist]
+# Host UI assets ship through their plugin, independently of the runtime package.
+exclude = ["/plugins", "/.agents/plugins"]
+
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]

@@ -40,7 +40,9 @@ from graph_skill_runtime.core.skill_resolver_protocol import (
 #: 1 — user ruling 2026-08-31: an AGENT phase resolving no `llm_role` is a
 #:     compile error ([F-v3-agent-llm-role-missing]). Entries minted before it
 #:     recorded a SUCCESS for exactly that shape.
-CACHE_SCHEMA_VERSION = 1
+#: 2 — user ruling 2026-10-08: reusable graph definitions live in subgraphs/.
+#:     A graphs/ cache entry must pass discovery again under the renamed contract.
+CACHE_SCHEMA_VERSION = 2
 
 
 @dataclass

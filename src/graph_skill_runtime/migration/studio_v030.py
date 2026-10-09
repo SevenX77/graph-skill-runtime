@@ -1118,7 +1118,7 @@ def _rewrite_resource_paths(
             declaration["path"] = (
                 portable_path
                 if is_root
-                else f"graphs/{graph.graph_id}/{portable_path}"
+                else f"subgraphs/{graph.graph_id}/{portable_path}"
             )
 
 
@@ -1255,7 +1255,7 @@ def _render_graph(
     artifacts: tuple[ArtifactDeclaration, ...],
     mappings: list[MigrationFileMapping],
 ) -> None:
-    bundle_root = destination_graph.parents[1] if destination_graph.parent.name == "graphs" else destination_graph
+    bundle_root = destination_graph.parents[1] if destination_graph.parent.name == "subgraphs" else destination_graph
     _write_text(destination_graph / "graph.yaml", serialize_graph(_portable_graph(graph, artifacts=artifacts)))
     mappings.append(
         MigrationFileMapping(
@@ -1330,7 +1330,7 @@ def _render_plan(plan: _MigrationPlan, stage: Path) -> tuple[MigrationFileMappin
         _render_graph(
             plan,
             graph,
-            stage / "graphs" / graph.graph_id,
+            stage / "subgraphs" / graph.graph_id,
             artifacts=(),
             mappings=mappings,
         )

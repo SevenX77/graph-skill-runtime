@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from graph_skill_runtime.core import cache as cache_module
+from graph_skill_runtime.core import compiler as compiler_module
 from graph_skill_runtime.core.compiler import compile_skill
 from graph_skill_runtime.core.exceptions import SkillLoadError
 
@@ -108,7 +109,7 @@ def test_nested_skill_entry_is_rejected_while_root_entry_remains_the_only_discov
     root = tmp_path / "portable-skill"
     _one_logic_skill(root)
     _write(
-        root / "graphs" / "child" / "SKILL.md",
+        root / "subgraphs" / "child" / "SKILL.md",
         "---\nname: child\ndescription: Nested entries are forbidden.\n---\n",
     )
 
@@ -117,7 +118,7 @@ def test_nested_skill_entry_is_rejected_while_root_entry_remains_the_only_discov
 
     issues = _issues(exc_info.value)
     assert [item.rule_id for item in issues] == ["[F-v3-skill-entry-nested]"]
-    assert issues[0].source_path == "graphs/child/SKILL.md"
+    assert issues[0].source_path == "subgraphs/child/SKILL.md"
 
 
 def test_graph_call_cycle_is_rejected_before_assembly(tmp_path: Path) -> None:
@@ -125,10 +126,10 @@ def test_graph_call_cycle_is_rejected_before_assembly(tmp_path: Path) -> None:
     _skill_entry(root)
     _graph(root, graph_id="root", phase_id="to-a")
     _subgraph(root, "to-a", "graph-a")
-    graph_a = root / "graphs" / "graph-a"
+    graph_a = root / "subgraphs" / "graph-a"
     _graph(graph_a, graph_id="graph-a", phase_id="to-b")
     _subgraph(graph_a, "to-b", "graph-b")
-    graph_b = root / "graphs" / "graph-b"
+    graph_b = root / "subgraphs" / "graph-b"
     _graph(graph_b, graph_id="graph-b", phase_id="to-a")
     _subgraph(graph_b, "to-a", "graph-a")
 
@@ -149,7 +150,7 @@ def test_failed_registry_graph_does_not_make_valid_references_look_unknown(
     _skill_entry(root)
     _graph(root, graph_id="root", phase_id="delegate")
     _subgraph(root, "delegate", "child")
-    (root / "graphs" / "child" / "phases" / "done").mkdir(parents=True)
+    (root / "subgraphs" / "child" / "phases" / "done").mkdir(parents=True)
 
     with pytest.raises(SkillLoadError) as exc_info:
         compile_skill(root, cache=False)
@@ -164,8 +165,8 @@ def test_graph_registry_rejects_non_directories_and_nested_registries(
 ) -> None:
     root = tmp_path / "portable-skill"
     _one_logic_skill(root)
-    _write(root / "graphs" / "README.md", "not a graph directory\n")
-    (root / "graphs" / "child" / "graphs").mkdir(parents=True)
+    _write(root / "subgraphs" / "README.md", "not a graph directory\n")
+    (root / "subgraphs" / "child" / "subgraphs").mkdir(parents=True)
 
     with pytest.raises(SkillLoadError) as exc_info:
         compile_skill(root, cache=False)
@@ -176,7 +177,7 @@ def test_graph_registry_rejects_non_directories_and_nested_registries(
         for item in issues
         if item.rule_id == "[F-v3-graph-registry-invalid]"
     }
-    assert registry_paths == {"graphs/README.md", "graphs/child/graphs"}
+    assert registry_paths == {"subgraphs/README.md", "subgraphs/child/subgraphs"}
 
 
 def test_cache_round_trip_rehydrates_the_complete_flat_registry(
@@ -187,7 +188,7 @@ def test_cache_round_trip_rehydrates_the_complete_flat_registry(
     _skill_entry(root)
     _graph(root, graph_id="root", phase_id="delegate")
     _subgraph(root, "delegate", "child")
-    child = root / "graphs" / "child"
+    child = root / "subgraphs" / "child"
     _graph(child, graph_id="child", phase_id="done")
     _logic(child, "done")
     cache_dir = tmp_path / "cache"
@@ -200,3 +201,63 @@ def test_cache_round_trip_rehydrates_the_complete_flat_registry(
     assert sorted(second.graph_registry) == ["child", "root"]
     assert second.graph_registry["child"].graph_root == child.resolve()
     assert list(cache_dir.glob("*.json"))
+
+
+def test_graphs_directory_is_not_a_subgraph_registry_alias(tmp_path: Path) -> None:
+    root = tmp_path / "portable-skill"
+    _skill_entry(root)
+    _graph(root, graph_id="root", phase_id="delegate")
+    _subgraph(root, "delegate", "child")
+    child = root / "graphs" / "child"
+    _graph(child, graph_id="child", phase_id="done")
+    _logic(child, "done")
+
+    with pytest.raises(SkillLoadError) as exc_info:
+        compile_skill(root, cache=False)
+
+    assert [issue.rule_id for issue in _issues(exc_info.value)] == [
+        "[F-v3-graph-reference-unknown]"
+    ]
+
+
+def test_cache_from_graphs_directory_rules_cannot_bypass_subgraphs_discovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "portable-skill"
+    _skill_entry(root)
+    _graph(root, graph_id="root", phase_id="delegate")
+    _write(
+        root / "phases" / "delegate" / "AGENT.md",
+        "---\nname: delegate\nllm_role: analyst\nio:\n"
+        f"  inputs:\n    {_EMPTY_OBJECT}\n  outputs:\n    {_EMPTY_OBJECT}\n"
+        "---\n<role>Analyst</role>\n<goal>Return an empty object.</goal>\n",
+    )
+    healthy = compile_skill(root, cache=False)
+
+    # Seed a loadable success against source that now calls the old directory.
+    # Its current-key replay is the control: rejection must come from the rule
+    # identity, rather than a snapshot that cannot be read in the first place.
+    (root / "phases" / "delegate" / "AGENT.md").unlink()
+    _subgraph(root, "delegate", "child")
+    child = root / "graphs" / "child"
+    _graph(child, graph_id="child", phase_id="done")
+    _logic(child, "done")
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(cache_module, "get_cache_dir", lambda: cache_dir)
+    current_key = cache_module.compute_cache_key(
+        root, schema_version=compiler_module.CACHE_SCHEMA_VERSION
+    )
+    cache_module.save_to_cache(current_key, healthy)
+    assert compile_skill(root, cache=True).nodes[0].mode == "agent"
+    (cache_dir / f"{current_key}.json").unlink()
+
+    old_key = cache_module.compute_cache_key(root, schema_version=1)
+    cache_module.save_to_cache(old_key, healthy)
+
+    with pytest.raises(SkillLoadError) as exc_info:
+        compile_skill(root, cache=True)
+
+    assert "[F-v3-graph-reference-unknown]" in {
+        issue.rule_id for issue in _issues(exc_info.value)
+    }

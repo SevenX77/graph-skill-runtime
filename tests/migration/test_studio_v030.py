@@ -207,7 +207,7 @@ def test_converter_promotes_direct_child_to_flat_registry_and_rewrites_reference
 
     report = migrate_studio_skill(source, destination)
 
-    child_graph = destination / "graphs" / "child-graph"
+    child_graph = destination / "subgraphs" / "child-graph"
     assert (child_graph / "graph.yaml").is_file()
     subgraph_doc = (destination / "phases" / "delegate" / "SUBGRAPH.md").read_text(
         encoding="utf-8"
@@ -215,6 +215,10 @@ def test_converter_promotes_direct_child_to_flat_registry_and_rewrites_reference
     assert "graph: child-graph" in subgraph_doc
     assert "path:" not in subgraph_doc
     assert report.graph_references == {"subskills/child": "child-graph"}
+    assert not (destination / "graphs").exists()
+    assert "subgraphs/child-graph/graph.yaml" in {
+        mapping.destination for mapping in report.file_mappings
+    }
     compiled = compile_skill(destination, cache=False)
     assert sorted(compiled.graph_registry) == ["child-graph", "legacy-parent"]
 

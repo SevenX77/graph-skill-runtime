@@ -459,14 +459,14 @@ def test_registry_graph_llm_role_missing_surfaces_in_the_root_compile(tmp_path: 
         f"---\nname: wrapper\ngraph: child\nio:\n  inputs:\n    {_schema({})}\n"
         f"  outputs:\n    {_schema({})}\n---\n",
     )
-    child = root / "graphs" / "child"
+    child = root / "subgraphs" / "child"
     _graph(child, phases=[("inner", ("input",), True)], graph_id="child")
     _agent(child, "inner")
 
     exc = _raise(root, allowed_roles={"analyst"})
 
     assert "[F-v3-agent-llm-role-missing]" in _codes(exc)
-    assert "graphs/child/phases/inner/AGENT.md" in {
+    assert "subgraphs/child/phases/inner/AGENT.md" in {
         str(issue.source_path) for issue in _issues(exc)
     }
 

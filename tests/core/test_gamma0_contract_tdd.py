@@ -194,7 +194,7 @@ def test_γ0_2_subgraph_loader_accepts_validator_true(
     root = tmp_path / "gamma-contract"
     _write_portable_graph(root)
     _write_subgraph_phase(root, validator=True)
-    child = root / "graphs" / "child"
+    child = root / "subgraphs" / "child"
     _write_portable_graph(child, graph_id="child", business_skill=False)
     _write_agent_phase(child)
 

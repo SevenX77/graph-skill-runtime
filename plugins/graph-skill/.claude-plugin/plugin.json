@@ -1,0 +1,6 @@
+{
+  "name": "graph-skill-canvas",
+  "version": "0.0.6",
+  "description": "Graph Skill canvas with automatic display guidance and a host folder shortcut.",
+  "author": { "name": "Graph Skill contributors" }
+}
