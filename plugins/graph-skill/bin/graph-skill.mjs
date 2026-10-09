@@ -7,9 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const state = process.platform === "win32"
-  ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "GraphSkill")
-  : join(homedir(), ".local", "share", "graph-skill");
+const state = join(homedir(), ".local", "share", "graph-skill");
 const lifecycle = new Set(["install", "update", "uninstall", "status", "cleanup", "detect"]);
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 
@@ -21,7 +19,16 @@ function installed() {
     }
     return value;
   } catch (error) {
-    if (error.code === "ENOENT") return null;
+    if (error.code === "ENOENT") {
+      const legacy = join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "GraphSkill", "install.json");
+      if (process.platform === "win32" && existsSync(legacy)) {
+        const old = JSON.parse(readFileSync(legacy, "utf8"));
+        if (old.schema === "graph-skill.toolkit-install.v1") {
+          throw new Error("The Windows installation needs path migration. Run: npx --yes graph-skill-toolkit@latest install");
+        }
+      }
+      return null;
+    }
     throw error;
   }
 }

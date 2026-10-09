@@ -105,8 +105,9 @@ class LifecycleTests(unittest.TestCase):
 
             with patch.object(install, "state_root", return_value=state), patch.object(
                 install, "load_manifest", return_value={"release": active.name}
-            ), patch.object(install, "ROOT", executing), patch.object(
-                install, "package", side_effect=package
+            ), patch.object(install, "legacy_state_root", return_value=None), patch.object(
+                install, "ROOT", executing
+            ), patch.object(install, "package", side_effect=package
             ), patch.object(install, "verify_release"):
                 planned = install.cleanup(True)
                 self.assertEqual(planned["inactive_releases"], [str(old)])

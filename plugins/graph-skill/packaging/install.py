@@ -10,6 +10,7 @@ import re
 import shlex
 import shutil
 import sys
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from discovery import discover, select_targets
@@ -19,6 +20,7 @@ from ownership import InstallError, Transaction, digest, json_bytes, plain_path,
 from runtime_layout import current_target, executable_paths, runtime_node, runtime_python
 
 SCHEMA = "graph-skill.toolkit-install.v1"
+MIGRATED = "graph-skill.toolkit-migrated.v1"
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -64,9 +66,52 @@ def completion(result: dict, operation: str) -> None:
 
 
 def state_root() -> Path:
+    # Windows packaged hosts have a redirected AppData view. Shared executable
+    # paths and their authoritative state must be outside that virtualized tree.
+    return Path.home() / ".local/share/graph-skill"
+
+
+def legacy_state_root() -> Path | None:
     if os.name == "nt":
         return Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "GraphSkill"
-    return Path.home() / ".local/share/graph-skill"
+    return None
+
+
+def migration_record(state: Path, release: str) -> dict:
+    return {"schema": MIGRATED, "home": str(Path.home()), "state_root": str(state), "release": release}
+
+
+def legacy_installation(state: Path) -> tuple[Path | None, dict]:
+    legacy = legacy_state_root()
+    if legacy is None or legacy == state:
+        return None, {}
+    data = read_json(legacy / "install.json")
+    if data.get("schema") == MIGRATED:
+        release_root(legacy, data.get("release", ""))
+        if data != migration_record(state, data["release"]):
+            raise InstallError("Legacy migration record changed; preserved")
+        return legacy, {}
+    return legacy, load_manifest(legacy)
+
+
+def installation_for_update(state: Path) -> tuple[Path, dict]:
+    current = load_manifest(state)
+    legacy, previous = legacy_installation(state)
+    if current and previous:
+        raise InstallError("Two active toolkit installations exist; preserved both for inspection")
+    return (legacy, previous) if previous and legacy is not None else (state, current)
+
+
+@contextmanager
+def lifecycle_lock(state: Path):
+    # Match the old installer's lock before acquiring the current lock. The
+    # migration tombstone subsequently makes old installers fail closed.
+    legacy = legacy_state_root()
+    with ExitStack() as stack:
+        if legacy is not None and legacy != state and legacy.exists():
+            stack.enter_context(installer_lock(legacy, progress))
+        stack.enter_context(installer_lock(state, progress))
+        yield
 
 
 def release_root(state: Path, identity: str) -> Path:
@@ -237,11 +282,12 @@ def set_windows_path(before: tuple[str, int], after: tuple[str, int]) -> None:
         pass
 
 
-def path_plan(state: Path, previous: dict, remove: bool) -> tuple[tuple[str, int], tuple[str, int], bool] | None:
+def path_plan(state: Path, previous: dict, remove: bool, previous_state: Path | None = None
+              ) -> tuple[tuple[str, int], tuple[str, int], bool] | None:
     if os.name != "nt":
         return None
     before = windows_path()
-    value = str(state / "bin")
+    value = str((previous_state or state) / "bin")
     parts = before[0].split(";") if before[0] else []
 
     def same(item: str) -> bool:
@@ -251,6 +297,12 @@ def path_plan(state: Path, previous: dict, remove: bool) -> tuple[tuple[str, int
     owned = previous.get("path_added", False)
     if previous and owned and len(matches) != 1:
         raise InstallError("Managed PATH entry changed; restore it before update/uninstall")
+    if previous_state is not None and previous_state != state:
+        if owned:
+            parts.pop(matches[0])
+        value = str(state / "bin")
+        matches = [i for i, item in enumerate(parts) if same(item)]
+        owned = False
     if remove:
         if owned:
             parts.pop(matches[0])
@@ -319,7 +371,7 @@ def install(source: Path, target_option: str, dry_run: bool, discovery_report: d
     state = state_root()
     progress("Checking package integrity...")
     info, raw = package(source)
-    old = load_manifest(state)
+    previous_state, old = installation_for_update(state)
     discovery_report = discover() if discovery_report is None else discovery_report
     targets = select_targets(target_option, discovery_report, old)
     progress(f"Checking configuration and file ownership for {', '.join(targets)}...")
@@ -333,7 +385,7 @@ def install(source: Path, target_option: str, dry_run: bool, discovery_report: d
     resources = projections(Path.home(), release, runtime_python(release), node, targets, source)
     resources += launchers(state, release, node)
     transaction, owned = plan(resources, old, state)
-    path_change = path_plan(state, old, False)
+    path_change = path_plan(state, old, False, previous_state)
     manifest = {
         "schema": SCHEMA,
         "home": str(Path.home()),
@@ -347,6 +399,11 @@ def install(source: Path, target_option: str, dry_run: bool, discovery_report: d
         "resources": owned,
     }
     transaction.add(state / "install.json", read_bytes(state / "install.json"), json_bytes(manifest))
+    if previous_state != state:
+        # Keep a closed migration receipt instead of an old active owner. Old
+        # installers reject its schema; verified cached bytes remain available.
+        transaction.add(previous_state / "install.json", read_bytes(previous_state / "install.json"),
+                        json_bytes(migration_record(state, old["release"])))
     report = {
         "status": "planned" if dry_run else "installed",
         "version": info["version"],
@@ -355,6 +412,8 @@ def install(source: Path, target_option: str, dry_run: bool, discovery_report: d
         "target_selection": "detected" if target_option == "auto" else "explicit",
         "discovery": discovery_report,
         "runtime": str(runtime_python(release)),
+        "state_root": str(state),
+        "migrated_from": str(previous_state) if previous_state != state else None,
         "restart_desktop": True,
         "native_canvas": "requires user acceptance",
         "hook_trust": "review in host; installer does not grant trust",
@@ -382,6 +441,9 @@ def install(source: Path, target_option: str, dry_run: bool, discovery_report: d
 def uninstall(dry_run: bool) -> dict:
     state = state_root()
     old = load_manifest(state)
+    _, previous = legacy_installation(state)
+    if previous:
+        raise InstallError("Legacy installation requires install/update migration before uninstall")
     if not old:
         return {"status": "not-installed"}
     transaction, _ = plan([], old, state)
@@ -411,6 +473,10 @@ def status() -> dict:
     state = state_root()
     old = load_manifest(state)
     if not old:
+        legacy, previous = legacy_installation(state)
+        if previous:
+            return {"status": "migration-required", "legacy_state_root": str(legacy),
+                    "state_root": str(state), "version": previous["version"], "targets": previous["targets"]}
         return {"status": "not-installed", "state_root": str(state)}
     problems = []
     progress("Checking installed configuration and package integrity...")
@@ -441,6 +507,21 @@ def status() -> dict:
 def cleanup(dry_run: bool) -> dict:
     state = state_root()
     old = load_manifest(state)
+    legacy, previous = legacy_installation(state)
+    if previous:
+        raise InstallError("Legacy installation requires install/update migration before cleanup")
+    roots = [state]
+    if legacy is not None and read_json(legacy / "install.json").get("schema") == MIGRATED:
+        roots.append(legacy)
+    removed, preserved = [], []
+    for root in roots:
+        result = cleanup_at(root, old if root == state else {}, dry_run)
+        removed.extend(result[0])
+        preserved.extend(result[1])
+    return {"status": "planned" if dry_run else "cleaned", "inactive_releases": removed, "preserved": preserved}
+
+
+def cleanup_at(state: Path, old: dict, dry_run: bool) -> tuple[list, list]:
     versions = state / "versions"
     plain_path(versions)
     removed, preserved = [], []
@@ -460,7 +541,7 @@ def cleanup(dry_run: bool) -> dict:
         if not dry_run:
             cleanup_release(checked, state)
         removed.append(str(path))
-    return {"status": "planned" if dry_run else "cleaned", "inactive_releases": removed, "preserved": preserved}
+    return removed, preserved
 
 
 def main() -> int:
@@ -480,7 +561,8 @@ def main() -> int:
         if args.operation in {"install", "update"}:
             # Reject discovery/profile uncertainty before the lock creates state.
             # Installation rechecks the previous target set while holding the lock.
-            targets = select_targets(args.targets, discovery_report, load_manifest(state_root()))
+            _, previous = installation_for_update(state_root())
+            targets = select_targets(args.targets, discovery_report, previous)
             assert_default_profiles(targets)
         if args.operation == "detect":
             result = discovery_report
@@ -495,7 +577,7 @@ def main() -> int:
                     else install(args.source.resolve(), args.targets, True, discovery_report)
                 )
         else:
-            with installer_lock(state_root(), progress):
+            with lifecycle_lock(state_root()):
                 if args.operation == "cleanup":
                     result = cleanup(False)
                 else:
