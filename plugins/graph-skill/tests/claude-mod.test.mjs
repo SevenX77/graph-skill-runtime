@@ -1,67 +1,69 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {graphPayload, makeCanvas, register} from '../claude-mod/hooks/register.js';
-import {projectGraph} from '../src/project-graph.mjs';
+import {graphPayload, previewPath, register} from '../claude-mod/hooks/register.js';
 
-const payload = {
-  skillRoot: '/business/中文 skill',
-  graph: projectGraph({graph_id:'actual',phases:[
-    {id:'greet',depends_on:['input'],output:false},
-    {id:'suffix',depends_on:['greet'],output:true}
-  ]}, {greet:'LOGIC',suffix:'LOGIC'})
-};
-
-function host() {
-  const handlers = [];
-  register((name, matcher, fn) => { handlers.push({name, matcher, fn}); });
-  const opened = [], logs = [];
-  const ui = {
-    open:async value => {opened.push(value);return {isPlaced:true};},
-    invalidate:()=>{}, log:value=>logs.push(value),
-    resolve:()=>Object.fromEntries(['Box','Text','Svg'].map(type=>[type, props=>{
-      // The real host rejects Text.text. This reproduces the first native failure.
-      if(type==='Text') assert.deepEqual(Object.keys(props).filter(k=>!['children','bold'].includes(k)),[]);
-      return {type,props};
-    }]))
-  };
-  const call = (event, input, next=async()=>({})) => {
-    const handler=handlers.find(h=>h.name===event && Object.entries(h.matcher).every(([k,v])=>input[k]===v));
-    return handler ? handler.fn({ui},input,next) : next(input);
+const url = '/business/中文 skill/.gskill/canvas/view-Ab12cd/canvas.html';
+const payload = {skillRoot:'/business/中文 skill',graph:{id:'actual'},presentation:{kind:'html',path:url}};
+const tool = 'mcp__graph-skill-canvas__show_graph';
+function host({available=true, canObserve=true}={}) {
+  const handlers = [], opened = [], logs = [];
+  register((name, matcher, fn) => handlers.push(typeof matcher === 'function' ? {name,matcher:{},fn:matcher} : {name,matcher,fn}));
+  const api = {command:{register:async()=>{}},tool:{
+    list:async()=>available ? [{name:'mcp__Claude_Browser__preview_start'},...(canObserve ? [{name:'mcp__Claude_Browser__tabs_context'}] : [])] : [],
+    call:async value=>{opened.push(value);return {result:{}};}
+  },ui:{log:value=>logs.push(value)}};
+  const call=(event,input,next=async()=>({}))=>{
+    const h=handlers.find(h=>h.name===event && Object.entries(h.matcher).every(([k,v])=>input[k]===v));
+    return h ? h.fn(api,input,next) : next(input);
   };
   return {call,opened,logs};
 }
-
-test('Mod observes exactly one completed graph call and returns it unchanged', async()=>{
-  const h=host();let calls=0;
-  const result={result:JSON.stringify(payload)};
-  assert.equal(await h.call('tool.call',{tool:'mcp__graph-skill-canvas__show_graph',skill_root:'/symlink'},async()=>{calls++;return result;}),result);
-  assert.equal(calls,1);assert.equal(h.opened.length,1);
-  const tree=await h.call('ui.render',{component:'Pane',requestId:'graph-skill-canvas',surface:'desktop'});
-  assert.equal(tree.props.children[1].props.children[0],payload.skillRoot);
-  assert.equal(tree.props.children[3].type,'Svg');
-  assert.match(tree.props.children[3].props.source,/>suffix</);
-  assert.equal((tree.props.children[3].props.source.match(/marker-end=/g)||[]).length,3);
-  assert.equal(await h.call('ui.render',{component:'Pane',requestId:'other'},async()=>'host'),'host');
+test('Claude adapter requests HTML once and hands opening to the normal reviewed tool flow',async()=>{
+  const h=host();let count=0;
+  const result={result:JSON.stringify(payload),ref:42,text:'unchanged',context:['existing reminder']};
+  const adapted=await h.call('tool.call',{tool,skill_root:'/symlink'},async input=>{
+    count++;assert.equal(input.presentation,'html');assert.equal(input.skill_root,'/symlink');return result;
+  });
+  assert.equal(adapted.result,result.result);assert.equal(adapted.ref,42);assert.equal(adapted.text,result.text);
+  assert.equal(adapted.context[0],'existing reminder');assert.equal(adapted.context.length,2);
+  assert.ok(adapted.context[1].includes(JSON.stringify({url})));
+  assert.match(adapted.context[1],/normal host tool mcp__Claude_Browser__preview_start/);
+  assert.match(adapted.context[1],/mcp__Claude_Browser__tabs_context once with \{\}/);
+  assert.match(adapted.context[1],/browserOpen alone does not establish visibility/);
+  assert.match(adapted.context[1],/local-file preview entry/);
+  assert.equal(count,1);
+  assert.deepEqual(h.opened,[]);
+  assert.ok((await h.call('command.run',{command:'graph-skill-canvas'})).text.includes(url));
+  assert.equal(await h.call('ui.render',{component:'Pane'},async()=>'host'),'host');
   assert.equal(await h.call('tool.call',{tool:'unrelated'},async()=>'host'),'host');
-  assert.equal(h.opened.length,1);
 });
-
-test('Mod skips denied, failed and demo results and exposes malformed graph failures without rerunning',async()=>{
+test('Claude preserves graph results on denied, failed or unavailable preview paths',async()=>{
   const h=host();
-  for(const value of [{deny:'no'},{isError:true},{result:{isError:true,structuredContent:payload}}]) assert.equal(await h.call('tool.call',{tool:'mcp__graph-skill-canvas__show_graph',skill_root:'/skill'},async()=>value),value);
-  const demo={result:payload};assert.equal(await h.call('tool.call',{tool:'mcp__graph-skill-canvas__show_graph'},async()=>demo),demo);
-  const broken={result:'not JSON'};let calls=0;
-  assert.equal(await h.call('tool.call',{tool:'mcp__graph-skill-canvas__show_graph',skill_root:'/skill'},async()=>{calls++;return broken;}),broken);
-  assert.equal(calls,1);assert.equal(h.opened.length,0);assert.equal(h.logs.length,1);
-  const tree=await h.call('ui.render',{component:'Pane',requestId:'graph-skill-canvas',surface:'desktop'});
-  assert.equal(tree.type,'Text');assert.match(tree.props.children[0],/Unable to show/);
-});
-
-test('MCP result envelopes retain the same graph; SVG escapes labels and rejects malformed topology',()=>{
-  for(const result of [payload,{structuredContent:payload},JSON.stringify(payload),[{type:'text',text:JSON.stringify(payload)}],{content:[{type:'text',text:JSON.stringify(payload)}]}]) assert.deepEqual(graphPayload({result}),payload);
-  const malicious=structuredClone(payload);malicious.graph.nodes[0].label='<script>alert("x")</script>';
-  const svg=makeCanvas(malicious).source;assert.doesNotMatch(svg,/<script>/);assert.match(svg,/&lt;script&gt;/);
-  for(const mutate of [p=>p.graph.nodes.push(p.graph.nodes[0]),p=>p.graph.nodes[0].x=NaN,p=>p.graph.edges.push({from:'missing',to:'greet'}),p=>p.graph.width=Infinity,p=>p.graph.nodes[0].label='中'.repeat(50000)]){
-    const value=structuredClone(payload);mutate(value);assert.throws(()=>makeCanvas(value));
+  for(const result of [{deny:'no'},{isError:true},{result:{isError:true,structuredContent:payload}}]) {
+    assert.equal(await h.call('tool.call',{tool,skill_root:'/skill'},async()=>result),result);
   }
+  const demo={result:payload};
+  assert.equal(await h.call('tool.call',{tool},async e=>{assert.equal(e.presentation,undefined);return demo;}),demo);
+  assert.equal(h.opened.length,0);
+  for(const options of [{available:false}]) {
+    const adapter=host(options);let count=0;
+    assert.equal(await adapter.call('tool.call',{tool,skill_root:'/skill'},async()=>{count++;return demo;}),demo);
+    assert.equal(count,1);assert.equal(adapter.logs.length,1);
+  }
+  const limited=await host({canObserve:false}).call('tool.call',{tool,skill_root:'/skill'},async()=>demo);
+  assert.equal(limited.result,payload);
+  assert.match(limited.context[0],/does not expose Browser visibility/);
+  assert.ok(!limited.context[0].includes('tabs_context'));
+});
+test('Claude validates owned local paths and MCP envelopes; rejects unrelated navigation',()=>{
+  for(const result of [payload,{structuredContent:payload},JSON.stringify(payload),[{type:'text',text:JSON.stringify(payload)}],{content:[{type:'text',text:JSON.stringify(payload)}]}]) {
+    assert.deepEqual(graphPayload({result}),payload);assert.equal(previewPath(graphPayload({result})),url);
+  }
+  for(const bad of ['https://example.com/','file:///private','http://127.0.0.1:31234/',url+'evil',url.replace('canvas.html','../private.html'),'/different'+url]) {
+    assert.throws(()=>previewPath({...payload,presentation:{kind:'html',path:bad}}));
+  }
+  assert.throws(()=>previewPath({...payload,skillRoot:null}));
+  const windows={...payload,skillRoot:'C:\\业务 skill',presentation:{kind:'html',path:'C:\\业务 skill\\.gskill\\canvas\\view-Ab12cd\\canvas.html'}};
+  assert.equal(previewPath(windows),windows.presentation.path);
+  assert.throws(()=>graphPayload({result:'broken'}));
 });
