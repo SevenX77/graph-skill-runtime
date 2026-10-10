@@ -14,7 +14,7 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from discovery import discover, select_targets
-from hosts import assert_default_profiles, merge, projections
+from hosts import CLAUDE_MOD_FILES, assert_default_profiles, merge, projections
 from locking import installer_lock
 from ownership import InstallError, Transaction, digest, json_bytes, plain_path, read_bytes, read_json
 from runtime_layout import current_target, executable_paths, runtime_node, runtime_python
@@ -196,6 +196,11 @@ def validate_resource(resource: dict, state: Path) -> None:
         state / "bin/graph-skill": "file",
     }
     if path in exact and resource["kind"] == exact[path]:
+        if "plugin_directory" in resource:
+            directory = Path(resource["plugin_directory"])
+            if (path != home / ".claude/settings.json" or directory.name != "claude-mod"
+                    or directory != release_root(state, directory.parent.name) / "claude-mod"):
+                raise InstallError("Manifest references an unowned Claude Mod directory")
         return
     for base in (home / ".agents/skills", home / ".claude/skills"):
         for name in ("graph-skill", "graph-skill-canvas"):
@@ -382,6 +387,8 @@ def install(source: Path, target_option: str, dry_run: bool, discovery_report: d
     identity = info["version"] + "-" + digest(raw)[:16]
     release = release_root(state, identity)
     node = runtime_node(release)
+    if "claude" in targets and any(member not in info["files"] for member in CLAUDE_MOD_FILES):
+        raise InstallError("Bundle must bind every Claude Mod asset")
     resources = projections(Path.home(), release, runtime_python(release), node, targets, source)
     resources += launchers(state, release, node)
     transaction, owned = plan(resources, old, state)

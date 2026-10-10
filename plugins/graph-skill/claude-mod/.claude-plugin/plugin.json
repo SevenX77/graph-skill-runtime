@@ -1,0 +1,6 @@
+{
+  "name": "graph-skill-canvas-mod",
+  "version": "0.3.3",
+  "author": {"name":"Graph Skill Runtime"},
+  "description": "Render the real Graph Skill tool result in a Claude Code pane."
+}

@@ -146,7 +146,7 @@ class InstallerTests(Fixture):
         self.make_bundle()
 
     def make_bundle(self):
-        paths = [*executable_paths(current_target()).values(), "runtime/runtime.whl"]
+        paths = [*executable_paths(current_target()).values(), "runtime/runtime.whl", *hosts.CLAUDE_MOD_FILES]
         for skill in ("graph-skill", "graph-skill-canvas"):
             paths.append(f"skills/{skill}/SKILL.md")
         content = b"private command {{GSKILL_COMMAND}}\n"
@@ -210,6 +210,89 @@ class InstallerTests(Fixture):
                 self.assertEqual(install.main(), 1)
             self.assertEqual(before, self.snapshot())
             self.assertFalse(self.state.exists())
+
+    def test_claude_mod_install_upgrade_and_uninstall_preserve_other_settings(self):
+        other = str(self.home / "other plugin")
+        settings = self.file(".claude/settings.json", json_bytes({
+            "env": {hosts.PLUGIN_DIRS: other, "KEEP": "yes"}, "unrelated": True
+        }))
+        install.install(self.source, "claude", False, self.report(["claude"]))
+        first = install.load_manifest(self.state)
+        record = next(r for r in first["resources"] if r["path"] == str(settings))
+        self.assertEqual(json.loads(settings.read_bytes())["env"][hosts.PLUGIN_DIRS],
+                         os.pathsep.join([other, record["plugin_directory"]]))
+        self.assertEqual(len([r for r in first["resources"] if r["path"] == str(settings)]), 1)
+        info = json.loads((self.source / "bundle.json").read_bytes())
+        info["version"] = "1.0.1"
+        (self.source / "bundle.json").write_bytes(json_bytes(info))
+        install.install(self.source, "claude", False, self.report(["claude"]))
+        current = install.load_manifest(self.state)
+        updated = next(r for r in current["resources"] if r["path"] == str(settings))
+        self.assertNotEqual(updated["plugin_directory"], record["plugin_directory"])
+        self.assertEqual(json.loads(settings.read_bytes())["env"][hosts.PLUGIN_DIRS],
+                         os.pathsep.join([other, updated["plugin_directory"]]))
+        install.uninstall(False)
+        data = json.loads(settings.read_bytes())
+        self.assertEqual(data["env"], {hosts.PLUGIN_DIRS: other, "KEEP": "yes"})
+        self.assertTrue(data["unrelated"])
+
+    def test_pre_mod_manifest_adds_only_new_owned_plugin_entry(self):
+        install.install(self.source, "claude", False, self.report(["claude"]))
+        manifest = install.load_manifest(self.state)
+        record = next(r for r in manifest["resources"] if "plugin_directory" in r)
+        record.pop("plugin_directory")
+        settings = Path(record["path"])
+        data = json.loads(settings.read_bytes())
+        data["env"].pop(hosts.PLUGIN_DIRS)
+        settings.write_bytes(json_bytes(data))
+        (self.state / "install.json").write_bytes(json_bytes(manifest))
+        install.install(self.source, "claude", False, self.report(["claude"]))
+        self.assertIn(hosts.PLUGIN_DIRS, json.loads(settings.read_bytes())["env"])
+
+    def test_edited_plugin_entry_blocks_all_changes_and_uninstall(self):
+        install.install(self.source, "claude", False, self.report(["claude"]))
+        settings = self.home / ".claude/settings.json"
+        data = json.loads(settings.read_bytes())
+        data["env"][hosts.PLUGIN_DIRS] += "-edited"
+        settings.write_bytes(json_bytes(data))
+        before = self.snapshot()
+        for action in [lambda: install.install(self.source, "codex,claude", False, self.report(["claude"])),
+                       lambda: install.uninstall(False)]:
+            with self.assertRaisesRegex(InstallError, "Managed Claude Mod entry changed"):
+                action()
+            self.assertEqual(before, self.snapshot())
+
+    def test_missing_mod_inventory_or_unmanaged_path_blocks_before_provision(self):
+        manifest = self.source / "bundle.json"
+        info = json.loads(manifest.read_bytes())
+        item = hosts.CLAUDE_MOD_FILES[0]
+        checksum = info["files"].pop(item)
+        manifest.write_bytes(json_bytes(info))
+        before = self.snapshot()
+        with self.assertRaisesRegex(InstallError, "bind every Claude Mod"):
+            install.install(self.source, "claude", False, self.report(["claude"]))
+        self.assertEqual(before, self.snapshot())
+        info["files"][item] = checksum
+        raw = json_bytes(info)
+        manifest.write_bytes(raw)
+        directory = self.state / "versions" / (info["version"] + "-" + digest(raw)[:16]) / "claude-mod"
+        self.file(".claude/settings.json", json_bytes({"env": {hosts.PLUGIN_DIRS: str(directory)}}))
+        before = self.snapshot()
+        with self.assertRaisesRegex(InstallError, "Unmanaged Claude Mod"):
+            install.install(self.source, "claude", False, self.report(["claude"]))
+        self.assertEqual(before, self.snapshot())
+
+    def test_plugin_list_separator_preserves_other_entries_on_both_platforms(self):
+        for separator in (";", ":"):
+            with patch.object(hosts.os, "pathsep", separator):
+                data = {"env": {hosts.PLUGIN_DIRS: separator.join(["/other/a", "/owned/old", "/other/b"])}}
+                resource = {"path": "/settings.json", "plugin_directory": "/owned/new"}
+                previous = {"plugin_directory": "/owned/old"}
+                hosts.merge_plugin_directory(data, resource, previous, False)
+                self.assertEqual(data["env"][hosts.PLUGIN_DIRS],
+                                 separator.join(["/other/a", "/owned/new", "/other/b"]))
+                hosts.merge_plugin_directory(data, resource, resource, True)
+                self.assertEqual(data["env"][hosts.PLUGIN_DIRS], separator.join(["/other/a", "/other/b"]))
 
     def test_missing_prior_target_preserved_until_explicit_selection(self):
         install.install(self.source, "auto", False, self.report(["codex", "claude"]))

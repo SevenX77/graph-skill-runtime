@@ -2,6 +2,8 @@
 
 Installs global `graph-skill` and `gskill` commands, shared Skills and the graph canvas integration for Codex Desktop and Claude Code Desktop. The bootstrap requires Node.js 18 or later, npm and network access. The installed toolkit includes private Node.js and Python runtimes.
 
+Codex displays an MCP App, a webpage attached to the graph tool's result. Claude Code displays a native Mod pane, drawn by a plugin inside Claude Code from the same graph data. Claude's pane is read-only and shows the selected root as text. `/graph-skill-canvas` reopens the available graph in the same Claude session; the host's file tools handle browsing and editing.
+
 Install the latest published version:
 
 ```text
@@ -11,6 +13,8 @@ npx --yes graph-skill-toolkit@latest install
 The installer selects Windows x64, Apple Silicon macOS, Linux x64 or Linux ARM64, verifies the matching release ZIP against `SHA256SUMS.txt` and runs its explicit installer. Intel Mac and Windows ARM64 packages are unavailable. Installing this npm package alone leaves host configuration unchanged.
 
 Version `0.3.3` uses `~/.local/share/graph-skill` for toolkit state, commands and private runtimes on all supported systems. Here `~` means the user's home directory; on Windows the path is `%USERPROFILE%\.local\share\graph-skill`. Its explicit install/update operation automatically migrates an intact toolkit-owned Windows installation from `%LOCALAPPDATA%/GraphSkill`. Run this version's npm entry or ZIP installer to perform that migration. It preserves unrelated configuration, stops on ownership conflicts or edited managed content, and retains old caches for explicit verified cleanup. Keep the migration record in the old root so older installers cannot reclaim it.
+
+When Claude is selected, the installer adds one owned Mod directory to `env.CLAUDE_CODE_PLUGIN_DIRS` in the default Claude user settings. Update replaces that recorded entry and uninstall removes it, preserving other plugin directories and settings. Codex keeps its existing integration. The independent Python runtime remains version `0.1.0a1`.
 
 Installation defaults to `--targets auto`: executable and native-application evidence selects the installed Codex and Claude clients. Configuration folders alone supply no client evidence. Unknown discovery results or no detected clients stop installation before toolkit state creation. An update preserves existing adapters and stops if a previously configured client is missing from detection. Use `--targets codex`, `--targets claude` or `--targets codex,claude` to choose the intended hosts explicitly, and `--dry-run` to preview. Selected hosts must use their default user profiles. Installing an older toolkit version over a newer one is rejected.
 
@@ -24,7 +28,9 @@ graph-skill update
 
 Ask the agent to open a Graph Skill folder and show its graph. Confirm the root and visible canvas in the restarted host; installation checks establish local configuration and files.
 
-The path repair is implemented in source. Real installed migration and automatic canvas display remain pending at this document's source freeze. Before publishing `0.3.3`, the release coordinator must observe an ordinary Graph Skill edit in real Claude Code naturally producing the visible correct updated canvas. An explicit request to show the graph is a separate diagnostic. Final candidate acceptance is recorded in the [release notes](https://github.com/SevenX77/graph-skill-runtime/releases) and retained receipts.
+Claude's [documented Mod prerequisites](https://code.claude.com/docs/en/plugins/mods/overview#turn-mods-on-or-off) are bundled Code engine `2.1.286` or later in Desktop and `2.1.287` or later in the terminal. Check the Desktop engine with `/status` in its local Code session. Host trust, settings and organization policy govern loading. The measured prototype used Windows Desktop `2.31226.1.0` / engine `2.1.295`; other host platforms and terminal drawing remain unverified.
+
+The path repair and packaged Mod are implemented in source. An earlier installed candidate passed migration, and a private Mod prototype passed automatic visible display. Official installed acceptance of the new combined candidate remains pending at this document's source freeze. Before publishing `0.3.3`, the release coordinator must observe a fresh ordinary Graph Skill edit naturally producing the correct native canvas and complete all release checks. An explicit display request is a separate diagnostic. Final candidate acceptance is recorded in the [release notes](https://github.com/SevenX77/graph-skill-runtime/releases) and retained receipts.
 
 `detect` reports client evidence and configuration destinations as JSON without changing toolkit or host state. The npm command uses an existing installed payload that supports detection. Without an installed or complete extracted payload, it reports `not-installed`; first-use preflight discovery runs after the explicit `install` command acquires the complete archive.
 

@@ -8,6 +8,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { graph, matchesProbeGraph } from "../src/graph.mjs";
+import { graphPayload, makeCanvas } from "../claude-mod/hooks/register.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -56,6 +57,10 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     assert.equal(actual.structuredContent.skillRoot, await realpath(skill));
     assert.equal(actual.structuredContent.graph.id, "actual");
     assert.deepEqual(actual.structuredContent.graph.nodes.map(node => node.kind), ["INPUT", "LOGIC", "OUTPUT"]);
+    const native = makeCanvas(graphPayload({ result: actual }));
+    assert.equal(native.root, await realpath(skill));
+    assert.match(native.source, />process</);
+    assert.equal(native.graph.edges.length, 2);
     for (const skill_root of ["relative", join(isolated, "missing"), isolated]) {
       assert.equal((await client.callTool({ name: tool.name, arguments: { skill_root } })).isError, true);
     }

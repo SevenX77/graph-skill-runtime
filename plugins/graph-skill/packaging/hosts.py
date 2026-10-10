@@ -14,6 +14,12 @@ from ownership import InstallError, digest, json_bytes, read_bytes
 
 SERVER = "graph-skill-canvas"
 MARKER = "graph-skill-toolkit:canvas"
+PLUGIN_DIRS = "CLAUDE_CODE_PLUGIN_DIRS"
+CLAUDE_MOD_FILES = (
+    "claude-mod/.claude-plugin/plugin.json",
+    "claude-mod/hooks/hooks.json",
+    "claude-mod/hooks/register.js",
+)
 
 
 def quoted_command(parts: list[str]) -> str:
@@ -71,12 +77,16 @@ def projections(
                 }
             )
             hook_file = home / ".claude" / "settings.json"
+            for member in CLAUDE_MOD_FILES:
+                if not (source_root / member).is_file():
+                    raise InstallError(f"Missing Claude Mod asset: {member}")
         result.append(
             {
                 "kind": "hook",
                 "path": str(hook_file),
                 "value": hook_group(node, payload / "dist/after-tool.mjs", target),
                 "target": target,
+                **({"plugin_directory": str(payload / "claude-mod")} if target == "claude" else {}),
             }
         )
         replacements = {
@@ -155,6 +165,7 @@ def merge(resource: dict, previous: dict | None, remove: bool = False) -> tuple[
         merge_mcp(data, resource, previous, remove)
     elif kind == "hook":
         merge_hook(data, resource, previous, remove)
+        merge_plugin_directory(data, resource, previous, remove)
     else:
         raise InstallError(f"Unknown resource kind: {kind}")
     return raw, json_bytes(data), owned
@@ -234,6 +245,44 @@ def merge_hook(data: dict, resource: dict, previous: dict | None, remove: bool) 
         raise InstallError(f"Unmanaged matching hook already exists: {path}")
     else:
         groups.append(copy.deepcopy(resource["value"]))
+
+
+def merge_plugin_directory(data: dict, resource: dict, previous: dict | None, remove: bool) -> None:
+    """Own one path-list entry alongside the hook in the same settings transaction."""
+    incoming = resource.get("plugin_directory")
+    prior = (previous or {}).get("plugin_directory")
+    if incoming is None and prior is None:
+        return
+    path = Path(resource["path"])
+    environment = object_at(data, "env", path)
+    value = environment.get(PLUGIN_DIRS, "")
+    if not isinstance(value, str):
+        raise InstallError(f"{path}: {PLUGIN_DIRS} must be a string")
+    parts = value.split(os.pathsep) if value else []
+
+    def equivalent(left: str, right: str) -> bool:
+        return os.path.normcase(os.path.normpath(left)) == os.path.normcase(os.path.normpath(right))
+
+    if prior is not None:
+        matches = [i for i, item in enumerate(parts) if equivalent(item, prior)]
+        if len(matches) != 1 or parts[matches[0]] != prior:
+            raise InstallError(f"Managed Claude Mod entry changed; preserved: {path}")
+        index = matches[0]
+        parts.pop(index)
+    else:
+        index = len(parts)
+    if not remove and incoming is not None:
+        if os.pathsep in incoming:
+            raise InstallError("Claude Mod installation path contains the plugin-list separator")
+        if any(equivalent(item, incoming) for item in parts):
+            raise InstallError(f"Unmanaged Claude Mod entry already exists; preserved: {path}")
+        parts.insert(index, incoming)
+    if parts:
+        environment[PLUGIN_DIRS] = os.pathsep.join(parts)
+    else:
+        environment.pop(PLUGIN_DIRS, None)
+    if not environment:
+        data.pop("env", None)
 
 
 def assert_default_profiles(targets: list[str]) -> None:

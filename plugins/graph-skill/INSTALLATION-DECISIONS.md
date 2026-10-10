@@ -1,8 +1,38 @@
 # Installation decisions
 
+## Claude native Mod delivery, 2026-10-10
+
+Toolkit `0.3.3` projects the existing graph tool's successful result into a native Claude Code pane. A Mod is a plugin whose event handlers run inside Claude Code and draw host interface elements. The user's instruction “Claude尝试用mod实现” (“Try implementing the Claude canvas using a mod”) selects this method for Claude under the existing ordinary-edit and verified-release requirements. Codex retains its MCP App, the webpage associated with the same tool result. The [current baseline](VALIDATION.md#current-baseline-claude-path-repair-and-automatic-canvas-2026-10-09) owns the result and release condition.
+
+### Presentation and package ownership
+
+The toolkit's [`claude-mod`](claude-mod) directory owns the three native assets: the plugin manifest, hook-module declaration and rendering module. [`packaging/hosts.py`](packaging/hosts.py) names their exact inventory; [`packaging/bundle.py`](packaging/bundle.py) includes them in the immutable versioned payload. Selecting Claude requires all three source files and their bundle-inventory entries before provisioning. The Python runtime and its distribution retain their independent boundary and version `0.1.0a1`.
+
+The [`rendering module`](claude-mod/hooks/register.js) observes only `mcp__graph-skill-canvas__show_graph`. It invokes the normal tool chain once, receives its result, and returns the same result. An explicit business root and valid successful graph result supply the native view. The existing graph reader owns canonical root resolution and graph projection; a symbolic-link input can therefore display a different resolved root. The Mod owns session-local presentation state, validates geometry and edges, escapes label markup and bounds the generated drawing. Its calls register a reopen command and operate the host interface. Business-file mutation, model calls, network access and permission decisions stay with their existing owners.
+
+The pane uses `Svg`, Claude's native vector drawing element, on Desktop and a text representation on terminal surfaces. It presents the graph name, root, counts and topology. `/graph-skill-canvas` opens the session's available graph or gives guidance when none is available. Result-parsing, projection and pane-opening errors clear invalid presentation state, provide a diagnostic and preserve the tool result. Claude owns validation and drawing of the returned interface elements, so actual rendered output requires native observation. Existing Skill and follow-up-hook instructions retain responsibility for requesting the normal graph call after related work.
+
+### One settings owner
+
+The existing `hook` resource for `~/.claude/settings.json` owns both the follow-up hook and one `env.CLAUDE_CODE_PLUGIN_DIRS` entry. The environment setting is a list of explicit plugin directories, separated by semicolons on Windows and colons on Unix. Its `plugin_directory` manifest field records the exact absolute `versions/<release>/claude-mod` path. The resource validator limits that field to the Claude settings resource and the installation's versioned payload boundary.
+
+Update replaces the exact recorded entry in place, and uninstall removes it while preserving other directories, other environment values and other settings. Equivalent duplicate entries, a changed owned entry, a non-string list value or a path containing the platform's list separator block the dependent operation. An older manifest without `plugin_directory` can acquire this new ownership through an explicit update. Codex receives no Mod entry. One combined settings after-image participates in the existing compare-before-write transaction; rollback restores prior bytes only while the current bytes still match the operation's write. This keeps concurrent changes preserved and gives the settings file one mutation owner.
+
+### Basis, alternatives and acceptance
+
+A private prototype in Windows Desktop `2.31226.1.0` / engine `2.1.295` displayed the correct six-node, five-edge graph after a fresh ordinary request added `suffix`. The request contained no canvas instruction. This closes the prototype's natural-display uncertainty. Formal source, installer and package changes require a new installed-candidate observation. The local [integration decision](evidence/path-rendering-decision.md#claude-mod-integration-decision-2026-10-10-utc) and [prototype receipt](evidence/path-mod-prototype-acceptance.json) retain source transcriptions, identities, the repaired initial blank-pane defect and the native evidence. Those private materials can be absent from public archives.
+
+| Approach | Judgment and disposition |
+| --- | --- |
+| Toolkit-owned native Mod | Display feasibility `0.94`, supported by the real natural observation; formal delivery feasibility `0.90`, supported by the current ownership model and source regressions, with installed acceptance outstanding. Selected. A mismatched graph, modified tool result or failed official installation would reopen the affected design. |
+| Claude MCP App activation through user settings | Feasibility `0` for the tested activation method on engine `2.1.295`: retained source and observations show the relevant setting was filtered and the canvas remained absent. Other activation routes remain unassessed. Retained as bounded diagnostic history. |
+| Generic HTML preview | Feasibility unassessed because this delivery path has no selected implementation or local acceptance. Unselected. |
+
+Reusing the successful tool result keeps graph semantics with one reader. Extending the current settings resource keeps installation and rollback with one owner; a second resource targeting the same file would violate the transaction's duplicate-owner check. The [source-freeze evidence](VALIDATION.md#claude-mod-source-freeze-2026-10-10) records the inspected implementation and remaining checks. The release coordinator must complete official installed natural acceptance and every required release gate for the exact candidate before publication. Cross-platform archive verification and real host rendering are separate evidence layers.
+
 ## Claude path repair decision, 2026-10-09
 
-The implemented repair gives the toolkit one user-owned state and payload root at `~/.local/share/graph-skill` on every supported operating system. The installer owns the explicit Windows transition from `%LOCALAPPDATA%/GraphSkill`. The [current validation baseline](VALIDATION.md#current-baseline-claude-path-repair-and-automatic-canvas-2026-10-09) owns the latest user authority, result criteria and conditional release. Its required result is a real Claude Code edit followed naturally by the visible correct canvas. The patch version is `0.3.3`; real installed migration, host acceptance and publication remain pending.
+The implemented repair gives the toolkit one user-owned state and payload root at `~/.local/share/graph-skill` on every supported operating system. The installer owns the explicit Windows transition from `%LOCALAPPDATA%/GraphSkill`. The [current validation baseline](VALIDATION.md#current-baseline-claude-path-repair-and-automatic-canvas-2026-10-09) owns the latest user authority, result criteria and conditional release. Its required result is a real Claude Code edit followed naturally by the visible correct canvas. The following evidence and feasibility judgments record the path decision at its first source freeze. Later migration acceptance and the selected native presentation are recorded in the current baseline and Mod decision above; publication remains conditional on the combined candidate's acceptance.
 
 ### Path evidence and limits
 

@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 from ownership import InstallError, digest, json_bytes, plain_path
+from hosts import CLAUDE_MOD_FILES
 from runtime_layout import current_target
 from runtime_payload import LOCK, assemble
 
@@ -87,6 +88,8 @@ def product_files(wheel: Path) -> dict[str, Path]:
         files["packaging/" + name] = ROOT / "packaging" / name
     for name in ("server.mjs", "after-tool.mjs", "canvas.html", "installer.mjs"):
         files["dist/" + name] = ROOT / "dist" / name
+    for name in CLAUDE_MOD_FILES:
+        files[name] = ROOT / name
     for skill in ("graph-skill", "graph-skill-canvas"):
         for path in sorted((ROOT / "skills" / skill).rglob("*.md")):
             files[path.relative_to(ROOT).as_posix()] = path
