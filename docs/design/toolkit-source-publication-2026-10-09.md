@@ -4,7 +4,7 @@ Date: 2026-10-09. Decision: recover and publish the source associated with the e
 
 ## Goal and authority
 
-This decision serves the stable goal `shared-graph-ui-feasibility`, whose [compact Markdown baseline](../../plugins/graph-skill/VALIDATION.md) owns the shared graph view, toolkit delivery and manual Desktop acceptance. The publication result is a committed, remotely available and downloadable source tree associated with the four published Graph Skill Toolkit `0.2.0` installers. The source tree must contain the toolkit and the runtime implementation represented by those installers.
+This decision serves the stable goal `shared-graph-ui-feasibility`, whose [compact Markdown baseline](../../src/graph_skill_toolkit/VALIDATION.md) owns the shared graph view, toolkit delivery and manual Desktop acceptance. The publication result is a committed, remotely available and downloadable source tree associated with the four published Graph Skill Toolkit `0.2.0` installers. The source tree must contain the toolkit and the runtime implementation represented by those installers.
 
 The coordinator's 2026-10-09 handoff transcribes the user's release instruction, “上传release” (“upload the release”), and subsequent correction, “什么叫源码仍未提交？都打包发布了源码还不提交？” (“What do you mean the source is still uncommitted? The packages are already published; why has the source not been committed?”). The coordinator owns comparison with the original conversation. This correction establishes source publication as part of the release responsibility. It replaces the earlier upload step's artifact-only boundary while retaining the existing installer bytes, preview designation and user-operated Desktop acceptance.
 
@@ -12,9 +12,11 @@ The coordinator owns source selection, identity verification, commits, branch pu
 
 The writer read the baseline on 2026-10-09 at SHA-256 `f1eae6ab9906d625a0ff4e0aa03bbe7d5f2a3a69dce1b7d55af5fb0a17c99948`, together with the project rules, shared goal method, prior upload brief and publication receipt. The Markdown baseline is reviewed through file identity, references and content; the JSON goal checker has no applicable interface for this format.
 
+Current toolkit source is now `src/graph_skill_toolkit/`; its [architecture](../../src/graph_skill_toolkit/ARCHITECTURE.md) and [current baseline](../../src/graph_skill_toolkit/VALIDATION.md#current-baseline-toolkit-source-structure-2026-10-10) own operating navigation and new-candidate acceptance. This dated source-recovery record retains its exact old archive paths, normalization exceptions, identities and publication scope. Relocated local evidence links below are navigation to those preserved records, not a claim that the old archives contain the new layout.
+
 ## Evidence and source ownership
 
-The local [upload brief](../../plugins/graph-skill/evidence/release-upload-brief.md) and [publication receipt](../../plugins/graph-skill/evidence/github-release-published.json) preserve the earlier decision and measured result. These local evidence files may be absent from a public checkout. The portable [artifact manifest](https://github.com/SevenX77/graph-skill-runtime/releases/download/graph-skill-toolkit-v0.2.0/graph-skill-0.2.0-artifacts.json) remains the public historical build receipt.
+The local [upload brief](../../src/graph_skill_toolkit/evidence/release-upload-brief.md) and [publication receipt](../../src/graph_skill_toolkit/evidence/github-release-published.json) preserve the earlier decision and measured result. These local evidence files may be absent from a public checkout. The portable [artifact manifest](https://github.com/SevenX77/graph-skill-runtime/releases/download/graph-skill-toolkit-v0.2.0/graph-skill-0.2.0-artifacts.json) remains the public historical build receipt.
 
 The receipt identifies repository `SevenX77/graph-skill-runtime`, release ID `407764422`, tag `graph-skill-toolkit-v0.2.0`, and prerelease publication at `2026-10-09T09:36:31Z`. Its tag commit was `205b34d34b9354deae5fe1f095f2ba62180a9c52`. That tree lacked the toolkit module. The coordinator verified the uploaded archive digests for Windows x64, macOS ARM64, Linux x64 and Linux ARM64. The handoff additionally records `immutable=false` for the release and writable repository access; the coordinator must recheck both before changing the tag.
 

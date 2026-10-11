@@ -1,0 +1,7 @@
+node_modules/
+dist/
+evidence/
+release/
+__pycache__/
+!scripts/build/
+!scripts/build/**

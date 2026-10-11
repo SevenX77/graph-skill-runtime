@@ -23,6 +23,8 @@ The project is not published on PyPI or TestPyPI. [`.github/workflows/release.ym
 
 This repository is a Python runtime and SDK. It owns compilation, typed dataflow, prediction and execution, request snapshots, checkpoint-domain contracts, events and traces, artifacts, inspection, golden evaluation, local skill resolution, and structured runtime errors.
 
+The host-delivery toolkit is a separate source sibling at [`src/graph_skill_toolkit`](src/graph_skill_toolkit), with one directory per executable responsibility. Its [`ARCHITECTURE.md`](src/graph_skill_toolkit/ARCHITECTURE.md) owns current module navigation and source/payload/session boundaries; its [`VALIDATION.md`](src/graph_skill_toolkit/VALIDATION.md#current-baseline-toolkit-source-structure-2026-10-10) owns current toolkit acceptance. The independent runtime distribution does not include this toolkit.
+
 The application boundary is organized as follows:
 
 - [`domain/models.py`](src/graph_skill_runtime/domain/models.py) owns closed, frozen, versioned public runtime data contracts;

@@ -61,7 +61,7 @@ packages = ["src/graph_skill_runtime"]
 
 [tool.hatch.build.targets.sdist]
 # Host UI assets ship through their plugin, independently of the runtime package.
-exclude = ["/plugins", "/.agents/plugins"]
+exclude = ["/plugins", "/.agents/plugins", "/src/graph_skill_toolkit"]
 
 [tool.pytest.ini_options]
 minversion = "9.0"
@@ -106,7 +106,7 @@ python_version = "3.11"
 strict = true
 explicit_package_bases = true
 mypy_path = ["src"]
-exclude = ["tests", "scripts"]
+exclude = ["tests", "scripts", "src/graph_skill_toolkit"]
 
 [[tool.mypy.overrides]]
 module = "langgraph.checkpoint.postgres.*"
