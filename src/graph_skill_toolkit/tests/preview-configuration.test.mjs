@@ -61,7 +61,11 @@ test("two cooperating owners preserve each other's entries, including a port upd
   assert.ok(results.some(result => result.status === "fulfilled"));
   for (let index = 0; index < results.length; index++) {
     if (results[index].status === "rejected") {
-      assert.match(results[index].reason.message, /busy/);
+      // A contender may observe the owner writing its freshly created lock.
+      // That revision guard is also a safe refusal; only lock-path contention
+      // is retried here, never a changed launch.json or another I/O failure.
+      assert.match(results[index].reason.message,
+        /(?:is busy|changed while (?:opening|reading)): .*[/\\]\.graph-skill-preview\.lock(?:\.|$)/);
       await [first, second][index].ensure(root, `http://127.0.0.1:${40001 + index}`);
     }
   }
