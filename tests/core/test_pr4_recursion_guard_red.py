@@ -176,7 +176,7 @@ def test_portable_loader_rejects_subgraph_cycle_before_assembly(tmp_path: Path) 
     skill_a = tmp_path / "skill-a"
     _write_graph(skill_a, name="skill-a", phases=["to-loop"])
     _write_subgraph_phase(skill_a, "to-loop", graph_id="loop")
-    loop = skill_a / "graphs" / "loop"
+    loop = skill_a / "subgraphs" / "loop"
     _write_graph(
         loop,
         name="loop",

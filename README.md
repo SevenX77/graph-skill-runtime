@@ -24,7 +24,7 @@ The current checkout provides the typed runtime facade and configuration boundar
 - the extracted engine behind `CurrentEngineAdapter`, including a verified compile/run path for an explicit embedded portable `LOGIC` skill;
 - one production reader for the portable root `SKILL.md` plus `graph.yaml` format, with a flat graph registry and no legacy fallback;
 - an explicit, non-overwriting `gskill migrate studio-skill` converter for legacy v0.3 source;
-- one optional MoirAI integration inventory at asset version `1.1.0`: four provider-neutral role/profile assets (`moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`), eight Agent Skills, and `KB-00` through `KB-15`; these assets share the one `gskill` MCP server and contain no business `graph.yaml`;
+- one optional MoirAI integration inventory at asset version `1.1.1`: four provider-neutral role/profile assets (`moirai`, `moirai-clotho`, `moirai-lachesis`, and `moirai-atropos`), eight Agent Skills, and `KB-00` through `KB-15`; these assets share the one `gskill` MCP server and contain no business `graph.yaml`;
 - explicit `gskill integrations detect/install/uninstall` and equivalent SDK contracts for `claude`, `codex`, `copilot`, `cursor`, `gemini`, and `opencode`, with dry-run planning, all-target conflict preflight, manifest ownership, causally safe rollback, idempotency, and hash-safe uninstall;
 - a release-artifact validator that requires exactly one wheel and one source distribution, validates metadata, the pure-wheel/console contract, safe archive paths, required and forbidden package content, and the manifest-closed MoirAI subtree, then binds their sizes and SHA-256 digests to one source commit;
 - a package-acceptance runner that verifies those manifest-owned artifact bytes and the expected source commit, installs the candidate through pip-wheel, uv-wheel, and pip-sdist channels, exercises the installed SDK/CLI/MCP/integration/durable-state behavior, and emits versioned acceptance evidence.
@@ -38,7 +38,7 @@ my-skill/
 ├── phases/
 │   └── <phase_id>/
 │       └── LOGIC.md | AGENT.md | SUBGRAPH.md
-└── graphs/
+└── subgraphs/                          # reusable subgraph definitions
     └── <graph_id>/
         ├── graph.yaml
         └── phases/
@@ -46,7 +46,9 @@ my-skill/
                 └── LOGIC.md | AGENT.md | SUBGRAPH.md
 ```
 
-The root `SKILL.md` is the only Agent Skills discovery target. `graph.yaml` uses schema version `gskill.graph.v1`; the root Agent Skill name and root graph id are separate identities. Reusable graphs live directly under the single-level `graphs/<graph_id>/` registry, and graph ids are explicit and unique across the bundle. Only the root graph declares artifacts; presets and requests select them by `artifact_id`.
+The root `SKILL.md` is the only Agent Skills discovery target. `graph.yaml` uses schema version `gskill.graph.v1`; the root Agent Skill name and root graph id are separate identities. Reusable graphs live directly under the single-level `subgraphs/<graph_id>/` registry, and graph ids are explicit and unique across the bundle. Only the root graph declares artifacts; presets and requests select them by `artifact_id`.
+
+Each `SUBGRAPH.md` phase is a call site: its `graph` field selects a reusable definition by `graph_id`. Multiple call sites can share one definition. The [directory naming decision](docs/design/subgraph-directory-naming-2026-10-08.md) records the path change and its validation scope.
 
 Production compile, predict, run, inspect, SDK, CLI, and MCP paths do not sniff formats or fall back to v0.3. Legacy parsing exists only behind `gskill migrate studio-skill SOURCE DESTINATION [--runtime-config PATH] [--preset-id ID]`. The converter leaves `SOURCE` unchanged, refuses an existing destination, and publishes from a sibling temporary directory through an operating-system-native create-if-absent rename with a deterministic migration report.
 
@@ -104,7 +106,7 @@ The source, built artifact, and real-host observations establish different parts
 
 Phase 5 acceptance retains its historical Claude skill/profile/MCP discovery and Codex skill/MCP cross-check. Current installed-host evidence adds the successful Codex CLI `0.144.1` default-approval `inspect` call against the new wheel, while Claude Code `2.1.250` is verified only at the MCP connection layer. It does not claim all six hosts are operational, authenticated model execution or a default tool call through Claude, or Codex custom-agent runtime invocation.
 
-Every observation above was recorded at MoirAI asset version `1.0.0`. The `1.1.0` bundle this checkout now carries was re-accepted on 2026-09-02 in the same three-layer shape — source gates, a freshly built wheel whose closed inventory is 29 members read as `4/8/16` from a clean Python 3.11 environment, and Claude Code `2.1.250` reporting the `gskill` MCP server connected against a user-scope projection whose 62 managed resources match their ownership manifest hash for hash. Section 10 of [MoirAI single-owner convergence](docs/design/moirai-asset-single-owner-2026-09-01.md) records those commands and raw outputs, and names what was not re-verified: the Claude client's own skill/profile discovery listing, authenticated Claude execution, and every Codex runtime observation.
+Every observation above was recorded at MoirAI asset version `1.0.0`. The historical `1.1.0` bundle was re-accepted on 2026-09-02 in the same three-layer shape — source gates, a freshly built wheel whose closed inventory is 29 members read as `4/8/16` from a clean Python 3.11 environment, and Claude Code `2.1.250` reporting the `gskill` MCP server connected against a user-scope projection whose 62 managed resources match their ownership manifest hash for hash. Section 10 of [MoirAI single-owner convergence](docs/design/moirai-asset-single-owner-2026-09-01.md) records those commands and raw outputs, and names what was not re-verified: the Claude client's own skill/profile discovery listing, authenticated Claude execution, and every Codex runtime observation. The current `1.1.1` bundle updates subgraph-path guidance; its separate evidence and remaining validation are recorded in the [directory naming decision](docs/design/subgraph-directory-naming-2026-10-08.md#validation-scope).
 
 ## Phase 6 package acceptance and publication boundary
 

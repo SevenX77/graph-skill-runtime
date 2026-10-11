@@ -143,3 +143,9 @@ seals:
     reason: "F-T3: the current portable format contract moves `audited-ready` -> `FROZEN`. Unlike the mvp0 entries this is not an archive but the live contract the production reader implements; sealing it is the gate for handing single engine ownership to this repository, and it was only sealable once D-T1 (#14) and D-T3 (#18) had landed."
     pr: "#22"
     pm_approval: "Owner sign-off carried by the merge of #22, on the F-T3 work order."
+  - exemption_id: EX-0018-portable-subgraphs-directory
+    file: "docs/skill-spec/01-PORTABLE-GSKILL-V1.md"
+    sha256: "8742ce1bb6b4d694a529eeaf0537bbd925068dd9b54ca925acf58581a9306d1d"
+    reason: "Use subgraphs/ for the flat reusable-definition registry and annotate its purpose; preserve graph ids, explicit call sites and shared-definition semantics. Rationale and validation scope: docs/design/subgraph-directory-naming-2026-10-08.md."
+    pr: "Local unsubmitted branch codex/rename-subgraph-directory; pull request pending separate authorization."
+    pm_approval: "Product owner request, 2026-10-08, Codex chat 01a11a98-1d29-7ef2-bd06-1b0716760323: 改成subgraphs/; 在后面加上标注，说明这里面是放子图的. English gloss: rename to subgraphs/ and annotate that it contains subgraphs."

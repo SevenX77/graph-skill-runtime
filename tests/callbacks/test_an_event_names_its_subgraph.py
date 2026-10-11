@@ -90,8 +90,8 @@ def test_two_subgraphs_same_phase_name_get_distinct_paths(tmp_path: Path) -> Non
         phases=[("alpha", ["input"], False), ("beta", ["alpha"], True)],
         required_inputs=["text"],
     )
-    _child_graph(root / "graphs" / "alpha-child", "alpha-child", "text", "middle")
-    _child_graph(root / "graphs" / "beta-child", "beta-child", "middle", "final")
+    _child_graph(root / "subgraphs" / "alpha-child", "alpha-child", "text", "middle")
+    _child_graph(root / "subgraphs" / "beta-child", "beta-child", "middle", "final")
     _subgraph_phase(root, "alpha", "alpha-child", "text", "middle")
     _subgraph_phase(root, "beta", "beta-child", "middle", "final")
 

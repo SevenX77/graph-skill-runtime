@@ -150,7 +150,7 @@ def test_subgraph_child_starts_from_explicit_inputs_only(
     skill_root = tmp_path / "gamma2-child"
     _base(skill_root, '<phase id="sub" src="phases/sub" depends_on="" />\n')
     _subgraph(skill_root, "sub", "gamma2-inspect")
-    child = skill_root / "graphs" / "gamma2-inspect"
+    child = skill_root / "subgraphs" / "gamma2-inspect"
     _base(
         child,
         '<phase id="inspect" src="phases/inspect" depends_on="" />\n',
@@ -196,7 +196,7 @@ def test_subgraph_child_outputs_are_deterministic_across_child_phases(
     skill_root = tmp_path / "gamma2-child"
     _base(skill_root, '<phase id="sub" src="phases/sub" depends_on="" />\n')
     _subgraph(skill_root, "sub", "gamma2-sequence")
-    child = skill_root / "graphs" / "gamma2-sequence"
+    child = skill_root / "subgraphs" / "gamma2-sequence"
     _base(
         child,
         '<phase id="first" src="phases/first" depends_on="" />\n'

@@ -12,7 +12,7 @@ Use this skill after the domain inputs, outputs, and invariants are explicit.
 3. Declare every phase and dependency in `graph.yaml`; treat explicit call edges as topology truth.
    Keep phase identity in two places only: the `phases/<phase_id>/` directory name and its `graph.yaml.phases[].id`. Do not restate the id inside the phase document.
 4. Trace required phase inputs to root inputs, upstream outputs, bindings, or iterator injection.
-5. Place reusable graphs directly under `graphs/<graph_id>/`; never encode parentage through nested folders.
+5. Place reusable graphs directly under `subgraphs/<graph_id>/`; never encode parentage through nested folders.
 6. Add batch or loop iteration only with explicit item, range, concurrency or accumulation semantics.
 7. Compile the complete bundle and address the full diagnostic set before execution.
 

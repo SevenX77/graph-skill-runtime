@@ -1,7 +1,7 @@
 {
   "schema_version": "gskill.integration-assets.v1",
   "integration_id": "moirai",
-  "asset_version": "1.1.0",
+  "asset_version": "1.1.1",
   "roles": [
     {
       "id": "moirai",

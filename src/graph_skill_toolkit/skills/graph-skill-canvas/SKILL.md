@@ -1,0 +1,17 @@
+---
+name: graph-skill-canvas
+description: Keep the actual SKILL.md and current graph canvas open after portable Graph Skill work, using the host file view and shared canvas tool.
+---
+
+# Graph Skill canvas
+
+After authoring, reading, compiling, predicting, running, inspecting, resuming, submitting an Agent result or evaluating a portable Graph Skill, display its actual `SKILL.md` and current graph together. Retain and reuse both views, preserve other user pages, and leave the canvas active. Follow explicit user instructions that narrow or disable this behavior.
+
+Use the host Agent's file or shell tools to resolve and verify the absolute business root containing `SKILL.md` and `graph.yaml`. Supply that root to the available `graph-skill-canvas` server's `show_graph` tool through the normal host tool interface; the host may namespace its name. A missing or unverifiable root requires a limitation report. Omit `skill_root` only for an explicitly requested labeled demonstration, which has no business document.
+
+- **Codex:** Open or reuse the exact root's `SKILL.md` through `open_in_codex` with `target.type="file"`, its absolute path and `target.line=1`. Issue this as a standalone host tool invocation and wait for its tool response. Then, in a separate tool invocation, call `show_graph` once for the same root as the final presentation. Do not batch the file-open and canvas calls in one orchestration or tool batch, even when sequentially awaited. Perform no later file opening within this display operation. A `queued` response establishes a pending request, not completed document activation; this sequence alone does not prove final focus. Observe the final state before claiming the canvas is active, and report a hidden canvas, wrong active view or lost/duplicate tab as a presentation failure.
+- **Claude Code:** Call `show_graph`, then follow the project Mod's ordered preview guidance. The Mod supplies the live host operation sequence. Use the returned `document.path` and `document.fileUrl` for the actual Skill document, and the returned preview configuration and URL for the HTTP canvas. Retain the identified document and canvas tabs, navigate only the HTTP tab, and verify the final state after canvas selection completes. Preserve observations and stop dependent steps if identity is ambiguous, an operation is refused or the required view remains hidden.
+
+Treat a hook follow-up and this rule as one display request per operation and root. File-preview, folder-opening, navigation and canvas-control calls are presentation steps and must not recursively trigger another display. Keep file opening in this explicit host sequence; page loading itself must not open a file or change host focus. Verify the displayed root and graph before claiming the current graph is visible.
+
+`show_graph` presents the root graph. Use the installed runtime CLI, {{GSKILL_COMMAND}}, for compilation, execution and other runtime operations, following the `graph-skill` Skill and its CLI reference. Prefix that quoted command with `&` in Windows PowerShell; invoke it directly in a macOS or Linux POSIX shell. A shell invocation preserves the runtime's host-native executor default; direct vendor execution requires a separate explicit executor choice. Keep code changes and folder browsing with the host's native tools. The host owns panel visibility and focus; successful tool delivery alone does not establish either.

@@ -134,7 +134,7 @@ io:
 ---
 """,
     )
-    _logic_graph(root / "graphs" / "child", graph_id="child", business_skill=False)
+    _logic_graph(root / "subgraphs" / "child", graph_id="child", business_skill=False)
 
 
 def test_compile_and_assemble_default_to_a_local_agent_skill_resolver(

@@ -1,0 +1,144 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { readFile, mkdtemp, mkdir, writeFile, rm, realpath, symlink, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { get } from 'node:http';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { codexAdapter } from '../adapters/codex/browser/index.mjs';
+import { claudeAdapter } from '../adapters/claude/browser/index.mjs';
+import { snapshotHtml, SNAPSHOT_SLOT } from '../adapters/claude/preview/publisher.mjs';
+import { createHostBridge } from '../adapters/claude/bridge/server.mjs';
+import { validateCanvas } from '../ui/canvas/index.mjs';
+import { graph } from '../demo/graph.mjs';
+
+const payload = {graph:{...graph,width:352,height:548},skillRoot:'/business/中文 skill'};
+const slot = /<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+const snapshot = text => JSON.parse(slot.exec(text)[1]);
+test('both browser adapters deliver the same data and declare their actual root action',async()=>{
+  const received=[],failed=[],actions=[];
+  const app={connect:async()=>{},getHostCapabilities:()=>({experimental:{'openai/files':{}},message:{}}),request:async value=>actions.push(value),sendMessage:async value=>{actions.push(value);return {};},close:()=>{}};
+  const codex=codexAdapter(app);
+  const claude=claudeAdapter({snapshot:()=>payload,clipboard:{writeText:async root=>actions.push(root)}});
+  await codex.connect({receive:p=>received.push(p),fail:e=>failed.push(e)});
+  app.ontoolresult({structuredContent:payload});
+  await claude.connect({receive:p=>received.push(p),fail:e=>failed.push(e)});
+  assert.deepEqual(received,[payload,payload]);assert.equal(failed.length,0);
+  await codex.openRoot(payload.skillRoot);await claude.openRoot(payload.skillRoot);
+  assert.match(actions[0].content[0].text,/中文 skill/);assert.equal(actions[1],payload.skillRoot);
+  assert.match(claude.rootActionLabel,/复制/);
+  app.ontoolresult({isError:true,content:[{type:'text',text:'bad graph'}]});
+  assert.equal(failed[0].message,'bad graph');
+  app.request=async()=>{throw new Error('folder unavailable');};
+  app.sendMessage=async value=>{actions.push(value);return {};};
+  await codex.invoke('open-file',{skillRoot:payload.skillRoot});
+  assert.match(actions[2].content[0].text,/中文 skill/);
+  await claudeAdapter({snapshot:()=>({error:'invalidated'})}).connect({receive:()=>assert.fail(),fail:e=>assert.equal(e.message,'invalidated')});
+});
+test('shared validation rejects malformed roots, topology and bounds before rendering',()=>{
+  assert.deepEqual(validateCanvas(payload),payload);
+  for(const mutate of [p=>p.skillRoot=undefined,p=>p.graph.nodes=[],p=>p.graph.width=Infinity,p=>p.graph.nodes.push(p.graph.nodes[0]),p=>p.graph.nodes[0].x=NaN,p=>p.graph.nodes[0].x=10000,p=>p.graph.edges.push({from:'missing',to:'output'})]) {
+    const value=structuredClone(payload);mutate(value);assert.throws(()=>validateCanvas(value));
+  }
+});
+test('HTTP snapshot changes only inert JSON and does not inherit the local-file size restriction',async()=>{
+  const html=await readFile(new URL('../dist/canvas.html',import.meta.url),'utf8');
+  const value={...payload,extra:'</script><script>evil()</script><!-- $& 中文'};
+  const output=snapshotHtml(html,value);
+  assert.deepEqual(snapshot(output),value);
+  assert.equal(output.replace(slot,SNAPSHOT_SLOT),html);
+  assert.ok(!output.includes('<script>evil()'));
+  assert.equal(snapshot(snapshotHtml(html,{value:'x'.repeat(524288)})).value.length,524288);
+  assert.throws(()=>snapshotHtml('no slot',payload),/slot/);
+});
+test('real stdio serves the same HTML over HTTP, owns attach config and refreshes isolated roots',async t=>{
+  const temp=await realpath(await mkdtemp(join(tmpdir(),'shared canvas 中文 ')));
+  t.after(()=>rm(temp,{recursive:true,force:true}));
+  async function fixture(name){
+    const path=join(temp,name);await mkdir(join(path,'phases','process'),{recursive:true});
+    await writeFile(join(path,'SKILL.md'),'---\nname: test\n---\n');
+    await writeFile(join(path,'phases','process','LOGIC.md'),'# Logic\n');
+    await writeFile(join(path,'graph.yaml'),`schema_version: gskill.graph.v1\ngraph_id: ${name}\nphases:\n  - id: process\n    depends_on: [input]\n    output: true\n`);
+    return path;
+  }
+  const a=await fixture('one'),b=await fixture('two');
+  await mkdir(join(temp,'.claude'));
+  const existing={version:'0.0.1',note:'user-owned',configurations:[{name:'user-app',url:'http://127.0.0.1:3011',port:3011}]};
+  await writeFile(join(temp,'.claude','launch.json'),JSON.stringify(existing));
+  const client=new Client({name:'shared-html-test',version:'1'});
+  const transport=new StdioClientTransport({command:process.execPath,args:[fileURLToPath(new URL('../dist/server.mjs',import.meta.url))],stderr:'pipe'});
+  await client.connect(transport);t.after(()=>client.close());
+  assert.deepEqual((await readdir(a)).sort(),['SKILL.md','graph.yaml','phases']);
+  assert.equal((await client.callTool({name:'show_graph',arguments:{skill_root:a,presentation:'html'}})).isError,true);
+  const show=skill_root=>client.callTool({name:'show_graph',arguments:{skill_root,presentation:'html',preview_project_root:temp}});
+  const result=await show(a);assert.notEqual(result.isError,true,JSON.stringify(result));
+  const presentation=result.structuredContent.presentation,url=presentation.url;
+  const other=await show(b),otherUrl=other.structuredContent.presentation.url;
+  assert.notEqual(url,otherUrl);assert.equal(new URL(url).origin,new URL(otherUrl).origin);
+  const document=result.structuredContent.document;
+  assert.equal(document.path,join(a,'SKILL.md'));
+  assert.equal(fileURLToPath(document.fileUrl),document.path);
+  assert.equal(await readFile(document.path,'utf8'),'---\nname: test\n---\n');
+  assert.equal(presentation.entry,undefined);
+  assert.notEqual(document.path,other.structuredContent.document.path);
+  await assert.rejects(readdir(join(temp,'.gskill')));
+  assert.equal(presentation.kind,'http');assert.equal(presentation.preview.projectRoot,temp);
+  const launch=JSON.parse(await readFile(join(temp,'.claude','launch.json'),'utf8'));
+  assert.deepEqual(launch.configurations[0],existing.configurations[0]);
+  assert.equal(launch.configurations.length,2);assert.equal(launch.note,'user-owned');
+  assert.equal(launch.configurations[1].name,presentation.preview.name);
+  assert.equal(launch.configurations[1].url,new URL(url).origin);
+  const resource=await client.readResource({uri:'ui://graph-skill/canvas-v2.html'});
+  assert.deepEqual(resource.contents[0]._meta['openai/ui'],{availableDisplayModes:['fullscreen'],preferredDisplayMode:'fullscreen'});
+  const content=await (await fetch(url)).text();
+  assert.equal(content.replace(slot,SNAPSHOT_SLOT),resource.contents[0].text);
+  assert.equal(resource.contents[0].text,await readFile(new URL('../dist/canvas.html',import.meta.url),'utf8'));
+  assert.equal(snapshot(content).graph.id,'one');
+  assert.equal(new URL(snapshot(content).hostBridge.url).origin,new URL(url).origin);
+  assert.ok(!content.includes(presentation.bridge.token));
+  await writeFile(join(a,'graph.yaml'),(await readFile(join(a,'graph.yaml'),'utf8')).replace('graph_id: one','graph_id: updated'));
+  assert.equal((await show(a)).structuredContent.presentation.url,url);
+  assert.equal(snapshot(await (await fetch(url)).text()).graph.id,'updated');
+  assert.equal(await readFile(document.path,'utf8'),'---\nname: test\n---\n');
+  assert.equal(snapshot(await (await fetch(otherUrl)).text()).graph.id,'two');
+  await writeFile(join(a,'graph.yaml'),'broken');
+  assert.equal((await show(a)).isError,true);
+  assert.equal(typeof snapshot(await (await fetch(url)).text()).error,'string');
+  await client.close();
+  await assert.rejects(fetch(url));await assert.rejects(fetch(otherUrl));
+  assert.equal(await readFile(document.path,'utf8'),'---\nname: test\n---\n');
+  assert.equal(await readFile(other.structuredContent.document.path,'utf8'),'---\nname: test\n---\n');
+  assert.deepEqual(JSON.parse(await readFile(join(temp,'.claude','launch.json'),'utf8')),existing);
+  assert.deepEqual((await readdir(a)).sort(),['SKILL.md','graph.yaml','phases']);
+});
+
+test('HTTP page identity and same-origin boundary reject ambient cross-site reads',async t=>{
+  const owner=createHostBridge();t.after(()=>owner.close());
+  const a=await owner.createView('/business/one'),b=await owner.createView('/business/two');
+  const html=await readFile(new URL('../dist/canvas.html',import.meta.url),'utf8');
+  owner.publish('/business/one',snapshotHtml(html,{...payload,hostBridge:a.browser}));
+  owner.publish('/business/two',snapshotHtml(html,{...payload,hostBridge:b.browser}));
+  const page=await fetch(a.url);assert.equal(page.status,200);
+  assert.equal(page.headers.get('access-control-allow-origin'),null);
+  assert.match(page.headers.get('content-security-policy'),/connect-src 'self'/);
+  assert.equal(snapshot(await page.text()).hostBridge.token,a.browser.token);
+  const home=await (await fetch(a.browser.url)).text();
+  assert.ok(!home.includes(a.browser.token));assert.ok(!home.includes(a.url));
+  assert.equal((await fetch(a.url,{headers:{Origin:'https://unrelated.invalid'}})).status,403);
+  assert.equal((await fetch(a.url,{headers:{'Sec-Fetch-Site':'cross-site'}})).status,403);
+  // fetch normalizes Host; the raw HTTP probe must exercise the rejected value.
+  const reboundStatus=await new Promise((resolve,reject)=>{
+    get(a.url,{headers:{Host:'localhost:'+new URL(a.url).port}},response=>{response.resume();resolve(response.statusCode);}).on('error',reject);
+  });
+  assert.equal(reboundStatus,403);
+  assert.equal((await fetch(a.browser.url+'/capabilities',{headers:{Origin:'null',Authorization:'Bearer '+a.browser.token}})).status,403);
+  const own=await fetch(a.browser.url+'/capabilities',{headers:{Origin:a.browser.url,Authorization:'Bearer '+a.browser.token}});
+  assert.equal(own.status,200);assert.equal(own.headers.get('access-control-allow-origin'),a.browser.url);
+  assert.equal((await fetch(a.browser.url+'/capabilities',{headers:{Authorization:'Bearer '+b.mod.token}})).status,404);
+  await fetch(a.mod.url+'/disconnect',{method:'POST',headers:{Authorization:'Bearer '+a.mod.token},body:'{}'});
+  assert.equal((await fetch(a.url)).status,410);
+  const next=await owner.createView('/business/one');assert.notEqual(next.url,a.url);
+  await owner.close();await assert.rejects(fetch(a.url));
+});

@@ -158,7 +158,7 @@ def test_subgraph_ast_accepts_graph_id_and_rejects_paths() -> None:
 def test_flat_registry_graph_compiles_and_assembles_without_external_resolver(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
     _subgraph_parent(parent, "child")
-    _logic_graph(parent / "graphs" / "child")
+    _logic_graph(parent / "subgraphs" / "child")
     resolver = ExplodingResolver()
 
     compiled = compile_skill(parent, cache=False, skill_resolver=resolver)
@@ -172,14 +172,14 @@ def test_flat_registry_graph_compiles_and_assembles_without_external_resolver(tm
 def test_graph_reference_remains_valid_after_skill_relocation(tmp_path: Path) -> None:
     origin = tmp_path / "origin" / "parent"
     _subgraph_parent(origin, "child")
-    _logic_graph(origin / "graphs" / "child")
+    _logic_graph(origin / "subgraphs" / "child")
     compile_skill(origin, cache=False)
 
     relocated = tmp_path / "ephemeral" / "parent"
     shutil.copytree(origin, relocated)
     compiled = compile_skill(relocated, cache=False)
 
-    assert compiled.graph_registry["child"].graph_root == (relocated / "graphs" / "child").resolve()
+    assert compiled.graph_registry["child"].graph_root == (relocated / "subgraphs" / "child").resolve()
     assert assemble_graph(compiled).phase_ids == ["delegate"]
 
 
@@ -204,7 +204,7 @@ def test_agent_subgraphs_use_graph_ids_while_subagents_keep_target_skill() -> No
     payload = _agent_ast_payload()
     payload["subgraphs"][0] = {
         "name": "child_graph",
-        "path": "graphs/child",
+        "path": "subgraphs/child",
         "description": "Paths are not portable graph identities.",
     }
     with pytest.raises(ValidationError, match="path"):
@@ -214,10 +214,10 @@ def test_agent_subgraphs_use_graph_ids_while_subagents_keep_target_skill() -> No
 def test_topology_projection_exposes_graph_id_and_flat_registry_child(tmp_path: Path) -> None:
     root = tmp_path / "parent"
     _subgraph_parent(root, "child")
-    _logic_graph(root / "graphs" / "child")
+    _logic_graph(root / "subgraphs" / "child")
 
     assert read_subgraph_graph_id(root, "delegate") == "child"
     child = load_child_graph_topology_projection(parent_skill_dir=root, graph_id="child")
     assert child.name == "child"
-    assert child.path == str((root / "graphs" / "child").resolve())
+    assert child.path == str((root / "subgraphs" / "child").resolve())
     assert child.phases == ["done"]

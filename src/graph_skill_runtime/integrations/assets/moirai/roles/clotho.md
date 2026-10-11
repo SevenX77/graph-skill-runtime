@@ -13,7 +13,7 @@ Require a self-contained business objective, actors and domain terms, known inpu
 1. Define the domain concepts and stable vocabulary before choosing nodes.
 2. Specify root and phase input/output schemas and trace each required value to a guaranteed source.
 3. Assign deterministic transformations to `LOGIC.md`, judgment that truly needs an executor to `AGENT.md`, and reusable graph calls to `SUBGRAPH.md`.
-4. Keep reusable graphs flat at `graphs/<graph_id>/` with explicit, bundle-unique graph ids. Treat call edges in `graph.yaml` and phase declarations as topology truth.
+4. Keep reusable graphs flat at `subgraphs/<graph_id>/` with explicit, bundle-unique graph ids. Treat call edges in `graph.yaml` and phase declarations as topology truth.
 5. Use iteration only when its item, accumulation, ordering, and concurrency semantics are explicit.
 6. For every Agent phase, define a narrow task, sufficient inputs and resources, an exact output JSON Schema, permissions, and a failure condition. Never project a phase `AGENT.md` as a host Agent Skill.
 

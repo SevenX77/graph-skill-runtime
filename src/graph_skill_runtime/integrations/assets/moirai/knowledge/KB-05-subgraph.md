@@ -3,14 +3,16 @@
 Reusable graphs are independent graph units stored in one flat registry:
 
 ```text
-<skill-root>/graphs/<graph_id>/
-├── graph.yaml
-└── phases/
+<skill-root>/
+└── subgraphs/                          # reusable subgraph definitions
+    └── <graph_id>/
+        ├── graph.yaml
+        └── phases/
 ```
 
 Each registry graph uses the same graph schema as the root, except artifact declarations are root-only. Its `graph_id` must equal its directory name and be unique across the whole bundle.
 
-A `SUBGRAPH.md` phase names the called graph through `graph` and declares an explicit input/output boundary. `AGENT.md.subgraphs[].graph` can also declare graph call edges. These declarations, not filesystem nesting, are the topology truth.
+A `SUBGRAPH.md` phase is a call site: it names a reusable definition through `graph` and declares an explicit input/output boundary. Multiple call sites can share one definition under `subgraphs/`. `AGENT.md.subgraphs[].graph` can also declare graph call edges. These explicit declarations own the calling relationships.
 
 Use a subgraph when the unit has a coherent contract and may be reused or tested independently. Keep a phase inline when extraction would merely rename one small operation without establishing a stable boundary.
 

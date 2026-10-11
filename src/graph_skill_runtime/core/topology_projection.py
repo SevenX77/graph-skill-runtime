@@ -118,7 +118,7 @@ def load_child_graph_topology_projection(
 
 
 def resolve_registry_graph_root(*, parent_skill_dir: Path, graph_id: str) -> Path:
-    expected_parent = parent_skill_dir.resolve() / "graphs"
+    expected_parent = parent_skill_dir.resolve() / "subgraphs"
     graph_dir = (expected_parent / graph_id).resolve()
     try:
         graph_dir.relative_to(expected_parent)

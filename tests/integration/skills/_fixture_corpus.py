@@ -73,7 +73,7 @@ def _write_story_deconstruction(root: Path) -> None:
     _write_logic(root, "batch_loop", "run_batch_loop")
     _write_subgraph(root, "global_synthesis", "global-synthesis")
     _write_global_synthesis(
-        root / "graphs" / "global-synthesis",
+        root / "subgraphs" / "global-synthesis",
         graph_id="global-synthesis",
         skill_entry=False,
     )

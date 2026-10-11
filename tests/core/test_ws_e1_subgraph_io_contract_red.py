@@ -148,7 +148,7 @@ def _subgraph_skill(
 ) -> tuple[Path, Path, DictSkillResolver]:
     parent = root / "parent"
     child_graph_id = "ws-e1-step5-child"
-    child = parent / "graphs" / child_graph_id
+    child = parent / "subgraphs" / child_graph_id
     child_outputs = child_outputs or parent_outputs
 
     _write_graph(
@@ -191,7 +191,7 @@ def _subgraph_skill(
         """,
     )
     # The child is a registry graph now, resolved by the compiler from
-    # `graphs/<graph_id>/`; the resolver is still supplied because the
+    # `subgraphs/<graph_id>/`; the resolver is still supplied because the
     # production signature takes one, but it no longer maps this subgraph.
     return parent, child, DictSkillResolver({})
 

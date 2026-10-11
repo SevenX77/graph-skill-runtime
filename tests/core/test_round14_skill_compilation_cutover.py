@@ -539,7 +539,7 @@ def test_subgraph_io_input_mismatch_is_allowed_at_compile_time(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
     parent = _new_skill(tmp_path, "parent")
-    child = parent / "graphs" / "child"
+    child = parent / "subgraphs" / "child"
     _graph(parent, inputs_field="parent_input")
     _subgraph_phase(parent, input_field="parent_input", output_field="result")
     _graph(
@@ -559,7 +559,7 @@ def test_subgraph_io_output_mismatch_is_allowed_at_compile_time(
     tmp_path: Path, mock_skill_resolver: object
 ) -> None:
     parent = _new_skill(tmp_path, "parent")
-    child = parent / "graphs" / "child"
+    child = parent / "subgraphs" / "child"
     _graph(parent, outputs_field="parent_output")
     _subgraph_phase(parent, output_field="parent_output")
     _graph(

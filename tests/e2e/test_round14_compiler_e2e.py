@@ -251,7 +251,7 @@ validator: false
 """,
     )
 
-    child = root / "graphs" / "e2e-expander"
+    child = root / "subgraphs" / "e2e-expander"
     _write(
         child / "graph.yaml",
         """schema_version: gskill.graph.v1

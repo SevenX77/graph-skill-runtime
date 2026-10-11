@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "graph-skill-canvas": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/server.mjs"]
+    }
+  }
+}

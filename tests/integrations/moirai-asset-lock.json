@@ -4,8 +4,8 @@
     "regenerate": "uv run python scripts/repin_moirai_asset_lock.py",
     "digest": "sha256 over every file, ordered by POSIX relative path string, content normalized to LF, each path and body NUL-terminated"
   },
-  "asset_version": "1.1.0",
-  "tree_digest": "94c9c1fcb5d76fc2457b40ab6b27c8017e3d5545d33d1bb23eb0ced64d81c061",
+  "asset_version": "1.1.1",
+  "tree_digest": "f6a4a441b7bf72593754341442587246a3243809e63e6899f21dd3036217c435",
   "file_count": 29,
   "role_skills": {
     "moirai": [

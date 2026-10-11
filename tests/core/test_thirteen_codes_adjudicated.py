@@ -208,7 +208,7 @@ class TestSubgraphSeamGates:
         adjudication from re-wiring the two deleted 1:1 codes by accident.
         """
         root = _parent(tmp_path)
-        _child(root / "graphs" / "child", "text", "result")
+        _child(root / "subgraphs" / "child", "text", "result")
         io = """io:
   inputs:
     type: object
@@ -229,7 +229,7 @@ class TestSubgraphSeamGates:
         self, tmp_path: Path, mock_skill_resolver: object
     ) -> None:
         root = _parent(tmp_path)
-        _child(root / "graphs" / "child", "text", "result")
+        _child(root / "subgraphs" / "child", "text", "result")
         _subgraph_md(root / "phases" / "work", graph_id="child", io_yaml=IO_OK)
 
         compile_skill(root, cache=False, skill_resolver=mock_skill_resolver)
@@ -239,7 +239,7 @@ class TestSubgraphSeamGates:
     ) -> None:
         """A display name may contain spaces, but it must not be empty."""
         root = _parent(tmp_path)
-        _child(root / "graphs" / "child", "text", "result")
+        _child(root / "subgraphs" / "child", "text", "result")
         _subgraph_md(
             root / "phases" / "work",
             graph_id="child",
@@ -266,7 +266,7 @@ class TestResolverInterfaceGate:
         diagnostics.
         """
         root = _parent(tmp_path)
-        _child(root / "graphs" / "child", "text", "result")
+        _child(root / "subgraphs" / "child", "text", "result")
         _subgraph_md(root / "phases" / "work", graph_id="child", io_yaml=IO_OK)
 
         class NotAResolver:

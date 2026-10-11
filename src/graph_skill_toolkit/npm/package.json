@@ -1,0 +1,10 @@
+{
+  "name": "graph-skill-toolkit",
+  "description": "Global Graph Skill CLI, shared agent Skills, and host canvas installer",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=18" },
+  "bin": { "graph-skill": "bin/graph-skill.mjs" },
+  "files": ["bin/", "dist/", "THIRD_PARTY_NOTICES.txt", "LICENSE", "README.md"],
+  "repository": { "type": "git", "url": "git+https://github.com/SevenX77/graph-skill-runtime.git" }
+}

@@ -17,7 +17,7 @@ The minimum root is:
 - Root `graph.yaml` is the sole machine-readable owner of root topology, root I/O, phase registry, edges, and artifact declarations.
 - Every registered phase directory contains exactly one type file: `LOGIC.md`, `AGENT.md`, or `SUBGRAPH.md`.
 - `AGENT.md` is a runtime-internal phase contract. It must not be named or projected as another host `SKILL.md`.
-- Reusable graphs live directly at `graphs/<graph_id>/`, each with its own `graph.yaml` and `phases/`. Graph ids are explicit and bundle-wide unique.
+- Reusable graphs live directly at `subgraphs/<graph_id>/`, each with its own `graph.yaml` and `phases/`. Graph ids are explicit and bundle-wide unique.
 - Physical directories own files; explicit graph and call edges own topology. Do not infer parentage from deep nesting.
 - Optional `gskill.toml` owns project runtime overrides and named presets. Default runtime state is `.gskill/` beneath the business skill root unless resolution selects another state root.
 
@@ -25,6 +25,6 @@ The minimum root is:
 
 A phase id lives in exactly two places and they must be equal: the phase directory name under `phases/`, and the `id` of its object in that graph's `graph.yaml.phases[]`. The directory name is the source of identity and the file name — `LOGIC.md`, `AGENT.md`, or `SUBGRAPH.md` — is the source of type. A phase document's frontmatter must not restate `phase_id`, `mode`, or the graph id. A third copy of the name is not a redundancy to keep in sync; it is a defect, and the format rejects it.
 
-The same rule shapes the reusable-graph registry: a registry `graph_id` equals its directory name under `graphs/`, and nothing else records that identity.
+The same rule shapes the reusable-graph registry: a registry `graph_id` equals its directory name under `subgraphs/`, and nothing else records that identity.
 
 MoirAI's packaged integration assets are host guidance, roles, and knowledge. They intentionally contain no `graph.yaml` and are not a business gSkill.

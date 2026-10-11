@@ -36,7 +36,7 @@ def _child(
     input_field: str,
     output_field: str,
 ) -> Path:
-    child = root / "graphs" / graph_id
+    child = root / "subgraphs" / graph_id
     _write(
         child / "graph.yaml",
         f"""schema_version: gskill.graph.v1
@@ -116,7 +116,7 @@ def _issues(root: Path) -> list[object]:
 
 def test_a_registry_graph_defect_is_not_reported_at_the_root_graph(tmp_path: Path) -> None:
     root = _skill(tmp_path)
-    child_graph = root / "graphs" / "first" / "graph.yaml"
+    child_graph = root / "subgraphs" / "first" / "graph.yaml"
     child_graph.write_text(
         child_graph.read_text(encoding="utf-8").replace(
             "phases:", "no_such_graph_field: 1\nphases:", 1
@@ -129,7 +129,7 @@ def test_a_registry_graph_defect_is_not_reported_at_the_root_graph(tmp_path: Pat
 
     assert (
         "[F-v3-graph-schema-unknown-field]",
-        "graphs/first/graph.yaml",
+        "subgraphs/first/graph.yaml",
     ) in located
     assert ("[F-v3-graph-schema-unknown-field]", "graph.yaml") not in located
 
@@ -139,7 +139,7 @@ def test_same_named_phases_in_two_registry_graphs_stay_distinguishable(
 ) -> None:
     root = _skill(tmp_path)
     for graph_id in ("first", "second"):
-        phase = root / "graphs" / graph_id / "phases" / "review" / "AGENT.md"
+        phase = root / "subgraphs" / graph_id / "phases" / "review" / "AGENT.md"
         phase.write_text(
             phase.read_text(encoding="utf-8").replace(
                 "<role>Review the input.</role>",
@@ -152,8 +152,8 @@ def test_same_named_phases_in_two_registry_graphs_stay_distinguishable(
 
     paths = [issue.source_path for issue in _issues(root)]
 
-    assert "graphs/first/phases/review/AGENT.md" in paths
-    assert "graphs/second/phases/review/AGENT.md" in paths
+    assert "subgraphs/first/phases/review/AGENT.md" in paths
+    assert "subgraphs/second/phases/review/AGENT.md" in paths
 
 
 def test_a_root_phase_defect_keeps_its_plain_relative_path(tmp_path: Path) -> None:

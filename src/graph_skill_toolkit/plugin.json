@@ -1,0 +1,7 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "graph-skill-canvas",
+  "version": "0.0.6",
+  "description": "Graph Skill canvas with automatic display guidance and a host folder shortcut.",
+  "author": { "name": "Graph Skill contributors" }
+}

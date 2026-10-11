@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Graph Skill · 接口原型</title>
+  <style>
+    :root { color-scheme: light dark; font: 13px/1.5 system-ui, sans-serif; color: #24304a; background: #f6f7f9; --surface: #fff; --surface-soft: #f6f7f9; --text: #24304a; --muted: #63718a; --border: #dce1e9; --accent: #675ec7; --accent-soft: #eeecfc; --grid: #d9dde6; --edge: #9ba8be; }
+    * { box-sizing: border-box; }
+    html, body, #app { width: 100%; height: 100%; margin: 0; }
+    body { overflow: hidden; }
+    button, textarea { font: inherit; }
+    button { border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; color: var(--text); background: var(--surface); cursor: pointer; white-space: nowrap; }
+    button:hover:enabled { border-color: var(--accent); background: var(--accent-soft); }
+    button:disabled { cursor: not-allowed; color: var(--muted); opacity: .58; }
+    button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .workbench { display: flex; flex-direction: column; width: 100%; height: 100dvh; }
+    .app-header { flex: 0 0 auto; padding: 14px 18px 10px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .heading { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .heading > strong { font-size: 17px; letter-spacing: -.4px; }
+    .prototype-badge { color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 5px; font-size: 11px; }
+    .connection { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .connection.connected::before { content: ""; display: inline-block; width: 6px; height: 6px; background: #399476; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+    .root-line { display: flex; align-items: baseline; gap: 9px; min-width: 0; margin-top: 8px; }
+    .field-label { color: var(--muted); font-size: 11px; }
+    #skill-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; font: 12px/1.5 ui-monospace, monospace; }
+    #status { margin: 5px 0 0; color: var(--muted); font-size: 11px; min-height: 17px; }
+    .test-toolbar { display: flex; flex: 0 0 auto; align-items: center; flex-wrap: nowrap; gap: 7px; overflow-x: auto; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+    .test-toolbar > *, .test-button-wrap { flex: 0 0 auto; }
+    .test-toolbar button { font-size: 12px; }
+    .content-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; flex: 1; min-height: 0; }
+    .graph-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 20px 20px; }
+    .graph-summary { display: flex; justify-content: space-between; gap: 10px; padding: 13px 18px 0; color: var(--muted); font-size: 11px; }
+    .graph-summary > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .graph-summary > :last-child { white-space: nowrap; }
+    .graph-area { flex: 1; min-height: 0; min-width: 0; padding: 8px 18px; }
+    .graph-area svg { display: block; width: 100%; height: 100%; }
+    .graph-hint { flex: 0 0 auto; margin: 0; padding: 9px 18px 12px; color: var(--muted); font-size: 11px; }
+    .empty-state { display: grid; place-content: center; height: 100%; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+    .graph-node { cursor: pointer; outline: none; }
+    .node { fill: var(--surface); stroke: var(--border); stroke-width: 1.25; }
+    .graph-node:hover .node { stroke: var(--accent); }
+    .graph-node[aria-pressed="true"] .node { stroke: var(--accent); stroke-width: 2.5; fill: var(--accent-soft); }
+    .graph-node:focus-visible .node { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 6 3; }
+    .label { fill: var(--text); font-size: 19px; font-weight: 600; }
+    .kind { fill: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: 1.5px; }
+    .edge { fill: none; stroke: var(--edge); stroke-width: 1.5; }
+    .arrow { fill: var(--edge); }
+    .dot { fill: var(--accent); } .input { fill: #499c84; } .output { fill: #cb9350; }
+    .inspector { min-height: 0; overflow-y: auto; background: var(--surface); border-left: 1px solid var(--border); scrollbar-width: thin; }
+    .inspector-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    h2 { font-size: 12px; margin: 0 0 9px; font-weight: 650; }
+    p { margin: 7px 0; }
+    .muted { color: var(--muted); font-size: 11px; }
+    dl { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 5px; font-size: 12px; margin: 0 0 9px; }
+    dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+    details { min-width: 0; } summary { cursor: pointer; color: var(--muted); font-size: 11px; }
+    pre { max-width: 100%; overflow-x: auto; font: 11px/1.5 ui-monospace, monospace; padding: 9px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    textarea { display: block; width: 100%; min-height: 78px; resize: vertical; border: 1px solid var(--border); border-radius: 7px; padding: 9px; background: var(--surface-soft); color: var(--text); font-size: 12px; }
+    .capabilities ul { list-style: none; padding: 0; margin: 10px 0 0; }
+    .capabilities li { padding: 7px 0; border-top: 1px solid var(--border); font-size: 11px; }
+    .capabilities li strong { display: flex; justify-content: space-between; gap: 8px; }
+    .capabilities li strong span { color: var(--muted); font-weight: normal; }
+    .capabilities li p { margin: 3px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; }
+    .section-heading > span { color: var(--muted); font-size: 11px; }
+    .action-log { max-height: 400px; overflow-y: auto; scrollbar-width: thin; }
+    .empty-log { padding: 12px 0; }
+    .log-entry { margin-top: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-soft); font-size: 11px; overflow-wrap: anywhere; }
+    .log-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .log-heading time { color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .result-status { display: inline-block; color: var(--accent); margin-top: 5px; font-weight: 600; }
+    .log-entry.error .result-status, .log-entry.rejected .result-status { color: #b94a4a; }
+    .log-entry.completed .result-status { color: #32856b; }
+    .log-entry.unsupported .result-status { color: var(--muted); }
+    .request-id { font: 10px/1.5 ui-monospace, monospace; color: var(--muted); }
+    .log-entry button { font-size: 11px; padding: 5px 8px; }
+    @media (max-width: 720px) {
+      body { overflow: auto; }
+      .workbench { height: auto; min-height: 100dvh; }
+      .app-header { padding: 12px 12px 8px; }
+      .heading { flex-wrap: wrap; gap: 7px; }
+      .connection { font-size: 10px; }
+      .test-toolbar { padding: 9px 12px; }
+      .content-layout { display: block; }
+      .graph-panel { height: min(66dvh, 620px); min-height: 320px; }
+      .inspector { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
+      .graph-summary, .graph-hint { padding-left: 12px; padding-right: 12px; }
+      .graph-area { padding: 8px 12px; }
+      .action-log { max-height: 360px; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color: #edf1f8; background: #171b23; --surface: #222936; --surface-soft: #1c222d; --text: #edf1f8; --muted: #a1adc2; --border: #3a4557; --accent: #b1a6ff; --accent-soft: #332f4d; --grid: #303746; --edge: #68758e; }
+      .log-entry.completed .result-status { color: #73cbb0; }
+      .log-entry.error .result-status, .log-entry.rejected .result-status { color: #ed9090; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <noscript>Graph Skill 画布需要启用 JavaScript。</noscript>
+  <script id="graph-skill-snapshot" type="application/json">null</script>
+  <script>/* APP_BUNDLE */</script>
+</body>
+</html>

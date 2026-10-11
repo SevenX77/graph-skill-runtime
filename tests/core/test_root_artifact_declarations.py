@@ -171,7 +171,7 @@ validator: false
 """,
     )
 
-    child = root / "graphs" / "child-pipeline"
+    child = root / "subgraphs" / "child-pipeline"
     _write(
         child / "graph.yaml",
         """schema_version: gskill.graph.v1

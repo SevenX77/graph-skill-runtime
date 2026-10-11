@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/after-tool.mjs\"", "timeout": 10 }] }]
+  }
+}
