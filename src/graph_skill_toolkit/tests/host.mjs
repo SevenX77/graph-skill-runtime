@@ -6,7 +6,9 @@ const iframe = document.querySelector("iframe");
 const response = await fetch("/tool-result.json");
 const result = await response.json();
 const native = ["native", "reject"].includes(new URLSearchParams(location.search).get("files"));
-const bridge = new AppBridge(null, { name: "graph-canvas-test-host", version: "0.0.2" }, { message: {text:{}}, updateModelContext: {}, serverTools: {}, ...(native ? { experimental: { "openai/files": {} } } : {}) });
+// Explicit fixture identity; the default generic MCP host must stay unknown.
+const simulatedCodex = new URLSearchParams(location.search).get("host") === "codex";
+const bridge = new AppBridge(null, { name: simulatedCodex ? "chatgpt" : "graph-canvas-test-host", version: "0.0.2" }, { message: {text:{}}, updateModelContext: {}, serverTools: {}, ...(native ? { experimental: { "openai/files": {}, "openai/message": {draft:{}} } } : {}) });
 bridge.setRequestHandler("openai/files/open", { params: z.object({ path: z.string() }) }, async request => {
   document.documentElement.dataset.openedPath = request.path;
   if (new URLSearchParams(location.search).get("files") === "reject") throw new Error("Test host rejects directories");

@@ -12,6 +12,7 @@ import { createPreviewConfiguration } from "../adapters/claude/preview_configura
 import { skillDocument } from "../presentation/index.mjs";
 import { codexResourceMetadata } from "../adapters/codex/resource/index.mjs";
 import { createCodexCanvasSessions } from "../adapters/codex/session/index.mjs";
+import { launchHostInfo, requestClientInfo } from "../adapters/launch/index.mjs";
 import packageInfo from "../package.json" with { type: "json" };
 
 const resourceUri = "ui://graph-skill/canvas-v2.html";
@@ -28,24 +29,27 @@ const stdio = serveStdio(() => {
   registerAppTool(server, "show_graph", {
     title: "Show Graph Skill canvas",
     description: "Display the selected Graph Skill's actual root graph together with its SKILL.md. In Codex, first open the verified SKILL.md with open_in_codex target type=file and line=1 in a standalone host invocation. After that invocation returns, call this tool in a separate invocation as the final presentation. Keep file opening and this tool in distinct tool batches, including when orchestrating calls; queued file delivery is not UI completion. Retain and reuse both views, with the canvas active. HTML presentation requires preview_project_root from the actual Claude session root; it starts an owned loopback preview and merges one temporary attach entry into that project's .claude/launch.json. Record existing tabs, attach the returned preview name and retain the actual HTTP tabId. Open or reuse document.path with normal file preview to show SKILL.md and reveal the sidebar. Navigate only the retained HTTP tab to the canvas URL, select it, and verify both views remain with the pane displayed. Preserve all prior user pages. Omit skill_root only for the explicitly requested demonstration, which has no business document.",
-    inputSchema: z.object({ skill_root: z.string().min(1).optional(), presentation: z.enum(["mcp-app", "html"]).optional(), preview_project_root: z.string().min(1).optional() }).strict(),
+    inputSchema: z.object({ skill_root: z.string().min(1).optional(), presentation: z.enum(["mcp-app", "html"]).optional(), preview_project_root: z.string().min(1).optional(),
+      native_host: z.object({name:z.literal("Claude Code"),version:z.string().min(1).max(256),client_type:z.literal("claude_code"),
+        sessionId:z.string().min(1).max(256),source:z.literal("claude-mod-session")}).strict().optional().describe("Supplied by the Claude Mod from native session APIs; the Mod overwrites caller values. Omit in ordinary calls.") }).strict(),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _meta: { ui: { resourceUri, visibility: ["model"] } },
-  }, async ({ skill_root, presentation, preview_project_root }) => {
+  }, async ({ skill_root, presentation, preview_project_root, native_host }, context) => {
     try {
+      const hostInfo = launchHostInfo({clientInfo:requestClientInfo(server.server, context),presentation,nativeHost:native_host});
       if (presentation === "html" && (!skill_root || !preview_project_root)) throw new Error("HTML preview requires skill_root and the actual host session's preview_project_root.");
       if (presentation !== "html" && preview_project_root !== undefined) throw new Error("preview_project_root applies only to HTML presentation.");
       if (!skill_root) return {
         content: [{ type: "text", text: "Demonstration canvas. No business Skill selected; pass skill_root for its actual graph and folder shortcut." }],
-        structuredContent: { graph: { ...graph, width: 352, height: 548 }, skillRoot: null },
+        structuredContent: { graph: { ...graph, width: 352, height: 548 }, skillRoot: null, hostInfo },
         _meta: codexSessions.metadata(null),
       };
       const skill = await loadSkill(skill_root);
       selectedRoots.set(skill_root, skill.skillRoot);
       const projected = projectGraph(skill.data, skill.kinds);
-      const payload = { graph: projected, skillRoot: skill.skillRoot, document: skillDocument(skill.skillRoot) };
+      const payload = { graph: projected, skillRoot: skill.skillRoot, document: skillDocument(skill.skillRoot), hostInfo };
       if (presentation === "html" && (await stat(payload.document.path)).size > 524288) throw new Error("SKILL.md exceeds the host file preview's 512 KiB limit.");
-      const bridge = presentation === "html" ? await hostBridge.createView(skill.skillRoot) : undefined;
+      const bridge = presentation === "html" ? await hostBridge.createView(skill.skillRoot, hostInfo) : undefined;
       let httpPresentation;
       if (bridge) {
         const document = snapshotHtml(html, { ...payload, hostBridge: bridge.browser });
@@ -79,7 +83,9 @@ const stdio = serveStdio(() => {
   registerAppResource(server, "Graph Skill canvas", resourceUri, {
     description: "Viewport-filling graph canvas with a host-owned Skill folder shortcut.",
     _meta: { ui, ...codexResourceMetadata },
-  }, async () => ({ contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html, _meta: { ui, ...codexResourceMetadata } }] }));
+  }, async (_uri, context) => ({ contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE,
+    text: snapshotHtml(html, {hostInfo:launchHostInfo({clientInfo:requestClientInfo(server.server, context)})}),
+    _meta: { ui, ...codexResourceMetadata } }] }));
   return server;
 }, { onerror: (error) => console.error(error.message) });
 

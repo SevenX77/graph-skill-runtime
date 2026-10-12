@@ -25,6 +25,7 @@ class BundleLayoutTests(unittest.TestCase):
             self.assertEqual(missing, [])
             self.assertIn("installer/entry/main.py", files)
             self.assertIn("installer/install/__init__.py", files)
+            self.assertEqual(files["ADAPTER.md"], ROOT / "ADAPTER.md")
             self.assertFalse(any(name.startswith("packaging/") for name in files))
             self.assertEqual(
                 files["claude-mod/hooks/register.js"],

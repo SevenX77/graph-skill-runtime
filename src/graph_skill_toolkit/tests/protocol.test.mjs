@@ -10,6 +10,7 @@ import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { graph, matchesProbeGraph } from "../demo/graph.mjs";
 import { graphPayload } from "../adapters/claude/mod/hooks/register.js";
 import { validateCanvas } from "../ui/canvas/index.mjs";
+import { SNAPSHOT_SLOT } from "../adapters/claude/preview/publisher.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -62,7 +63,9 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     assert.equal(actual.structuredContent.skillRoot, await realpath(skill));
     assert.equal(actual.structuredContent.graph.id, "actual");
     assert.equal(actual.structuredContent.document.path, join(await realpath(skill), "SKILL.md"));
-    assert.deepEqual((await client.callTool({name:"inspect_graph",arguments:{skill_root:actual.structuredContent.skillRoot}})).structuredContent,actual.structuredContent);
+    const {hostInfo,...graphContent}=actual.structuredContent;
+    assert.equal(hostInfo.id,"unknown");assert.equal(hostInfo.name,"graph-canvas-test");
+    assert.deepEqual((await client.callTool({name:"inspect_graph",arguments:{skill_root:actual.structuredContent.skillRoot}})).structuredContent,graphContent);
     assert.deepEqual(actual.structuredContent.graph.nodes.map(node => node.kind), ["INPUT", "LOGIC", "OUTPUT"]);
     const native = validateCanvas(graphPayload({ result: actual }));
     assert.equal(native.skillRoot, await realpath(skill));
@@ -85,7 +88,9 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     const { contents } = await client.readResource({ uri: tool._meta.ui.resourceUri });
     assert.deepEqual(contents[0]._meta["openai/ui"], codexDisplay);
     assert.equal(contents[0].mimeType, RESOURCE_MIME_TYPE);
-    assert.equal(contents[0].text, await readFile(join(root, "dist/canvas.html"), "utf8"));
+    const slot=/<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+    assert.deepEqual(JSON.parse(slot.exec(contents[0].text)[1]).hostInfo,hostInfo);
+    assert.equal(contents[0].text.replace(slot,SNAPSHOT_SLOT), await readFile(join(root, "dist/canvas.html"), "utf8"));
     assert.deepEqual(contents[0]._meta.ui.csp, { connectDomains: [], resourceDomains: [] });
     assert.doesNotMatch(contents[0].text, /<script[^>]+src=|<link[^>]+href=/i);
     assert.match(contents[0].text, /id="app"/);

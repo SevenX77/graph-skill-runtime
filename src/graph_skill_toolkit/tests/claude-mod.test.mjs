@@ -13,7 +13,7 @@ const tool = 'mcp__graph-skill-canvas__show_graph';
 function host({available=true, canNavigate=true, canObserve=true, canSelect=true, root=projectRoot, rootError=false}={}) {
   const handlers = [], opened = [], logs = [];
   register((name, matcher, fn) => handlers.push(typeof matcher === 'function' ? {name,matcher:{},fn:matcher} : {name,matcher,fn}));
-  const api = {command:{register:async()=>{}},session:{root:async()=>{
+  const api = {command:{register:async()=>{}},session:{id:async()=>"native-session",version:async()=>({version:"native-engine"}),root:async()=>{
     if(rootError) throw new Error('session root unavailable');
     return root;
   }},tool:{
@@ -30,9 +30,10 @@ function host({available=true, canNavigate=true, canObserve=true, canSelect=true
 test('Claude binds HTTP preview to the actual session root and requests normal attach then navigate',async()=>{
   const h=host();let count=0;
   const result={result:JSON.stringify(payload),ref:42,text:'unchanged',context:['existing reminder']};
-  const adapted=await h.call('tool.call',{tool,skill_root:'/business-link',preview_project_root:'/untrusted-other-project'},async input=>{
+  const adapted=await h.call('tool.call',{tool,skill_root:'/business-link',preview_project_root:'/untrusted-other-project',native_host:{sessionId:'model-forged'}},async input=>{
     count++;assert.equal(input.presentation,'html');assert.equal(input.skill_root,'/business-link');
-    assert.equal(input.preview_project_root,projectRoot);return result;
+    assert.equal(input.preview_project_root,projectRoot);
+    assert.deepEqual(input.native_host,{name:'Claude Code',version:'native-engine',client_type:'claude_code',sessionId:'native-session',source:'claude-mod-session'});return result;
   });
   assert.equal(adapted.result,result.result);assert.equal(adapted.ref,42);assert.equal(adapted.text,result.text);
   assert.equal(adapted.context[0],'existing reminder');assert.equal(adapted.context.length,2);

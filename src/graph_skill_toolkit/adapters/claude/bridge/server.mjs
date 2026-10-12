@@ -1,7 +1,9 @@
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
+import { HOST_ACTIONS } from "../../../ports/host/contract.mjs";
+import { identifyHost, hostIdentityKey } from "../../detection/index.mjs";
 
-const actions = new Set(["open-root", "open-file", "fill-prompt", "send-prompt", "update-context", "list-tools", "call-tool", "request-skill"]);
+const actions = new Set(HOST_ACTIONS);
 const statuses = new Set(["completed", "accepted", "unsupported", "rejected", "error"]);
 const token = () => randomBytes(32).toString("hex");
 const pending = id => ({ status: "pending", message: "宿主仍未返回结果；查询此请求不会重复执行。", requestId: id });
@@ -38,7 +40,7 @@ function validateAction(input, root) {
 export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}) {
   const roots = new Map(), credentials = new Map(), pages = new Map();
   let server, base, opening, closing, closed = false;
-  const connected = view => !view.disconnected && now() - view.lastPoll < 5000;
+  const connected = view => view.confirmed && !view.disconnected && now() - view.lastPoll < 5000;
   function finish(entry, result) {
     if (entry.result) return;
     entry.result = result;
@@ -82,13 +84,24 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}
     const { view, role } = credential;
     try {
       if (request.method === "GET" && url.pathname === "/capabilities" && role === "browser") {
-        return send(200, { connected: connected(view), capabilities: connected(view) ? view.capabilities : {}, message: connected(view) ? "Claude Mod 已连接" : "尚未收到当前 Claude Mod 的心跳" });
+        return send(200, { connected: connected(view), identity: view.identity, capabilities: connected(view) ? view.capabilities : {}, message: connected(view) ? "Claude Mod 已连接" : "尚未收到当前 Claude Mod 的有效身份和心跳" });
       }
       if (request.method === "POST" && url.pathname === "/poll" && role === "mod") {
         const input = await readJson(request);
-        if (!input.capabilities || typeof input.capabilities !== "object" || Array.isArray(input.capabilities)) throw new Error("Missing Mod capabilities.");
         if (view.disconnected) return send(401, { error: "This Claude session has ended." });
-        view.lastPoll = now(); view.capabilities = input.capabilities;
+        const info = identifyHost({transport:"http-bridge",connected:true,identity:input.identity,capabilities:input.capabilities});
+        view.identity = input.identity ?? null;
+        view.confirmed = info.status === "confirmed";
+        view.lastPoll = now(); view.capabilities = info.capabilities;
+        if (!view.confirmed) return send(200, {requests:[]});
+        const identityKey = hostIdentityKey(info);
+        if (view.identityKey && view.identityKey !== identityKey) {
+          view.disconnected = true;
+          credentials.delete(view.mod.token);
+          for (const entry of view.requests.values()) finish(entry, {status:entry.delivered ? "pending" : "error",message:"会话身份已改变；旧画布操作不会交给新会话。",requestId:entry.request.id});
+          return send(409, {error:"The bridge belongs to another host session. Open a new canvas."});
+        }
+        view.identityKey = identityKey;
         const requests = [];
         for (const entry of view.requests.values()) if (!entry.delivered && !entry.result) {
           entry.delivered = true; requests.push(entry.request);
@@ -142,17 +155,26 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}
     });
   }
   return {
-    async createView(root) {
+    async createView(root, launchInfo) {
       await open();
       if (closed) throw new Error("Bridge is closed.");
       let view = roots.get(root);
+      // Bind a native startup session before its first heartbeat. A later
+      // explicit launch in another session gets its own page and credentials.
+      const launchKey = launchInfo?.identitySource === "claude-mod-session" && launchInfo.status === "confirmed" ? hostIdentityKey(launchInfo) : "";
+      if (view && launchKey && view.identityKey && view.identityKey !== launchKey) {
+        view.disconnected = true;
+        credentials.delete(view.mod.token);
+        for (const entry of view.requests.values()) finish(entry, {status:entry.delivered ? "pending" : "error",message:"启动会话已改变；原画布操作不会交给新会话。",requestId:entry.request.id});
+      }
       if (!view || view.disconnected) {
-        view = { root, path: `/view/${token()}`, html: null, lastPoll: -Infinity, disconnected: false, capabilities: {}, requests: new Map(), browser: { url: base, token: token() }, mod: { url: base, token: token() } };
+        view = { root, path: `/view/${token()}`, html: null, lastPoll: -Infinity, disconnected: false, identity:null, identityKey:null, confirmed:false, capabilities: {}, requests: new Map(), browser: { url: base, token: token() }, mod: { url: base, token: token() } };
         roots.set(root, view);
         pages.set(view.path, view);
         credentials.set(view.browser.token, { view, role: "browser" });
         credentials.set(view.mod.token, { view, role: "mod" });
       }
+      if (launchKey) view.identityKey = launchKey;
       return { browser: view.browser, mod: view.mod, url: base + view.path };
     },
     publish(root, html) {

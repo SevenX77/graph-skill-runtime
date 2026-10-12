@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { mcpConnection } from '../adapters/codex/connection/index.mjs';
 import { codexAdapter } from '../adapters/codex/browser/index.mjs';
 import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -34,7 +35,7 @@ test('Codex file requests use the same Windows path identity and never route fol
 test('Codex receiving graph data has no file opening or message side effect',async()=>{
   const received=[];
   const app={connect:async()=>{},request:()=>assert.fail('Unexpected file request'),sendMessage:()=>assert.fail('Unexpected host turn')};
-  await codexAdapter(app).connect({receive:p=>received.push(p),fail:assert.fail});
+  await mcpConnection(app).connect({receive:p=>received.push(p),fail:assert.fail});
   const payload={skillRoot:'C:/skill',document:{path:'C:/skill/SKILL.md'},graph:{id:'main'}};
   app.ontoolresult({structuredContent:payload});
   assert.deepEqual(received,[payload]);

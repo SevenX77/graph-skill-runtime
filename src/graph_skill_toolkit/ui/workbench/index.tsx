@@ -34,30 +34,9 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function failedResult(error: unknown): HostResult {
-  if (error && typeof error === "object" && "outcome" in error && error.outcome === "unknown") {
-    const requestId = "requestId" in error && typeof error.requestId === "string" ? error.requestId : undefined;
-    return { status: "pending", message: `请求结果未知：${messageOf(error)}。请检查宿主结果，避免重复发送。`, ...(requestId ? { requestId } : {}) };
-  }
-  return { status: "error", message: messageOf(error) };
-}
-
 function printable(value: unknown): string {
   try { return JSON.stringify(value, null, 2) ?? String(value); }
   catch { return String(value); }
-}
-
-function resultOf(result: HostResult): HostResult {
-  if (!result || !Object.hasOwn(statusLabels, result.status) || typeof result.message !== "string") throw new Error("适配器返回了无效结果，无法判断操作状态。");
-  return result;
-}
-
-function capabilitySet(value: HostCapabilities): HostCapabilities {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("适配器返回了无效能力列表。");
-  for (const capability of Object.values(value)) {
-    if (!capability || typeof capability.available !== "boolean" || typeof capability.detail !== "string") throw new Error("适配器返回了无效能力说明。");
-  }
-  return value;
 }
 
 export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
@@ -68,6 +47,7 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
   const [capabilities, setCapabilities] = useState<HostCapabilities>({});
   const [capabilityError, setCapabilityError] = useState("");
   const [capabilitiesRead, setCapabilitiesRead] = useState(false);
+  const [hostInfo, setHostInfo] = useState(adapter?.hostInfo ?? null);
   const [prompt, setPrompt] = useState("请仅回复：Graph Skill 反向接口测试成功。");
   const [busy, setBusy] = useState<string | null>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -86,8 +66,14 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
 
   async function readCapabilities() {
     if (!adapter) return {};
-    const value = capabilitySet(await adapter.capabilities());
+    let value;
+    try { value = await adapter.capabilities(); }
+    catch (error) {
+      if (alive.current) { setHostInfo(adapter.hostInfo); setCapabilities({}); setCapabilityError(messageOf(error)); }
+      throw error;
+    }
     if (alive.current) {
+      setHostInfo(adapter.hostInfo);
       setCapabilities(value);
       setCapabilitiesRead(true);
       setCapabilityError("");
@@ -98,6 +84,7 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
   useEffect(() => {
     alive.current = true;
     let disposed = false;
+    let identityTimer: ReturnType<typeof setInterval> | undefined;
     const state = document.documentElement.dataset;
     state.connection = adapter ? "connecting" : "standalone";
     delete state.toolResult;
@@ -125,6 +112,7 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
         state.connection = "connected";
         try { await readCapabilities(); }
         catch (error) { if (!disposed) setCapabilityError(messageOf(error)); }
+        if (!disposed) identityTimer = setInterval(() => { void readCapabilities().catch(() => {}); }, 2000);
       }).catch(error => {
         if (disposed) return;
         setConnection("failed");
@@ -137,6 +125,7 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
     const dispose = () => {
       if (disposed) return;
       disposed = true;
+      clearInterval(identityTimer);
       alive.current = false;
       void adapter?.dispose();
     };
@@ -163,17 +152,17 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
     setBusy(action);
     const requestedRoot = root;
     try {
-      const result = resultOf(await adapter.invoke(action, { skillRoot: requestedRoot, ...(definition.needsPrompt ? { text: prompt } : {}), ...(action === "update-context" && context ? { context } : {}) }));
+      const result = await adapter.invoke(action, { skillRoot: requestedRoot, ...(definition.needsPrompt ? { text: prompt } : {}), ...(action === "update-context" && context ? { context } : {}) });
       append(definition.label, result, requestedRoot);
-    } catch (error) { append(definition.label, failedResult(error), requestedRoot); }
-    finally { busyRef.current = false; if (alive.current) setBusy(null); }
+    }
+    finally { busyRef.current = false; if (alive.current) { setBusy(null); setHostInfo(adapter.hostInfo); setCapabilities(adapter.hostInfo.capabilities); } }
   }
 
   async function inspectCapabilities() {
     if (busyRef.current || connection !== "connected") return;
     busyRef.current = true;
     setBusy("capabilities");
-    try { append("检查宿主能力", { status: "completed", message: "已读取当前适配器的能力声明；原生效果以实际操作结果为准。", data: await readCapabilities() }); }
+    try { await readCapabilities(); append("检查宿主能力", { status: "completed", message: "已读取当前连接的身份和能力；原生效果以实际操作结果为准。", data: adapter?.hostInfo }); }
     catch (error) { setCapabilityError(messageOf(error)); append("检查宿主能力", { status: "error", message: messageOf(error) }); }
     finally { busyRef.current = false; if (alive.current) setBusy(null); }
   }
@@ -183,7 +172,7 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
     busyRef.current = true;
     setBusy("check-result");
     try {
-      const result = resultOf(await adapter.getResult(entry.result.requestId));
+      const result = await adapter.getResult(entry.result.requestId);
       if (alive.current) setLog(current => current.map(item => item.id === entry.id ? { ...item, result: { ...result, requestId: result.requestId ?? entry.result.requestId } } : item));
     } catch (error) { append("检查请求结果", { status: "error", message: messageOf(error), requestId: entry.result.requestId }, entry.skillRoot); }
     finally { busyRef.current = false; if (alive.current) setBusy(null); }
@@ -192,9 +181,9 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
   return (
     <main className="workbench" aria-label="Graph Skill canvas">
       <header className="app-header">
-        <div className="heading"><strong>Graph Skill</strong><span className="prototype-badge">接口原型</span><span className={`connection ${connection}`} data-host={adapter?.hostName ?? "standalone"}>{adapter?.hostName ?? "独立示例"} · {connection === "connected" ? "页面就绪" : connection === "connecting" ? "连接中" : connection === "failed" ? "连接失败" : "未连接宿主"}</span></div>
+        <div className="heading"><strong>Graph Skill</strong><span className="prototype-badge">接口原型</span><span className={`connection ${hostInfo?.status === "unknown" ? "unknown" : connection}`} data-host={adapter?.hostName ?? "standalone"}>{adapter?.hostName ?? "独立示例"} · {connection === "connected" ? hostInfo?.status === "confirmed" ? "页面就绪" : "身份未确认" : connection === "connecting" ? "连接中" : connection === "failed" ? "连接失败" : "未连接宿主"}</span></div>
         <div className="root-line"><span className="field-label">Skill</span><span id="skill-path" title={root ?? "示例画布未绑定实际 Skill"}>{root ?? "示例画布 · 未选择 Skill"}</span></div>
-        <p id="status" role="status" aria-live="polite">{failure || capabilityError || (busy ? "正在等待接口返回…" : !adapter ? "这是独立示例。请通过宿主打开真实 Skill 后测试接口。" : "点击节点查看上下文；反向操作只在点击测试按钮后触发。")}</p>
+        <p id="status" role="status" aria-live="polite">{failure || capabilityError || (busy ? "正在等待接口返回…" : !adapter ? "这是独立示例。请通过宿主打开真实 Skill 后测试接口。" : hostInfo?.status === "unknown" ? hostInfo.reason : "点击节点查看上下文；反向操作只在点击测试按钮后触发。")}</p>
       </header>
       <nav className="test-toolbar" aria-label="宿主接口测试">
         <button type="button" data-action="capabilities" disabled={connection !== "connected" || Boolean(busy)} title="读取当前适配器的能力与限制" onClick={() => void inspectCapabilities()}>检查宿主能力</button>
@@ -212,6 +201,7 @@ export function GraphWorkbench({ adapter }: { adapter: HostAdapter | null }) {
         <aside className="inspector" aria-label="节点与接口详情">
           <section className="inspector-section"><h2>所选节点</h2>{selectedNode ? <dl><dt>节点 ID</dt><dd data-selected-node>{selectedNode.id}</dd><dt>类型</dt><dd>{selectedNode.kind}</dd></dl> : <p className="muted">尚未选择节点。</p>}<details><summary>将发送的上下文</summary><pre data-selection-context>{context ? printable(context) : "未绑定实际 Skill"}</pre></details></section>
           <section className="inspector-section"><h2><label htmlFor="test-prompt">测试提示词</label></h2><textarea id="test-prompt" rows={4} value={prompt} onChange={event => setPrompt(event.target.value)} /><p className="muted">“填入草稿”只准备文本；“发送并执行”会请求宿主开始对话。“请求使用 Skill”请求读取说明并概述用途。</p></section>
+          <section className="inspector-section"><details><summary>宿主连接信息</summary><pre data-host-info>{hostInfo ? printable(hostInfo) : "独立示例未连接宿主"}</pre></details></section>
           <section className="inspector-section capabilities"><details><summary>宿主能力与限制</summary>{capabilityError ? <p>{capabilityError}</p> : !capabilitiesRead ? <p className="muted">尚未取得能力声明。</p> : <ul>{actions.map(action => <li key={action.id}><strong>{action.label} <span>{capabilities[action.id]?.available ? "可测试" : "不可用"}</span></strong><p>{capabilities[action.id]?.detail ?? "适配器未声明此能力"}</p></li>)}</ul>}</details></section>
           <section className="inspector-section action-results"><div className="section-heading"><h2>操作结果</h2><span>{log.length}</span></div><p className="muted">“请求已接受”表示接口已受理，宿主任务是否完成需另行观察。</p><div className="action-log" role="log" aria-live="polite" aria-relevant="additions text">{log.length === 0 ? <p className="muted empty-log">尚未触发测试操作。</p> : log.map(entry => <article key={entry.id} className={`log-entry ${entry.result.status}`} data-result-status={entry.result.status}><div className="log-heading"><strong>{entry.action}</strong><time>{entry.time}</time></div><span className="result-status">{statusLabels[entry.result.status]}</span><p>{entry.result.message}</p>{entry.result.requestId ? <p className="request-id">请求：{entry.result.requestId}</p> : null}{entry.result.status === "pending" && entry.result.requestId && adapter?.getResult ? <button type="button" data-action="check-result" disabled={Boolean(busy) || connection !== "connected"} onClick={() => void checkResult(entry)}>检查请求结果</button> : null}{entry.result.status === "pending" ? entry.acknowledged ? <p className="muted">结果仍未知；已允许继续测试。</p> : <button type="button" data-action="acknowledge-unknown" disabled={Boolean(busy)} onClick={() => setLog(current => current.map(item => item.id === entry.id ? { ...item, acknowledged: true } : item))}>已查看宿主，继续测试</button> : null}{entry.result.data !== undefined ? <details><summary>响应数据</summary><pre>{printable(entry.result.data)}</pre></details> : null}</article>)}</div></section>
         </aside>

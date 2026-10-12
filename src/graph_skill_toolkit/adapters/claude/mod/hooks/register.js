@@ -18,6 +18,9 @@ export function bridgeDescriptor(payload) {
 
 function hostCapabilities(tools) {
   const inspect = tools.some(tool => tool.name === INSPECT_TOOL);
+  // The native Mod validator verifies the statically named API calls in this
+  // module before it can load. API nouns cannot be reflected on as JS values.
+  // Tool presence remains a live session observation, not a static promise.
   return {
     'open-root':{available:true,detail:'请求当前 Claude 会话打开 Skill 文件夹；回执只确认会话已启动'},
     'open-file':{available:true,detail:'请求当前 Claude 会话打开 SKILL.md；回执只确认会话已启动'},
@@ -28,6 +31,16 @@ function hostCapabilities(tools) {
     'call-tool':{available:inspect,detail:inspect ? '请求当前会话调用只读 inspect_graph；实际查询结果显示在会话中' : '当前会话没有 inspect_graph 工具'},
     'request-skill':{available:true,detail:'请求当前 Claude 会话阅读 Graph Skill 并概述；不直接执行业务图'},
   };
+}
+
+// Product provenance is this Claude-native Mod API, not a DOM snapshot. The
+// engine supplies the version and session identity; never invent either.
+export async function readHostIdentity($) {
+  try {
+    const [sessionId, build] = await Promise.all([$.session.id(), $.session.version()]);
+    if (typeof sessionId !== 'string' || !sessionId || typeof build?.version !== 'string' || !build.version) return null;
+    return {name:'Claude Code',version:build.version,client_type:'claude_code',sessionId,source:'claude-mod-session'};
+  } catch { return null; }
 }
 
 async function bridgePost($, bridge, path, body) {
@@ -97,11 +110,14 @@ export async function executeBridgeAction($, state, bridge, request) {
   return {status:'accepted',message:request.action === 'call-tool' ? 'Claude 已接受只读查询请求；是否执行成功及图数据请查看会话。' : 'Claude 已启动这次会话请求；任务结果请查看会话。'};
 }
 
-async function executeAndReport($, state, bridge, request) {
+async function executeAndReport($, state, bridge, request, sessionId) {
   const key = bridgeKey(bridge) + '/' + request.id;
   const generation = state.generation;
   let result;
-  try { result = await executeBridgeAction($, state, bridge, request); }
+  try {
+    if (await $.session.id() !== sessionId || state.closed || state.generation !== generation) throw new Error('The originating Claude session has ended.');
+    result = await executeBridgeAction($, state, bridge, request);
+  }
   catch (error) { result = {status:'error',message:String(error.message || error)}; }
   const resultBytes = new TextEncoder().encode(JSON.stringify(result)).length;
   if (resultBytes > 60000) result = {
@@ -131,13 +147,16 @@ export async function pollBridges($, state) {
     await flushReceipts($, state);
     const tools = await $.tool.list();
     if (state.closed || state.generation !== generation) return;
+    const identity = await readHostIdentity($);
     const capabilities = hostCapabilities(tools);
+    if (state.closed || state.generation !== generation) return;
     for (const bridge of state.bridges.values()) {
       try {
-        const result = await bridgePost($, bridge, '/poll', {capabilities});
+        const result = await bridgePost($, bridge, '/poll', {identity,capabilities});
         // A response may already be in flight when /clear ends the session.
         // Never dispatch that earlier session's actions after its boundary.
         if (state.closed || state.generation !== generation) return;
+        if (!identity) continue;
         if (!Array.isArray(result.requests)) throw new Error('Canvas bridge returned no request list.');
         for (const request of result.requests) {
           const key = bridgeKey(bridge) + '/' + request.id;
@@ -145,7 +164,7 @@ export async function pollBridges($, state) {
           state.seen.add(key);state.running.add(key);
           // prompt.submit may wait for the active turn to finish. Its promise
           // must not block this worker's heartbeat or another read-only action.
-          void executeAndReport($, state, bridge, request);
+          void executeAndReport($, state, bridge, request, identity.sessionId);
         }
       } catch (error) {
         if (!state.reported.has(bridgeKey(bridge))) { $.ui.log('Canvas host connection unavailable: ' + String(error.message || error)); state.reported.add(bridgeKey(bridge)); }
@@ -248,20 +267,24 @@ export function register(on) {
   });
   on('tool.call', {tool:'mcp__graph-skill-canvas__show_graph'}, async ($, e, next) => {
     if (typeof e.skill_root !== 'string' || !e.skill_root) return next(e);
-    let available = false, projectRoot, unavailable = '';
+    let available = false, projectRoot, nativeHost, unavailable = '';
     latestCanObserve = false;
     try {
       const tools = await $.tool.list();
       available = tools.some(tool => tool.name === PREVIEW_TOOL) && tools.some(tool => tool.name === NAVIGATE_TOOL);
       latestCanObserve = tools.some(tool => tool.name === CONTEXT_TOOL) && tools.some(tool => tool.name === SELECT_TOOL);
-      if (available) projectRoot = previewProjectRoot(await $.session.root());
+      if (available) {
+        projectRoot = previewProjectRoot(await $.session.root());
+        nativeHost = await readHostIdentity($);
+        if (!nativeHost) throw new Error('Current Claude session identity is unavailable.');
+      }
     }
     catch (error) { unavailable = 'Cannot identify the Claude preview project: ' + String(error.message || error); }
-    const canPresent = available && projectRoot !== undefined;
+    const canPresent = available && projectRoot !== undefined && nativeHost !== undefined && nativeHost !== null;
     // Only the live host root can select the launch.json owner. Model-provided
     // roots must not redirect writes to another project when the API is absent.
-    const {preview_project_root:ignoredRoot,presentation:requestedPresentation,...graphInput} = e;
-    const result = await next(canPresent ? {...e,presentation:'html',preview_project_root:projectRoot} : graphInput);
+    const {preview_project_root:ignoredRoot,presentation:requestedPresentation,native_host:ignoredIdentity,...graphInput} = e;
+    const result = await next(canPresent ? {...graphInput,presentation:'html',preview_project_root:projectRoot,native_host:nativeHost} : graphInput);
     if (result.deny || result.isError || result.result?.isError) { latestView = null; return result; }
     try {
       latestView = null;

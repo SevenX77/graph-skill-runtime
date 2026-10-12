@@ -1,7 +1,5 @@
-import { McpAppTransport } from "../transport/index.mjs";
-import packageInfo from "../../../package.json" with { type: "json" };
+import { mcpCapabilities } from "../connection/index.mjs";
 
-const capability = (available, detail) => ({ available: Boolean(available), detail });
 const textOf = result => result?.content?.filter(item => item.type === "text").map(item => item.text).join("\n");
 const unsupported = message => ({ status: "unsupported", message });
 function rootPath(root) {
@@ -9,8 +7,8 @@ function rootPath(root) {
   return root;
 }
 
-/** @returns {import('../../../ports/host/index').HostAdapter} */
-export function codexAdapter(app = new McpAppTransport({ name: "Graph Skill canvas", version: packageInfo.version })) {
+/** @returns {import('../../../ports/host/index').HostDriver} */
+export function codexAdapter(app) {
   const caps = () => app.getHostCapabilities() ?? {};
   async function send(text, draft = false) {
     if (typeof text !== "string" || !text.trim() || text.length > 8000) throw new Error("消息须包含 1–8000 个字符。");
@@ -20,29 +18,7 @@ export function codexAdapter(app = new McpAppTransport({ name: "Graph Skill canv
       { status: "accepted", message: draft ? "宿主已接受追加草稿请求；请检查输入框，本操作不发送。" : "宿主已接受消息请求；执行进度和结果请查看会话。", data: response };
   }
   return {
-    hostName: "Codex · MCP App",
-    rootActionLabel: "在宿主中打开 Skill 文件夹",
-    async connect({ receive, fail }) {
-      app.ontoolresult = result => {
-        if (result.isError) fail(new Error(result.content?.filter(item => item.type === "text").map(item => item.text).join("\n") || "Cannot display this Skill."));
-        else receive(result.structuredContent);
-      };
-      await app.connect();
-    },
-    async capabilities() {
-      const host = caps(), files = host.experimental?.["openai/files"], message = host.message;
-      return {
-        "open-root": capability(message, "请求当前 Agent 打开目录；回执不代表目录已经显示"),
-        "open-file": capability(files || message, "打开当前 Skill 的 SKILL.md；宿主决定可用的文件视图"),
-        "fill-prompt": capability(message && host.experimental?.["openai/message"]?.draft,
-          host.experimental?.["openai/message"]?.draft ? "通过宿主草稿扩展追加文本，保留原草稿且不发送" : "宿主未声明可追加草稿的消息扩展"),
-        "send-prompt": capability(message, "发送给当前宿主会话；回执仅代表请求被接受"),
-        "update-context": capability(host.updateModelContext, "更新下一次模型请求读取的上下文，不启动会话"),
-        "list-tools": capability(false, "当前接口仅能调用所属服务的已知工具，不能列出宿主全部工具"),
-        "call-tool": capability(host.serverTools, "调用本画布服务的只读 inspect_graph"),
-        "request-skill": capability(message, "请求 Agent 读取此 Skill 并概述；不直接执行业务图"),
-      };
-    },
+    async capabilities() { return mcpCapabilities(app.getHostCapabilities()); },
     async invoke(action, args = {}) {
       const available = (await this.capabilities())[action];
       if (!available?.available) return unsupported(available?.detail || "未知操作。");
@@ -80,11 +56,5 @@ export function codexAdapter(app = new McpAppTransport({ name: "Graph Skill canv
       }
       return unsupported("当前宿主没有此操作。");
     },
-    async openRoot(root) {
-      const result = await this.invoke("open-root", { skillRoot: root });
-      if (["error", "rejected", "unsupported"].includes(result.status)) throw new Error(result.message);
-      return result.message;
-    },
-    dispose() { return app.close(); },
   };
 }

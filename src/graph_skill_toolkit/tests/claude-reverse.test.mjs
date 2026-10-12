@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {connect} from 'node:net';
-import {claudeAdapter,validateBrowserBridge} from '../adapters/claude/browser/index.mjs';
+import {claudeAdapter as executionAdapter} from '../adapters/claude/browser/index.mjs';
+import {httpConnection,validateBrowserBridge} from '../adapters/claude/connection/index.mjs';
+const identity={name:'Claude Code',version:'test-engine',sessionId:'test-session',client_type:'claude_code',source:'claude-mod-session'};
+const sessionApi={id:async()=>identity.sessionId,version:async()=>({version:identity.version})};
+function claudeAdapter(options) {
+ const connection=httpConnection(options), driver=executionAdapter(connection,options);
+ return {...connection,...driver,capabilities:async()=> (await connection.inspect()).capabilities};
+}
+
 import {bridgeDescriptor,executeBridgeAction,pollBridges,register} from '../adapters/claude/mod/hooks/register.js';
 import {createHostBridge} from '../adapters/claude/bridge/server.mjs';
 
@@ -22,7 +30,7 @@ test('Claude browser uses its own token and preserves pending versus completed a
   }});
   await adapter.connect({receive:payload=>assert.equal(payload,snapshot),fail:assert.fail});
   assert.equal((await adapter.capabilities())['send-prompt'].available,true);
-  assert.equal((await adapter.capabilities())['open-root'].available,false);
+  assert.equal((await adapter.capabilities())['open-root'],undefined);
   assert.deepEqual(await adapter.invoke('send-prompt',{text:'canvas test'}),{status:'pending',message:'waiting',requestId:'request-1'});
   assert.equal((await adapter.getResult('request-1')).status,'accepted');
   for(const {init} of calls) assert.equal(init.headers.Authorization,'Bearer '+snapshot.hostBridge.token);
@@ -38,9 +46,7 @@ test('Claude browser refuses missing or non-loopback credentials and never falls
     assert.throws(()=>bridgeDescriptor({skillRoot:root,presentation:{bridge:{...bridge,url}}}));
   }
   const adapter=claudeAdapter({snapshot:()=>({graph:{},skillRoot:root})});
-  await adapter.connect({receive:()=>{},fail:assert.fail});
-  assert.equal((await adapter.capabilities())['send-prompt'].available,false);
-  await assert.rejects(()=>adapter.invoke('send-prompt',{text:'hello'}),/未连接/);
+  await assert.rejects(adapter.connect({receive:assert.fail,fail:assert.fail}),/连接/);
 });
 
 test('Claude browser retains operation identity when the submission response is lost or malformed',async()=>{
@@ -65,7 +71,7 @@ test('Claude browser retains operation identity when the submission response is 
 
 test('Claude worker preserves drafts and requests inspection through the normal host turn with honest receipts',async()=>{
   const called=[];
-  const api={prompt:{fill:async value=>{called.push(value);return {isFilled:true};},submit:async value=>{called.push(value);return {text:value.text};}},tool:{
+  const api={session:sessionApi,prompt:{fill:async value=>{called.push(value);return {isFilled:true};},submit:async value=>{called.push(value);return {text:value.text};}},tool:{
     list:async()=>[{name:'mcp__graph-skill-canvas__inspect_graph'}],
     call:assert.fail,
   }};
@@ -90,7 +96,7 @@ test('Claude worker preserves drafts and requests inspection through the normal 
 test('Claude canvas submission carries saved selection without reentering its own hook and isolates roots',async()=>{
   const submissions=[];
   // The real Mod host skips the originating Mod's hook for its own API calls.
-  const api={prompt:{submit:async input=>{submissions.push(input);return {text:input.text};}}};
+  const api={session:sessionApi,prompt:{submit:async input=>{submissions.push(input);return {text:input.text};}}};
   const state=makeState();
   const text='Reply with the selected node ID; do not read files or call tools.';
   await executeBridgeAction(api,state,bridge,request('update-context',{context:{skillRoot:root,graphId:'main',nodeId:'signature'}}));
@@ -109,7 +115,7 @@ test('Claude canvas submission carries saved selection without reentering its ow
 });
 
 test('Claude tool-list test reports only the canvas allowlist intersected with session tools',async()=>{
-  const api={tool:{list:async()=>[{name:'Bash'},{name:'mcp__graph-skill-canvas__inspect_graph'},{name:'mcp__other__write_data'}]}};
+  const api={session:sessionApi,tool:{list:async()=>[{name:'Bash'},{name:'mcp__graph-skill-canvas__inspect_graph'},{name:'mcp__other__write_data'}]}};
   const result=await executeBridgeAction(api,makeState(),bridge,request('list-tools'));
   assert.deepEqual(result.data,{scope:'canvas-allowlist',tools:[{name:'mcp__graph-skill-canvas__inspect_graph'}]});
 });
@@ -117,7 +123,7 @@ test('Claude tool-list test reports only the canvas allowlist intersected with s
 test('Claude worker does not hold the heartbeat while a user prompt waits for idle and retries only result delivery',async()=>{
   let resolveTurn,submitted=0,failReceipt=true,polls=0;
   const receipts=[];
-  const api={tool:{list:async()=>[]},ui:{log:()=>{}},prompt:{submit:async()=>{submitted++;await new Promise(resolve=>{resolveTurn=resolve;});}},http:{
+  const api={session:sessionApi,tool:{list:async()=>[]},ui:{log:()=>{}},prompt:{submit:async()=>{submitted++;await new Promise(resolve=>{resolveTurn=resolve;});}},http:{
     fetch:async(url,init)=>{
       const body=JSON.parse(init.body);
       if(url.endsWith('/poll')) {polls++;return {ok:true,text:JSON.stringify({requests:[request('send-prompt',{text:'test from canvas'})]})};}
@@ -137,7 +143,7 @@ test('Claude worker does not hold the heartbeat while a user prompt waits for id
 
 test('Claude large host refusal still produces an explicit bounded receipt',async()=>{
   const receipts=[];
-  const api={tool:{list:async()=>[{name:'mcp__graph-skill-canvas__inspect_graph'}]},prompt:{submit:async()=>({drop:'x'.repeat(90000)})},ui:{log:assert.fail},http:{
+  const api={session:sessionApi,tool:{list:async()=>[{name:'mcp__graph-skill-canvas__inspect_graph'}]},prompt:{submit:async()=>({drop:'x'.repeat(90000)})},ui:{log:assert.fail},http:{
     fetch:async(url,init)=>{
       if(url.endsWith('/poll')) return {ok:true,text:JSON.stringify({requests:[request('call-tool')]})};
       receipts.push(JSON.parse(init.body));return {ok:true,text:'{}'};
@@ -153,7 +159,7 @@ test('Claude drops an in-flight old-session poll response even if a new view has
   for(const reopened of [false,true]) {
     let releasePoll,enteredPoll,filled=0;
     const pollStarted=new Promise(resolve=>{enteredPoll=resolve;});
-    const api={tool:{list:async()=>[]},ui:{log:assert.fail},prompt:{fill:async()=>{filled++;return {isFilled:true};}},http:{
+    const api={session:sessionApi,tool:{list:async()=>[]},ui:{log:assert.fail},prompt:{fill:async()=>{filled++;return {isFilled:true};}},http:{
       fetch:async()=>{enteredPoll();return new Promise(resolve=>{releasePoll=resolve;});},
     }};
     const state=makeState();
@@ -174,8 +180,8 @@ test('Claude drops an in-flight old-session poll response even if a new view has
 test('Claude selection reaches the next normal prompt without starting a turn, and session end stops polling',async()=>{
   const handlers=[];let timerCancelled=false,submitted=0,timerCallback,timers=0;
   register((event,matcher,handler)=>handlers.push({event,handler:typeof matcher==='function'?matcher:handler,matcher:typeof matcher==='function'?{}:matcher}));
-  const api={clock:{every:(milliseconds,callback)=>{timers++;assert.equal(milliseconds,1000);timerCallback=callback;return {cancel:()=>{timerCancelled=true;}};}},command:{register:async()=>{}},
-    session:{root:async()=>root},tool:{list:async()=>[{name:'mcp__Claude_Browser__preview_start'},{name:'mcp__Claude_Browser__navigate'}]},prompt:{submit:async()=>{submitted++;}},ui:{log:()=>{}},http:{fetch:async(url)=>({ok:true,text:JSON.stringify({requests:url.endsWith('/poll')?[request('update-context',{context:{skillRoot:root,graphId:'main',nodeId:'greet'}})]:[]})})}};
+  const api={session:sessionApi,clock:{every:(milliseconds,callback)=>{timers++;assert.equal(milliseconds,1000);timerCallback=callback;return {cancel:()=>{timerCancelled=true;}};}},command:{register:async()=>{}},
+    session:{...sessionApi,root:async()=>root},tool:{list:async()=>[{name:'mcp__Claude_Browser__preview_start'},{name:'mcp__Claude_Browser__navigate'}]},prompt:{submit:async()=>{submitted++;}},ui:{log:()=>{}},http:{fetch:async(url)=>({ok:true,text:JSON.stringify({requests:url.endsWith('/poll')?[request('update-context',{context:{skillRoot:root,graphId:'main',nodeId:'greet'}})]:[]})})}};
   const find=event=>handlers.find(item=>item.event===event).handler;
   await find('session.start')(api,{},async()=>({}));
   const result={result:{...snapshot,document:{path:root+'/SKILL.md',fileUrl:encodeURI('file://'+root+'/SKILL.md')},presentation:{kind:'http',url:bridge.url+'/view/'+'a'.repeat(64),preview:{name:'graph-skill-test',projectRoot:root},bridge}}};
@@ -198,7 +204,7 @@ test('Claude selection reaches the next normal prompt without starting a turn, a
 test('real loopback bridge carries browser requests through Mod actions and keeps two roots isolated',async()=>{
   const owner=createHostBridge({responseWaitMs:25});
   const fills=[],queries=[];
-  const api={tool:{list:async()=>[{name:'mcp__graph-skill-canvas__inspect_graph'}],call:assert.fail},
+  const api={session:sessionApi,tool:{list:async()=>[{name:'mcp__graph-skill-canvas__inspect_graph'}],call:assert.fail},
     prompt:{fill:async input=>{fills.push(input);return {isFilled:true};},submit:async input=>{queries.push(input);return {text:input.text};}},ui:{log:assert.fail},
     http:{fetch:async(url,init)=>{const response=await fetch(url,init);return {ok:response.ok,status:response.status,text:await response.text()};}}};
   const state=makeState();state.bridges.clear();
@@ -247,30 +253,30 @@ test('disconnect rotates view credentials while preserving lookup of an unresolv
   try {
     const old=await owner.createView(root);
     const capabilities={'fill-prompt':{available:true,detail:'append draft'}};
-    await send(old.mod,'/poll',{capabilities});
+    await send(old.mod,'/poll',{identity,capabilities});
     const pending=await send(old.browser,'/action',{id:'original',action:'fill-prompt',args:{text:'once'}});
     assert.equal(pending.body.status,'pending');
-    assert.equal((await send(old.mod,'/poll',{capabilities})).body.requests[0].id,'original');
+    assert.equal((await send(old.mod,'/poll',{identity,capabilities})).body.requests[0].id,'original');
     await send(old.mod,'/disconnect',{});
     const current=await owner.createView(root);
     assert.notEqual(current.browser.token,old.browser.token);assert.notEqual(current.mod.token,old.mod.token);
-    assert.equal((await send(old.mod,'/poll',{capabilities})).ok,false);
+    assert.equal((await send(old.mod,'/poll',{identity,capabilities})).ok,false);
     const oldLookup=await send(old.browser,'/result?id=original');
     assert.equal(oldLookup.ok,true);assert.equal(oldLookup.body.status,'pending');assert.equal(oldLookup.body.requestId,'original');
     const attempted=await send(old.browser,'/action',{id:'different',action:'fill-prompt',args:{text:'must not execute'}});
     assert.ok(!attempted.ok || ['unsupported','rejected'].includes(attempted.body.status));
-    assert.deepEqual((await send(current.mod,'/poll',{capabilities})).body.requests,[]);
+    assert.deepEqual((await send(current.mod,'/poll',{identity,capabilities})).body.requests,[]);
   } finally {await Promise.all([owner.close(),owner.close()]);}
 });
 
 
 test('Claude browser refuses a transplanted snapshot before sending its token',async()=>{
   for(const pageOrigin of ['null','https://unrelated.invalid','http://127.0.0.1:32123']) {
-    let requests=0,error;
+    let requests=0;
     const adapter=claudeAdapter({snapshot:()=>snapshot,pageOrigin,fetch:async()=>{requests++;throw Error('must not fetch');}});
-    await adapter.connect({receive:()=>assert.fail('must not render a mismatched origin'),fail:value=>{error=value;}});
-    assert.match(error.message,/HTTP/);assert.equal(requests,0);
-    assert.equal((await adapter.capabilities())['send-prompt'].available,false);
+    await assert.rejects(adapter.connect({receive:()=>assert.fail('must not render a mismatched origin'),fail:assert.fail}),/HTTP/);
+    assert.equal(requests,0);
+    await assert.rejects(adapter.capabilities(),/未连接/);
   }
 });
 
@@ -296,9 +302,9 @@ test('HTTP action boundary rejects non-string identities and non-object argument
   const owner=createHostBridge();t.after(()=>owner.close());
   const view=await owner.createView(root);
   const post=async(descriptor,path,body)=>fetch(descriptor.url+path,{method:'POST',headers:{Authorization:'Bearer '+descriptor.token},body:JSON.stringify(body)});
-  await post(view.mod,'/poll',{capabilities:{'call-tool':{available:true}}});
+  await post(view.mod,'/poll',{identity,capabilities:{'call-tool':{available:true,detail:'test'}}});
   for(const body of [{id:123,action:'call-tool'},{id:'invalid-array',action:'call-tool',args:[]},{id:'invalid-string',action:'call-tool',args:''}]) {
     assert.equal((await post(view.browser,'/action',body)).status,400);
   }
-  assert.deepEqual((await (await post(view.mod,'/poll',{capabilities:{'call-tool':{available:true}}})).json()).requests,[]);
+  assert.deepEqual((await (await post(view.mod,'/poll',{identity,capabilities:{'call-tool':{available:true,detail:'test'}}})).json()).requests,[]);
 });

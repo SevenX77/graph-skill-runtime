@@ -77,6 +77,7 @@ def product_files(wheel: Path) -> dict[str, Path]:
         "VALIDATION.md": ROOT / "VALIDATION.md",
         "INSTALLATION-DECISIONS.md": ROOT / "INSTALLATION-DECISIONS.md",
         "ARCHITECTURE.md": ROOT / "ARCHITECTURE.md",
+        "ADAPTER.md": ROOT / "ADAPTER.md",
         "PROTOTYPE.md": ROOT / "PROTOTYPE.md",
         "MANUAL-TESTS.md": ROOT / "MANUAL-TESTS.md",
         "install.cmd": ROOT / "install.cmd",
