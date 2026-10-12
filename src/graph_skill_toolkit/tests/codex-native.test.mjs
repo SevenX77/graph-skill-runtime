@@ -25,7 +25,9 @@ test('Codex file requests use the same Windows path identity and never route fol
   assert.equal((await adapter.invoke('open-root',{skillRoot:'C:\\Users\\test\\hello-world'})).status,'accepted');
   assert.equal(files.length,2);
   assert.equal(messages.length,1);
-  assert.match(messages[0].content[0].text,/打开此路径/);
+  assert.match(messages[0].content[0].text,/这是目录，不是文件/);
+  assert.match(messages[0].content[0].text,/不要把目录传给文件预览接口/);
+  assert.match(messages[0].content[0].text,/操作系统的文件管理器/);
   app.getHostCapabilities=()=>({experimental:{'openai/files':{}}});
   assert.equal((await adapter.capabilities())['open-root'].available,false);
   assert.equal((await adapter.invoke('open-root',{skillRoot:'C:/Users/test/hello-world'})).status,'unsupported');
