@@ -44,7 +44,9 @@ try {
   } while (!target && cursor);
   if (!target) throw new Error("Codex did not discover graph-skill-canvas");
   transcript.push({ server: target });
-  const resource = await request("mcpServer/resource/read", { server: "graph-skill-canvas", uri: "ui://graph-skill/canvas-v2.html" });
+  const canvas = target.resources.find(resource => resource.name === "Graph Skill canvas");
+  if (!canvas) throw new Error("Codex did not discover the current canvas resource");
+  const resource = await request("mcpServer/resource/read", { server: "graph-skill-canvas", uri: canvas.uri });
   const content = resource.contents[0];
   transcript.push({ resource: { uri: content.uri, mimeType: content.mimeType, bytes: Buffer.byteLength(content.text), sha256: createHash("sha256").update(content.text).digest("hex") } });
   const cwds = [fileURLToPath(new URL("../../../../", import.meta.url))];

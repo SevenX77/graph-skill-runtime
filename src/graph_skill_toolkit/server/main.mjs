@@ -10,14 +10,14 @@ import { snapshotHtml } from "../adapters/claude/preview/publisher.mjs";
 import { createHostBridge } from "../adapters/claude/bridge/server.mjs";
 import { createPreviewConfiguration } from "../adapters/claude/preview_configuration/index.mjs";
 import { skillDocument } from "../presentation/index.mjs";
-import { codexResourceMetadata } from "../adapters/codex/resource/index.mjs";
+import { canvasResourceUri, codexResourceMetadata } from "../adapters/codex/resource/index.mjs";
 import { createCodexCanvasSessions } from "../adapters/codex/session/index.mjs";
 import { launchHostInfo, requestClientInfo } from "../adapters/launch/index.mjs";
 import packageInfo from "../package.json" with { type: "json" };
 
-const resourceUri = "ui://graph-skill/canvas-v2.html";
 // The build places this self-contained resource alongside the bundled server.
 const html = await readFile(new URL("./canvas.html", import.meta.url), "utf8");
+const resourceUri = canvasResourceUri(html);
 const ui = { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: false };
 const previewConfiguration = createPreviewConfiguration();
 const hostBridge = createHostBridge();

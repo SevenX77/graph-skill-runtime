@@ -132,7 +132,8 @@ test('real stdio and HTTP deliver startup identity before any page handshake and
       const result=await client.callTool({name:'show_graph',arguments:args});assert.notEqual(result.isError,true,JSON.stringify(result));
       const info=result.structuredContent.hostInfo;
       assert.equal(info.id,isClaude?'claude':clientInfo.name==='codex-mcp-client'?'codex':'unknown');unavailable(info);
-      const resource=await client.readResource({uri:'ui://graph-skill/canvas-v2.html'});
+      const uri=(await client.listTools()).tools.find(tool=>tool.name==='show_graph')._meta.ui.resourceUri;
+      const resource=await client.readResource({uri});
       assert.equal(resource.contents[0].text.replace(slot,SNAPSHOT_SLOT),template);
       if(!isClaude) {
         assert.deepEqual(extract(resource.contents[0].text).hostInfo,info);

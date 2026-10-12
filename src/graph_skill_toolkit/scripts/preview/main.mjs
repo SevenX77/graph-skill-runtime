@@ -11,7 +11,8 @@ let result, html;
 try {
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL("../../dist/server.mjs", import.meta.url))] }));
   result = await client.callTool({ name: "show_graph", arguments: process.argv[2] ? { skill_root: process.argv[2] } : {} });
-  const resource = await client.readResource({ uri: "ui://graph-skill/canvas-v2.html" });
+  const uri = (await client.listTools()).tools.find(tool => tool.name === "show_graph")._meta.ui.resourceUri;
+  const resource = await client.readResource({ uri });
   html = resource.contents[0].text;
 } catch (error) { await client.close(); throw error; }
 const host = await build({ absWorkingDir: root, entryPoints: ["tests/host.mjs"], bundle: true, platform: "browser", format: "esm", target: "es2022", write: false });

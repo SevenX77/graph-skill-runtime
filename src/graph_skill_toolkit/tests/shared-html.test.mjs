@@ -91,7 +91,8 @@ test('real stdio serves the same HTML over HTTP, owns attach config and refreshe
   assert.equal(launch.configurations.length,2);assert.equal(launch.note,'user-owned');
   assert.equal(launch.configurations[1].name,presentation.preview.name);
   assert.equal(launch.configurations[1].url,new URL(url).origin);
-  const resource=await client.readResource({uri:'ui://graph-skill/canvas-v2.html'});
+  const uri=(await client.listTools()).tools.find(tool=>tool.name==='show_graph')._meta.ui.resourceUri;
+  const resource=await client.readResource({uri});
   assert.deepEqual(resource.contents[0]._meta['openai/ui'],{availableDisplayModes:['fullscreen'],preferredDisplayMode:'fullscreen'});
   const content=await (await fetch(url)).text();
   assert.equal(content.replace(slot,SNAPSHOT_SLOT),resource.contents[0].text.replace(slot,SNAPSHOT_SLOT));

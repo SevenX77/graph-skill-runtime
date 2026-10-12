@@ -4,6 +4,7 @@ import { mkdtemp, readFile, readdir, copyFile, rm, mkdir, writeFile, realpath } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
@@ -13,6 +14,35 @@ import { validateCanvas } from "../ui/canvas/index.mjs";
 import { SNAPSHOT_SLOT } from "../adapters/claude/preview/publisher.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+
+test("MCP resource identity follows HTML bytes across same-version restarts", async (context) => {
+  const isolated = await mkdtemp(join(tmpdir(), "graph-resource-upgrade-"));
+  context.after(() => rm(isolated, { recursive: true, force: true }));
+  await copyFile(join(root, "dist/server.mjs"), join(isolated, "server.mjs"));
+  const original = await readFile(join(root, "dist/canvas.html"), "utf8");
+  const uris = [];
+  for (const [index, html] of [original, original, `${original}\n<!-- changed build -->`].entries()) {
+    await writeFile(join(isolated, "canvas.html"), html);
+    const client = new Client({ name: `resource-test-${index}`, version: "1" });
+    const transport = new StdioClientTransport({ command: process.execPath, args: [join(isolated, "server.mjs")], stderr: "pipe" });
+    try {
+      await client.connect(transport);
+      const { tools } = await client.listTools();
+      const uri = tools.find(tool => tool.name === "show_graph")._meta.ui.resourceUri;
+      assert.equal(uri, `ui://graph-skill/canvas-${createHash("sha256").update(html).digest("hex")}.html`);
+      assert.equal(tools.find(tool => tool.name === "inspect_graph")._meta.ui.resourceUri, uri);
+      const { resources } = await client.listResources();
+      assert.deepEqual(resources.map(resource => resource.uri), [uri]);
+      const resource = await client.readResource({ uri });
+      const slot = /<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+      assert.equal(resource.contents[0].text.replace(slot, SNAPSHOT_SLOT), html);
+      if (index === 2) await assert.rejects(client.readResource({ uri: uris[0] }));
+      uris.push(uri);
+    } finally { await client.close(); }
+  }
+  assert.equal(uris[0], uris[1]);
+  assert.notEqual(uris[1], uris[2]);
+});
 
 test("host JSON key reordering preserves the fixture while invalid graph data is rejected", () => {
   const reordered = JSON.parse(JSON.stringify(graph), (_key, value) => {
@@ -47,7 +77,8 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     assert.equal(tool.annotations.readOnlyHint, false);
     assert.equal(tool.annotations.destructiveHint, false);
     assert.equal(tool.annotations.openWorldHint, false);
-    assert.equal(tool._meta.ui.resourceUri, "ui://graph-skill/canvas-v2.html");
+    const template = await readFile(join(root, "dist/canvas.html"), "utf8");
+    assert.equal(tool._meta.ui.resourceUri, `ui://graph-skill/canvas-${createHash("sha256").update(template).digest("hex")}.html`);
     const result = await client.callTool({ name: tool.name, arguments: {} });
     assert.notEqual(result.isError, true);
     assert.deepEqual(result.structuredContent.graph.nodes.map((node) => node.id), ["input", "process", "output"]);
