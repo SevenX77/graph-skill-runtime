@@ -1,0 +1,32 @@
+Graph Skill 宿主接口并行接通任务（2026-10-13）
+
+来源与授权：用户在当前 Codex 对话明确要求“每一个接口，并发启动prime进行接通，每个prime接一个接口”。此前用户要求 15 个接口各有独立子模块，并要求尝试接通所有接口；无法接通的须给出原因。此前还明确：目录定位必须使用宿主自己的文件浏览器，不能用系统 Explorer 或让 Agent 代办；草稿只填入不发送；直接工具调用与发送消息须分开；一份 HTML、Codex/Claude 两个 adapter。当前会话未授权提交、推送、发布或更改全局安装。用户要求使用 computer use 后立即退出，尽量避免 15 个并发任务同时操控桌面。
+
+实际工作目录：本仓库工作树（不是另一份 checkout）。进入后先读仓库 AGENTS.md 和必要流程。源码在 src/graph_skill_toolkit。这个工作树已有大量用户/其他任务的未提交改动，禁止清理、重置或覆盖不属本任务的内容。当前接口契约见 src/graph_skill_toolkit/ADAPTER.md，架构见 ARCHITECTURE.md，验证边界见 VALIDATION.md；本任务接手时 15 个目录和两端实现已存在，source tests 87/87，通过不等于桌面宿主效果已验收。有效父结果责任是 VALIDATION.md 中 shared-graph-ui-feasibility 的宿主接口接通部分，当前目标是提高每个接口的实际连接程度，不能靠状态标签宣布成功。
+
+角色：你是可见 Prime 根会话中的协调者。按用户明确的一接口一 Prime 授权，尽快通过 Prime 原生 rlm.spawn 并发创建恰好 15 个独立子代理，每个只负责下列一个接口。每个子代理共享工作目录但拥有唯一源码文件 owner。你负责审查子代理输出、必要的公共文件集成、运行门禁与向 Codex 报告，不额外占一个接口。若当前 Prime 实际并发容量不足，先启动能同时运行的代理，记录具体限制与其余待启动，不要虚称 15 个并发。
+
+接口与唯一可写源码目录：
+1 files.revealDirectory -> src/graph_skill_toolkit/host_interfaces/files/reveal_directory/
+2 files.openFile -> src/graph_skill_toolkit/host_interfaces/files/open_file/
+3 composer.writeDraft -> src/graph_skill_toolkit/host_interfaces/composer/write_draft/
+4 conversation.submitMessage -> src/graph_skill_toolkit/host_interfaces/conversation/submit_message/
+5 context.set -> src/graph_skill_toolkit/host_interfaces/context/set/
+6 context.remove -> src/graph_skill_toolkit/host_interfaces/context/remove/
+7 tools.list -> src/graph_skill_toolkit/host_interfaces/tools/list/
+8 tools.call -> src/graph_skill_toolkit/host_interfaces/tools/call/
+9 views.open -> src/graph_skill_toolkit/host_interfaces/views/open/
+10 views.list -> src/graph_skill_toolkit/host_interfaces/views/list/
+11 views.activate -> src/graph_skill_toolkit/host_interfaces/views/activate/
+12 views.close -> src/graph_skill_toolkit/host_interfaces/views/close/
+13 views.requestDisplayMode -> src/graph_skill_toolkit/host_interfaces/views/request_display_mode/
+14 skills.list -> src/graph_skill_toolkit/host_interfaces/skills/list/
+15 skills.invoke -> src/graph_skill_toolkit/host_interfaces/skills/invoke/
+
+每个子代理的独立测试文件归自己，放在 src/graph_skill_toolkit/tests/host/interfaces/<接口的下划线名字>.test.mjs，例如 files_reveal_directory.test.mjs。每个子代理只修改自己的源码目录和这个唯一测试文件。ports/、adapters/、server/、UI、共同测试与文档一律只读；若确需公共改动，向你交付精确补丁建议，你作为唯一 owner 顺序集成。子代理不运行会互相改写 dist 的全局构建，不并发操控真实 Codex/Claude UI、不更改用户安装/配置；可运行只读的聚焦测试。你负责整合后构建及完整测试。不得删、弱化测试让其变绿。
+
+逐接口工作：从该接口已定义的语义、两端当前实现及实际可得宿主 API 开始。先验证现有可用路由是否真能表达接口语义；查本地 SDK 类型/Mod 工具清单及必要的官方原始资料。能实现的，在所属目录完善 Codex/Claude 能力判定与调用，增加针对真实协议形状和失败边界的聚焦测试。不能确认的保留 unknown/unavailable，不用聊天提示词、Agent 代办、系统窗口、任意文件预览或特制 Graph 画布流程冒充通用宿主接口。特别区分调用受理、宿主实际效果、业务执行结果；丢失回执不得盲目重发。不要把曾经的模拟 peer 结果当成当前桌面客户端证据。
+
+每个子代理完成后写一份独立结果到 build/prime-interface-20261013/results/<接口下划线名字>.md，并通过 agent_message.send 发给 parent：改动文件、Codex/Claude 分别的现状（接通/有条件/未知）、实际 API 证据、聚焦测试及未验的真实宿主效果、不能接通的具体原因及下一步最小证据。报告须区分已观察事实与推断。你读取每份结果与实际源码、必要原始证据，不能只收状态。所有子代理都结束后做公共集成、typecheck/build/npm test、相关 Python 门禁；若宿主真实验收需桌面操作，排队顺序执行并遵守 computer use 用完立刻 reset。无需为了并发数量刻意增加无贡献修改。
+
+协调结果写到 build/prime-interface-20261013/summary.md，逐一列出 15 个子代理的真实状态和接口结果，保留验收限制。向 Codex 报告文件路径、Prime 会话身份、实际完成数量及需要 Codex 复核的事项。未达到全部接通时不要称全部完成，不要自行提交、推送或发布。

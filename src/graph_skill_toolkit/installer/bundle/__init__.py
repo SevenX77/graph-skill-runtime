@@ -88,14 +88,15 @@ def product_files(wheel: Path) -> dict[str, Path]:
         "runtime/" + wheel.name: wheel,
     }
     files["installer/entry/main.py"] = ROOT / "installer/entry/main.py"
-    for name in ("install", "locking", "discovery", "hosts", "ownership", "runtime_layout"):
+    files["installer/entry/mode.py"] = ROOT / "installer/entry/mode.py"
+    for name in ("install", "locking", "discovery", "hosts", "mode", "ownership", "runtime_layout"):
         member = f"installer/{name}/__init__.py"
         files[member] = ROOT / member
     files["installer/runtime_payload/runtime-lock.json"] = ROOT / "installer/runtime_payload/runtime-lock.json"
     for name in ("server.mjs", "after-tool.mjs", "canvas.html", "installer.mjs"):
         files["dist/" + name] = ROOT / "dist" / name
     for name in CLAUDE_MOD_FILES:
-        files[name] = ROOT / "adapters/claude/mod" / name.removeprefix("claude-mod/")
+        files[name] = ROOT / "dist" / name
     for skill in ("graph-skill", "graph-skill-canvas"):
         for path in sorted((ROOT / "skills" / skill).rglob("*.md")):
             files[path.relative_to(ROOT).as_posix()] = path

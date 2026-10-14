@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
 import { GraphWorkbench } from "../ui/workbench/index";
-import { createHostAdapter } from "../adapters/index.mjs";
+import { createCanvasComposition } from "./composition.mjs";
 
-const adapter = createHostAdapter();
+const { adapter, source } = createCanvasComposition();
 const root = document.querySelector("#app");
 if (!root) throw new Error("Missing shared canvas application root.");
-createRoot(root).render(<GraphWorkbench adapter={adapter} />);
+createRoot(root).render(<GraphWorkbench adapter={adapter} source={source} />);

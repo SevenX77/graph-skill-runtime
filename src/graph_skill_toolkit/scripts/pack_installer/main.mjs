@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = fileURLToPath(new URL("../../", import.meta.url));
+const root = fileURLToPath(new URL("../..", import.meta.url));
 const repository = resolve(root, "../..");
 const output = join(root, "release");
 const git = (...args) => execFileSync("git", args, { cwd: repository, encoding: "utf8" }).trim();

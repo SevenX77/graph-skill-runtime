@@ -1,0 +1,372 @@
+{
+  "profile": "graph-skill-toolkit-interface-file-hashes/v1",
+  "observed_at": "2026-10-14T03:04:51.232325+00:00",
+  "scope": "Final local uncommitted source/test/docs after the 168-case JavaScript gate. No claim of installed Desktop loading, runtime package acceptance, or publication.",
+  "entries": [
+    {
+      "path": "src/graph_skill_toolkit/.gitignore",
+      "size": 161,
+      "sha256": "ed00820a5e6b8fdc9a2606ed9c4e6b6e16ec8ef35a3ed2f3a99bb3d239436fbc"
+    },
+    {
+      "path": "src/graph_skill_toolkit/ADAPTER.md",
+      "size": 15088,
+      "sha256": "9169b542cde3c54244bce218373c242c7010468c2928dfae3d43ef8ad36e5c71"
+    },
+    {
+      "path": "src/graph_skill_toolkit/ARCHITECTURE.md",
+      "size": 16449,
+      "sha256": "f71b5cd6e11d86df193b3fb2c856ff6b433ca19a111abd51500d5b246da97c08"
+    },
+    {
+      "path": "src/graph_skill_toolkit/VALIDATION.md",
+      "size": 334374,
+      "sha256": "5b2cd95d80475191dbe1fd1a7e68250c49dc7b01e61ff3c9b23c0db5e79f3a46"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/claude/mod/hooks/register.js",
+      "size": 4415,
+      "sha256": "5d8855a3d06b8574ccbc34c0b1a8b8789c01fc3bfd8e26000da1ac570df01517"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/claude/mod/lifecycle/index.mjs",
+      "size": 5233,
+      "sha256": "99562b69e77253ef1d0db4fe6d1cf2e1e1961d0d4ac665832c434d76eff58780"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/claude/mod/operations/index.mjs",
+      "size": 1967,
+      "sha256": "8926760223026341275e7ba78babf50cce516477dbf5916b5311ac927b2b28e9"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/claude/mod/operations/registry.mjs",
+      "size": 2205,
+      "sha256": "0d86b3d65fc0bedc377d8e0bb8d30beb9a43cca1a559681f2811c1e4396e1de5"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/claude/mod/operations/views/index.mjs",
+      "size": 3530,
+      "sha256": "862fba388a7f44f09a399e622e053818fcf4b67bc817890322d48c29ec81fb55"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/codex/driver/index.mjs",
+      "size": 1072,
+      "sha256": "24cf61aff761599047e05cfa24fa59748f4889af71db8f511daff3f155e26c02"
+    },
+    {
+      "path": "src/graph_skill_toolkit/adapters/codex/driver/shared.mjs",
+      "size": 2386,
+      "sha256": "ce7be2501498b7b5541cab6139ec3274a0248fdc2d4e30f78982dad33f2f92fa"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/composer/write_draft/claude.mjs",
+      "size": 660,
+      "sha256": "40cd60261fa76fdf5a4c38367e12ed45daaa9910aeabd632ab2e80fffc2b391d"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/composer/write_draft/codex.mjs",
+      "size": 918,
+      "sha256": "245e0a0ce74ea2edb575b517ea9b63ab94d62581944885455667fb14d74e7aeb"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/composer/write_draft/index.mjs",
+      "size": 429,
+      "sha256": "d04945d1e331f403d6ecfc9dc3060ba2cb6de6c4cf9f6fb4aebe44f5b4a5179b"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/context/remove/claude.mjs",
+      "size": 554,
+      "sha256": "83b5b01c0f2392821c07269ae4936f9ee1e7ac30689d6419f9de854d0686774c"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/context/remove/codex.mjs",
+      "size": 336,
+      "sha256": "80afc39949463ce01d0f6c79436da77935069fd8da6e2a6d6a3bc3796b42f866"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/context/remove/index.mjs",
+      "size": 331,
+      "sha256": "33b19e8f298ce18a9b03c24ad519fa1ae6aad10b6c061d81ae618b41ade8dea0"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/context/set/claude.mjs",
+      "size": 593,
+      "sha256": "27edb2d9300b63236908c4b350fd8f53f53c44b3876ee76f10c3ff0d019dfa51"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/context/set/codex.mjs",
+      "size": 337,
+      "sha256": "2845b1d0745af3be61130d4515a67a3580105ef009978597038de97c69404270"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/context/set/index.mjs",
+      "size": 474,
+      "sha256": "0be5e216c14fdc3fa6195a8f7082cb00fa5159371370eea82e0329481bf84f1f"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/conversation/submit_message/claude.mjs",
+      "size": 1193,
+      "sha256": "277f4dbef948d89b3cd8bbbfe1ebc2f89622cae7aed74bef5424eb61762b7d10"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/conversation/submit_message/codex.mjs",
+      "size": 663,
+      "sha256": "8beed5814731037ae68a15beb777427827cd22c5558b9eb804267414a8298a20"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/conversation/submit_message/index.mjs",
+      "size": 322,
+      "sha256": "8a8eda085d52a1377cca5a5745270b0f606b0ddbd8884d0c4a8cbaf15f87e8b0"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/files/open_file/claude.mjs",
+      "size": 806,
+      "sha256": "ac59969e9f8e39564146350f312d94291d46a8bd043f3c555ac9b9dc1aabfc77"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/files/open_file/codex.mjs",
+      "size": 673,
+      "sha256": "14279e2c2bb0419700cd0b7be901f523bd4eadb5b0a1e77fa74195363a76f55b"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/files/open_file/index.mjs",
+      "size": 417,
+      "sha256": "dd729dbbd415637583d6da454df2b7f022dbfbaddbfbed9625867825f83a00c1"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/files/reveal_directory/claude.mjs",
+      "size": 250,
+      "sha256": "7920bdaa7a8e3a07f4f09b1bdda1313d69e19dad0bcf380cbf89cd19b88a27f8"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/files/reveal_directory/codex.mjs",
+      "size": 170,
+      "sha256": "0bc09f5287d06cc2309af8093071baddff40291e59138132fb35fb826a6906c3"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/files/reveal_directory/index.mjs",
+      "size": 301,
+      "sha256": "82cbca07a414c62af90af4602845e5375b6956b1db8f3806a65edb23dceabafa"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/skills/invoke/claude.mjs",
+      "size": 1930,
+      "sha256": "b74de8f5391653cc96b138fca0f8c685b25a0c0cc4b9225b97ac413319148b1a"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/skills/invoke/codex.mjs",
+      "size": 158,
+      "sha256": "c6a5f9c6160048aef6b8b0b2a2457d716f99a93332b69e5d574ef7994c0b1ea1"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/skills/invoke/index.mjs",
+      "size": 307,
+      "sha256": "67794a55cdfac350c8d77499d5dea92143d46e1a28e82de32e75d18d2a3a0e86"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/skills/list/claude.mjs",
+      "size": 2568,
+      "sha256": "419b022de691a929c842936690674b28272585b796278e5f2568ca38a2797aff"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/skills/list/codex.mjs",
+      "size": 122,
+      "sha256": "ef5ddb27182ea9de13e08dedc2f66d3582a7babf080fdbf5af73a47202045233"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/skills/list/index.mjs",
+      "size": 111,
+      "sha256": "528265115ae12a4a425a0a5ab61bc8da5984ee16a39b9b87b6527a39c1d6610f"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/tools/call/claude.mjs",
+      "size": 1548,
+      "sha256": "bcf7098b901692b067e7b93809192b3db3c35aebee136b69cc4f724a0a5b5ad7"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/tools/call/codex.mjs",
+      "size": 734,
+      "sha256": "5b9bafe1b99a014bc54bda49353015e8d860ad14eeb7492f4669836d7b1fced6"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/tools/call/index.mjs",
+      "size": 594,
+      "sha256": "44520045c9a45fd735289413bfb7be0d32e4f108a3d9c77aa312309033016a90"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/tools/list/claude.mjs",
+      "size": 1612,
+      "sha256": "c4710c85bc3a6cbd2a8a28e6088cec458282936dae3397a5764066974f42fb38"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/tools/list/codex.mjs",
+      "size": 1803,
+      "sha256": "339cbb6570a24bf6e9aa4052684199c449099f702ffbb60f3db3821089647211"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/tools/list/index.mjs",
+      "size": 258,
+      "sha256": "5ad906ac34fd85e74cb45263b67f639e4a77e32c537f78f1981a0a0ea6d2ffdd"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/activate/claude.mjs",
+      "size": 1602,
+      "sha256": "354130d0f3a66aa57177df4473a72f40254a5e57bf6826a3629a8115c0fd8e40"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/activate/codex.mjs",
+      "size": 156,
+      "sha256": "929c7b14b62fee0798d58b425e3f490bb84d7621445a62d76c3d8f8a821eafe4"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/activate/index.mjs",
+      "size": 272,
+      "sha256": "a1c128f139c93293660e0eb760a37cd02ecaaa5c7781032bb7d1e5ac0ea58025"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/close/claude.mjs",
+      "size": 296,
+      "sha256": "240058fe29b5b9909a7dde05c1b8920da238d731ff90b8fca16533f448c3491d"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/close/codex.mjs",
+      "size": 210,
+      "sha256": "7dbe8150892058fe0e007ca0e191cf07dd5e14642ba5a8c8a663dbb16c3cf0a2"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/close/index.mjs",
+      "size": 269,
+      "sha256": "dd01868b88bec6b60f296a4f85587c306063d6d877e8f242ae5c4f3cc4a43721"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/list/claude.mjs",
+      "size": 1170,
+      "sha256": "79f4610652b18dcf41f3467910a34359fbd53de77efd55798bf95bdc655593ad"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/list/codex.mjs",
+      "size": 121,
+      "sha256": "142e92d915d45d2d95aa4a1dfa8b12e6d4f4292b8f59c1d0d161324874eca90c"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/list/index.mjs",
+      "size": 110,
+      "sha256": "e2a869d12595e1f814e243a3d2908af92e51da5ca247aa892ff5cc1bf2fda10a"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/open/claude.mjs",
+      "size": 363,
+      "sha256": "1307b2832beed5551f3f76eaeb20fe1c4ed0118d684c27d19a47bec6cb054326"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/open/codex.mjs",
+      "size": 241,
+      "sha256": "d063c991e0cc9286426a73cd7ea30dd06941fc1d309ad9a580bde3733a80887f"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/open/index.mjs",
+      "size": 1172,
+      "sha256": "10f2f1a625b7c37c9eeb20a6282702aa53bb66ee0199827953d877c03eaa9789"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/request_display_mode/claude.mjs",
+      "size": 204,
+      "sha256": "494eba66f6f8aefe659c5e754bed767358f824cc59ded7027c2f66e6e9709113"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/request_display_mode/codex.mjs",
+      "size": 1105,
+      "sha256": "516b93f6a6f8170931c65f41c4c5ec0202694d51c5009329e5891afff68473c6"
+    },
+    {
+      "path": "src/graph_skill_toolkit/host_interfaces/views/request_display_mode/index.mjs",
+      "size": 266,
+      "sha256": "3389b0bb9b153d7cb87cc34b624eeb6a807997978df622c301810b86b95984af"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/adapters/claude/operations.test.mjs",
+      "size": 10325,
+      "sha256": "06664f9087b993174c283b44e1eb48e77da9fe31f674b9bf2602de8872aa4d75"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/adapters/codex/driver.test.mjs",
+      "size": 5787,
+      "sha256": "b4f02b05861a43e749600ebfb866ed2775ffdae33702d1f99a5e756332b63d79"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/composer_write_draft.test.mjs",
+      "size": 4316,
+      "sha256": "caf6ac079abc4c9e1dbbf5bfa6e058d33405a5f096e837d6303e6f2c84b3da38"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/context_remove.test.mjs",
+      "size": 4515,
+      "sha256": "49a8cedb35fdd3c55a1f500a3f77ca43876162104ab61e8af9bacf4d8e4e2a6e"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/context_set.test.mjs",
+      "size": 4917,
+      "sha256": "d69b0521ca7dc88f1f0ce6ab1668bc3824d66b63d3663cb28acd6dd0d3d3e999"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/conversation_submit_message.test.mjs",
+      "size": 6907,
+      "sha256": "5b0f51d14f176bcd1f9525cd1fcd9e9e87e97a1905014b1ceaab9b1085f592fe"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/files_open_file.test.mjs",
+      "size": 5625,
+      "sha256": "029ae567058dff568dccb56b1fb14755b1415ac39e44a1b8ec1550c0f58137b1"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/files_reveal_directory.test.mjs",
+      "size": 3130,
+      "sha256": "105259aa511bc8a55c36a374adde3b9fd87fb1d4505af90bd4e0bbe6a7b8604e"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/skills_invoke.test.mjs",
+      "size": 4348,
+      "sha256": "46961ca2811005a124ecfc8d0395c423b092cd30c7e1ceb8952308f753265fc6"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/skills_list.test.mjs",
+      "size": 5693,
+      "sha256": "dd99ec54bacf52beb360299306f13d7f2c241d02ea518c15d52d44602d68aaf7"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/tools_call.test.mjs",
+      "size": 5309,
+      "sha256": "aa7b9d59f5088ce2745cb6b26054291322dd441880c147843182ae67b9ed9b26"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/tools_list.test.mjs",
+      "size": 4525,
+      "sha256": "76b6ab5d8fc6e0c6591b21a603ecead1bf4e6b2de280d2a366cde6191a728ec0"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/views_activate.test.mjs",
+      "size": 6376,
+      "sha256": "37bd0254d51fd989441e5c5331a33b9918ba773fb2601776ae23ab3ce47b176e"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/views_close.test.mjs",
+      "size": 3418,
+      "sha256": "8284efee17cf48e968960ec824c68147a59ec63ef843f832cf39aaad1b2d8fe4"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/views_list.test.mjs",
+      "size": 4343,
+      "sha256": "79ff398db1f485bce210e28f072d51d4c62695f0bff32fe0ad30b8512aa6243e"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/views_open.test.mjs",
+      "size": 3789,
+      "sha256": "a8bc02d88b7e9f367d17eb3476c43746b827ccc83c2a70f765b8dd729bbac04e"
+    },
+    {
+      "path": "src/graph_skill_toolkit/tests/host/interfaces/views_request_display_mode.test.mjs",
+      "size": 4384,
+      "sha256": "856373c65904c9c64d7f5cf43a9157d29db41b8a2c6b1b5ba833d603ba017534"
+    }
+  ]
+}

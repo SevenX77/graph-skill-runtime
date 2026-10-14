@@ -49,7 +49,7 @@ try {
   const resource = await request("mcpServer/resource/read", { server: "graph-skill-canvas", uri: canvas.uri });
   const content = resource.contents[0];
   transcript.push({ resource: { uri: content.uri, mimeType: content.mimeType, bytes: Buffer.byteLength(content.text), sha256: createHash("sha256").update(content.text).digest("hex") } });
-  const cwds = [fileURLToPath(new URL("../../../../", import.meta.url))];
+  const cwds = [fileURLToPath(new URL("../../../..", import.meta.url))];
   const hooks = await request("hooks/list", { cwds });
   transcript.push({ hooks: hooks.data.map(entry => ({ cwd: entry.cwd, inventory: entry.hooks.map(hook => ({ eventName: hook.eventName, sourcePath: hook.sourcePath, pluginId: hook.pluginId, trustStatus: hook.trustStatus })), hooks: entry.hooks.filter(hook => JSON.stringify(hook).includes("graph-skill-canvas")), errors: entry.errors.filter(error => JSON.stringify(error).includes("graph-skill")), warnings: entry.warnings.filter(warning => warning.includes("graph-skill")) })) });
   const skills = await request("skills/list", { cwds, forceReload: true });
@@ -60,7 +60,7 @@ try {
   console.error(error.message);
   process.exitCode = 1;
 } finally {
-  await mkdir(new URL("../../evidence/", import.meta.url), { recursive: true });
+  await mkdir(new URL("../../evidence", import.meta.url), { recursive: true });
   await writeFile(new URL("../../evidence/codex-connection-v2.json", import.meta.url), JSON.stringify(transcript, null, 2));
   child.stdin.end();
   const cleanup = setTimeout(() => child.kill(), 5000);

@@ -10,9 +10,12 @@
   "scripts": {
     "build": "node scripts/build/main.mjs",
     "start": "node dist/server.mjs",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test",
     "typecheck": "tsc --noEmit",
     "preview": "node scripts/preview/main.mjs",
+    "mode:test": "node bin/graph-skill.mjs mode test",
+    "mode:installed": "node bin/graph-skill.mjs mode installed",
+    "mode:status": "node bin/graph-skill.mjs mode status",
     "pack:installer": "node scripts/pack_installer/main.mjs"
   },
   "dependencies": {

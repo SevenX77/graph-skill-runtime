@@ -1,0 +1,162 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { readFile, mkdtemp, mkdir, writeFile, rm, realpath, symlink, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { get } from 'node:http';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { codexAdapter } from '../../adapters/codex/driver/index.mjs';
+import { httpConnection } from '../../adapters/claude/connection/index.mjs';
+import { mcpConnection } from '../../adapters/codex/connection/index.mjs';
+import { snapshotHtml, SNAPSHOT_SLOT } from '../../ui/template/publisher.mjs';
+import { createHostBridge } from '../../adapters/claude/bridge/server.mjs';
+import { validateCanvas } from '../../ui/canvas/index.mjs';
+import { graph } from '../../application/graph/demo/graph.mjs';
+import { createGraphConnection } from '../../application/graph/client/index.mjs';
+import { fakeRuntimeEnv } from "../support/runtime.mjs";
+
+const payload = {graph:{...graph,width:352,height:548},skillRoot:'/business/中文 skill'};
+const slot = /<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+const snapshot = text => JSON.parse(slot.exec(text)[1]);
+test('both browser connections deliver the same graph and Codex uses only a declared file interface',async()=>{
+  const received=[],failed=[],actions=[];
+  const app={connect:async()=>{},getHostCapabilities:()=>({experimental:{'openai/files':{}},message:{}}),request:async value=>actions.push(value),sendMessage:async value=>{actions.push(value);return {};},close:()=>{}};
+  const codex=codexAdapter(app);
+  const claude=httpConnection({snapshot:()=>({...payload,hostBridge:{url:'http://127.0.0.1:12345',token:'a'.repeat(48)}})});
+  const codexConnection=mcpConnection(app);
+  try {
+  await codexConnection.connect({receive:p=>received.push(p),fail:e=>failed.push(e)});
+  app.ontoolresult({structuredContent:payload});
+  await claude.connect({receive:p=>received.push(p),fail:e=>failed.push(e)});
+  assert.deepEqual(received.map(({hostBridge,...rest})=>rest),[payload,payload]);assert.equal(failed.length,0);
+  assert.equal((await codex.invoke('files.revealDirectory',{path:payload.skillRoot})).status,'unsupported');
+  assert.equal(actions.length,0);
+  app.ontoolresult({isError:true,content:[{type:'text',text:'bad graph'}]});
+  assert.equal(failed[0].message,'bad graph');
+  await codex.invoke('files.openFile',{path:payload.skillRoot+'/SKILL.md'});
+  assert.equal(actions[0].params.path,payload.skillRoot+'/SKILL.md');
+  await httpConnection({snapshot:()=>({error:'invalidated'})}).connect({receive:()=>assert.fail(),fail:e=>assert.equal(e.message,'invalidated')});
+  } finally { claude.dispose(); await codexConnection.dispose(); }
+});
+test('shared validation rejects malformed roots, topology and bounds before rendering',()=>{
+  assert.deepEqual(validateCanvas(payload),payload);
+  for(const mutate of [p=>p.skillRoot=undefined,p=>p.graph.nodes=[],p=>p.graph.width=Infinity,p=>p.graph.nodes.push(p.graph.nodes[0]),p=>p.graph.nodes[0].x=NaN,p=>p.graph.nodes[0].x=10000,p=>p.graph.edges.push({from:'missing',to:'output'})]) {
+    const value=structuredClone(payload);mutate(value);assert.throws(()=>validateCanvas(value));
+  }
+});
+test('HTTP snapshot changes only inert JSON and does not inherit the local-file size restriction',async()=>{
+  const html=await readFile(new URL('../../dist/canvas.html',import.meta.url),'utf8');
+  const value={...payload,extra:'</script><script>evil()</script><!-- $& 中文'};
+  const output=snapshotHtml(html,value);
+  assert.deepEqual(snapshot(output),value);
+  assert.equal(output.replace(slot,SNAPSHOT_SLOT),html);
+  assert.ok(!output.includes('<script>evil()'));
+  assert.equal(snapshot(snapshotHtml(html,{value:'x'.repeat(524288)})).value.length,524288);
+  assert.throws(()=>snapshotHtml('no slot',payload),/slot/);
+});
+test('real stdio serves the same HTML over HTTP, owns attach config and refreshes isolated roots',async t=>{
+  const temp=await realpath(await mkdtemp(join(tmpdir(),'shared canvas 中文 ')));
+  t.after(()=>rm(temp,{recursive:true,force:true}));
+  async function fixture(name){
+    const path=join(temp,name);await mkdir(join(path,'phases','process'),{recursive:true});
+    await writeFile(join(path,'SKILL.md'),'---\nname: test\n---\n');
+    await writeFile(join(path,'phases','process','LOGIC.md'),'# Logic\n');
+    await writeFile(join(path,'graph.yaml'),`schema_version: gskill.graph.v1\ngraph_id: ${name}\nphases:\n  - id: process\n    depends_on: [input]\n    output: true\n`);
+    return path;
+  }
+  const a=await fixture('one'),b=await fixture('two');
+  await mkdir(join(temp,'.claude'));
+  const existing={version:'0.0.1',note:'user-owned',configurations:[{name:'user-app',url:'http://127.0.0.1:3011',port:3011}]};
+  await writeFile(join(temp,'.claude','launch.json'),JSON.stringify(existing));
+  const client=new Client({name:'shared-html-test',version:'1'});
+  const transport=new StdioClientTransport({command:process.execPath,args:[fileURLToPath(new URL('../../dist/server.mjs',import.meta.url))],stderr:'pipe',env:fakeRuntimeEnv()});
+  await client.connect(transport);t.after(()=>client.close());
+  assert.deepEqual((await readdir(a)).sort(),['SKILL.md','graph.yaml','phases']);
+  assert.equal((await client.callTool({name:'show_graph',arguments:{skill_root:a,presentation:'html'}})).isError,true);
+  const show=skill_root=>client.callTool({name:'show_graph',arguments:{skill_root,presentation:'html',preview_project_root:temp}});
+  const result=await show(a);assert.notEqual(result.isError,true,JSON.stringify(result));
+  const presentation=result.structuredContent.presentation,url=presentation.url;
+  const other=await show(b),otherUrl=other.structuredContent.presentation.url;
+  assert.notEqual(url,otherUrl);assert.equal(new URL(url).origin,new URL(otherUrl).origin);
+  assert.equal(result.structuredContent.document,undefined);
+  assert.equal(other.structuredContent.document,undefined);
+  assert.equal(await readFile(join(a,'SKILL.md'),'utf8'),'---\nname: test\n---\n');
+  assert.equal(presentation.entry,undefined);
+  await assert.rejects(readdir(join(temp,'.gskill')));
+  assert.equal(presentation.kind,'http');assert.equal(presentation.preview.projectRoot,temp);
+  const launch=JSON.parse(await readFile(join(temp,'.claude','launch.json'),'utf8'));
+  assert.deepEqual(launch.configurations[0],existing.configurations[0]);
+  assert.equal(launch.configurations.length,2);assert.equal(launch.note,'user-owned');
+  assert.equal(launch.configurations[1].name,presentation.preview.name);
+  assert.equal(launch.configurations[1].url,new URL(url).origin);
+  const uri=(await client.listTools()).tools.find(tool=>tool.name==='show_graph')._meta.ui.resourceUri;
+  const resource=await client.readResource({uri});
+  assert.deepEqual(resource.contents[0]._meta['openai/ui'],{availableDisplayModes:['fullscreen'],preferredDisplayMode:'fullscreen'});
+  const content=await (await fetch(url)).text();
+  assert.equal(content.replace(slot,SNAPSHOT_SLOT),resource.contents[0].text.replace(slot,SNAPSHOT_SLOT));
+  assert.equal(resource.contents[0].text.replace(slot,SNAPSHOT_SLOT),await readFile(new URL('../../dist/canvas.html',import.meta.url),'utf8'));
+  assert.equal(snapshot(content).hostInfo.transport,'http-bridge');
+  assert.equal(snapshot(resource.contents[0].text).hostInfo.transport,'mcp-app');
+  assert.equal(snapshot(content).graph.id,'one');
+  const live=createGraphConnection({backend:snapshot(content).graphBackend});
+  t.after(()=>live.dispose());
+  const liveGraphs=[];
+  live.connect({receive:value=>liveGraphs.push(value.graph.id),fail:assert.fail});
+  live.selectRoot(a);
+  for(let i=0;i<100&&liveGraphs.at(-1)!=='one';i++) await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(liveGraphs,['one']);
+  assert.equal(new URL(snapshot(content).hostBridge.url).origin,new URL(url).origin);
+  assert.ok(!content.includes(presentation.bridge.token));
+  await writeFile(join(a,'graph.yaml'),(await readFile(join(a,'graph.yaml'),'utf8')).replace('graph_id: one','graph_id: updated'));
+  for(let i=0;i<100&&liveGraphs.at(-1)!=='updated';i++) await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(liveGraphs,['one','updated']);
+  live.dispose();
+  assert.equal((await show(a)).structuredContent.presentation.url,url);
+  assert.equal(snapshot(await (await fetch(url)).text()).graph.id,'updated');
+  assert.equal(await readFile(join(a,'SKILL.md'),'utf8'),'---\nname: test\n---\n');
+  assert.equal(snapshot(await (await fetch(otherUrl)).text()).graph.id,'two');
+  await writeFile(join(a,'graph.yaml'),'broken');
+  const invalid=await show(a);
+  assert.notEqual(invalid.isError,true);assert.equal(invalid.structuredContent.presentation.url,url);
+  assert.equal(invalid.structuredContent.compile.status,'failed');
+  assert.equal(snapshot(await (await fetch(url)).text()).graph,null);
+  assert.deepEqual(snapshot(await (await fetch(url)).text()).graphBackend,snapshot(content).graphBackend);
+  await client.close();
+  await assert.rejects(fetch(url));await assert.rejects(fetch(otherUrl));
+  assert.equal(await readFile(join(a,'SKILL.md'),'utf8'),'---\nname: test\n---\n');
+  assert.equal(await readFile(join(b,'SKILL.md'),'utf8'),'---\nname: test\n---\n');
+  assert.deepEqual(JSON.parse(await readFile(join(temp,'.claude','launch.json'),'utf8')),existing);
+  assert.deepEqual((await readdir(a)).sort(),['SKILL.md','graph.yaml','phases']);
+});
+
+test('HTTP page identity and same-origin boundary reject ambient cross-site reads',async t=>{
+  const owner=createHostBridge();t.after(()=>owner.close());
+  const a=await owner.createView('/business/one'),b=await owner.createView('/business/two');
+  const html=await readFile(new URL('../../dist/canvas.html',import.meta.url),'utf8');
+  owner.publish('/business/one',snapshotHtml(html,{...payload,hostBridge:a.browser}));
+  owner.publish('/business/two',snapshotHtml(html,{...payload,hostBridge:b.browser}));
+  const page=await fetch(a.url);assert.equal(page.status,200);
+  assert.equal(page.headers.get('access-control-allow-origin'),null);
+  assert.match(page.headers.get('content-security-policy'),/connect-src 'self'/);
+  assert.equal(snapshot(await page.text()).hostBridge.token,a.browser.token);
+  const home=await (await fetch(a.browser.url)).text();
+  assert.ok(!home.includes(a.browser.token));assert.ok(!home.includes(a.url));
+  assert.equal((await fetch(a.url,{headers:{Origin:'https://unrelated.invalid'}})).status,403);
+  assert.equal((await fetch(a.url,{headers:{'Sec-Fetch-Site':'cross-site'}})).status,403);
+  // fetch normalizes Host; the raw HTTP probe must exercise the rejected value.
+  const reboundStatus=await new Promise((resolve,reject)=>{
+    get(a.url,{headers:{Host:'localhost:'+new URL(a.url).port}},response=>{response.resume();resolve(response.statusCode);}).on('error',reject);
+  });
+  assert.equal(reboundStatus,403);
+  assert.equal((await fetch(a.browser.url+'/capabilities',{headers:{Origin:'null',Authorization:'Bearer '+a.browser.token}})).status,403);
+  const own=await fetch(a.browser.url+'/capabilities',{headers:{Origin:a.browser.url,Authorization:'Bearer '+a.browser.token}});
+  assert.equal(own.status,200);assert.equal(own.headers.get('access-control-allow-origin'),a.browser.url);
+  assert.equal((await fetch(a.browser.url+'/capabilities',{headers:{Authorization:'Bearer '+b.mod.token}})).status,404);
+  await fetch(a.mod.url+'/disconnect',{method:'POST',headers:{Authorization:'Bearer '+a.mod.token},body:'{}'});
+  assert.equal((await fetch(a.url)).status,410);
+  const next=await owner.createView('/business/one');assert.notEqual(next.url,a.url);
+  await owner.close();await assert.rejects(fetch(a.url));
+});
+

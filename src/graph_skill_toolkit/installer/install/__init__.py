@@ -184,12 +184,21 @@ def load_manifest(state: Path) -> dict:
         release_root(state, data["release"])
         if not set(data["targets"]).issubset({"codex", "claude"}):
             raise InstallError("Unknown manifest target")
+        mode = data.get("source_mode", "installed")
+        if mode not in {"installed", "test"}:
+            raise InstallError("Unknown toolkit source mode")
+        test_mod = None
+        if mode == "test":
+            root = Path(data.get("test_root", ""))
+            if not root.is_absolute() or ".." in root.parts:
+                raise InstallError("Invalid test source root")
+            test_mod = root / "dist/claude-mod"
         for resource in data["resources"]:
-            validate_resource(resource, state)
+            validate_resource(resource, state, test_mod=test_mod)
     return data
 
 
-def validate_resource(resource: dict, state: Path) -> None:
+def validate_resource(resource: dict, state: Path, *, test_mod: Path | None = None) -> None:
     home = Path.home()
     path = Path(resource["path"])
     if not path.is_absolute() or ".." in path.parts:
@@ -213,8 +222,10 @@ def validate_resource(resource: dict, state: Path) -> None:
             directory = Path(resource["plugin_directory"])
             if (
                 path != home / ".claude/settings.json"
-                or directory.name != "claude-mod"
-                or directory != release_root(state, directory.parent.name) / "claude-mod"
+                or (directory != test_mod and (
+                    directory.name != "claude-mod"
+                    or directory != release_root(state, directory.parent.name) / "claude-mod"
+                ))
             ):
                 raise InstallError("Manifest references an unowned Claude Mod directory")
         return
@@ -334,11 +345,13 @@ def path_plan(
     return before, (";".join(parts), before[1]), owned
 
 
-def plan(resources: list[dict], old: dict, state: Path) -> tuple[Transaction, list[dict]]:
+def plan(
+    resources: list[dict], old: dict, state: Path, *, test_mod: Path | None = None
+) -> tuple[Transaction, list[dict]]:
     transaction, owned = Transaction(), []
     previous = {entry["path"]: entry for entry in old.get("resources", [])}
     for resource in resources:
-        validate_resource(resource, state)
+        validate_resource(resource, state, test_mod=test_mod)
         before, after, record = merge(resource, previous.pop(resource["path"], None))
         transaction.add(Path(resource["path"]), before, after)
         owned.append(record)
@@ -532,6 +545,8 @@ def status() -> dict:
         "status": "configuration-changed" if problems else "installed-files-present",
         "version": old["version"],
         "targets": old["targets"],
+        "source_mode": old.get("source_mode", "installed"),
+        "test_root": old.get("test_root"),
         "problems": problems,
         "native_host_loading": "unverified",
         "state_root": str(state),

@@ -1,8 +1,8 @@
 import { build } from "esbuild";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const root = fileURLToPath(new URL("../../", import.meta.url));
+const root = fileURLToPath(new URL("../..", import.meta.url));
 const dist = new URL("../../dist/", import.meta.url);
 await mkdir(dist, { recursive: true });
 const browser = await build({
@@ -15,6 +15,15 @@ const template = await readFile(new URL("../../ui/template/canvas.html", import.
 const script = browser.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
 const page = template.replace("/* APP_BUNDLE */", () => script);
 await writeFile(new URL("canvas.html", dist), page);
+await mkdir(new URL('claude-mod/hooks/', dist), { recursive: true });
+await mkdir(new URL('claude-mod/.claude-plugin/', dist), { recursive: true });
+await build({
+  absWorkingDir: root, entryPoints: ['adapters/claude/mod/hooks/register.js'],
+  outfile: 'dist/claude-mod/hooks/register.js', bundle: true, platform: 'neutral',
+  format: 'esm', target: 'es2022', charset: 'utf8',
+});
+await copyFile(new URL('../../adapters/claude/mod/hooks/hooks.json', import.meta.url), new URL('claude-mod/hooks/hooks.json', dist));
+await copyFile(new URL('../../adapters/claude/mod/.claude-plugin/plugin.json', import.meta.url), new URL('claude-mod/.claude-plugin/plugin.json', dist));
 await build({
   absWorkingDir: root, entryPoints: ["server/main.mjs"], outfile: "dist/server.mjs",
   bundle: true, platform: "node", format: "esm", target: "node22",

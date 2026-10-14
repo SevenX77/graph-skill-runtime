@@ -47,8 +47,13 @@ def hook_group(node: Path, script: Path, target: str) -> dict:
 
 
 def projections(
-    home: Path, payload: Path, python: Path, node: Path, targets: list[str], source_root: Path
+    home: Path, payload: Path, python: Path, node: Path, targets: list[str], source_root: Path,
+    *, mod_root: Path | None = None, mod_assets: Path | None = None,
+    portable_spec: Path | None = None,
 ) -> list[dict]:
+    mod_root = mod_root or payload / "claude-mod"
+    mod_assets = mod_assets or source_root
+    portable_spec = portable_spec or payload / "references" / PORTABLE_SPEC_NAME
     result = []
     for target in targets:
         if target == "codex":
@@ -79,7 +84,7 @@ def projections(
             )
             hook_file = home / ".claude" / "settings.json"
             for member in CLAUDE_MOD_FILES:
-                if not (source_root / member).is_file():
+                if not (mod_assets / member).is_file():
                     raise InstallError(f"Missing Claude Mod asset: {member}")
         result.append(
             {
@@ -87,13 +92,13 @@ def projections(
                 "path": str(hook_file),
                 "value": hook_group(node, payload / "dist/after-tool.mjs", target),
                 "target": target,
-                **({"plugin_directory": str(payload / "claude-mod")} if target == "claude" else {}),
+                **({"plugin_directory": str(mod_root)} if target == "claude" else {}),
             }
         )
         replacements = {
             "{{GSKILL_COMMAND}}": quoted_command([str(python), "-I", "-B", "-X", "utf8", "-m", "graph_skill_runtime"]),
             "{{TOOLKIT_COMMAND}}": quoted_command([str(node), str(payload / "bin/graph-skill.mjs")]),
-            "{{PORTABLE_SPEC}}": str(payload / "references" / PORTABLE_SPEC_NAME),
+            "{{PORTABLE_SPEC}}": str(portable_spec),
         }
         for skill_id in ("graph-skill", "graph-skill-canvas"):
             skill_source = source_root / "skills" / skill_id

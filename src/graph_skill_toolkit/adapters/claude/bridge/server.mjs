@@ -1,10 +1,10 @@
-import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
-import { HOST_ACTIONS } from "../../../ports/host/contract.mjs";
+import { createLocalHttpServer } from "../../../backend/http/index.mjs";
+import { HOST_ACTIONS, validateArguments } from "../../../ports/host/contract.mjs";
 import { identifyHost, hostIdentityKey } from "../../detection/index.mjs";
 
 const actions = new Set(HOST_ACTIONS);
-const statuses = new Set(["completed", "accepted", "unsupported", "rejected", "error"]);
+const statuses = new Set(["completed", "accepted", "pending", "unsupported", "rejected", "error"]);
 const token = () => randomBytes(32).toString("hex");
 const pending = id => ({ status: "pending", message: "宿主仍未返回结果；查询此请求不会重复执行。", requestId: id });
 
@@ -19,27 +19,19 @@ async function readJson(request) {
 }
 
 function validateAction(input, root) {
-  if (!input || typeof input.id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/.test(input.id) || !actions.has(input.action)) throw new Error("Unknown action or invalid request id.");
-  const args = input.args ?? {};
-  if (typeof args !== "object" || Array.isArray(args)) throw new Error("Action arguments must be an object.");
-  if (Object.keys(args).some(key => !["skillRoot", "text", "context"].includes(key))) throw new Error("Unknown action argument.");
-  if (args.skillRoot !== undefined && args.skillRoot !== root) throw new Error("Skill root differs from the displayed view.");
-  if (["fill-prompt", "send-prompt"].includes(input.action) && (typeof args.text !== "string" || !args.text.trim() || args.text.length > 8000)) throw new Error("Prompt must contain 1–8000 characters.");
-  if (args.context !== undefined) {
-    const value = args.context;
-    if (!value || value.skillRoot !== root || typeof value.graphId !== "string" || value.graphId.length > 256 ||
-      (value.nodeId !== undefined && (typeof value.nodeId !== "string" || value.nodeId.length > 256)) ||
-      Object.keys(value).some(key => !["skillRoot", "graphId", "nodeId"].includes(key))) throw new Error("Invalid selected-node context.");
-  }
-  if (input.action === "update-context" && !args.context) throw new Error("Node context is required.");
-  return { id: input.id, action: input.action, args: { ...args, skillRoot: root }, skillRoot: root };
+  if (!input || typeof input.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(input.id) || !actions.has(input.action)) throw new Error("Unknown action or invalid request id.");
+  const args = validateArguments(input.action, input.args ?? {});
+  return { id: input.id, action: input.action, args, skillRoot: root };
 }
 
 // This owner exists only after an explicit HTML show_graph call. Browser and Mod
 // have distinct bearer capabilities; neither token is placed in a URL or a log.
-export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}) {
+export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http } = {}) {
   const roots = new Map(), credentials = new Map(), pages = new Map();
-  let server, base, opening, closing, closed = false;
+  const listener = http ?? createLocalHttpServer();
+  const paths = new Set(["/capabilities", "/poll", "/disconnect", "/result", "/action"]);
+  listener.mount(path => path === "/" || pages.has(path) || paths.has(path), handle);
+  let base, closing, closed = false;
   const connected = view => view.confirmed && !view.disconnected && now() - view.lastPoll < 5000;
   function finish(entry, result) {
     if (entry.result) return;
@@ -56,6 +48,7 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}
     });
   }
   async function handle(request, response) {
+    base = listener.origin;
     // The normal host preview attaches this actual loopback origin. Documents
     // and actions share that origin; no cross-origin page may read credentials.
     response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -131,7 +124,7 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}
           if (JSON.stringify(entry.request) !== JSON.stringify(action)) throw new Error("Request id already belongs to a different action.");
         } else {
           if (!connected(view)) return send(200, { status: "unsupported", message: "Claude Mod 未连接；操作未交付。" });
-          if (view.capabilities[action.action]?.available !== true) return send(200, { status: "unsupported", message: view.capabilities[action.action]?.detail || "当前宿主未提供此操作。" });
+          if (view.capabilities[action.action]?.state !== "available") return send(200, { status: "unsupported", message: view.capabilities[action.action]?.detail || "当前宿主未提供此操作。" });
           if ([...view.requests.values()].filter(item => !item.result).length >= 32) return send(429, { error: "32 host operations are still pending; inspect their results first." });
           while (view.requests.size >= 256) {
             const completed = [...view.requests].find(([, item]) => item.result);
@@ -148,11 +141,7 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}
   }
   async function open() {
     if (closed) throw new Error("Bridge is closed.");
-    return opening ??= new Promise((resolve, reject) => {
-      server = createServer((request, response) => { void handle(request, response).catch(() => response.destroy()); });
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => { base = `http://127.0.0.1:${server.address().port}`; resolve(); });
-    });
+    base = await listener.open();
   }
   return {
     async createView(root, launchInfo) {
@@ -187,12 +176,11 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now } = {}
     close() {
       return closing ??= (async () => {
       closed = true;
-      if (opening) await opening;
       for (const view of roots.values()) for (const entry of view.requests.values()) finish(entry, { status: entry.delivered ? "pending" : "error", message: entry.delivered ? "画布服务已关闭；操作结果未知，不会自动重试。" : "画布服务已关闭，操作未交付。", requestId: entry.request.id });
       credentials.clear(); roots.clear(); pages.clear();
       // Partial HTTP bodies must not hold the MCP process alive at session EOF.
       // Completed/unknown receipts were settled above before retiring sockets.
-      if (server?.listening) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+      if (!http) await listener.close();
       })();
     },
   };

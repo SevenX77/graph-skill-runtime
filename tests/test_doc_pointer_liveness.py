@@ -554,7 +554,13 @@ def _collect_owning_spec_violations(*, catalog: Path) -> tuple[list[str], set[st
 
 
 def _python_sources(repo_root: Path) -> list[Path]:
-    return [path for tree in SOURCE_TREES for path in (repo_root / tree).rglob("*.py")]
+    generated = {".venv", "node_modules", "dist", "release", "build", "evidence"}
+    return [
+        path
+        for tree in SOURCE_TREES
+        for path in (repo_root / tree).rglob("*.py")
+        if not generated.intersection(path.relative_to(repo_root).parts)
+    ]
 
 
 def test_error_registry_documentation_pointers_target_contract_documents() -> None:

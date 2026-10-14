@@ -65,7 +65,7 @@ function immutable(info) {
 export function unknownHost(reason = "尚未取得宿主身份。", facts = {}) {
   return immutable({ name: null, version: null, clientType: null, sessionId: null, transport: "none", identitySource: "none",
     ...facts, id: "unknown", status: "unknown", reason,
-    capabilities: Object.fromEntries(HOST_ACTIONS.map(action => [action, { available: false, detail: reason }])) });
+    capabilities: Object.fromEntries(HOST_ACTIONS.map(action => [action, { state: "unknown", detail: reason }])) });
 }
 
 /** Only connection-returned evidence enters product identification.

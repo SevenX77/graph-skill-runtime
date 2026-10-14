@@ -1,34 +1,58 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
-import { graph } from "../demo/graph.mjs";
-import { loadSkill } from "../skill_source/files.mjs";
-import { projectGraph } from "../projection/graph.mjs";
-import { snapshotHtml } from "../adapters/claude/preview/publisher.mjs";
+import { describeDiagnostics, readGraphState } from "../application/graph/service/index.mjs";
+import { selectSkillRoot } from "../application/graph/source/files.mjs";
+import { createRuntimeCompiler } from "../backend/runtime/index.mjs";
+import { createLocalHttpServer } from "../backend/http/index.mjs";
+import { createGraphBackend } from "../backend/graph/index.mjs";
+import { createGraphRelay } from "../backend/relay/index.mjs";
+import { createLiveGraphSource } from "../application/graph/live_source/index.mjs";
+import { snapshotHtml } from "../ui/template/publisher.mjs";
 import { createHostBridge } from "../adapters/claude/bridge/server.mjs";
-import { createPreviewConfiguration } from "../adapters/claude/preview_configuration/index.mjs";
-import { skillDocument } from "../presentation/index.mjs";
-import { canvasResourceUri, codexResourceMetadata } from "../adapters/codex/resource/index.mjs";
-import { createCodexCanvasSessions } from "../adapters/codex/session/index.mjs";
+import { createPreviewConfiguration } from "../adapters/claude/presentation/preview_configuration/index.mjs";
+import { canvasResourceUri, codexResourceMetadata } from "../adapters/codex/presentation/resource/index.mjs";
+import { createCodexCanvasSessions } from "../adapters/codex/presentation/session/index.mjs";
 import { launchHostInfo, requestClientInfo } from "../adapters/launch/index.mjs";
 import packageInfo from "../package.json" with { type: "json" };
 
 // The build places this self-contained resource alongside the bundled server.
 const html = await readFile(new URL("./canvas.html", import.meta.url), "utf8");
-const resourceUri = canvasResourceUri(html);
-const ui = { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: false };
+const localHttp = createLocalHttpServer();
+// One live source per root serves both page transports: SSE for the Claude
+// HTTP page and long poll (watch_graph) for the sandboxed Codex MCP App page.
+// The runtime compiler is the only validity authority behind that source.
+const compiler = createRuntimeCompiler();
+const liveSource = createLiveGraphSource({ read: root => readGraphState(root, { compiler }) });
+
+// Tool-facing graph state: the drawable graph when the runtime accepts the
+// skill, otherwise no graph plus the runtime's compile diagnostics.
+function canvasState(event) {
+  if (event?.type === "snapshot") return { ...event.data, compile: { status: "passed", diagnostics: [] } };
+  if (event?.type === "invalid") return { graph: null, skillRoot: event.skillRoot, compile: { status: "failed", diagnostics: event.diagnostics } };
+  throw new Error(event?.message ?? "Graph state is unavailable.");
+}
+const invalidText = state => `The graph is currently invalid. Runtime compile reported ${state.compile.diagnostics.length} diagnostic(s); the canvas lists them and redraws once the files compile again:\n${describeDiagnostics(state.compile.diagnostics)}`;
+const graphBackend = createGraphBackend({ http: localHttp, source: liveSource });
+const graphRelay = createGraphRelay({ source: liveSource });
 const previewConfiguration = createPreviewConfiguration();
-const hostBridge = createHostBridge();
-const selectedRoots = new Map();
+const hostBridge = createHostBridge({ http: localHttp });
+const serverInfo = Object.freeze({ name: "graph-skill-canvas", version: packageInfo.version });
+await localHttp.open();
 
 const stdio = serveStdio(() => {
-  const server = new McpServer({ name: "graph-skill-canvas", version: packageInfo.version });
+  const server = new McpServer(serverInfo);
+  const graphConnection = graphBackend.createConnection();
+  const bootstrap = { graphBackend: graphConnection.descriptor, serverInfo };
+  const resourceUri = canvasResourceUri(snapshotHtml(html, bootstrap));
+  const ui = { csp: { connectDomains: [localHttp.origin], resourceDomains: [] }, prefersBorder: false };
+  const selectedRoots = new Map();
   const codexSessions = createCodexCanvasSessions();
   registerAppTool(server, "show_graph", {
     title: "Show Graph Skill canvas",
-    description: "Display the selected Graph Skill's actual root graph together with its SKILL.md. In Codex, first open the verified SKILL.md with open_in_codex target type=file and line=1 in a standalone host invocation. After that invocation returns, call this tool in a separate invocation as the final presentation. Keep file opening and this tool in distinct tool batches, including when orchestrating calls; queued file delivery is not UI completion. Retain and reuse both views, with the canvas active. HTML presentation requires preview_project_root from the actual Claude session root; it starts an owned loopback preview and merges one temporary attach entry into that project's .claude/launch.json. Record existing tabs, attach the returned preview name and retain the actual HTTP tabId. Open or reuse document.path with normal file preview to show SKILL.md and reveal the sidebar. Navigate only the retained HTTP tab to the canvas URL, select it, and verify both views remain with the pane displayed. Preserve all prior user pages. Omit skill_root only for the explicitly requested demonstration, which has no business document.",
+    description: "Display the selected Graph Skill's actual root graph on the shared canvas. The canvas is the only view this presentation opens, selects and verifies: in Codex it is the MCP App view attached to this result, requested once as the final presentation; in Claude Code it is the owned loopback HTTP page shown in the Browser pane. HTML presentation requires preview_project_root from the actual Claude session root; it starts an owned loopback preview and merges one temporary attach entry into that project's .claude/launch.json. Record existing tabs, attach the returned preview name, retain the actual HTTP tabId, navigate only that tab to the canvas URL, select it, and verify the canvas is active with every prior user page preserved. If the Browser pane stays hidden, ask the user to open it manually; open no file or other page to reveal it. Repeated display reuses the same canvas view. Omit skill_root only for the explicitly requested demonstration, which has no business root.",
     inputSchema: z.object({ skill_root: z.string().min(1).optional(), presentation: z.enum(["mcp-app", "html"]).optional(), preview_project_root: z.string().min(1).optional(),
       native_host: z.object({name:z.literal("Claude Code"),version:z.string().min(1).max(256),client_type:z.literal("claude_code"),
         sessionId:z.string().min(1).max(256),source:z.literal("claude-mod-session")}).strict().optional().describe("Supplied by the Claude Mod from native session APIs; the Mod overwrites caller values. Omit in ordinary calls.") }).strict(),
@@ -39,58 +63,103 @@ const stdio = serveStdio(() => {
       const hostInfo = launchHostInfo({clientInfo:requestClientInfo(server.server, context),presentation,nativeHost:native_host});
       if (presentation === "html" && (!skill_root || !preview_project_root)) throw new Error("HTML preview requires skill_root and the actual host session's preview_project_root.");
       if (presentation !== "html" && preview_project_root !== undefined) throw new Error("preview_project_root applies only to HTML presentation.");
-      if (!skill_root) return {
+      if (!skill_root) {
+        graphConnection.select(null);
+        return {
         content: [{ type: "text", text: "Demonstration canvas. No business Skill selected; pass skill_root for its actual graph and folder shortcut." }],
-        structuredContent: { graph: { ...graph, width: 352, height: 548 }, skillRoot: null, hostInfo },
+        structuredContent: { ...canvasState(await liveSource.current(null)), hostInfo, serverInfo },
         _meta: codexSessions.metadata(null),
-      };
-      const skill = await loadSkill(skill_root);
-      selectedRoots.set(skill_root, skill.skillRoot);
-      const projected = projectGraph(skill.data, skill.kinds);
-      const payload = { graph: projected, skillRoot: skill.skillRoot, document: skillDocument(skill.skillRoot), hostInfo };
-      if (presentation === "html" && (await stat(payload.document.path)).size > 524288) throw new Error("SKILL.md exceeds the host file preview's 512 KiB limit.");
-      const bridge = presentation === "html" ? await hostBridge.createView(skill.skillRoot, hostInfo) : undefined;
+        };
+      }
+      // An invalid graph still opens the canvas: the page shows the runtime's
+      // diagnostics and redraws when a later save compiles.
+      const presentationData = canvasState(await liveSource.current(await selectSkillRoot(skill_root)));
+      selectedRoots.set(skill_root, presentationData.skillRoot);
+      graphConnection.select(skill_root, presentationData.skillRoot);
+      const payload = { ...presentationData, hostInfo, serverInfo };
+      const projected = presentationData.graph;
+      const bridge = presentation === "html" ? await hostBridge.createView(payload.skillRoot, hostInfo) : undefined;
       let httpPresentation;
       if (bridge) {
-        const document = snapshotHtml(html, { ...payload, hostBridge: bridge.browser });
+        const document = snapshotHtml(html, { ...payload, ...bootstrap, hostBridge: bridge.browser });
         const preview = await previewConfiguration.ensure(preview_project_root, bridge.browser.url);
-        const url = hostBridge.publish(skill.skillRoot, document);
+        const url = hostBridge.publish(payload.skillRoot, document);
         httpPresentation = { kind: "http", url, preview, bridge: bridge.mod };
       }
       return {
-        content: [{ type: "text", text: `Graph Skill canvas: ${skill.skillRoot} (${projected.nodes.length} nodes).` }],
+        content: [{ type: "text", text: projected ? `Graph Skill canvas: ${payload.skillRoot} (${projected.nodes.length} nodes).` : `Graph Skill canvas: ${payload.skillRoot}. ${invalidText(payload)}` }],
         structuredContent: { ...payload, ...(httpPresentation ? { presentation: httpPresentation } : {}) },
-        ...(presentation !== "html" ? { _meta: codexSessions.metadata(skill.skillRoot) } : {}),
+        ...(presentation !== "html" ? { _meta: codexSessions.metadata(payload.skillRoot) } : {}),
       };
     } catch (error) {
-      try { hostBridge.publish(selectedRoots.get(skill_root) ?? skill_root, snapshotHtml(html, { error: error.message })); } catch { /* No previous HTTP view for this root. */ }
+      // Keep an existing App bootstrap intact. Its filesystem subscription
+      // reports invalid saves and can recover without replacing the page.
       return { isError: true, content: [{ type: "text", text: `Cannot display Graph Skill: ${error.message}` }], ...(presentation !== "html" ? { _meta: codexSessions.existingMetadata(selectedRoots.get(skill_root)) } : {}) };
     }
   });
   registerAppTool(server, "inspect_graph", {
     title: "Inspect the displayed graph",
-    description: "Read current graph presentation data for a Skill previously selected with show_graph in this connection. Reads files only; does not compile or execute business code.",
+    description: "Read the current graph of a Skill previously selected with show_graph in this connection: the drawable graph when the runtime compiles it, otherwise the runtime compile diagnostics. Compiles without cache writes; never executes business code.",
     inputSchema: z.object({ skill_root: z.string().min(1) }).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    _meta: { ui: { resourceUri, visibility: ["app", "model"] } },
+    // Reading current graph data must not instantiate a second canvas.
+    _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ skill_root }) => {
     try {
-      if (![...selectedRoots.values()].includes(skill_root)) throw new Error("Select this Skill with show_graph before inspecting it.");
-      const skill = await loadSkill(skill_root);
-      return { content: [{ type: "text", text: `Read graph ${skill.data.graph_id}` }], structuredContent: { graph: projectGraph(skill.data, skill.kinds), skillRoot: skill.skillRoot, document: skillDocument(skill.skillRoot) }, _meta: codexSessions.metadata(skill.skillRoot) };
+      const selectedRoot = selectedRoots.get(skill_root) ?? ([...selectedRoots.values()].includes(skill_root) ? skill_root : undefined);
+      if (!selectedRoot) throw new Error("Select this Skill with show_graph before inspecting it.");
+      const presentationData = canvasState(await liveSource.current(selectedRoot));
+      return { content: [{ type: "text", text: presentationData.graph ? `Read graph ${presentationData.graph.id}` : invalidText(presentationData) }], structuredContent: { ...presentationData, serverInfo }, _meta: codexSessions.metadata(presentationData.skillRoot) };
     } catch (error) { return { isError: true, content: [{ type: "text", text: error.message }], _meta: codexSessions.existingMetadata(skill_root) }; }
   });
+  registerAppTool(server, "watch_graph", {
+    title: "Watch the displayed graph",
+    description: "Canvas page channel: wait for the next change of a Skill graph selected with show_graph in this connection, then return its current graph, runtime compile diagnostics or file error. Never executes business code.",
+    inputSchema: z.object({ skill_root: z.string().min(1).nullable(), after_revision: z.number().int().min(0).optional(), timeout_ms: z.number().int().min(0).max(25000).optional() }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Page-only long poll: hidden from the model and attaches no canvas.
+    _meta: { ui: { visibility: ["app"] } },
+  }, async ({ skill_root, after_revision, timeout_ms }, context) => {
+    try {
+      const selectedRoot = skill_root === null ? null : selectedRoots.get(skill_root) ?? ([...selectedRoots.values()].includes(skill_root) ? skill_root : undefined);
+      if (selectedRoot === undefined) throw new Error("Select this Skill with show_graph before watching it.");
+      const result = await graphRelay.wait(selectedRoot, after_revision ?? -1, timeout_ms ?? 20000, context?.mcpReq?.signal);
+      return {
+        content: [{ type: "text", text: result.event ? `Graph revision ${result.revision}.` : `No graph change after revision ${result.revision}.` }],
+        structuredContent: { revision: result.revision, event: result.event },
+      };
+    } catch (error) { return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }] }; }
+  });
+  registerAppTool(server, "list_canvas_tools", {
+    title: "List canvas app tools",
+    description: "Return the tools this Graph Skill MCP App exposes to its own page. This does not enumerate the host session.",
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { ui: { visibility: ["app"] } },
+  }, async () => ({
+    content: [{ type: "text", text: "Three canvas app tools are available." }],
+    structuredContent: { scope: "originating-server", complete: true, tools: [
+      { name: "inspect_graph", description: "Read the selected graph without executing it.", reference: { name: "inspect_graph", scope: "originating-server" } },
+      { name: "watch_graph", description: "Wait for the selected graph's next change.", reference: { name: "watch_graph", scope: "originating-server" } },
+      { name: "list_canvas_tools", description: "List this canvas's page-callable tools.", reference: { name: "list_canvas_tools", scope: "originating-server" } },
+    ] },
+  }));
   registerAppResource(server, "Graph Skill canvas", resourceUri, {
     description: "Viewport-filling graph canvas with a host-owned Skill folder shortcut.",
     _meta: { ui, ...codexResourceMetadata },
   }, async (_uri, context) => ({ contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE,
-    text: snapshotHtml(html, {hostInfo:launchHostInfo({clientInfo:requestClientInfo(server.server, context)})}),
+    text: snapshotHtml(html, {...bootstrap,hostInfo:launchHostInfo({clientInfo:requestClientInfo(server.server, context)})}),
     _meta: { ui, ...codexResourceMetadata } }] }));
   return server;
 }, { onerror: (error) => console.error(error.message) });
 
 // Normal shutdown removes only exact owned attach entries and closes HTTP.
-const cleanup = () => Promise.all([previewConfiguration.close(), hostBridge.close()]);
+const cleanup = async () => {
+  graphRelay.close();
+  graphBackend.close();
+  await Promise.all([previewConfiguration.close(), hostBridge.close()]);
+  await localHttp.close();
+};
 process.stdin.once("end", () => void cleanup());
 process.stdin.once("close", () => void cleanup());
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, async () => {

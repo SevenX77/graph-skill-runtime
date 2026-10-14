@@ -66,6 +66,9 @@ try {
   graph-skill status
   graph-skill uninstall [--dry-run]
   graph-skill cleanup [--dry-run]
+  graph-skill mode test [TOOLKIT_SOURCE_DIR] [--dry-run]
+  graph-skill mode installed [--dry-run]
+  graph-skill mode status
   graph-skill <runtime command> [arguments]
   gskill <runtime command> [arguments]
 
@@ -80,6 +83,32 @@ Cleanup removes verified inactive release caches; close/restart hosts first.
 See the packaged README for installation and manual Desktop acceptance.`);
   } else if (operation === "--version") {
     console.log(version);
+  } else if (operation === "mode") {
+    const [mode, ...tail] = args;
+    if (!["test", "installed", "status"].includes(mode)) throw new Error("Use mode test, installed, or status.");
+    const manifest = installed();
+    if (!manifest) throw new Error("Install the toolkit before switching its source.");
+    const release = join(state, "versions", manifest.release);
+    const python = join(release, "runtimes", "python", process.platform === "win32" ? "python.exe" : "bin/python3");
+    const entry = join(root, "installer", "entry", "mode.py");
+    if (!existsSync(entry)) throw new Error("This toolkit does not include source-mode switching. Run the command from the updated source tree.");
+    let sourceArgs = [];
+    if (mode === "test") {
+      const source = tail[0] && !tail[0].startsWith("--") ? resolve(tail.shift()) : root;
+      const script = join(source, "scripts", "build", "main.mjs");
+      if (!existsSync(script)) throw new Error(`Not a buildable toolkit source: ${source}`);
+      if (!tail.includes("--dry-run")) {
+        const environment = { ...process.env };
+        delete environment.NODE_OPTIONS;
+        delete environment.NODE_PATH;
+        const built = spawnSync(process.execPath, [script], { cwd: source, stdio: "inherit", windowsHide: true, env: environment });
+        if (built.error) throw built.error;
+        if (built.status !== 0) throw new Error(`Test source build failed with exit code ${built.status}. Host configuration was not changed.`);
+      }
+      sourceArgs = [source];
+    }
+    if (tail.some(value => value !== "--dry-run") || tail.length > 1) throw new Error("Unexpected mode arguments.");
+    run(python, ["-I", "-B", "-X", "utf8", entry, mode, ...sourceArgs, ...tail]);
   } else if (lifecycle.has(operation)) {
     const explicitSource = args[0] && !args[0].startsWith("--") ? resolve(args[0]) : null;
     const hasBundle = existsSync(join(root, "bundle.json"));
