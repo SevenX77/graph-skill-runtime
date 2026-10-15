@@ -55,7 +55,7 @@ Each call has comparison controls for **matches**, **differs** and **not observe
 | System | Nominal lab state directory and real-path handling |
 | --- | --- |
 | Windows | `%LOCALAPPDATA%\plugin-interface-lab`; with no `LOCALAPPDATA`, `<home>/AppData/Local/plugin-interface-lab`. Preparation resolves the real path. |
-| Windows packaged host | MSIX is the Windows packaged-app format. Windows can redirect a packaged host's and its descendant processes' writes under `%LOCALAPPDATA%` into the package's private directory. For Claude Desktop on the measured Windows installation, the real lab directory is `C:\Users\test\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\plugin-interface-lab`. The lab reports and uses the resolved directory. |
+| Windows packaged host | MSIX is the Windows packaged-app format. Windows can redirect a packaged host's and its descendant processes' writes under `%LOCALAPPDATA%` into the package's private directory. For Claude Desktop the real lab directory has the form `%LOCALAPPDATA%\Packages\<package family name>\LocalCache\Local\plugin-interface-lab`. The lab reports and uses the resolved directory. |
 | macOS | `~/Library/Application Support/plugin-interface-lab`, resolved to its real path. |
 | Linux | `$XDG_STATE_HOME/plugin-interface-lab`, or `~/.local/state/plugin-interface-lab`, resolved to its real path. |
 
