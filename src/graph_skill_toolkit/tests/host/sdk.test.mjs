@@ -74,10 +74,10 @@ test("MCP capability interpretation does not infer unadvertised host operations"
 
 test("Codex text and structured-context operations require their declared content modalities", () => {
   const caps = mcpCapabilities({
-    message: { image: {} }, updateModelContext: { text: {} },
+    message: { image: {} }, updateModelContext: { image: {} },
     experimental: { "openai/message": { draft: {} } },
   });
-  for (const action of ["composer.writeDraft", "conversation.submitMessage", "context.set", "context.remove"]) {
+  for (const action of ["composer.writeDraft", "conversation.submitMessage", "context.update"]) {
     assert.equal(caps[action].state, "unavailable", action);
   }
 });

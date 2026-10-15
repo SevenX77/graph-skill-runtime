@@ -29,7 +29,7 @@ function validateAction(input, key) {
 export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http } = {}) {
   const keys = new Map(), credentials = new Map(), pages = new Map();
   const listener = http ?? createLocalHttpServer();
-  const paths = new Set(["/capabilities", "/poll", "/disconnect", "/result", "/action"]);
+  const paths = new Set(["/capabilities", "/poll", "/disconnect", "/result", "/action", "/events"]);
   listener.mount(path => path === "/" || pages.has(path) || paths.has(path), handle);
   let base, closing, closed = false;
   const connected = view => view.confirmed && !view.disconnected && now() - view.lastPoll < 5000;
@@ -113,6 +113,27 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http 
         if (entry.result && JSON.stringify(entry.result) !== JSON.stringify(input.result)) throw new Error("Conflicting result receipt.");
         finish(entry, input.result); return send(200, {});
       }
+      if (request.method === "POST" && url.pathname === "/events" && role === "mod") {
+        const input = await readJson(request);
+        if (!Array.isArray(input.events) || input.events.some(event => typeof event?.type !== "string" || typeof event.at !== "string")) throw new Error("Invalid event batch.");
+        for (const event of input.events) view.events.push({ seq: ++view.eventSeq, type: event.type, at: event.at, ...(event.data === undefined ? {} : { data: event.data }) });
+        if (view.events.length > 500) view.events.splice(0, view.events.length - 500);
+        for (const resolve of view.eventWaiters) resolve();
+        view.eventWaiters.clear();
+        return send(200, {});
+      }
+      if (request.method === "GET" && url.pathname === "/events" && role === "browser") {
+        const after = Number(url.searchParams.get("after") ?? 0);
+        if (!Number.isSafeInteger(after) || after < 0) throw new Error("Invalid event cursor.");
+        if (!view.events.some(event => event.seq > after) && !view.disconnected) {
+          await new Promise(resolve => {
+            const done = () => { clearTimeout(timer); view.eventWaiters.delete(done); resolve(); };
+            const timer = setTimeout(done, Math.min(responseWaitMs, 20000));
+            view.eventWaiters.add(done);
+          });
+        }
+        return send(200, { events: view.events.filter(event => event.seq > after), cursor: view.eventSeq, disconnected: view.disconnected });
+      }
       if (request.method === "GET" && url.pathname === "/result" && role === "browser") {
         const entry = view.requests.get(url.searchParams.get("id"));
         return entry ? send(200, await wait(entry)) : send(404, { error: "Unknown request." });
@@ -158,7 +179,7 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http 
         for (const entry of view.requests.values()) finish(entry, {status:entry.delivered ? "pending" : "error",message:"启动会话已改变；原画布操作不会交给新会话。",requestId:entry.request.id});
       }
       if (!view || view.disconnected) {
-        view = { key, path: `/view/${token()}`, html: null, lastPoll: -Infinity, disconnected: false, identity:null, identityKey:null, confirmed:false, capabilities: {}, requests: new Map(), browser: { url: base, token: token() }, mod: { url: base, token: token(), key } };
+        view = { events: [], eventSeq: 0, eventWaiters: new Set(), key, path: `/view/${token()}`, html: null, lastPoll: -Infinity, disconnected: false, identity:null, identityKey:null, confirmed:false, capabilities: {}, requests: new Map(), browser: { url: base, token: token() }, mod: { url: base, token: token(), key } };
         keys.set(key, view);
         pages.set(view.path, view);
         credentials.set(view.browser.token, { view, role: "browser" });

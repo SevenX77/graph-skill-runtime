@@ -25,7 +25,8 @@ export function mcpConnection(app, { transport, originatingServer, missingDataTi
       await connected;
       return app.callServerTool({ name, arguments: args });
     },
-    async connect({ receive, fail }) {
+    async connect({ receive, fail, event = () => {} }) {
+      const emit = (type, data) => event({ type, at: new Date().toISOString(), ...(data === undefined ? {} : { data }) });
       // The page owner interprets the presenting tool's arguments.
       app.ontoolinput = input => {
         const args = input?.arguments;
@@ -36,6 +37,7 @@ export function mcpConnection(app, { transport, originatingServer, missingDataTi
         }
       };
       app.ontoolresult = result => {
+        emit("tool.completed", { isError: result.isError === true, structuredContent: result.structuredContent ?? null });
         if (result.isError) {
           clearTimeout(missingDataTimer);
           fail(new Error(result.content?.filter(item => item.type === "text").map(item => item.text).join("\n") || "The tool returned an error."));
@@ -45,6 +47,8 @@ export function mcpConnection(app, { transport, originatingServer, missingDataTi
           receive(result.structuredContent);
         }
       };
+      app.onhostcontextchanged = context => emit("host.contextChanged", context);
+      app.onteardown = async () => { emit("page.teardown"); return {}; };
       app.onclose = () => { ready = false; clearTimeout(missingDataTimer); };
       try { await app.connect(transport); }
       catch (error) { settleConnected.reject(error); throw error; }

@@ -1,5 +1,8 @@
 /** Shared page contract. Host-specific protocols and side effects belong to adapters. */
-export type HostAction = "files.revealDirectory" | "files.openFile" | "composer.writeDraft" | "conversation.submitMessage" | "context.set" | "context.remove" | "tools.list" | "tools.call" | "views.open" | "views.list" | "views.activate" | "views.close" | "views.requestDisplayMode" | "skills.list" | "skills.invoke";
+export type HostAction = "host.getInfo" | "host.getCapabilities" | "host.getContext" | "events.subscribe" | "files.openFile" | "files.revealDirectory" | "composer.writeDraft" | "conversation.submitMessage" | "context.update" | "tools.list" | "tools.call" | "skills.list" | "skills.invoke" | "views.open" | "views.list" | "views.close" | "views.requestDisplayMode";
+export type HostEventType = "tool.completed" | "turn.completed" | "session.ended" | "page.teardown" | "host.contextChanged" | "context.attached";
+export interface HostEvent { type: HostEventType; at: string; data?: unknown }
+export type Selection = { source: "current" } | { source: "default" } | { source: "specified"; value: string };
 export type HostId = "codex" | "claude" | "unknown";
 export type HostState = "new" | "connecting" | "connected" | "failed" | "disposed";
 export type HostTransport = "mcp-app" | "http-bridge" | "none";
@@ -27,7 +30,9 @@ export interface HostEvidence {
 
 /** Establishing a channel does not select an execution adapter. */
 export interface HostConnection {
-  connect(callbacks: { receive: (payload: unknown) => void; fail: (error: unknown) => void }): Promise<void>;
+  connect(callbacks: { receive: (payload: unknown) => void; fail: (error: unknown) => void; event?: (event: HostEvent) => void }): Promise<void>;
+  /** Pull-based connections start relaying events on the first subscriber. */
+  subscribeEvents?(event: (event: HostEvent) => void): void;
   inspect(): Promise<HostEvidence>;
   dispose(): void | Promise<void>;
 }
@@ -41,17 +46,32 @@ export interface HostCapability {
   detail: string;
   scope?: string;
   constraints?: Record<string, unknown>;
+  /** Host limits a caller must know before relying on the effect, in plain text. */
+  limits?: string[];
 }
 
 export type HostCapabilities = Record<string, HostCapability>;
 
 export type HostResultStatus = "completed" | "accepted" | "pending" | "unsupported" | "rejected" | "error";
 
+/** What every call reports besides its status. */
+export interface CallEvidence {
+  /** The exact payload delivered to the host or operating system. */
+  sent?: unknown;
+  /** The raw host response. */
+  receipt?: unknown;
+  /** Data read back about the actual effect. */
+  observed?: unknown;
+  /** Host limits that applied, in plain text. */
+  limits?: string[];
+}
+
 export interface HostResult {
   status: HostResultStatus;
   message: string;
   data?: unknown;
   requestId?: string;
+  evidence?: CallEvidence;
 }
 
 /** Internal host execution contract; consumers use the adapter factory. */
@@ -68,13 +88,15 @@ export interface HostAdapter extends HostDriver {
   readonly state: HostState;
   connect(callbacks: { receive: (payload: unknown) => void; fail: (error: unknown) => void }): Promise<void>;
   capabilities(): Promise<HostCapabilities>;
-  readonly host: { getInfo(): Promise<HostInfo>; getCapabilities(): Promise<HostCapabilities> };
+  readonly host: { getInfo(): Promise<HostInfo>; getCapabilities(): Promise<HostCapabilities>; getContext(): Promise<HostResult> };
+  /** Receive host notifications; returns the unsubscribe function. */
+  readonly events: { subscribe(listener: (event: HostEvent) => void, types?: HostEventType[]): () => void };
   readonly files: { revealDirectory(args: { path: string }): Promise<HostResult>; openFile(args: { path: string; line?: number }): Promise<HostResult> };
   readonly composer: { writeDraft(args: { text: string; mode: "append" | "replace" }): Promise<HostResult> };
-  readonly conversation: { submitMessage(args: { text: string }): Promise<HostResult> };
-  readonly context: { set(args: { key: string; content: unknown }): Promise<HostResult>; remove(args: { key: string }): Promise<HostResult> };
+  readonly conversation: { submitMessage(args: { text: string; model?: Selection; effort?: Selection }): Promise<HostResult> };
+  readonly context: { update(args: { snapshot: Record<string, unknown> }): Promise<HostResult> };
   readonly tools: { list(args?: { scope?: "session" | "originating-server" }): Promise<HostResult>; call(args: { tool: ToolReference; arguments: Record<string, unknown> }): Promise<HostResult> };
-  readonly views: { open(args: { resource: ViewResource; reuseKey: string; activate: boolean }): Promise<HostResult>; list(): Promise<HostResult>; activate(args: { viewId: string }): Promise<HostResult>; close(args: { viewId: string }): Promise<HostResult>; requestDisplayMode(args: { mode: "inline" | "fullscreen" | "pip" }): Promise<HostResult> };
+  readonly views: { open(args: { resource: ViewResource; reuseKey: string; activate: boolean }): Promise<HostResult>; list(): Promise<HostResult>; close(args: { viewId: string }): Promise<HostResult>; requestDisplayMode(args: { mode: "inline" | "fullscreen" | "pip" }): Promise<HostResult> };
   readonly skills: { list(): Promise<HostResult>; invoke(args: { skill: string; input?: unknown }): Promise<HostResult> };
   dispose(): void | Promise<void>;
 }

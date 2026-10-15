@@ -6,7 +6,7 @@ import { operations as codexOperations } from "../../plugin_base/adapters/codex/
 import { operations as claudeOperations } from "../../plugin_base/adapters/claude/mod/operations/registry.mjs";
 
 test("every public host interface accepts its portable generic sample without a Graph Skill root", () => {
-  assert.equal(new Set(HOST_ACTIONS).size,15);
+  assert.equal(new Set(HOST_ACTIONS).size,17);
   for (const entry of INTERFACES) assert.deepEqual(validateArguments(entry.id,entry.sample),entry.sample,entry.id);
   for (const registry of [codexOperations, claudeOperations]) {
     assert.deepEqual(Object.keys(registry).sort(), [...HOST_ACTIONS].sort());
@@ -21,11 +21,14 @@ test("Port rejects hidden graph binding, malformed paths and nonportable input b
     ["conversation.submitMessage",{text:" "}],
     ["tools.call",{tool:{name:"inspect"},arguments:[]}],
     ["views.open",{resource:{kind:"web",url:"file:///private"},reuseKey:"file",activate:true}],
-    ["context.set",{key:"__proto__",content:{}}],
+    ["context.update",{snapshot:[]}],
+    ["conversation.submitMessage",{text:"hi",model:{source:"specified"}}],
+    ["conversation.submitMessage",{text:"hi",effort:{source:"specified",value:"extreme"}}],
+    ["events.subscribe",{types:["unknown.event"]}],
     ["views.requestDisplayMode",{mode:"focus"}],
   ]) assert.throws(()=>validateArguments(action,args),undefined,action);
   const cycle={}; cycle.self=cycle;
-  assert.throws(()=>validateArguments("context.set",{key:"cycle",content:cycle}),/JSON/);
+  assert.throws(()=>validateArguments("context.update",{snapshot:cycle}),/JSON/);
 });
 
 test("capability status has three explicit states and absent entries remain unknown", () => {

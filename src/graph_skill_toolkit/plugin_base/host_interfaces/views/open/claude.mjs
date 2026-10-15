@@ -1,2 +1,7 @@
-import { unknown } from "../../../adapters/claude/mod/operations/shared.mjs";
-export const capability = () => unknown("历史宿主会话中 Browser preview_start 打开了 URL 或文件；当前连接尚未确认 reuseKey、activate=false 与新建标签所有权的通用语义，不能据此声明可管理的 views.open。");
+import { PREVIEW_TOOL, CONTEXT_TOOL, SELECT_TOOL, NAVIGATE_TOOL } from "../../../adapters/claude/mod/host_tools/index.mjs";
+import { has, present } from "../../../adapters/claude/mod/operations/shared.mjs";
+import { openView, HIDDEN_PANE_LIMIT } from "../../../adapters/claude/mod/operations/views/index.mjs";
+export const capability = tools => present([PREVIEW_TOOL, CONTEXT_TOOL, SELECT_TOOL, NAVIGATE_TOOL].every(name => has(tools, name)),
+  "在 Claude Browser 面板为本页面打开或复用一个网页标签，返回本页面拥有的 viewId", { scope: "own-views", constraints: { kinds: ["web"] },
+    limits: [HIDDEN_PANE_LIMIT, "文件视图不返回句柄：文件请用 files.openFile。"] });
+export function invoke($, context) { return openView($, context); }

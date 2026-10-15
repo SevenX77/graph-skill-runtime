@@ -10,6 +10,20 @@ export function validateBrowserBridge(value) {
 /** @param {{snapshot:()=>unknown, fetch?:typeof globalThis.fetch, pageOrigin?:string}} options */
 export function httpConnection({ snapshot, fetch: fetchImpl = globalThis.fetch?.bind(globalThis), pageOrigin = globalThis.location?.origin }) {
   let bridge = null, disposed = false;
+  // Long-poll the bridge's event queue; one failed read waits before retrying.
+  async function pollEvents(event) {
+    let cursor = 0;
+    while (!disposed && bridge && fetchImpl) {
+      try {
+        const response = await fetchImpl(bridge.url + "/events?after=" + cursor, { headers: { Authorization: "Bearer " + bridge.token }, cache: "no-store", credentials: "omit", redirect: "error" });
+        if (!response.ok) throw new Error("events " + response.status);
+        const value = await response.json();
+        for (const item of value.events ?? []) { cursor = Math.max(cursor, item.seq); if (!disposed) event({ type: item.type, at: item.at, ...(item.data === undefined ? {} : { data: item.data }) }); }
+        if (value.disconnected) return;
+        if (!(value.events ?? []).length) await new Promise(resolve => setTimeout(resolve, 250));
+      } catch { await new Promise(resolve => setTimeout(resolve, 2000)); }
+    }
+  }
   return {
     async connect({ receive, fail }) {
       const payload = snapshot();
@@ -22,6 +36,8 @@ export function httpConnection({ snapshot, fetch: fetchImpl = globalThis.fetch?.
       }
       receive(payload);
     },
+    /** Start relaying host events; the facade calls this once, on its first subscriber. */
+    subscribeEvents(event) { void pollEvents(event); },
     async request(path, body) {
       if (disposed) throw new Error("画布连接已关闭。");
       if (!bridge || !fetchImpl) throw new Error("当前 HTML 未连接宿主会话。");

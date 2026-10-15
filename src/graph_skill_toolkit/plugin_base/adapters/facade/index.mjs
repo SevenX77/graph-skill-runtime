@@ -1,5 +1,6 @@
 // @ts-check
 import { HOST_ACTIONS, validateArguments, validateResult, failureResult } from "../../ports/host/contract.mjs";
+import { FACADE_ACTIONS } from "../../ports/host/catalog.mjs";
 import { identifyHost, unknownHost, hostIdentityKey, readLaunchHostInfo } from "../detection/index.mjs";
 import { launchMatchesConnection } from "../launch/index.mjs";
 
@@ -21,6 +22,16 @@ export function hostAdapter(createConnection, selectDriver, launchInfo = unknown
   let inspecting;
   /** @type {Promise<void> | undefined} */
   let closing;
+  /** @type {Set<{listener:(event:import('../../ports/host/index').HostEvent)=>void, types:Set<string>|null}>} */
+  const subscribers = new Set();
+  let eventsStarted = false;
+  /** @param {import('../../ports/host/index').HostEvent} event */
+  const dispatchEvent = event => {
+    if (!active()) return;
+    for (const item of subscribers) if (!item.types || item.types.has(event.type)) {
+      try { item.listener(structuredClone(event)); } catch { /* A listener failure stays with its owner. */ }
+    }
+  };
   const active = () => state === "connecting" || state === "connected";
   const disposed = () => state === "disposed";
   const requireConnected = () => { if (state !== "connected") throw new Error("宿主尚未连接或连接已关闭。"); };
@@ -96,6 +107,7 @@ export function hostAdapter(createConnection, selectDriver, launchInfo = unknown
             if (state === "connecting") connectionFailure = error instanceof Error ? error : new Error(String(error));
             callbacks.fail(error);
           },
+          event: dispatchEvent,
         });
         if (state !== "connecting") throw new Error("连接完成前画布已关闭。");
         if (connectionFailure) throw connectionFailure;
@@ -113,30 +125,57 @@ export function hostAdapter(createConnection, selectDriver, launchInfo = unknown
       return (await refreshIdentity()).capabilities;
     },
     async invoke(/** @type {import('../../ports/host/index').HostAction} */ action, /** @type {unknown} */ input) {
-      let dispatched = false;
+      let dispatched = false, limits = /** @type {string[]} */ ([]);
+      /** @type {import('../../ports/host/index').HostActionArgs | undefined} */
+      let args;
+      // Every result carries evidence: what was sent and which host limits applied.
+      const withEvidence = (/** @type {import('../../ports/host/index').HostResult} */ result) => ({ ...result, evidence: {
+        ...(result.evidence ?? {}), sent: result.evidence?.sent ?? args ?? input ?? {},
+        limits: [...new Set([...limits, ...(result.evidence?.limits ?? [])])] } });
       try {
         requireConnected();
-        if (!HOST_ACTIONS.includes(action)) return { status: "unsupported", message: "未知的宿主操作。" };
-        const args = validateArguments(action, input);
+        if (!HOST_ACTIONS.includes(action)) return withEvidence({ status: "unsupported", message: "未知的宿主操作。" });
+        args = validateArguments(action, input);
         const capabilities = await this.capabilities();
         requireConnected();
+        if (FACADE_ACTIONS.includes(action)) return withEvidence(facadeAction(action, capabilities));
         const capability = capabilities[action];
-        if (capability.state !== "available") return { status: "unsupported", message: capability.detail, data: { capabilityState: capability.state } };
+        limits = capability.limits ?? [];
+        if (capability.state !== "available") return withEvidence({ status: "unsupported", message: capability.detail, data: { capabilityState: capability.state } });
         dispatched = true;
         const result = validateResult(await execution().invoke(action, args));
-        if (state !== "connected") return { status: "pending", message: "操作提交后连接已关闭；请检查宿主中的实际结果。", ...(result.requestId ? { requestId: result.requestId } : {}) };
-        return result;
-      } catch (error) { return failureResult(error, dispatched); }
+        if (state !== "connected") return withEvidence({ status: "pending", message: "操作提交后连接已关闭；请检查宿主中的实际结果。", ...(result.requestId ? { requestId: result.requestId } : {}) });
+        return withEvidence(result);
+      } catch (error) { return withEvidence(failureResult(error, dispatched)); }
     },
     async dispose() {
       state = "disposed";
+      subscribers.clear();
       info = unknownHost("画布连接已关闭。", info);
       await closeDriver();
     },
   });
+  /** @param {string} action @param {import('../../ports/host/index').HostCapabilities} capabilities @returns {import('../../ports/host/index').HostResult} */
+  function facadeAction(action, capabilities) {
+    if (action === "host.getInfo") return { status: "completed", message: "已读取当前连接的宿主身份。", data: info };
+    if (action === "host.getCapabilities") return { status: "completed", message: "已读取当前连接的宿主能力。", data: capabilities };
+    return { status: "unsupported", message: "订阅需要监听函数：请调用 adapter.events.subscribe(listener, types)。", data: { capability: capabilities[action] } };
+  }
   for (const namespace of ["files", "composer", "conversation", "context", "tools", "views", "skills"]) {
     (/** @type {any} */ (adapter))[namespace] = Object.freeze(Object.fromEntries(HOST_ACTIONS.filter(action => action.startsWith(namespace + ".")).map(action => [action.split(".")[1], /** @param {import('../../ports/host/index').HostActionArgs} [args] */ args => adapter.invoke(/** @type {import('../../ports/host/index').HostAction} */ (action), args ?? {})])));
   }
-  (/** @type {any} */ (adapter)).host = Object.freeze({ getInfo: async () => { await refreshIdentity(); return info; }, getCapabilities: () => adapter.capabilities() });
+  (/** @type {any} */ (adapter)).host = Object.freeze({ getInfo: async () => { await refreshIdentity(); return info; }, getCapabilities: () => adapter.capabilities(),
+    getContext: () => adapter.invoke("host.getContext", {}) });
+  (/** @type {any} */ (adapter)).events = Object.freeze({
+    subscribe(/** @type {(event:import('../../ports/host/index').HostEvent)=>void} */ listener, /** @type {string[]|undefined} */ types) {
+      if (typeof listener !== "function") throw new Error("事件订阅需要监听函数。");
+      if (types !== undefined) validateArguments("events.subscribe", { types });
+      const item = { listener, types: types ? new Set(types) : null };
+      subscribers.add(item);
+      // Pull-based connections relay host events only once a page listens.
+      if (!eventsStarted && connection && "subscribeEvents" in connection) { eventsStarted = true; /** @type {any} */ (connection).subscribeEvents(dispatchEvent); }
+      return () => { subscribers.delete(item); };
+    },
+  });
   return adapter;
 }

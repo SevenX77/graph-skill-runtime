@@ -56,12 +56,28 @@ async function flushReceipts($, state) {
   }
 }
 
+/** Queue a host event for every page of this session; bounded so a closed page cannot grow it. */
+export function queueEvent(state, type, data) {
+  if (state.closed || !state.events) return;
+  state.events.push({ type, at: new Date().toISOString(), ...(data === undefined ? {} : { data }) });
+  if (state.events.length > 200) state.events.splice(0, state.events.length - 200);
+}
+
+export async function flushEvents($, state) {
+  if (!state.events?.length || state.bridges.size === 0) return;
+  const events = state.events.splice(0);
+  for (const bridge of state.bridges.values()) {
+    try { await bridgePost($, bridge, '/events', { events }); } catch { /* A page that cannot receive events keeps its other functions. */ }
+  }
+}
+
 export async function pollBridges($, state) {
   if (state.polling || state.closed || state.bridges.size === 0) return;
   const generation = state.generation;
   state.polling = true;
   try {
     await flushReceipts($, state);
+    await flushEvents($, state);
     const tools = await $.tool.list();
     if (state.closed || state.generation !== generation) return;
     const identity = await readHostIdentity($);
@@ -93,6 +109,7 @@ export async function pollBridges($, state) {
 
 
 export function createModState() {
-  return { bridges: new Map(), running: new Set(), seen: new Set(), receipts: new Map(), reported: new Set(), contexts: new Map(), views: new Map(), viewQueues: new Map(), nextViewId: 0, sessionFacts: null, polling: false, closed: false, generation: 0 };
+  return { bridges: new Map(), running: new Set(), seen: new Set(), receipts: new Map(), reported: new Set(), contexts: new Map(), views: new Map(), viewQueues: new Map(), nextViewId: 0, sessionFacts: null, polling: false, closed: false, generation: 0,
+    events: [], overrides: [], turns: new Map() };
 }
 

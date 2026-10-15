@@ -5,6 +5,7 @@ import { mcpCapabilities } from "../../../plugin_base/adapters/codex/driver/regi
 import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
 import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { fakeBrowser } from "../../support/browser.mjs";
 
 const web = { resource: { kind: "web", url: "https://example.com/docs" }, reuseKey: "docs", activate: true };
 const file = { resource: { kind: "file", path: "C:/business/SKILL.md", line: 3 }, reuseKey: "skill", activate: false };
@@ -41,29 +42,25 @@ test("Codex advertised openLink, files and display do not supply a manageable vi
   assert.deepEqual(calls, []);
 });
 
-test("Claude Browser preview and tab tools do not imply reusable owned view semantics", async () => {
-  const listed = [
-    { name: "mcp__Claude_Browser__preview_start" },
-    { name: "mcp__Claude_Browser__tabs_create" },
-    { name: "mcp__Claude_Browser__tabs_context" },
-    { name: "mcp__Claude_Browser__tabs_select" },
-    { name: "mcp__Claude_Browser__tabs_close" },
-    { name: "mcp__ccd_view__show_pane" },
-  ];
-  const calls = [], state = createModState();
-  const api = { session: { id: async () => "session-a" }, tool: {
-    list: async () => listed,
-    call: async input => { calls.push(input); return { result: { tabId: "pre-existing" } }; },
-  } };
-  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "C:/business" };
-  const cap = nativeCapabilities(listed)["views.open"];
-  assert.equal(cap.state, "unknown");
-  assert.match(cap.detail, /reuseKey.*activate=false/);
-  for (const [id, args] of [["web", web], ["file", file]]) {
-    const result = await executeBridgeAction(api, state, bridge, { id, action: "views.open", args, key: bridge.key });
-    assert.equal(result.status, "unsupported");
-    assert.equal(result.data.capabilityState, "unknown");
-  }
-  assert.deepEqual(calls, []);
-  assert.equal(state.views.size, 0);
+const claudeBridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "page-a" };
+const open = (id, args) => ({ id, action: "views.open", args, key: claudeBridge.key });
+
+test("Claude opens an own Browser tab, reuses it by reuseKey and reports a hidden pane honestly", async () => {
+  const browser = fakeBrowser({ tabs: [{ tabId: "user-tab", origin: "https://user.example", isActive: true }] });
+  const state = createModState();
+  assert.equal(nativeCapabilities(browser.api ? (await browser.api.tool.list()) : [])["views.open"].state, "available");
+  const first = await executeBridgeAction(browser.api, state, claudeBridge, open("o1", web));
+  assert.equal(first.status, "accepted");
+  assert.match(first.evidence.limits[0], /面板保持隐藏/);
+  assert.equal(first.evidence.observed.active, true);
+  assert.equal(first.evidence.observed.paneDisplayed, false);
+  browser.paneDisplayed = true;
+  const again = await executeBridgeAction(browser.api, state, claudeBridge, open("o2", { ...web, resource: { kind: "web", url: "https://example.com/next" } }));
+  assert.equal(again.status, "completed");
+  assert.equal(again.data.viewId, first.data.viewId);
+  assert.equal(browser.calls.filter(call => call.tool.endsWith("preview_start")).length, 1);
+  assert.equal(browser.calls.filter(call => call.tool.endsWith("navigate")).length, 1);
+  assert.equal(browser.tabs.find(tab => tab.tabId === "user-tab").isActive, false);
+  const fileView = await executeBridgeAction(browser.api, state, claudeBridge, open("o3", file));
+  assert.equal(fileView.status, "unsupported");
 });

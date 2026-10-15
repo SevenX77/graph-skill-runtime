@@ -22,7 +22,8 @@ function host({available=true, canNavigate=true, canObserve=true, canSelect=true
     call:async value=>{opened.push(value);return {result:{}};}
   },ui:{log:value=>logs.push(value)}};
   const call=(event,input,next=async()=>({}))=>{
-    const h=handlers.find(h=>h.name===event && Object.entries(h.matcher).every(([k,v])=>input[k]===v));
+    // The page's matcher hook is the one under test; generic base hooks only observe.
+    const h=handlers.filter(h=>h.name===event && Object.entries(h.matcher).every(([k,v])=>input[k]===v)).sort((a,b)=>Object.keys(b.matcher).length-Object.keys(a.matcher).length)[0];
     return h ? h.fn(api,input,next) : next(input);
   };
   return {call,opened,logs};
@@ -88,9 +89,9 @@ test('Missing Browser or valid host root preserves graph-only results and strips
       count++;assert.equal(input.presentation,undefined);assert.equal(input.preview_project_root,undefined);return result;
     });
     assert.equal(count,1);assert.equal(adapted.result,result.result);assert.equal(adapted.ref,result.ref);
-    assert.equal(adapted.context[0],'existing');assert.match(adapted.context[1],/Unable to show the graph/);
-    assert.match(adapted.context[1],/graph result is preserved/);assert.equal(h.logs.length,1);assert.deepEqual(h.opened,[]);
-    assert.match((await h.call('command.run',{command:'graph-skill-canvas'})).text,/Unable to show the graph/);
+    assert.equal(adapted.context[0],'existing');assert.match(adapted.context[1],/Unable to show Graph Skill canvas/);
+    assert.match(adapted.context[1],/tool result is preserved/);assert.equal(h.logs.length,1);assert.deepEqual(h.opened,[]);
+    assert.match((await h.call('command.run',{command:'graph-skill-canvas'})).text,/Unable to show Graph Skill canvas/);
   }
 });
 

@@ -20,15 +20,25 @@ export function validateCapabilities(value) {
     if (!["available", "unavailable", "unknown"].includes(/** @type {string} */ (capability.state)) || typeof capability.detail !== "string") throw new Error("适配器返回了无效能力说明。");
     if (capability.scope !== undefined && typeof capability.scope !== "string") throw new Error("无效的接口范围。");
     if (capability.constraints !== undefined) record(capability.constraints);
-    return [action, { state: capability.state, detail: capability.detail, ...(capability.scope ? {scope: capability.scope} : {}), ...(capability.constraints ? { constraints: structuredClone(capability.constraints) } : {}) }];
+    if (capability.limits !== undefined && (!Array.isArray(capability.limits) || capability.limits.some(item => typeof item !== "string"))) throw new Error("无效的接口限制说明。");
+    return [action, { state: capability.state, detail: capability.detail, ...(capability.scope ? {scope: capability.scope} : {}), ...(capability.constraints ? { constraints: structuredClone(capability.constraints) } : {}), ...(capability.limits ? { limits: [...capability.limits] } : {}) }];
   })));
+}
+
+/** @param {unknown} value */
+function validEvidence(value) {
+  if (value === undefined) return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const limits = /** @type {{limits?: unknown}} */ (value).limits;
+  return limits === undefined || (Array.isArray(limits) && limits.every(item => typeof item === "string"));
 }
 
 /** @param {unknown} value @returns {import('./index').HostResult} */
 export function validateResult(value) {
   const result = record(value);
   if (typeof result.status !== "string" || !["completed", "accepted", "pending", "unsupported", "rejected", "error"].includes(result.status) ||
-      typeof result.message !== "string" || (result.requestId !== undefined && typeof result.requestId !== "string")) {
+      typeof result.message !== "string" || (result.requestId !== undefined && typeof result.requestId !== "string") ||
+      !validEvidence(result.evidence)) {
     throw Object.assign(new Error("适配器返回了无效结果，无法确认操作状态。"),
       typeof result.requestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(result.requestId) ? { requestId: result.requestId } : {});
   }

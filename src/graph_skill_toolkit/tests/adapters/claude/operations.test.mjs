@@ -31,12 +31,6 @@ function modApi(overrides = {}) {
   return { api, calls, messages, fills };
 }
 
-test("Claude Mod does not inject page context into unrelated ordinary prompts", () => {
-  const registered = [];
-  register(event => { registered.push(event); });
-  assert.equal(registered.includes("prompt.submit"), false);
-});
-
 test("Claude browser uses its own same-origin token and preserves a pending request id", async () => {
   const requests = [];
   const fetch = async (url, options) => {
@@ -75,19 +69,6 @@ test("Claude lost HTTP reply stays pending with the original id and is not resen
   assert.equal(submissions,1);
 });
 
-test("Claude Mod executes generic draft, context and submit interfaces without graph-specific arguments", async () => {
-  const state = createModState(), {api,fills,messages} = modApi();
-  assert.equal((await executeBridgeAction(api,state,bridge,request("draft","composer.writeDraft",{text:"draft",mode:"replace"}))).status,"completed");
-  assert.deepEqual(fills,[{text:"draft",mode:"replace"}]);
-  await executeBridgeAction(api,state,bridge,request("context","context.set",{key:"selection",content:{nodeId:"greet"}}));
-  assert.equal((await executeBridgeAction(api,state,bridge,request("send","conversation.submitMessage",{text:"run"}))).status,"accepted");
-  assert.match(messages[0].text,/"nodeId":"greet"/);
-  await executeBridgeAction(api,state,bridge,request("remove","context.remove",{key:"selection"}));
-  await executeBridgeAction(api,state,bridge,request("send2","conversation.submitMessage",{text:"again"}));
-  assert.equal(messages[1].text,"again");
-  assert.equal(fills.length,1);
-});
-
 test("Claude tool catalog is session inventory and direct calls stay distinct from Agent messages", async () => {
   const state=createModState(), {api,calls,messages}=modApi();
   const listed=await executeBridgeAction(api,state,bridge,request("list","tools.list"));
@@ -98,25 +79,6 @@ test("Claude tool catalog is session inventory and direct calls stay distinct fr
   assert.equal(messages.length,0);
   assert.equal((await executeBridgeAction(api,state,bridge,request("missing","tools.call",{tool:{name:"not_available"},arguments:{}}))).status,"unsupported");
   assert.equal((await executeBridgeAction(api,state,bridge,request("skill","skills.invoke",{skill:"graph-skill-canvas",input:"open"}))).status,"completed");
-});
-
-test("Claude view handles are connection-scoped and never close a pre-existing tab", async () => {
-  const state=createModState(), tabs=[{tabId:"existing",isActive:false,origin:"file:///existing"}], calls=[];
-  const {api}=modApi({tool:{list:async()=>tools,call:async input=>{
-    calls.push(input);
-    if(input.tool.endsWith("tabs_context")) return {result:{tabs:tabs.map(item=>({...item}))}};
-    if(input.tool.endsWith("tabs_select")){for(const tab of tabs)tab.isActive=tab.tabId===input.tabId;return {result:{}};}
-    if(input.tool.endsWith("tabs_close")){tabs.splice(tabs.findIndex(tab=>tab.tabId===input.tabId),1);return {result:{}};}
-    return {result:{}};
-  }}});
-  const listed=await executeBridgeAction(api,state,bridge,request("list","views.list"));
-  const oldId=listed.data.views[0].viewId;
-  assert.equal((await executeBridgeAction(api,state,bridge,request("close-old","views.close",{viewId:oldId}))).status,"unsupported");
-  assert.equal((await executeBridgeAction(api,state,bridge,request("open","views.open",{resource:{kind:"web",url:"http://127.0.0.1:12345/graph"},reuseKey:"canvas",activate:true}))).status,"unsupported");
-  assert.equal((await executeBridgeAction(api,state,bridge,request("activate","views.activate",{viewId:oldId}))).status,"completed");
-  assert.equal(tabs.length,1);
-  assert.equal(tabs[0].tabId,"existing");
-  assert.equal(calls.filter(input=>input.tool.endsWith("preview_start")).length,0);
 });
 
 test("real loopback bridge isolates Claude sessions and refuses old canvas operations", async t => {
@@ -148,4 +110,15 @@ test("Mod ignores an old-session poll response before any host side effect", asy
   await pollBridges(api,state);
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(submitted,0);
+});
+
+test("Claude Mod executes generic draft, context and submit interfaces without graph-specific arguments", async () => {
+  const state = createModState(), {api,fills,messages} = modApi({ session: { id: async () => "session-a", version: async () => ({ version: "2.1.295" }), model: async () => "m" } });
+  assert.equal((await executeBridgeAction(api,state,bridge,request("draft","composer.writeDraft",{text:"draft",mode:"replace"}))).status,"completed");
+  assert.deepEqual(fills,[{text:"draft",mode:"replace"}]);
+  assert.equal((await executeBridgeAction(api,state,bridge,request("context","context.update",{snapshot:{nodeId:"greet"}}))).status,"completed");
+  assert.equal((await executeBridgeAction(api,state,bridge,request("send","conversation.submitMessage",{text:"run"}))).status,"accepted");
+  // The snapshot rides on the prompt.submit hook; the message text is the page's text.
+  assert.deepEqual(messages,[{text:"run"}]);
+  assert.equal(fills.length,1);
 });
