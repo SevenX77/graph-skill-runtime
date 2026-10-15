@@ -1,55 +1,136 @@
-# Unified host Port and adapters
+# Host Port and adapters
 
 <a id="current-baseline-adopted-architecture-direction-2026-10-12"></a>
 <a id="current-baseline-host-capability-interfaces-2026-10-12"></a>
 <a id="contract"></a>
+<a id="interface-contract"></a>
 
-The toolkit exposes current host capabilities to one shared canvas. The [Host Port](ports/host/index.ts) defines host-neutral requests and results; an adapter maps them to a connection's declared native interfaces. The separate [GraphConnection](ports/graph/index.ts) contract defines the frontend's graph-data startup, root selection and disposal. Graph reading, projection, file observation and streaming belong to the [local Graph application](ARCHITECTURE.md#local-graph-data-and-authorization). A business gSkill is a user-owned directory containing `SKILL.md`, `graph.yaml` and phase definitions; it is an explicit input to that application. Generic Host Port operations take their own operation-specific inputs.
+The Plugin Base connects plugin pages to Claude Code Desktop and Codex Desktop through one host-neutral Port. A **Port** is the page-facing contract; an **adapter** implements that contract through one host's native features. This document owns connection, identity, authority, transport, event delivery and the per-host route mapping. [Plugin Base usage](plugin_base/README.md) owns plugin construction and the full argument, result and evidence reference for the 17 host interfaces and 5 local capabilities. [ARCHITECTURE.md](ARCHITECTURE.md) owns the application map, process composition, route ownership and lifecycle.
 
-The host-operation path uses one [catalog](ports/host/catalog.mjs), one [argument/result validator](ports/host/contract.mjs), a [factory](adapters/factory/index.mjs), a page [facade](adapters/facade/index.mjs) and separate Codex/Claude connections and drivers. Each of the 15 operations has an [independent interface directory](host_interfaces/) containing `index.mjs` for its shared definition and `codex.mjs` and `claude.mjs` for host-specific capability and execution. The [Codex registry](adapters/codex/driver/registry.mjs) and [Claude registry](adapters/claude/mod/operations/registry.mjs) map the closed vocabulary to those modules. The [architecture review](evidence/native-launch-20261012/architecture-feasibility.md) records the adopted rationale and alternatives. The [local application map](ARCHITECTURE.md) owns the independent graph-data path, and [VALIDATION.md](VALIDATION.md) distinguishes source checks from native host effects.
+## Terms
 
-## Connection and authority
+- **MCP (Model Context Protocol)** is the protocol through which the host calls the plugin server's tools and reads its resources. The toolkit uses standard input and output, or stdio, for this connection.
+- **MCP App** is the extension that displays a plugin's HTML resource in a host-owned frame and carries page-to-host messages. Codex uses this channel.
+- **Claude Mod** is hook code loaded inside a Claude Code session. It reads session facts and calls native host APIs for the page.
+- **Browser pane** is the Claude Code Desktop panel that displays web pages in tabs.
+- **Loopback** is the address `127.0.0.1`, which refers to the same machine. The plugin process opens one HTTP listener there on an operating-system-assigned port.
+- **Host bridge** is the authenticated channel on that listener between a Claude page and its Mod.
+- **Facade** is the page-side object returned by `createHostAdapter()`. It owns one host connection and checks operation authority.
+- **Originating server** is the MCP server that presented the page. Codex page tool calls stay within that server.
+- **Capability** is one interface's current declaration: state, detail, scope, constraints and limits. Its state is `available`, `unavailable` or `unknown`.
 
-Model Context Protocol (MCP) is the tool-message protocol used to deliver this canvas to a host; an MCP App is its embedded page connection. The Claude Mod is the host extension that reads the active Claude session and calls its exposed tools.
+## Adapter module map
 
-`createHostAdapter()` reads the inert `graph-skill-snapshot` in the shared HTML and selects only the declared `mcp-app` or `http-bridge` transport. A missing snapshot gives a standalone display. Malformed startup data fails visibly. A parent frame alone does not identify Codex. [Launch](adapters/launch/index.mjs) captures the invoking MCP client's report and compares startup with current evidence. Startup data selects transport and supplies comparison facts; it never grants an operation. The graph client separately reads the backend URL and credential from that slot. Graph access follows the backend's selected-root scope; host-operation authority follows the confirmed host connection and current capability.
+All paths in this table are inside the Plugin Base. Its four public entries and closure rule are specified in [Plugin Base usage](plugin_base/README.md#entry-files).
 
-The connection returns identity and capabilities. [Detection](adapters/detection/index.mjs) recognizes Codex from the MCP App initialization identity `chatgpt` with absent or `codex_desktop` client type, and Claude from the authenticated Mod's `Claude Code` session identity, version and `claude_code` client type. The facade selects a driver only after this confirmation, pins the connection identity, refreshes capabilities before each call, validates and copies arguments, and refuses dispatch when identity changes or capability is not `available`. `unknown` remains visible as unknown. It owns one page connection and its disposal; a lost response retains a pending outcome without automatic replay. `HostInfo` reports available product, version, source, session and transport facts, while [HostStatus](ui/host_status/index.tsx) separately displays the toolkit version from `package.json`. These version values have different owners.
+| Responsibility | Source |
+| --- | --- |
+| Port types, catalog and argument/result validation | [ports/host/](plugin_base/ports/host/) |
+| One shared definition and two host implementations per interface | [host_interfaces/](plugin_base/host_interfaces/) |
+| Factory and local-client attachment | [adapters/factory/index.mjs](plugin_base/adapters/factory/index.mjs) |
+| Connection lifecycle, identity pinning and dispatch gate | [adapters/facade/index.mjs](plugin_base/adapters/facade/index.mjs) |
+| Transport discovery and live host recognition | [adapters/detection/index.mjs](plugin_base/adapters/detection/index.mjs) |
+| Launch facts and their comparison with the connection | [adapters/launch/index.mjs](plugin_base/adapters/launch/index.mjs) |
+| Codex channel and operation dispatch | [adapters/codex/connection/](plugin_base/adapters/codex/connection/), [driver/](plugin_base/adapters/codex/driver/) |
+| Claude page channel, dispatch and bridge | [adapters/claude/connection/](plugin_base/adapters/claude/connection/), [driver/](plugin_base/adapters/claude/driver/), [bridge/](plugin_base/adapters/claude/bridge/) |
+| Claude hooks and native execution | [adapters/claude/mod/hooks/base.js](plugin_base/adapters/claude/mod/hooks/base.js), [operations/](plugin_base/adapters/claude/mod/operations/) |
 
-Codex's [connection](adapters/codex/connection/index.mjs) uses the official `@modelcontextprotocol/ext-apps` `App` and `PostMessageTransport` for initialization, messages and teardown. Its [driver](adapters/codex/driver/index.mjs) invokes only declared file, draft, message, model-context, originating-server tool and display-mode interfaces. It does not turn a file or directory request into an Agent message. Claude's [connection](adapters/claude/connection/index.mjs) calls an authenticated same-origin HTTP bridge. The Mod [lifecycle](adapters/claude/mod/lifecycle/index.mjs) reads the real session API and tool inventory; [operations](adapters/claude/mod/operations/index.mjs) declare capabilities from those facts and call native APIs through the [Claude driver](adapters/claude/driver/index.mjs). The bridge binds requests and receipts to the current view and session. A direct `tools.call` returns the requested tool result; `conversation.submitMessage` only establishes message acceptance, not subsequent Agent work.
+## Connection and detection
 
-## Interface contract
+The server publishes startup data in the page's inert JSON snapshot, whose element id is `plugin-base-snapshot`. The snapshot selects a transport and provides launch facts for comparison. Its format and construction belong to [Plugin Base usage](plugin_base/README.md#the-page-document-and-its-bootstrap-snapshot).
 
-The 15 operations below are the exact closed vocabulary in `ports/host/catalog.mjs`. Each linked directory owns one interface's shared input contract and both host mappings. `ports/host/contract.mjs` validates the closed fields, portable JSON, capability and result shapes. Examples in the canvas are editable sample inputs; they grant no host permission. An operation becomes `available` after host identity is confirmed and its module's required host features, where any, are present. An absent required feature yields `unavailable`; a mapping with no confirmed equivalent native interface yields `unknown`.
+`createHostAdapter({ appInfo })` treats a missing or `null` snapshot as a standalone page and returns `null`. Malformed JSON, a non-object snapshot or a snapshot containing an error produces a visibly failing connection. A snapshot with `hostInfo.transport: "mcp-app"` selects the Codex channel and requires a parent frame. `http-bridge` selects the Claude channel. A parent frame alone supplies no host identity.
 
-| Interface module | Shared request and effect | Codex mapping | Claude mapping |
-| --- | --- | --- | --- |
-| [`files.revealDirectory`](host_interfaces/files/reveal_directory/index.mjs) | Absolute `path`; locate a directory in the host's own file browser. | Unknown: the file extension does not declare directory reveal. | Unknown: the Mod has no confirmed directory navigation interface. |
-| [`files.openFile`](host_interfaces/files/open_file/index.mjs) | Absolute `path` and optional positive `line`; request a host file view. | Advertised `openai/files/open` accepts a file request without line navigation. | Listed `mcp__ccd_view__show_pane` accepts a file request and optional line. The host view still needs visual confirmation. |
-| [`composer.writeDraft`](host_interfaces/composer/write_draft/index.mjs) | Nonempty `text` and `mode=append` or `replace`; change the draft without sending it. | Requires both advertised `message.text` and the `openai/message` draft extension; accepts `append` only. | Mod `prompt.fill` accepts both modes and reports fill or refusal. |
-| [`conversation.submitMessage`](host_interfaces/conversation/submit_message/index.mjs) | Nonempty `text`; submit one message to the current conversation. | Requires advertised `message.text` and returns acceptance. | Mod `prompt.submit` includes only this page's stored context as visible data in the submitted text. An affirmative receipt establishes acceptance or reports a host rewrite; a missing receipt leaves the outcome unknown. Neither receipt proves later Agent work. |
-| [`context.set`](host_interfaces/context/set/index.mjs) | `key` and explicit JSON `content`; set one page-owned context value without submitting a message. | Requires advertised `updateModelContext.structuredContent` and publishes the page's complete `toolkitContext` snapshot after success. | Mod stores the value for inclusion only in a later submission from this page. |
-| [`context.remove`](host_interfaces/context/remove/index.mjs) | `key`; remove one page-owned context value without submitting a message. | Requires advertised `updateModelContext.structuredContent` and publishes the remaining page snapshot. | Mod removes the stored value before a later submission from this page. |
-| [`tools.list`](host_interfaces/tools/list/index.mjs) | Optional `scope=session` or `originating-server`; return tool references within that scope. | Advertised `serverTools` calls this canvas server's read-only `list_canvas_tools` through `App.callServerTool`. The server returns `inspect_graph` and `list_canvas_tools` as page-callable tools. A session-wide request is unsupported. | Mod `tool.list` returns the current session's native and MCP tool inventory. An `originating-server` request is unsupported. |
-| [`tools.call`](host_interfaces/tools/call/index.mjs) | Named `tool` reference plus JSON `arguments`; return the direct tool response. | Advertised `serverTools` calls only a tool on the confirmed originating MCP server through `App.callServerTool`. | Calls a listed current-session native or MCP tool through the Mod's permission-checking `tool.call`; it does not submit a conversation message. |
-| [`views.open`](host_interfaces/views/open/index.mjs) | File or HTTP(S) `resource`, `reuseKey` and `activate`; request a manageable view. | Unknown: no arbitrary-view creation API returning a `viewId` is confirmed. | Unknown: the Graph canvas preview flow does not provide a generic arbitrary-view API. |
-| [`views.list`](host_interfaces/views/list/index.mjs) | No arguments; return views visible within the supported scope. | Unknown: no host tab or file-view inventory is declared. | Listed `tabs_context` returns browser tabs only, with connection-scoped `viewId` values; independent file panels are outside this list. |
-| [`views.activate`](host_interfaces/views/activate/index.mjs) | Connection-scoped `viewId`; request activation of an observed view. | Unknown: display-mode changes do not identify or activate a view. | Listed `tabs_context` and `tabs_select` can select a browser tab observed by this connection; the result checks its reported active state. |
-| [`views.close`](host_interfaces/views/close/index.mjs) | Connection-scoped `viewId`; request closure of a module-owned view. | Unknown: no owned view handle and close API are confirmed. | Unknown: generic view creation has no ownership receipt, so the adapter cannot establish a safe closure target. |
-| [`views.requestDisplayMode`](host_interfaces/views/request_display_mode/index.mjs) | `inline`, `fullscreen` or `pip`; request a mode for the current canvas container. | `App.requestDisplayMode` is available only for modes declared in the current host context; its returned mode does not prove tab focus. | Unknown: the Mod has no confirmed interface with the same container-mode effect. |
-| [`skills.list`](host_interfaces/skills/list/index.mjs) | No arguments; return the current session's host Skill names. | Unknown: no MCP App Skill-name inventory is declared. | The current Mod session must expose `session.usage`; its summary supplies a conditional session-context route. It returns names only when the host's `totalSkills`, `includedSkills` and listed frontmatter count agree; an incomplete token-budget listing is `unsupported`. |
-| [`skills.invoke`](host_interfaces/skills/invoke/index.mjs) | Skill name and optional JSON `input`; request native Skill activation. | Unknown: the MCP App has no direct Skill invocation interface. | Listed `Skill` tool accepts string input; its tool response does not prove that the business task completed. |
+At tool invocation, `launchHostInfo()` records the calling MCP client. `codex-mcp-client` or `chatgpt`, with an absent or `codex_desktop` client type, identifies a Codex launch. `claude-code` identifies a Claude launch. For HTML presentation the Claude Mod supplies the native session identity from the live session.
 
-`HostCapability.state` is `available`, `unavailable` or `unknown`, with a reason and optional scope/constraints. A missing declaration becomes `unknown`. `HostResult.status` is `completed`, `accepted`, `pending`, `unsupported`, `rejected` or `error`. `completed` applies only to the interface's specified effect: it does not prove a separate UI, conversation or business result. `pending` preserves a request ID when available; receipt lookup does not resubmit. The boundary rejects nonportable JSON, invalid arguments and results. It accepts no `skillRoot` requirement for generic operations. The Graph application may supply a root to a particular request, such as `files.openFile` or `inspect_graph`.
+Live recognition uses connection evidence:
 
-Codex context updates overwrite the prior page snapshot. If an update may have reached the host but its receipt is lost, that page connection refuses further `context.set` and `context.remove` writes until a new connection is established; this guards against restoring a removed value from stale local state. Claude keeps context per page connection and sends it as visible data through that page's explicit `conversation.submitMessage`. The Mod's general host hook handles Graph presentation and session lifecycle. Claude reports `skills.list` as available only when the current Mod session exposes `session.usage`; an observed session without it reports unavailable, and an unobserved session API reports unknown. The query then requires a valid session summary. A valid breakdown with no `skills` entry yields an empty list; a missing or malformed breakdown is an error, and an incomplete listing does not yield a complete inventory. The Skill invocation tool does not provide a Skill-name inventory.
+- Codex requires MCP App initialization reporting `chatgpt` with an absent or `codex_desktop` client type.
+- Claude requires a current Mod heartbeat and the identity `Claude Code`, source `claude-mod-session`, version, session id and client type `claude_code`.
 
-The canvas server's [`list_canvas_tools`](server/main.mjs) is an app-visible, read-only inventory of that server's page-callable tools. It provides the Codex `tools.list` implementation within the originating-server scope. The source-tested capability snapshot and remaining Desktop checks are recorded in [VALIDATION.md](VALIDATION.md). Read the current capability and its constraints immediately before relying on an interface.
+Other evidence yields an unknown host with unknown capabilities. The facade compares transport, host id and any recorded session id with the live connection. Name, version and client type are also compared when the records have the same identity source. Different identity sources identify different software layers, such as an MCP engine and a desktop shell. A mismatch yields an unknown host and a diagnostic asking the user to reopen the page in the current session.
 
-## Graph presentation boundary
+## Identity, authority and facade behavior
 
-The canvas MCP server's `show_graph` and `inspect_graph` are Graph application entry points. `show_graph` authorizes the selected root for that MCP connection and returns launch diagnostics. `inspect_graph` serves explicit selected-root inspection. The workbench uses the host's delivered root to select its own direct backend stream, then renders snapshots from the shared [graph client](application/graph/client/index.mjs). File observation and graph updates have their own lifecycle, independent of host identity checks and generic tool calls.
+The [facade](plugin_base/adapters/facade/index.mjs) owns one connection from creation to disposal. It connects once and exposes the states `new`, `connecting`, `connected`, `failed` and `disposed`. Disposal closes the host connection and disposes the local page client.
 
-Codex [resource](adapters/codex/presentation/resource/index.mjs) and [session](adapters/codex/presentation/session/index.mjs) own display metadata and reusable widget identity. Claude [guidance](adapters/claude/presentation/guidance/index.mjs) and [preview configuration](adapters/claude/presentation/preview_configuration/index.mjs) own its ordered `preview_start`/navigation/selection flow and temporary project preview entry. These host-specific Graph presentation paths coexist with the generic `views.open` contract. The actual `SKILL.md` remains user-owned; the canvas is the one view the presentation opens, and the laboratory's `files.openFile` sample reaches that file on request. The graph route accepts authenticated cross-origin reads for the MCP sandbox, while Claude host actions use the same-origin authenticated bridge. Both routes share one loopback listener with distinct credentials. See [ARCHITECTURE.md](ARCHITECTURE.md#save-to-render-flow-and-lifecycle) for data flow and cleanup, and [PROTOTYPE.md](PROTOTYPE.md) for page behavior.
+The facade selects a host driver only after live identity confirmation on the matching transport. It pins host id, transport, name, version, client type and session id. A changed identity prevents further host dispatch. Before each operation, it refreshes identity and capability, validates and snapshots the arguments, and dispatches only an `available` operation. `unavailable` and `unknown` return `unsupported` with `data.capabilityState`. The [usage contract](plugin_base/README.md#results-and-evidence) defines argument bounds and result semantics.
 
-Source tests, including fake host peers and MCP stdio/HTTP paths, can establish only the exercised protocol and dispatch behavior. Complete native Desktop effects, actual installed loading and publication of this working source remain unverified; [VALIDATION.md](VALIDATION.md) owns their acceptance and historical evidence scopes.
+A capability is `available` when the confirmed connection declares the required features. It is `unavailable` when a required feature is absent, and `unknown` when an equivalent native route has not been confirmed. An omitted declaration becomes `unknown`. These states describe the current adapter and connection. They leave future host capabilities open to independent verification.
+
+The Codex driver refreshes declarations before execution. The Claude bridge checks the Mod's latest declaration, and the Mod checks its live session and tool inventory before native execution. Native permissions remain with the host. Launch data, editable samples and possession of a graph credential each supply their own limited facts; host execution requires the full connection gate.
+
+## Receipt handling
+
+[Plugin Base usage](plugin_base/README.md#results-and-evidence) owns the six result statuses and the four evidence slots. The facade supplies evidence on every `invoke` result. Empty receipt or observation slots state the available evidence boundary.
+
+A failure after dispatch is `pending` unless it proves either refusal or absence of dispatch. The adapters retain the original request identity and avoid automatic replay:
+
+- Claude exposes `adapter.getResult(requestId)` for querying an existing bridge receipt. A failed lookup preserves the uncertain original action.
+- Codex treats explicit rejection and JSON-RPC errors `-32600`, `-32601` and `-32602` as proof that the update was refused. Other post-dispatch failures remain `pending`.
+- A connection closed after dispatch leaves the effect uncertain and requires host observation.
+
+## Codex transport
+
+The [Codex connection](plugin_base/adapters/codex/connection/index.mjs) uses the official `@modelcontextprotocol/ext-apps` `App` and `PostMessageTransport`. This library owns handshake, message framing, request correlation, schema validation and teardown. `appInfo` supplies the page's name and version.
+
+The host delivers the presenting tool's input and result to the page. A tool error fails connection with its message. If startup data does not arrive within 12 seconds after handshake, the connection reports the missing data and asks the user to reopen the page. Identity comes from `App.getHostVersion()`; capabilities and environment come from `App.getHostCapabilities()` and `App.getHostContext()`.
+
+The driver calls declared native features: `openai/files`, `openai/message`, `sendMessage`, `updateModelContext`, `callServerTool` and `requestDisplayMode`. Page tool calls use `App.callServerTool` on the originating server. `list_page_tools` lists the apps' declared page-callable tools and itself. In this toolkit the list contains `inspect_graph`, `watch_graph`, `list_page_tools` and, when the lab is enabled, `lab_echo`. The local transport tools are registered separately with page-only visibility.
+
+## Claude transport
+
+**Page connection.** The [connection](plugin_base/adapters/claude/connection/index.mjs) validates the bridge descriptor. Its URL is `http://127.0.0.1:<port>/` with no credentials, query or fragment, and its token has 32–256 URL-safe characters. Its origin must match the page. Requests carry bearer authorization, omit cookies, disable caching and refuse redirects. HTTP responses 400, 401, 403, 404 and 429 mean `rejected`.
+
+**Bridge.** The [bridge](plugin_base/adapters/claude/bridge/server.mjs) creates a published view path and distinct browser and Mod credentials. Bearer credentials stay in headers and snapshot data. A view is connected while its confirmed Mod heartbeat is less than five seconds old. The bridge deduplicates request ids, refuses a reused id with different content, holds at most 32 unsettled actions per view and retains up to 256 results. It returns `pending` with the request id after 20 seconds without an answer. A session-identity change, session end or process closure settles delivered actions as uncertain and undelivered actions as unsent errors. [ARCHITECTURE.md](ARCHITECTURE.md#loopback-listener-and-route-owners) owns the routes and their network policies.
+
+**Mod.** [registerPluginBase](plugin_base/adapters/claude/mod/hooks/base.js) starts one-second heartbeats at session start. Each heartbeat reads identity and tools, posts declarations, receives queued actions and executes them once. Before native execution it checks that session id and generation remain unchanged. A failed result posting is retried; the native operation is executed once. A result exceeding 60,000 bytes retains its status and message while its data is omitted. The `tools.list` implementation detects this bound and returns an explicit error for an oversized list. Session end emits `session.ended`, disconnects bridges and clears session state.
+
+The Mod supplies current session facts to presenting tools and adds ordered Browser-pane guidance to their results. [Plugin Base usage](plugin_base/README.md#registering-the-page-with-the-claude-mod) specifies page registration. [PROTOTYPE.md](PROTOTYPE.md#host-presentation) owns the visible presentation sequence and hidden-pane limit.
+
+## Event delivery
+
+`adapter.events.subscribe(listener, types?)` registers a listener and returns its unsubscribe function. Events are `{ type, at, data? }`. The facade copies events for listeners and isolates a failing listener. The [event reference](plugin_base/README.md#events) owns event fields and the host-specific data shapes.
+
+Claude's Mod gathers `tool.completed`, main-agent `turn.completed`, `session.ended` and `context.attached` from its hooks. Each heartbeat posts queued events to the bridge through `POST /events`. The page starts long-polling `GET /events?after=N` at its first subscriber. Each bridge view retains the most recent 500 events. Relay delay is about one second, and the declared boundary excludes replay of events produced while the page is closed.
+
+Codex converts MCP App notifications into `tool.completed`, `host.contextChanged` and `page.teardown`. Its `tool.completed` describes the presenting tool result. Turn-completion and session-end notifications have no confirmed MCP App route.
+
+## Interface mapping
+
+This table owns routes and per-host behavior. [The full operation reference](plugin_base/README.md#host-interface-reference) owns argument definitions, return fields, limits and examples. Availability also depends on the current connection gate.
+
+| Interface | Codex route and behavior | Claude route and behavior |
+| --- | --- | --- |
+| `host.getInfo` | Facade; confirmed MCP App identity. | Facade; confirmed Mod session identity. |
+| `host.getCapabilities` | Facade; current declarations. | Facade; current declarations. |
+| `host.getContext` | MCP App host context: theme, locale and display modes; workspace roots unavailable. | Mod session APIs: project root, working directory and model; theme and locale unavailable. |
+| `events.subscribe` | Facade listeners over MCP App notifications. | Facade listeners over Mod events and bridge long polls. |
+| `files.openFile` | `openai/files/open`; accepted request; line navigation unsupported. | Native file-pane tool; accepted request with optional line. |
+| `files.revealDirectory` | `unknown`; host file-browser directory route unconfirmed. | `unknown`; host file-browser directory route unconfirmed. |
+| `composer.writeDraft` | `openai/message` draft extension; append only. | Mod `prompt.fill`; append or replace. |
+| `conversation.submitMessage` | `sendMessage`; current session model and effort only. Other selection sources return `unsupported` without sending. | Mod `prompt.submit`; current or specified settings. A specified value applies to one main-agent turn through `turn.step`; default selection is unsupported. |
+| `context.update` | `updateModelContext` using declared modalities; receipt-only confirmation of a whole snapshot. | Per-page stored snapshot attached by the next prompt-submission hook; `context.attached` reports attached blocks. |
+| `tools.list` | `list_page_tools` on the originating server. | Session tool inventory with native and MCP entries. |
+| `tools.call` | `App.callServerTool` on the originating server. | Permission-checked Mod `tool.call` for a listed session tool. |
+| `skills.list` | `unknown`; native Skill inventory unconfirmed. | `session.usage` summary; complete names only. |
+| `skills.invoke` | `unknown`; native Skill activation unconfirmed. | Native `Skill` tool; activation receipt and business outcome assessed separately. |
+| `views.open` | `unknown`; owned reusable view handles unconfirmed. | Browser tools open or reuse this page's own web tab. |
+| `views.list` | `unknown`; host view inventory unconfirmed. | Browser inventory filtered to this page's own views. |
+| `views.close` | `unknown`; owned view closure unconfirmed. | Browser tools close this page's owned tab and read back inventory. |
+| `views.requestDisplayMode` | `App.requestDisplayMode` for host-declared modes; resources advertise fullscreen. | `unknown`; equivalent container-mode route unconfirmed. |
+
+Claude's specified model/effort correlation matches submitted text to `turn.start`, then applies the override to that turn's main-agent steps. `turn.completed.override.applied` carries applied values and the values the session would have used. The [decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md#open-items) owns the unresolved correlation and host-default questions.
+
+## Local capability transports
+
+The five local capabilities execute in the plugin's Node process. The [local reference](plugin_base/README.md#local-capability-reference) owns their file scope, arguments, evidence and platform commands. Their page route is selected by the snapshot's `local` field:
+
+- Claude receives `{ transport: "http", url, token }` and calls `/local/call` and `/local/events` on the page's loopback origin with bearer authorization.
+- Codex receives `{ transport: "mcp-tools" }` and calls the originating server's `local_call` and `local_events`. Both tools declare visibility `["app"]`, which keeps them hidden from the model. Codex Desktop 26.1007 admits only `https` and `wss` page connections, so the MCP channel carries these calls.
+
+An absent usable route makes `adapter.local.available` false. [ARCHITECTURE.md](ARCHITECTURE.md#local-capabilities-in-the-process) owns the shared session connection and its grants.
+
+## Verification boundary
+
+The routes above describe source-checked behavior and capability declarations. [VALIDATION.md](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) owns dated command results and their scope. Native acceptance of all 22 operations on both hosts is pending. [MANUAL-TESTS.md](MANUAL-TESTS.md) gives the Interface Lab procedure for collecting candidate-bound effects and comparison records.

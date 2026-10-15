@@ -121,9 +121,12 @@ class SourceModeTests(unittest.TestCase):
         self.assertIn((self.source / "bin/graph-skill.mjs").as_posix(), skill_text)
         # Test mode alone serves the Interface Lab and installs its Skill.
         self.assertEqual(codex["mcp_servers"][hosts.SERVER]["env"][hosts.INTERFACE_LAB_ENV], "1")
-        claude_env = json.loads((self.home / ".claude.json").read_text(encoding="utf-8"))["mcpServers"][hosts.SERVER]["env"]
-        self.assertEqual(claude_env[hosts.INTERFACE_LAB_ENV], "1")
-        lab_skills = [self.home / ".agents/skills/plugin-interface-lab/SKILL.md", self.home / ".claude/skills/plugin-interface-lab/SKILL.md"]
+        claude_config = json.loads((self.home / ".claude.json").read_text(encoding="utf-8"))
+        self.assertEqual(claude_config["mcpServers"][hosts.SERVER]["env"][hosts.INTERFACE_LAB_ENV], "1")
+        lab_skills = [
+            self.home / ".agents" / "skills" / "plugin-interface-lab" / "SKILL.md",
+            self.home / ".claude" / "skills" / "plugin-interface-lab" / "SKILL.md",
+        ]
         self.assertTrue(all(path.is_file() for path in lab_skills))
         self.assertEqual(mode.source_status()["status"], "configured")
         self.assertEqual(mode.switch("test", self.source)["status"], "unchanged")

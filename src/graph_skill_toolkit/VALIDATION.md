@@ -2,7 +2,87 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format. Earlier sections below the current baseline preserve historical candidates and their stated cutoffs; their old paths and action names do not define the current source contract.
 
-## Current baseline: unified host Port implementation, 2026-10-13
+## Current baseline: Plugin Base, local capabilities and Interface Lab, 2026-10-14
+
+The working source has one closed Plugin Base, a Graph Skill canvas app, a separate developer Interface Lab app and one composition root. The Plugin Base implements 17 host interfaces and 5 local capabilities. The [decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) owns design choices, acceptance criteria and open items. [Plugin Base usage](plugin_base/README.md) owns construction and the full 22-operation reference. [ADAPTER.md](ADAPTER.md) owns host identity, authority and route mappings. [ARCHITECTURE.md](ARCHITECTURE.md) owns the module map, process and lifecycle. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns native observation through the Interface Lab.
+
+### Source identity and implementation evidence
+
+The source sequence on branch `claude/toolkit-host-interfaces` is `f6dbba98` (decision), `3773e6f6` (module relocation), `29557f9b` (closed entries), `e1061429` (17 host interfaces, evidence and events) and `514ae7f5` (local capabilities, process runner, composition, Interface Lab and source-mode registration). These commit identities bind the reported implementation checks below. The documentation revision describes that implementation and preserves the historical ledger at its own candidate scopes.
+
+| Necessary result | Observation and judgment |
+| --- | --- |
+| Closed reusable foundation | **Source-checked and source-tested.** The four Plugin Base entries expose page runtime, page types, server runtime and Claude Mod registration. `tests/plugin_base/closure.test.mjs` checks both import directions. |
+| Distinct business pages | **Implemented and source-tested.** The canvas holds graph presentation, selection and host/version status. The separate Interface Lab has its own app, page, `open_interface_lab` tool and Skill. Its guide covers the 17 host interfaces and 5 local capabilities. |
+| Shared process and local effects | **Implemented and source-tested.** `servePlugin` composes one listener, host bridge and local executor. The local tests exercise file-scope checks, read-back evidence, change events and shell-free system launches. The protocol test checks the lab switch and page-only local tool route. |
+| Usage and navigation | **Documentation checked.** `plugin_base/README.md` is present, covers all 22 operations and plugin construction, and links to the owning adapter, architecture, page and observation documents. |
+| Native effects on both hosts | **Unverified for this candidate.** Native acceptance of all 22 operations has not been run in Claude Code Desktop or Codex Desktop. Fake-host results and a standalone browser render have their stated narrower scopes. |
+
+### Checks reported on 2026-10-14
+
+These results were measured against the content of `514ae7f5`. Documentation checks cover current links, operation coverage, fact ownership and preservation of historical ledger content.
+
+| Check | Observed result | Evidence scope |
+| --- | --- | --- |
+| `npm run typecheck` | Clean. | JavaScript/TypeScript source contract check. |
+| `npm run build` | Server, hook, canvas (696,330 bytes), Interface Lab (705,789 bytes) and installer built. | Build output only. |
+| `node --test` | 184 passed, 0 failed. Includes `tests/plugin_base/local.test.mjs`, `tests/interface_lab/guide.test.mjs` and `tests/integration/protocol.test.mjs`. | Source, simulated host behavior, and real MCP stdio/HTTP protocol tests. |
+| `uv run pytest src/graph_skill_toolkit/tests/installation` | 51 passed. Run from the repository root. | Installer tests. |
+| `claude.exe plugin validate dist/claude-mod` | “Validation passed” using Claude Desktop's bundled Claude Code 2.1.295 binary; warning “gating hook without .catch” for `command.run`. | Mod package validation; live loading and hook execution remain unverified. |
+| Built lab opened in a browser outside either host | Operation list, per-host guidance and argument presets displayed. | Standalone page rendering. |
+
+The JavaScript commands and Mod validation above run from the toolkit directory. The corresponding source checks live under [tests/](tests/), including [the closure test](tests/plugin_base/closure.test.mjs), [local capability tests](tests/plugin_base/local.test.mjs), [guide tests](tests/interface_lab/guide.test.mjs) and [protocol integration](tests/integration/protocol.test.mjs). Source tests establish the behavior exercised by their peers and fixtures. They leave actual host rendering, native effects and model consumption to native observation.
+
+### Configured source test mode and loaded-host boundary
+
+On 2026-10-14, `node bin/graph-skill.mjs mode test <toolkit>` selected this worktree for both hosts. `mode status` reported `configured` with no problems. Source test mode sets `GRAPH_SKILL_INTERFACE_LAB=1` in both MCP registrations and installs the `plugin-interface-lab` Skill. Installed release mode selects the canvas projection. [ARCHITECTURE.md](ARCHITECTURE.md#installation-and-source-selection) owns those registrations, and [README.md](README.md#switch-the-desktop-source-for-testing) gives the commands.
+
+Configuration is observed; loaded server and Mod identity after host reload remains unverified for this candidate. Native acceptance must bind the selected source, built assets, host version, actual process and page session before testing operations. The [manual procedure](MANUAL-TESTS.md) records each operation as matches, differs or not observed with evidence and a note, and checks the saved comparison files.
+
+### Documentation and repository checks, 2026-10-15 UTC
+
+The documentation pass checked 253 current relative Markdown links, including fragments, with every target resolving. It checked all 17 host-interface ids and all 5 local-capability ids against the usage reference. The required body-marker scan found zero hits after the declared quotation, revision-log and historical-ledger exclusions. UTF-8/LF byte read-back passed. The historical ledger bodies are byte-identical apart from the specified 2026-10-13 heading and its `a4e8cd50` qualification. These results establish the documentation responsibility at this scope.
+
+The following repository-root checks combine the writer's measured results with the repository coordinator's subsequent verification on 2026-10-15 UTC. A private temporary directory is a fresh directory owned by the test invocation.
+
+| Check | Current observed result and scope |
+| --- | --- |
+| `uv run ruff check src tests scripts tools` | Passed: “All checks passed!” The coordinator verified the current `src/graph_skill_toolkit/tests/installation/test_source_mode.py`, whose host-install destination paths use separate path components. |
+| `uv run pytest tests/test_doc_pointer_liveness.py src/graph_skill_toolkit/tests/installation --basetemp=<private directory>` | 66 passed in the coordinator's run. The source-document-pointer check and installer tests pass. |
+| `uv run mypy --strict src` | Passed over 149 source files. |
+| `uv run lint-imports` | Passed: nine contracts kept, zero broken. |
+| `uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml` | Passed. |
+| `uv build --no-sources` | Built the runtime wheel and source distribution. This establishes build completion for that invocation; release-artifact acceptance is separate. |
+| `uv run pip-audit` | Reported no known vulnerabilities in resolved third-party distributions. The unpublished local `graph-skill-runtime` distribution was skipped. |
+| `uv run pytest -q -p no:cacheprovider --basetemp=<private directory>` | The coordinator's latest full run reported 16 failed, 1,797 passed and 1 skipped. The failing file set and comparative evidence are listed below. |
+
+The latest full-suite failures are:
+
+- `tests/application/test_host_native_handoff.py`: four tests.
+- `tests/core/test_cache_key_covers_the_compiler_identity.py`: two tests.
+- `tests/core/test_portable_gskill_v1.py`: two cache round-trip tests.
+- `tests/core/test_pr4_cache_roundtrip_red.py`: one test.
+- `tests/integration/skills/event_extraction/test_cognitive_flow_smoke.py`: three tests.
+- `tests/integration/skills/text_segmentation/test_cognitive_flow_smoke.py`: three tests.
+- `tests/test_round28_contract_manifests.py::test_task7_hash_lock_detects_mutated_schema_fixture`: one test. Its nested `uv run pytest tests/test_contract_hash_lock.py` invocation used the default temporary directory and reported four setup errors.
+
+Full-suite results vary between invocations. The coordinator's preceding run with the same private-directory command reported 15 failed, 1,798 passed and 1 skipped, with a different failing set. The writer's dated `uv run pytest --tb=short -q` run with private `TEMP`, `TMP` and `TMPDIR` reported 6 failed, 1,807 passed and 1 skipped in 144.32 seconds. Five of those failures were in `tests/test_import_boundary_contracts.py`, where wrapped report names prevented the test parser from reconciling contract totals. The source-document-pointer failure in that writer run is covered by the current 66-pass check above.
+
+The writer's default-temporary-directory run reported 2 failed, 1,000 passed, 1 skipped and 811 setup errors. The coordinator confirmed access denied, `PermissionError: [WinError 5]`, on the shared Windows temporary path `<Windows temporary directory>/pytest-of-test`. That shared-directory condition caused the 811 setup errors. Nested pytest commands require their own usable temporary-directory configuration.
+
+### Runtime-suite comparison with the branch base
+
+The repository coordinator compared both committed changes and working-tree changes with `a4e8cd50`. All changed files are under `src/graph_skill_toolkit/` or at `docs/design/plugin-base-and-interface-lab-2026-10-14.md`. Python runtime source, runtime tests and repository tooling are identical to that base.
+
+A separate checkout of `a4e8cd50`, tested with the same private-directory invocation on the then-failing selection, reported 10 failed and 67 passed. The comparison covered `test_portable_gskill_v1.py`, `test_pr4_cache_roundtrip_red.py`, both `test_cognitive_flow_smoke.py` files, `test_doc_pointer_liveness.py` and `test_round28_contract_manifests.py`. The same ten overlapping runtime failures reproduced on the base. The source-document-pointer test passed on the base and passes on this branch in the current focused run.
+
+The remaining runtime-suite failures are pre-existing or environment-dependent conditions of the Python runtime suite in this environment, independent of this branch's changes. They remain open repository items outside this toolkit candidate's scope. The base comparison directly covers the ten reproduced failures; diagnosis of the other varying runtime failures remains open. The 2026-10-14 implementation measurements retain their own source and invocation conditions.
+
+The documentation responsibility is **attained within the checks recorded here**. Current Ruff, mypy, import contracts, manifest validation, build and dependency-audit checks pass at their recorded scopes. The runtime pytest suite retains the environment-dependent failures above, so repository-wide runtime-suite acceptance remains open. The broader shared-graph goal is **partially attained**: current two-host loading, the 22-operation native run and delivery acceptance remain open. The decision's open items include the graph credential retained until process exit, Claude override correlation and unconfirmed host routes. This baseline supplies source evidence and configured selection; native operational acceptance and publication require their own results.
+
+## Historical baseline: unified host Port implementation, 2026-10-13
+
+The paths and 15-name vocabulary in this section refer to the source at commit `a4e8cd50`.
 
 The current source implements one shared Graph canvas, reusable host operations, identity-guarded drivers for Codex and Claude, and Graph-specific presentation above that Port. [ADAPTER.md](ADAPTER.md) owns the 15-interface contract and connection authority; [ARCHITECTURE.md](ARCHITECTURE.md) maps the present source tree; [PROTOTYPE.md](PROTOTYPE.md) owns the visible page behavior. The [feasibility review](evidence/native-launch-20261012/architecture-feasibility.md) records the architecture's alternatives and constraints. The implementation uses the official Codex MCP Apps SDK and Claude's authenticated same-origin HTTP/Mod bridge. Installed native-host behavior has its own acceptance boundary below.
 
