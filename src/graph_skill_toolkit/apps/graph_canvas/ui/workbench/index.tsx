@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import type { HostAdapter, HostCapabilities, HostInfo } from "../../ports/host/index";
+import type { HostAdapter, HostCapabilities, HostInfo } from "../../../../plugin_base/ports/host/index";
 import type { GraphConnection } from "../../ports/graph/index";
-import { graph as demoGraph } from "../../application/graph/demo/graph.mjs";
-import { graphInterfaceSamples } from "../../application/graph/interface_samples/index.mjs";
+import { graph as demoGraph } from "../../application/demo/graph.mjs";
+import { graphInterfaceSamples } from "../../application/interface_samples/index.mjs";
 import { validateCanvas } from "../canvas/index.mjs";
 import type { CanvasSnapshot } from "../canvas/types";
 import { GraphCanvas } from "../canvas/view";
 import { HostStatus } from "../host_status/index";
-import { InterfaceLab } from "../interface_lab/index";
+import { InterfaceLab } from "../../../interface_lab/ui/index";
 import { validateInvalidEvent } from "../diagnostics/index.mjs";
 import { InvalidGraphNotice, type InvalidGraph } from "../diagnostics/index";
 

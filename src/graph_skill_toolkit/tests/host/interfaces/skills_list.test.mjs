@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mcpCapabilities } from "../../../adapters/codex/driver/registry.mjs";
-import { bridgeKey, createModState, pollBridges } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { executeBridgeAction, nativeCapabilities } from "../../../adapters/claude/mod/operations/index.mjs";
+import { mcpCapabilities } from "../../../plugin_base/adapters/codex/driver/registry.mjs";
+import { bridgeKey, createModState, pollBridges } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { executeBridgeAction, nativeCapabilities } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
 const bridge = { url: "http://127.0.0.1:43123", token: "a".repeat(64), skillRoot: "C:/example" };
 const request = id => ({ id, skillRoot: bridge.skillRoot, action: "skills.list", args: {} });

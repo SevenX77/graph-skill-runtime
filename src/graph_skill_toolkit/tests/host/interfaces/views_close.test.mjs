@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateArguments } from "../../../ports/host/contract.mjs";
-import { executeBridgeAction, nativeCapabilities } from "../../../adapters/claude/mod/operations/index.mjs";
-import { createModState } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { capability as codexCapability } from "../../../host_interfaces/views/close/codex.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
+import { executeBridgeAction, nativeCapabilities } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
+import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { capability as codexCapability } from "../../../plugin_base/host_interfaces/views/close/codex.mjs";
 
 const root = "C:/business/hello-world";
 const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: root };

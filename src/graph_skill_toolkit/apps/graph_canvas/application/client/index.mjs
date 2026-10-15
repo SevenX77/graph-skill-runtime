@@ -6,7 +6,7 @@ export function validateGraphBackend(value) {
 }
 
 /** Browser composition reads only the App's backend bootstrap, not host identity.
- * @returns {import('../../../ports/graph/index').GraphConnection | null}
+ * @returns {import('../../ports/graph/index').GraphConnection | null}
  */
 export function createPageGraphConnection(page = globalThis.document) {
   try {
@@ -21,7 +21,7 @@ export function createPageGraphConnection(page = globalThis.document) {
   }
 }
 
-/** @returns {import('../../../ports/graph/index').GraphConnection} */
+/** @returns {import('../../ports/graph/index').GraphConnection} */
 export function createGraphConnection({ backend, fetch: fetchImpl = globalThis.fetch?.bind(globalThis), retryMs = 750 }) {
   const descriptor = validateGraphBackend(backend);
   let callbacks, root, selected = false, disposed = false, generation = 0, abort, retryTimer, lastFailure = "";
@@ -89,7 +89,7 @@ export function createGraphConnection({ backend, fetch: fetchImpl = globalThis.f
 /** Long-poll GraphConnection for pages whose only route to the backend is a
  * request/response relay (the Codex MCP App channel). `call(name, args)` sends
  * one originating-server tool call and resolves with its MCP result.
- * @returns {import('../../../ports/graph/index').GraphConnection}
+ * @returns {import('../../ports/graph/index').GraphConnection}
  */
 export function createRelayGraphConnection({ call, retryMs = 750, timeoutMs = 20000, setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout }) {
   if (typeof call !== "function") throw new Error("画布数据中继缺少调用接口。");

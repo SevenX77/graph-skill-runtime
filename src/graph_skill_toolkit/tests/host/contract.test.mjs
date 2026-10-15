@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HOST_ACTIONS, INTERFACES } from "../../ports/host/catalog.mjs";
-import { validateArguments, validateCapabilities, validateResult, failureResult } from "../../ports/host/contract.mjs";
-import { operations as codexOperations } from "../../adapters/codex/driver/registry.mjs";
-import { operations as claudeOperations } from "../../adapters/claude/mod/operations/registry.mjs";
+import { HOST_ACTIONS, INTERFACES } from "../../plugin_base/ports/host/catalog.mjs";
+import { validateArguments, validateCapabilities, validateResult, failureResult } from "../../plugin_base/ports/host/contract.mjs";
+import { operations as codexOperations } from "../../plugin_base/adapters/codex/driver/registry.mjs";
+import { operations as claudeOperations } from "../../plugin_base/adapters/claude/mod/operations/registry.mjs";
 
 test("every public host interface accepts its portable generic sample without a Graph Skill root", () => {
   assert.equal(new Set(HOST_ACTIONS).size,15);

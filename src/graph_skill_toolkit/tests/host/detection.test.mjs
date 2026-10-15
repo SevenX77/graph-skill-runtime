@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {discoverConnection,identifyHost} from '../../adapters/detection/index.mjs';
-import {createHostAdapter} from '../../adapters/factory/index.mjs';
-import {createHostBridge} from '../../adapters/claude/bridge/server.mjs';
-import {readHostIdentity,pollBridges} from '../../adapters/claude/mod/lifecycle/index.mjs';
-import {graph} from '../../application/graph/demo/graph.mjs';
-import {launchHostInfo} from '../../adapters/launch/index.mjs';
+import {discoverConnection,identifyHost} from '../../plugin_base/adapters/detection/index.mjs';
+import {createHostAdapter} from '../../plugin_base/adapters/factory/index.mjs';
+import {createHostBridge} from '../../plugin_base/adapters/claude/bridge/server.mjs';
+import {readHostIdentity,pollBridges} from '../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
+import {graph} from '../../apps/graph_canvas/application/demo/graph.mjs';
+import {launchHostInfo} from '../../plugin_base/adapters/launch/index.mjs';
 
 const capabilities={'conversation.submitMessage':{state:'available',detail:'live declared message capability'}};
 const codex={name:'chatgpt',version:'26.1007.2314.0',client_type:'codex_desktop'};

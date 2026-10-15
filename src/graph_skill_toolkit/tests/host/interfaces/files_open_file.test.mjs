@@ -3,12 +3,12 @@ import test from "node:test";
 import { z } from "zod";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { validateArguments } from "../../../ports/host/contract.mjs";
-import { mcpCapabilities } from "../../../adapters/codex/driver/registry.mjs";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { mcpConnection } from "../../../adapters/codex/connection/index.mjs";
-import { nativeCapabilities, executeBridgeAction } from "../../../adapters/claude/mod/operations/index.mjs";
-import { createModState } from "../../../adapters/claude/mod/lifecycle/index.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
+import { mcpCapabilities } from "../../../plugin_base/adapters/codex/driver/registry.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { mcpConnection } from "../../../plugin_base/adapters/codex/connection/index.mjs";
+import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
+import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 
 const action = "files.openFile";
 const file = "C:/project with spaces/技能/SKILL.md";

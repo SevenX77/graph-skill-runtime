@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {graphPayload, previewProjectRoot, previewTarget} from '../../../adapters/claude/presentation/guidance/index.mjs';
-import {register} from '../../../adapters/claude/mod/hooks/register.js';
+import {graphPayload, previewProjectRoot, previewTarget} from '../../../plugin_base/adapters/claude/presentation/guidance/index.mjs';
+import {register} from '../../../apps/graph_canvas/claude_mod/hooks/register.js';
 
 const projectRoot = '/host/project';
 const url = 'http://127.0.0.1:31234/view/' + 'a'.repeat(64);

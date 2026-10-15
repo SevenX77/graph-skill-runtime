@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createCanvasComposition } from "../../app/composition.mjs";
+import { createCanvasComposition } from "../../apps/graph_canvas/app/composition.mjs";
 
 const hostInfo = transport => ({ transport, id: "unknown", status: "unknown", identitySource: "none", name: null, version: null, clientType: null, sessionId: null, reason: "test", capabilities: {} });
 const page = snapshot => ({ querySelector: () => ({ textContent: JSON.stringify(snapshot) }) });

@@ -9,8 +9,8 @@ export function fakeRuntimeEnv(extra = {}) {
 /** In-process compile port for backend tests: passes when the plugin can draw the graph. */
 export const fakeCompiler = {
   async compile(root) {
-    const { loadSkill } = await import("../../application/graph/source/files.mjs");
-    const { projectGraph } = await import("../../application/graph/projection/graph.mjs");
+    const { loadSkill } = await import("../../apps/graph_canvas/application/source/files.mjs");
+    const { projectGraph } = await import("../../apps/graph_canvas/application/projection/graph.mjs");
     try {
       const skill = await loadSkill(root);
       projectGraph(skill.data, skill.kinds);

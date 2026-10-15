@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, cp } from "node:fs/pr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRuntimeCompiler, parseCompileResult, runtimeCommand } from "../../backend/runtime/index.mjs";
+import { createRuntimeCompiler, parseCompileResult, runtimeCommand } from "../../apps/graph_canvas/backend/runtime/index.mjs";
 import { fakeRuntimeCommand } from "../support/runtime.mjs";
 
 const diagnostic = { code: "[F-x]", severity: "fatal", message: "bad", source_path: "graph.yaml", line: 3 };

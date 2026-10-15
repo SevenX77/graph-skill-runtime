@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mcpConnection } from '../../../adapters/codex/connection/index.mjs';
-import { codexAdapter } from '../../../adapters/codex/driver/index.mjs';
+import { mcpConnection } from '../../../plugin_base/adapters/codex/connection/index.mjs';
+import { codexAdapter } from '../../../plugin_base/adapters/codex/driver/index.mjs';
 import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

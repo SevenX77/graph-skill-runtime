@@ -1,7 +1,7 @@
 import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
 import { mcpCapabilities } from "../driver/registry.mjs";
 export { mcpCapabilities } from "../driver/registry.mjs";
-import packageInfo from "../../../package.json" with { type: "json" };
+import packageInfo from "../../../../package.json" with { type: "json" };
 
 /** @param {{window?:Window & typeof globalThis,transport?:unknown,originatingServer?:string}} [options] */
 export function createMcpConnection({ window: view = globalThis.window, transport, originatingServer } = {}) {

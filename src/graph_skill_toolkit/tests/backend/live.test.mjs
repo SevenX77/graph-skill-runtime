@@ -3,15 +3,15 @@ import test from "node:test";
 import { mkdtemp, mkdir, writeFile, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createLocalHttpServer } from "../../backend/http/index.mjs";
-import { createGraphBackend } from "../../backend/graph/index.mjs";
-import { createLiveGraphSource } from "../../application/graph/live_source/index.mjs";
-import { readGraphState } from "../../application/graph/service/index.mjs";
+import { createLocalHttpServer } from "../../plugin_base/backend/http/index.mjs";
+import { createGraphBackend } from "../../apps/graph_canvas/backend/graph/index.mjs";
+import { createLiveGraphSource } from "../../apps/graph_canvas/application/live_source/index.mjs";
+import { readGraphState } from "../../apps/graph_canvas/application/service/index.mjs";
 import { fakeCompiler } from "../support/runtime.mjs";
 
 const read = root => readGraphState(root, { compiler: fakeCompiler });
-import { createGraphConnection, validateGraphBackend } from "../../application/graph/client/index.mjs";
-import { createHostBridge } from "../../adapters/claude/bridge/server.mjs";
+import { createGraphConnection, validateGraphBackend } from "../../apps/graph_canvas/application/client/index.mjs";
+import { createHostBridge } from "../../plugin_base/adapters/claude/bridge/server.mjs";
 
 async function until(condition) {
   for (let i = 0; i < 100 && !condition(); i++) await new Promise(resolve => setTimeout(resolve, 10));

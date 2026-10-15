@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { nativeCapabilities } from "../../../adapters/claude/mod/operations/registry.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { nativeCapabilities } from "../../../plugin_base/adapters/claude/mod/operations/registry.mjs";
 
 function pair() {
   const view = {}, host = {};
@@ -36,7 +36,7 @@ async function sdkHost(t, modes, actualMode) {
 
 test("Codex SDK display-mode request sends only a declared mode and reports the actual response", async t => {
   const { app, requests, adapter } = await sdkHost(t, ["inline", "fullscreen"], "fullscreen");
-  const cap = (await import("../../../adapters/codex/driver/registry.mjs")).mcpCapabilities(app.getHostCapabilities(), app.getHostContext())["views.requestDisplayMode"];
+  const cap = (await import("../../../plugin_base/adapters/codex/driver/registry.mjs")).mcpCapabilities(app.getHostCapabilities(), app.getHostContext())["views.requestDisplayMode"];
   assert.equal(cap.state, "available");
   assert.deepEqual(cap.constraints.modes, ["inline", "fullscreen"]);
   const result = await adapter.invoke("views.requestDisplayMode", { mode: "fullscreen" });
@@ -64,7 +64,7 @@ test("SDK default bridge can return unchanged current mode despite advertised su
 
 test("An explicit empty modes declaration is unavailable without a host request", async t => {
   const { app, adapter, requests } = await sdkHost(t, [], "inline");
-  const cap = (await import("../../../adapters/codex/driver/registry.mjs")).mcpCapabilities(app.getHostCapabilities(), app.getHostContext())["views.requestDisplayMode"];
+  const cap = (await import("../../../plugin_base/adapters/codex/driver/registry.mjs")).mcpCapabilities(app.getHostCapabilities(), app.getHostContext())["views.requestDisplayMode"];
   assert.equal(cap.state, "unavailable");
   assert.equal((await adapter.invoke("views.requestDisplayMode", { mode: "fullscreen" })).status, "unsupported");
   assert.deepEqual(requests, []);

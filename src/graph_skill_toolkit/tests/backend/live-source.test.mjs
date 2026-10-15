@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createLiveGraphSource } from "../../application/graph/live_source/index.mjs";
-import { readGraphState } from "../../application/graph/service/index.mjs";
+import { createLiveGraphSource } from "../../apps/graph_canvas/application/live_source/index.mjs";
+import { readGraphState } from "../../apps/graph_canvas/application/service/index.mjs";
 import { fakeCompiler } from "../support/runtime.mjs";
 
 const yaml = id => `schema_version: gskill.graph.v1\ngraph_id: ${id}\nphases:\n  - id: work\n    depends_on: [input]\n    output: true\n`;

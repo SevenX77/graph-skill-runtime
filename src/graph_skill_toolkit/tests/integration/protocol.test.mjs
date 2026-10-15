@@ -8,10 +8,10 @@ import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
-import { graph, matchesProbeGraph } from "../../application/graph/demo/graph.mjs";
-import { graphPayload } from "../../adapters/claude/presentation/guidance/index.mjs";
-import { validateCanvas } from "../../ui/canvas/index.mjs";
-import { SNAPSHOT_SLOT, snapshotHtml } from "../../ui/template/publisher.mjs";
+import { graph, matchesProbeGraph } from "../../apps/graph_canvas/application/demo/graph.mjs";
+import { graphPayload } from "../../plugin_base/adapters/claude/presentation/guidance/index.mjs";
+import { validateCanvas } from "../../apps/graph_canvas/ui/canvas/index.mjs";
+import { SNAPSHOT_SLOT, snapshotHtml } from "../../plugin_base/template/publisher.mjs";
 import { fakeRuntimeEnv } from "../support/runtime.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));

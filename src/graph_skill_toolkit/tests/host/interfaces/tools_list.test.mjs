@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import * as codex from "../../../host_interfaces/tools/list/codex.mjs";
-import * as claude from "../../../host_interfaces/tools/list/claude.mjs";
+import * as codex from "../../../plugin_base/host_interfaces/tools/list/codex.mjs";
+import * as claude from "../../../plugin_base/host_interfaces/tools/list/claude.mjs";
 
 const sourceTools = [
   { name: "inspect_graph", description: "Inspect", reference: { name: "inspect_graph", scope: "originating-server" } },

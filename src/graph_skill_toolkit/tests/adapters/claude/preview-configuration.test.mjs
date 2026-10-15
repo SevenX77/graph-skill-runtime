@@ -3,7 +3,7 @@ import test from "node:test";
 import { link, lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
-import { createPreviewConfiguration } from "../../../adapters/claude/presentation/preview_configuration/index.mjs";
+import { createPreviewConfiguration } from "../../../plugin_base/adapters/claude/presentation/preview_configuration/index.mjs";
 
 async function fixture(t) {
   const prefix = join(await realpath(tmpdir()), "gskill-preview-config-");

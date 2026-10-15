@@ -1,6 +1,6 @@
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { findSkillRoot } from "../application/graph/source/files.mjs";
+import { findSkillRoot } from "../application/source/files.mjs";
 
 const pathKeys = new Set(["skill_root", "skill_path", "file_path", "path", "filename", "workdir", "cwd"]);
 

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { createModState } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { executeBridgeAction } from "../../../adapters/claude/mod/operations/index.mjs";
-import { validateArguments } from "../../../ports/host/contract.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
 
 function pair() {
   const view = { start: async () => {}, close: async () => {}, send: async message => queueMicrotask(() => host.onmessage?.(message)) };

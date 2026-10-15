@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateInvalidEvent } from "../../ui/diagnostics/index.mjs";
-import { describeDiagnostics } from "../../application/graph/service/index.mjs";
+import { validateInvalidEvent } from "../../apps/graph_canvas/ui/diagnostics/index.mjs";
+import { describeDiagnostics } from "../../apps/graph_canvas/application/service/index.mjs";
 
 const item = n => ({ code: `[F-${n}]`, severity: "fatal", message: `problem ${n}`, source_path: "graph.yaml", line: n, field_path: "phases", extra: "dropped" });
 

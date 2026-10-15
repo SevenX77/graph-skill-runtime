@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { afterTool } from "../../hooks/after-tool.mjs";
-import { projectGraph } from "../../application/graph/projection/graph.mjs";
-import { loadSkill } from "../../application/graph/source/files.mjs";
+import { afterTool } from "../../apps/graph_canvas/hooks/after-tool.mjs";
+import { projectGraph } from "../../apps/graph_canvas/application/projection/graph.mjs";
+import { loadSkill } from "../../apps/graph_canvas/application/source/files.mjs";
 
 test("actual branched graph projection preserves edges and separates siblings", () => {
   const phase = (id, depends_on, output = false) => ({ id, depends_on, output });

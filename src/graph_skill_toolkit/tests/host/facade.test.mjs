@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hostAdapter } from "../../adapters/facade/index.mjs";
-import { createHostAdapter } from "../../adapters/factory/index.mjs";
-import { capability } from "../../ports/host/catalog.mjs";
-import { launchHostInfo } from "../../adapters/launch/index.mjs";
+import { hostAdapter } from "../../plugin_base/adapters/facade/index.mjs";
+import { createHostAdapter } from "../../plugin_base/adapters/factory/index.mjs";
+import { capability } from "../../plugin_base/ports/host/catalog.mjs";
+import { launchHostInfo } from "../../plugin_base/adapters/launch/index.mjs";
 
 const identity = { name: "chatgpt", version: "26.1007", client_type: "codex_desktop" };
 const launch = launchHostInfo({ clientInfo: identity });

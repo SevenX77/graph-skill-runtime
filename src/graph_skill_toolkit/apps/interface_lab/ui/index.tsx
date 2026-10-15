@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { INTERFACES } from "../../ports/host/catalog.mjs";
-import type { HostAction, HostAdapter, HostCapabilities, HostResult } from "../../ports/host/index";
+import { INTERFACES } from "../../../plugin_base/ports/host/catalog.mjs";
+import type { HostAction, HostAdapter, HostCapabilities, HostResult } from "../../../plugin_base/ports/host/index";
 
 type Entry = { id: number; action: HostAction; result: HostResult; time: string };
 const labels: Record<HostResult["status"], string> = {

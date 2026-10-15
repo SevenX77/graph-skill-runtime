@@ -3,8 +3,8 @@
 // runtime's validity rules. A graph.yaml containing "fake-invalid" fails.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { loadSkill } from "../../application/graph/source/files.mjs";
-import { projectGraph } from "../../application/graph/projection/graph.mjs";
+import { loadSkill } from "../../apps/graph_canvas/application/source/files.mjs";
+import { projectGraph } from "../../apps/graph_canvas/application/projection/graph.mjs";
 
 const [command, flag, root] = process.argv.slice(2);
 if (command !== "compile" || flag !== "--no-cache" || !root) { console.error("fake runtime: unexpected arguments"); process.exit(64); }

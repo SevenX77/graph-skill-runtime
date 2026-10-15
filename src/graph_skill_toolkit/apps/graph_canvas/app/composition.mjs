@@ -1,15 +1,15 @@
 // @ts-check
-import { createHostAdapter } from "../adapters/factory/index.mjs";
-import { discoverConnection } from "../adapters/detection/index.mjs";
-import { createMcpConnection } from "../adapters/codex/connection/index.mjs";
-import { createPageGraphConnection, createRelayGraphConnection } from "../application/graph/client/index.mjs";
+import { createHostAdapter } from "../../../plugin_base/adapters/factory/index.mjs";
+import { discoverConnection } from "../../../plugin_base/adapters/detection/index.mjs";
+import { createMcpConnection } from "../../../plugin_base/adapters/codex/connection/index.mjs";
+import { createPageGraphConnection, createRelayGraphConnection } from "../application/client/index.mjs";
 
 /** Browser composition root: pairs the host adapter with the graph transport
  * its page may use. A Codex MCP App page cannot reach loopback HTTP (its CSP
  * admits only https/wss), so it long-polls the backend through the same MCP
  * connection the adapter uses; every other page reads the backend's SSE.
  * @param {Parameters<typeof createHostAdapter>[0]} [options]
- * @returns {{ adapter: import('../ports/host/index').HostAdapter | null, source: import('../ports/graph/index').GraphConnection | null }}
+ * @returns {{ adapter: import('../../../plugin_base/ports/host/index').HostAdapter | null, source: import('../ports/graph/index').GraphConnection | null }}
  */
 export function createCanvasComposition(options = {}) {
   const page = options.document ?? globalThis.document, view = options.window ?? globalThis.window;

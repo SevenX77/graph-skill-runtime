@@ -1,6 +1,6 @@
-import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL } from '../host_tools/index.mjs';
-import { bridgeDescriptor, bridgeKey, bridgePost, readHostIdentity, pollBridges, createModState } from '../lifecycle/index.mjs';
-import { graphPayload, previewProjectRoot, previewTarget, browserReminder } from '../../presentation/guidance/index.mjs';
+import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL } from '../../../../plugin_base/adapters/claude/mod/host_tools/index.mjs';
+import { bridgeDescriptor, bridgeKey, bridgePost, readHostIdentity, pollBridges, createModState } from '../../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
+import { graphPayload, previewProjectRoot, previewTarget, browserReminder } from '../../../../plugin_base/adapters/claude/presentation/guidance/index.mjs';
 
 export function register(on) {
   let latestView = null, latestCanObserve = false, problem = '';

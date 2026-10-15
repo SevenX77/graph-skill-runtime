@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateArguments } from "../../../ports/host/contract.mjs";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { capability as claudeCapability, invoke as callClaude } from "../../../host_interfaces/tools/call/claude.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { capability as claudeCapability, invoke as callClaude } from "../../../plugin_base/host_interfaces/tools/call/claude.mjs";
 
 const mcpName = "mcp__graph-skill-canvas__inspect_graph";
 const listed = [{ name: "Read", mcp: false }, { name: mcpName, mcp: true }];

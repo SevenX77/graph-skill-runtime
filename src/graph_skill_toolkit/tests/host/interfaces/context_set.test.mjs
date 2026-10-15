@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateArguments } from "../../../ports/host/contract.mjs";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { createModState } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { executeBridgeAction } from "../../../adapters/claude/mod/operations/index.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
 const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: "C:/skill" };
 const request = (id, args) => ({ id, action: "context.set", args, skillRoot: bridge.skillRoot });

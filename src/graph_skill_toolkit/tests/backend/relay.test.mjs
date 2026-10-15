@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createGraphRelay } from "../../backend/relay/index.mjs";
+import { createGraphRelay } from "../../apps/graph_canvas/backend/relay/index.mjs";
 
 function fakeSource() {
   const listeners = new Map(), subscriptions = [];

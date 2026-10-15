@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { mcpConnection } from "../../../adapters/codex/connection/index.mjs";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { validateArguments } from "../../../ports/host/contract.mjs";
-import { bridgeKey, createModState, pollBridges } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { executeBridgeAction } from "../../../adapters/claude/mod/operations/index.mjs";
+import { mcpConnection } from "../../../plugin_base/adapters/codex/connection/index.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
+import { bridgeKey, createModState, pollBridges } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
 const action = "conversation.submitMessage";
 function pair() {

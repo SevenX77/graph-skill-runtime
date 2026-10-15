@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateArguments } from "../../../ports/host/contract.mjs";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
-import { mcpCapabilities } from "../../../adapters/codex/driver/registry.mjs";
-import { createModState } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { nativeCapabilities, executeBridgeAction } from "../../../adapters/claude/mod/operations/index.mjs";
+import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
+import { mcpCapabilities } from "../../../plugin_base/adapters/codex/driver/registry.mjs";
+import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
 const action = "files.revealDirectory";
 const args = { path: "C:/projects/business-skill" };

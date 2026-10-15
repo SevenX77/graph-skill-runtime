@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createRelayGraphConnection } from "../../application/graph/client/index.mjs";
+import { createRelayGraphConnection } from "../../apps/graph_canvas/application/client/index.mjs";
 
 const result = (revision, event) => ({ structuredContent: { revision, event } });
 const snapshot = id => ({ type: "snapshot", data: { graph: { id }, skillRoot: "C:/skill" } });

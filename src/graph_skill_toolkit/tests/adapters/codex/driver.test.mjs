@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { codexAdapter } from "../../../adapters/codex/driver/index.mjs";
+import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
 
 function host(capabilities={}) {
   const calls=[];

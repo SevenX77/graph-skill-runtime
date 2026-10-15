@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { claudeAdapter } from "../../../adapters/claude/driver/index.mjs";
-import { httpConnection } from "../../../adapters/claude/connection/index.mjs";
-import { createHostBridge } from "../../../adapters/claude/bridge/server.mjs";
-import { nativeCapabilities, executeBridgeAction } from "../../../adapters/claude/mod/operations/index.mjs";
-import { createModState, pollBridges } from "../../../adapters/claude/mod/lifecycle/index.mjs";
-import { register } from "../../../adapters/claude/mod/hooks/register.js";
+import { claudeAdapter } from "../../../plugin_base/adapters/claude/driver/index.mjs";
+import { httpConnection } from "../../../plugin_base/adapters/claude/connection/index.mjs";
+import { createHostBridge } from "../../../plugin_base/adapters/claude/bridge/server.mjs";
+import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
+import { createModState, pollBridges } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { register } from "../../../apps/graph_canvas/claude_mod/hooks/register.js";
 
 const root = "C:/business/hello-world";
 const identity = { name: "Claude Code", version: "2.1.295", client_type: "claude_code", sessionId: "session-a", source: "claude-mod-session" };
