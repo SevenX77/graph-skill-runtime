@@ -57,8 +57,8 @@ test("Codex unadvertised text is unavailable and an ambiguous reply is not calle
   assert.equal(calls, 1);
 });
 
-const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: "C:/business/skill" };
-const request = (id, text) => ({ id, action, args: { text }, skillRoot: bridge.skillRoot });
+const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "C:/business/skill" };
+const request = (id, text) => ({ id, action, args: { text }, key: bridge.key });
 function claudeApi(submit, session = () => "session-a") {
   return { session: { id: async () => session() }, tool: { list: async () => [] }, prompt: { submit } };
 }

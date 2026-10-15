@@ -55,12 +55,12 @@ test("Claude Browser preview and tab tools do not imply reusable owned view sema
     list: async () => listed,
     call: async input => { calls.push(input); return { result: { tabId: "pre-existing" } }; },
   } };
-  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: "C:/business" };
+  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "C:/business" };
   const cap = nativeCapabilities(listed)["views.open"];
   assert.equal(cap.state, "unknown");
   assert.match(cap.detail, /reuseKey.*activate=false/);
   for (const [id, args] of [["web", web], ["file", file]]) {
-    const result = await executeBridgeAction(api, state, bridge, { id, action: "views.open", args, skillRoot: bridge.skillRoot });
+    const result = await executeBridgeAction(api, state, bridge, { id, action: "views.open", args, key: bridge.key });
     assert.equal(result.status, "unsupported");
     assert.equal(result.data.capabilityState, "unknown");
   }

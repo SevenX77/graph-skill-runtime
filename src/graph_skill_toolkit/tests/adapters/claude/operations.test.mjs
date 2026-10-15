@@ -10,8 +10,8 @@ import { register } from "../../../apps/graph_canvas/claude_mod/hooks/register.j
 const root = "C:/business/hello-world";
 const identity = { name: "Claude Code", version: "2.1.295", client_type: "claude_code", sessionId: "session-a", source: "claude-mod-session" };
 const token = "a".repeat(64);
-const bridge = { url: "http://127.0.0.1:12345", token, skillRoot: root };
-const request = (id, action, args = {}) => ({ id, action, args, skillRoot: root });
+const bridge = { url: "http://127.0.0.1:12345", token, key: root };
+const request = (id, action, args = {}) => ({ id, action, args, key: root });
 const tools = [
   { name: "mcp__ccd_view__show_pane" }, { name: "mcp__Claude_Browser__preview_start" },
   { name: "mcp__Claude_Browser__navigate" }, { name: "mcp__Claude_Browser__tabs_context" },

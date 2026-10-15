@@ -5,18 +5,19 @@ import { codexAdapter } from "../codex/driver/index.mjs";
 import { claudeAdapter } from "../claude/driver/index.mjs";
 import { httpConnection } from "../claude/connection/index.mjs";
 import { createMcpConnection } from "../codex/connection/index.mjs";
+import { SNAPSHOT_ELEMENT_ID } from "../../template/publisher.mjs";
 
 /** The browser composition boundary. Environment and drivers can be supplied
- * by an isolated test; normal consumers call this with no host argument.
- * @param {{document?: Pick<Document, 'querySelector'>, window?: Window,
+ * by an isolated test; normal consumers pass only their own appInfo.
+ * @param {{appInfo?: {name:string, version:string}, document?: Pick<Document, 'querySelector'>, window?: Window,
  * connections?: Partial<Record<'mcp-app'|'http-bridge', () => import('../../ports/host/index').HostConnection>>,
  * drivers?: Partial<Record<'codex'|'claude', (connection:import('../../ports/host/index').HostConnection) => import('../../ports/host/index').HostDriver>>}} [options]
  * @returns {import('../../ports/host/index').HostAdapter | null}
  */
-export function createHostAdapter({ document: page = globalThis.document, window: view = globalThis.window, connections = {}, drivers = {} } = {}) {
+export function createHostAdapter({ appInfo, document: page = globalThis.document, window: view = globalThis.window, connections = {}, drivers = {} } = {}) {
   let detected;
   try {
-    detected = discoverConnection({ snapshotText: page?.querySelector("#graph-skill-snapshot")?.textContent, framed: Boolean(view?.parent && view.parent !== view) });
+    detected = discoverConnection({ snapshotText: page?.querySelector("#" + SNAPSHOT_ELEMENT_ID)?.textContent, framed: Boolean(view?.parent && view.parent !== view) });
   } catch (error) {
     // Render a normal connection error instead of crashing the React entry or
     // interpreting malformed host data as a standalone demonstration.
@@ -26,7 +27,7 @@ export function createHostAdapter({ document: page = globalThis.document, window
   const { transport, snapshot, hostInfo } = detected;
   const createConnection = connections[transport] ?? (transport === "http-bridge"
     ? () => httpConnection({ snapshot: () => snapshot, pageOrigin: view?.location?.origin })
-    : () => createMcpConnection({ window: /** @type {any} */ (view), originatingServer: /** @type {any} */ (snapshot)?.serverInfo?.name }));
+    : () => createMcpConnection({ window: /** @type {any} */ (view), originatingServer: /** @type {any} */ (snapshot)?.serverInfo?.name, appInfo: /** @type {any} */ (appInfo) }));
   return hostAdapter(createConnection, (info, connection) => {
     // This registry is consulted only after the connection returns identity and
     // capabilities. Unknown hosts have no execution adapter.

@@ -15,7 +15,7 @@ export async function sessionFacts($, state, sessionId) {
 
 /** Check session authority, then dispatch to the matching interface module. */
 export async function executeBridgeAction($, state, bridge, request, binding = {}) {
-  if (!request || typeof request.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(request.id) || request.skillRoot !== bridge.skillRoot) throw notSent("请求不属于当前页面连接。");
+  if (!request || typeof request.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(request.id) || request.key !== bridge.key) throw notSent("请求不属于当前页面连接。");
   let args;
   try { args = validateArguments(request.action, request.args ?? {}); } catch (error) { error.outcome = "not-sent"; throw error; }
   const generation = binding.generation ?? state.generation;

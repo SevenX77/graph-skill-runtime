@@ -1,12 +1,12 @@
 import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
 import { mcpCapabilities } from "../driver/registry.mjs";
 export { mcpCapabilities } from "../driver/registry.mjs";
-import packageInfo from "../../../../package.json" with { type: "json" };
 
-/** @param {{window?:Window & typeof globalThis,transport?:unknown,originatingServer?:string}} [options] */
-export function createMcpConnection({ window: view = globalThis.window, transport, originatingServer } = {}) {
+/** @param {{window?:Window & typeof globalThis,transport?:unknown,originatingServer?:string,appInfo:{name:string,version:string}}} options */
+export function createMcpConnection({ window: view = globalThis.window, transport, originatingServer, appInfo }) {
+  if (typeof appInfo?.name !== "string" || !appInfo.name || typeof appInfo.version !== "string" || !appInfo.version) throw new Error("MCP App connection requires appInfo with name and version.");
   if (!transport && (!view?.parent || view.parent === view)) throw new Error("MCP App requires a host frame.");
-  const app = new App({ name: "Graph Skill canvas", version: packageInfo.version }, {}, { autoResize: false });
+  const app = new App({ name: appInfo.name, version: appInfo.version }, {}, { autoResize: false });
   return mcpConnection(app, { transport: transport ?? new PostMessageTransport(view.parent, view.parent), originatingServer });
 }
 
@@ -26,12 +26,13 @@ export function mcpConnection(app, { transport, originatingServer, missingDataTi
       return app.callServerTool({ name, arguments: args });
     },
     async connect({ receive, fail }) {
+      // The page owner interprets the presenting tool's arguments.
       app.ontoolinput = input => {
-        const root = input?.arguments?.skill_root;
-        if (typeof root === "string" && root.length > 0) {
+        const args = input?.arguments;
+        if (args && typeof args === "object" && !Array.isArray(args)) {
           startupDelivered = true;
           clearTimeout(missingDataTimer);
-          receive({ skillRoot: root });
+          receive({ toolInput: args });
         }
       };
       app.ontoolresult = result => {
@@ -50,7 +51,7 @@ export function mcpConnection(app, { transport, originatingServer, missingDataTi
       ready = true;
       settleConnected.resolve();
       missingDataTimer = setTimeout(() => {
-        if (!startupDelivered) fail(new Error("宿主没有向画布交付 show_graph 的 Skill 路径；请重新打开画布。"));
+        if (!startupDelivered) fail(new Error("宿主没有向页面交付展示工具的输入或结果；请重新打开页面。"));
       }, missingDataTimeoutMs);
     },
     /** @returns {Promise<import('../../../ports/host/index').HostEvidence>} */

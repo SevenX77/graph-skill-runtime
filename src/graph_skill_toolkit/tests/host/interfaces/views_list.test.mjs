@@ -6,8 +6,8 @@ import { executeBridgeAction, nativeCapabilities } from "../../../plugin_base/ad
 import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 import { CONTEXT_TOOL } from "../../../plugin_base/adapters/claude/mod/host_tools/index.mjs";
 
-const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: "C:/business/skill" };
-const request = id => ({ id, action: "views.list", args: {}, skillRoot: bridge.skillRoot });
+const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "C:/business/skill" };
+const request = id => ({ id, action: "views.list", args: {}, key: bridge.key });
 function peer(payload, toolInventory = [{ name: CONTEXT_TOOL }]) {
   const calls = [];
   return {

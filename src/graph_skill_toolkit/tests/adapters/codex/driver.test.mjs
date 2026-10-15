@@ -6,7 +6,7 @@ function host(capabilities={}) {
   const calls=[];
   const app={getHostCapabilities:()=>capabilities,getHostContext:()=>({availableDisplayModes:["fullscreen"]}),
     sendMessage:async value=>{calls.push(["message",value]);return {};},
-    callServerTool:async value=>{calls.push(["tool",value]);return value.name === "list_canvas_tools"
+    callServerTool:async value=>{calls.push(["tool",value]);return value.name === "list_page_tools"
       ? {structuredContent:{scope:"originating-server",complete:true,tools:[{name:"inspect_graph"}]}}
       : {content:[{type:"text",text:"done"}]};},
     updateModelContext:async value=>{calls.push(["context",value]);return {};},
@@ -27,7 +27,7 @@ test("Codex lists only its originating MCP server tools and rejects session inve
   const result = await h.adapter.invoke("tools.list", { scope: "originating-server" });
   assert.equal(result.status, "completed");
   assert.equal(result.data.scope, "originating-server");
-  assert.deepEqual(h.calls, [["tool", { name: "list_canvas_tools", arguments: {} }]]);
+  assert.deepEqual(h.calls, [["tool", { name: "list_page_tools", arguments: {} }]]);
   assert.equal((await h.adapter.invoke("tools.list", { scope: "session" })).status, "unsupported");
   assert.equal(h.calls.length, 1);
 });

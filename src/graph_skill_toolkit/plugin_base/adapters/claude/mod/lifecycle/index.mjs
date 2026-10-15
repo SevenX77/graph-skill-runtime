@@ -4,11 +4,11 @@ export const bridgeKey = bridge => bridge.url + '/' + bridge.token;
 export function bridgeDescriptor(payload) {
   const value = payload?.presentation?.bridge;
   if (!value) return null;
-  if (typeof value.url !== 'string' || typeof value.token !== 'string') throw new Error('Invalid canvas bridge descriptor.');
+  if (typeof value.url !== 'string' || typeof value.token !== 'string' || typeof value.key !== 'string' || !value.key) throw new Error('Invalid page bridge descriptor.');
   const url = new URL(value.url);
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.pathname !== '/' || url.username || url.password || url.search || url.hash ||
-      !/^[A-Za-z0-9_-]{32,256}$/.test(value.token)) throw new Error('Canvas bridge must use authenticated IPv4 loopback.');
-  return { url:url.origin, token:value.token, skillRoot:payload.skillRoot };
+      !/^[A-Za-z0-9_-]{32,256}$/.test(value.token)) throw new Error('Page bridge must use authenticated IPv4 loopback.');
+  return { url:url.origin, token:value.token, key:value.key };
 }
 
 export async function readHostIdentity($) {
@@ -23,7 +23,7 @@ export async function bridgePost($, bridge, path, body) {
   const response = await $.http.fetch(bridge.url + path, {
     method:'POST',headers:{Authorization:'Bearer ' + bridge.token,'Content-Type':'application/json'},body:JSON.stringify(body),
   });
-  if (!response.ok) throw Object.assign(new Error('Canvas bridge returned HTTP ' + response.status), { httpStatus: response.status });
+  if (!response.ok) throw Object.assign(new Error('Page bridge returned HTTP ' + response.status), { httpStatus: response.status });
   return JSON.parse(response.text);
 }
 
@@ -74,7 +74,7 @@ export async function pollBridges($, state) {
         // Never dispatch that earlier session's actions after its boundary.
         if (state.closed || state.generation !== generation) return;
         if (!identity) continue;
-        if (!Array.isArray(result.requests)) throw new Error('Canvas bridge returned no request list.');
+        if (!Array.isArray(result.requests)) throw new Error('Page bridge returned no request list.');
         for (const request of result.requests) {
           const key = bridgeKey(bridge) + '/' + request.id;
           if (state.running.has(key) || state.seen.has(key)) continue;
@@ -85,7 +85,7 @@ export async function pollBridges($, state) {
         }
       } catch (error) {
         if ([401,403,404].includes(error.httpStatus)) { state.bridges.delete(bridgeKey(bridge));state.contexts.delete(bridgeKey(bridge));state.views.delete(bridgeKey(bridge)); }
-        if (!state.reported.has(bridgeKey(bridge))) { $.ui.log('Canvas host connection unavailable: ' + String(error.message || error)); state.reported.add(bridgeKey(bridge)); }
+        if (!state.reported.has(bridgeKey(bridge))) { $.ui.log('Plugin page host connection unavailable: ' + String(error.message || error)); state.reported.add(bridgeKey(bridge)); }
       }
     }
   } finally { state.polling = false; }

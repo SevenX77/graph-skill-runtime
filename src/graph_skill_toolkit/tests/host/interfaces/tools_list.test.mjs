@@ -5,7 +5,7 @@ import * as claude from "../../../plugin_base/host_interfaces/tools/list/claude.
 
 const sourceTools = [
   { name: "inspect_graph", description: "Inspect", reference: { name: "inspect_graph", scope: "originating-server" } },
-  { name: "list_canvas_tools", description: "List", reference: { name: "list_canvas_tools", scope: "originating-server" } },
+  { name: "list_page_tools", description: "List", reference: { name: "list_page_tools", scope: "originating-server" } },
 ];
 
 test("Codex lists only the originating canvas server's page-callable tools", async () => {
@@ -17,7 +17,7 @@ test("Codex lists only the originating canvas server's page-callable tools", asy
   const result = await codex.invoke(app, { scope: "originating-server" });
   assert.equal(result.status, "completed");
   assert.deepEqual(result.data.tools.map(tool => tool.reference), sourceTools.map(tool => tool.reference));
-  assert.deepEqual(calls, [{ name: "list_canvas_tools", arguments: {} }]);
+  assert.deepEqual(calls, [{ name: "list_page_tools", arguments: {} }]);
   assert.equal((await codex.invoke(app, { scope: "session" })).status, "unsupported");
   assert.equal(calls.length, 1);
 });

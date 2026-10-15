@@ -1,6 +1,7 @@
-import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL } from '../../../../plugin_base/adapters/claude/mod/host_tools/index.mjs';
-import { bridgeDescriptor, bridgeKey, bridgePost, readHostIdentity, pollBridges, createModState } from '../../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
-import { graphPayload, previewProjectRoot, previewTarget, browserReminder } from '../../../../plugin_base/adapters/claude/presentation/guidance/index.mjs';
+import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, bridgeDescriptor, bridgeKey, bridgePost, readHostIdentity, pollBridges, createModState, previewProjectRoot, previewTarget, browserReminder } from '../../../../plugin_base/claude_mod/index.js';
+import { graphPayload } from '../payload.js';
+
+const LABEL = 'Graph Skill canvas';
 
 export function register(on) {
   let latestView = null, latestCanObserve = false, problem = '';
@@ -24,7 +25,7 @@ export function register(on) {
   });
   on('command.run', {command:'graph-skill-canvas'}, async () => {
     if (!latestView) return {text:problem || 'No graph has been shown in this session. Ask Claude to show your Graph Skill.'};
-    return {text:'[Graph Skill canvas](' + latestView.url + ')\n' + browserReminder(latestView, latestCanObserve)};
+    return {text:'[Graph Skill canvas](' + latestView.url + ')\n' + browserReminder(latestView, latestCanObserve, LABEL)};
   });
   on('tool.call', {tool:'mcp__graph-skill-canvas__show_graph'}, async ($, e, next) => {
     if (typeof e.skill_root !== 'string' || !e.skill_root) return next(e);
@@ -64,7 +65,7 @@ export function register(on) {
       }
       problem = '';
       // Keep graph data and the host's causal result reference intact.
-      return {...result,context:[...(result.context || []),browserReminder(latestView, latestCanObserve)]};
+      return {...result,context:[...(result.context || []),browserReminder(latestView, latestCanObserve, LABEL)]};
     } catch (error) {
       problem = 'Unable to show the graph: ' + String(error.message || error);
       $.ui.log(problem);

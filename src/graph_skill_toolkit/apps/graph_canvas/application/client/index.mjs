@@ -1,3 +1,4 @@
+import { SNAPSHOT_ELEMENT_ID } from "../../../../plugin_base/page/index.mjs";
 export function validateGraphBackend(value) {
   if (!value || typeof value.url !== "string" || !/^[A-Za-z0-9_-]{32,256}$/.test(value.token ?? "")) throw new Error("本地画布后端连接信息无效。");
   const url = new URL(value.url);
@@ -10,7 +11,7 @@ export function validateGraphBackend(value) {
  */
 export function createPageGraphConnection(page = globalThis.document) {
   try {
-    const text = page?.querySelector("#graph-skill-snapshot")?.textContent;
+    const text = page?.querySelector("#" + SNAPSHOT_ELEMENT_ID)?.textContent;
     const snapshot = text ? JSON.parse(text) : null;
     if (!snapshot?.graphBackend) return null;
     const connection = createGraphConnection({ backend: snapshot.graphBackend });

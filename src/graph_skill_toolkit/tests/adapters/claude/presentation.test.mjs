@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {graphPayload, previewProjectRoot, previewTarget} from '../../../plugin_base/adapters/claude/presentation/guidance/index.mjs';
+import {previewProjectRoot, previewTarget} from '../../../plugin_base/adapters/claude/presentation/guidance/index.mjs';
+import {graphPayload} from '../../../apps/graph_canvas/claude_mod/payload.js';
 import {register} from '../../../apps/graph_canvas/claude_mod/hooks/register.js';
 
 const projectRoot = '/host/project';
 const url = 'http://127.0.0.1:31234/view/' + 'a'.repeat(64);
 const token = 'mod_' + 'b'.repeat(48);
 const payload = {skillRoot:'/business/中文 skill',graph:{id:'actual'},presentation:{
-  kind:'http',url,preview:{name:'graph-skill-test',projectRoot},bridge:{url:'http://127.0.0.1:31234',token},
+  kind:'http',url,preview:{name:'graph-skill-test',projectRoot},bridge:{url:'http://127.0.0.1:31234',token,key:'/business/中文 skill'},
 }};
 const tool = 'mcp__graph-skill-canvas__show_graph';
 function host({available=true, canNavigate=true, canObserve=true, canSelect=true, root=projectRoot, rootError=false}={}) {
@@ -48,7 +49,7 @@ test('Claude binds HTTP preview to the actual session root and requests normal a
   assert.doesNotMatch(reminder,/SKILL\.md|DOCUMENT_TAB|document|file preview|open_in_codex|show_pane|fileUrl/i);
   assert.match(reminder,/Open no other page or file for this flow/);
   // A hidden pane is revealed by the user; the agent never opens a file to reveal it.
-  assert.match(reminder,/If the Browser pane is hidden, the canvas is ready but not visible: ask the user in one sentence to open it manually/);
+  assert.match(reminder,/If the Browser pane is hidden, the page is ready but not visible: ask the user in one sentence to open it manually/);
   assert.match(reminder,/do not open any file or other page to reveal it/);
   assert.match(reminder,/HTTP_TAB active at the returned HTTP origin/);
   assert.ok(reminder.includes(JSON.stringify(url)));assert.ok(reminder.includes(JSON.stringify(projectRoot)));

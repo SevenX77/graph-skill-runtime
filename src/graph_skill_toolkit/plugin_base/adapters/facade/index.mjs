@@ -79,7 +79,7 @@ export function hostAdapter(createConnection, selectDriver, launchInfo = unknown
           receive(payload) {
             if (!active()) return;
             try {
-              // Tool results carry the invocation's identity as well as graph data.
+              // Tool results carry the invocation's identity as well as business data.
               // Reused resource documents must not overwrite that per-call binding.
               if (payload && typeof payload === "object" && "hostInfo" in payload) {
                 const supplied = readLaunchHostInfo(payload.hostInfo);

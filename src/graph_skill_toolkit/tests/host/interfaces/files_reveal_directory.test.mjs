@@ -13,7 +13,7 @@ test("directory reveal has its own absolute-path request, not a Graph Skill bind
   assert.deepEqual(validateArguments(action, args), args);
   assert.deepEqual(validateArguments(action, { path: "/home/user/business-skill" }), { path: "/home/user/business-skill" });
   assert.throws(() => validateArguments(action, { path: "business-skill" }), /绝对路径/);
-  assert.throws(() => validateArguments(action, { ...args, skillRoot: args.path }), /未知的宿主接口参数/);
+  assert.throws(() => validateArguments(action, { ...args, key: args.path }), /未知的宿主接口参数/);
 });
 
 test("Codex file-open advertisement does not declare host file-browser directory reveal", async () => {
@@ -46,8 +46,8 @@ test("Claude Files-pane file tool does not establish native directory navigation
       submit: async (...values) => { calls.push(["message", ...values]); throw new Error("must not delegate to Agent"); },
     },
   };
-  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: "C:/projects/business-skill" };
-  const request = { id: "reveal-test", action, args, skillRoot: bridge.skillRoot };
+  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "C:/projects/business-skill" };
+  const request = { id: "reveal-test", action, args, key: bridge.key };
   assert.equal(nativeCapabilities(tools)[action].state, "unknown");
   const result = await executeBridgeAction(api, createModState(), bridge, request, { sessionId: "session-a" });
   assert.equal(result.status, "unsupported");

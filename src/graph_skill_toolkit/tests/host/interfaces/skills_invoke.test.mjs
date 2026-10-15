@@ -7,8 +7,8 @@ import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecyc
 import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
 const root = "C:/business/example";
-const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: root };
-const request = (id, args) => ({ id, action: "skills.invoke", args, skillRoot: root });
+const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: root };
+const request = (id, args) => ({ id, action: "skills.invoke", args, key: root });
 const nativeTools = [{ name: "Skill", description: "Activate a Skill", mcp: false }];
 function host(reply, tools = nativeTools) {
   const calls = [];

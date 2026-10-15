@@ -119,8 +119,8 @@ test('Mod never executes a response if identity APIs are missing or the session 
     let ids=0,submitted=0;
     const api={session:missing ? {} : {id:async()=>++ids===1?'original':'replacement',version:async()=>({version:'build'})},
       tool:{list:async()=>[]},prompt:{submit:async()=>{submitted++;}},ui:{log:assert.fail},
-      http:{fetch:async(url)=>({ok:true,text:JSON.stringify(url.endsWith('/poll') ? {requests:[{id:'test',action:'conversation.submitMessage',skillRoot:payload.skillRoot,args:{text:'never'}}]} : {})})}};
-    const bridge={url:'http://127.0.0.1:12345',token:'a'.repeat(48),skillRoot:payload.skillRoot};
+      http:{fetch:async(url)=>({ok:true,text:JSON.stringify(url.endsWith('/poll') ? {requests:[{id:'test',action:'conversation.submitMessage',key:payload.skillRoot,args:{text:'never'}}]} : {})})}};
+    const bridge={url:'http://127.0.0.1:12345',token:'a'.repeat(48),key:payload.skillRoot};
     const state={bridges:new Map([['test',bridge]]),running:new Set(),seen:new Set(),receipts:new Map(),reported:new Set(),context:null,polling:false,closed:false,generation:0};
     await pollBridges(api,state);await new Promise(resolve=>setImmediate(resolve));assert.equal(submitted,0);
   }

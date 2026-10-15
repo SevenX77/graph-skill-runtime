@@ -18,7 +18,7 @@ import { createGraphConnection } from '../../apps/graph_canvas/application/clien
 import { fakeRuntimeEnv } from "../support/runtime.mjs";
 
 const payload = {graph:{...graph,width:352,height:548},skillRoot:'/business/中文 skill'};
-const slot = /<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+const slot = /<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
 const snapshot = text => JSON.parse(slot.exec(text)[1]);
 test('both browser connections deliver the same graph and Codex uses only a declared file interface',async()=>{
   const received=[],failed=[],actions=[];

@@ -27,7 +27,7 @@ test("file request validates an absolute path and optional positive line without
   for (const args of [{path:"relative.txt"},{path:""},{path:file,line:0},{path:file,line:1.5},{path:file,line:"1"}]) {
     assert.throws(() => validateArguments(action,args));
   }
-  assert.throws(() => validateArguments(action,{path:file,skillRoot:"C:/project"}), /未知的宿主接口参数/);
+  assert.throws(() => validateArguments(action,{path:file,key:"C:/project"}), /未知的宿主接口参数/);
 });
 
 test("Codex advertised file extension sends one native request through the official SDK", async t => {
@@ -69,16 +69,16 @@ test("Claude calls the listed native file-pane tool with flat arguments and only
     calls.push(input);
     return {result:{content:[{type:"text",text:'Showing the file pane.\n{"views":[{"placement":"primary"}],"open_panes":["file","preview"]}'}]}};
   }}};
-  const state=createModState(), bridge={url:"http://127.0.0.1:12345",token:"x",skillRoot:null};
+  const state=createModState(), bridge={url:"http://127.0.0.1:12345",token:"x",key:null};
   assert.equal(nativeCapabilities(tools)[action].state,"available");
   assert.equal(nativeCapabilities(tools)[action].constraints.lineNavigation,true);
-  const result=await executeBridgeAction(api,state,bridge,{id:"open1",action,args:{path:file,line:3},skillRoot:null});
+  const result=await executeBridgeAction(api,state,bridge,{id:"open1",action,args:{path:file,line:3},key:null});
   assert.equal(result.status,"accepted");
   assert.match(result.message,/实际显示效果需观察/);
   assert.deepEqual(calls,[{tool:"mcp__ccd_view__show_pane",pane:"file",path:file,line:3}]);
   tools.splice(0);
   assert.equal(nativeCapabilities(tools)[action].state,"unavailable");
-  assert.equal((await executeBridgeAction(api,state,bridge,{id:"open2",action,args:{path:file},skillRoot:null})).status,"unsupported");
+  assert.equal((await executeBridgeAction(api,state,bridge,{id:"open2",action,args:{path:file},key:null})).status,"unsupported");
   assert.equal(calls.length,1);
 });
 
@@ -86,8 +86,8 @@ test("Claude refuses a changed session or host denial before claiming file displ
   const tools=[{name:"mcp__ccd_view__show_pane",mcp:true}];
   let session="one", calls=0;
   const api={session:{id:async()=>session},tool:{list:async()=>tools,call:async()=>{calls++;return {deny:"Not allowed"};}}};
-  const state=createModState(), bridge={url:"http://127.0.0.1:12345",token:"x",skillRoot:null};
-  const request={id:"open3",action,args:{path:file},skillRoot:null};
+  const state=createModState(), bridge={url:"http://127.0.0.1:12345",token:"x",key:null};
+  const request={id:"open3",action,args:{path:file},key:null};
   await assert.rejects(executeBridgeAction(api,state,bridge,request),error=>error.outcome==="rejected");
   assert.equal(calls,1);
   api.tool.list=async()=>{session="two";return tools;};

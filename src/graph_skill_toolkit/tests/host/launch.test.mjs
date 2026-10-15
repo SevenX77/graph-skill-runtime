@@ -21,7 +21,7 @@ const codexClient={name:'codex-mcp-client',version:'engine-version'};
 const claudeClient={name:'claude-code',version:'native-engine'};
 const caps={'conversation.submitMessage':{state:'available',detail:'live'}};
 const payload={skillRoot:'/business/skill',graph:{...graph,width:352,height:548}};
-const slot=/<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+const slot=/<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
 const extract=html=>JSON.parse(slot.exec(html)[1]);
 const unavailable=info=>assert.ok(Object.values(info.capabilities).every(c=>c.state!=='available'));
 const launch=(clientInfo=codexClient)=>launchHostInfo({clientInfo});

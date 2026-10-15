@@ -6,9 +6,9 @@ import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/op
 import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 
 const root = "C:/business/skill";
-const bridge = { url: "http://127.0.0.1:10345", token: "a".repeat(64), skillRoot: root };
+const bridge = { url: "http://127.0.0.1:10345", token: "a".repeat(64), key: root };
 const tools = [{ name: "mcp__Claude_Browser__tabs_context" }, { name: "mcp__Claude_Browser__tabs_select" }];
-const request = (id, action, args = {}) => ({ id, action, args, skillRoot: root });
+const request = (id, action, args = {}) => ({ id, action, args, key: root });
 const context = tabs => ({ result: { content: [{ type: "text", text: JSON.stringify({ browserOpen: true, tabs }) + "\nThe Browser pane is currently hidden." }] } });
 
 function host({ after = null, onSelect = null } = {}) {

@@ -9,7 +9,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { graph, matchesProbeGraph } from "../../apps/graph_canvas/application/demo/graph.mjs";
-import { graphPayload } from "../../plugin_base/adapters/claude/presentation/guidance/index.mjs";
+import { graphPayload } from "../../apps/graph_canvas/claude_mod/payload.js";
 import { validateCanvas } from "../../apps/graph_canvas/ui/canvas/index.mjs";
 import { SNAPSHOT_SLOT, snapshotHtml } from "../../plugin_base/template/publisher.mjs";
 import { fakeRuntimeEnv } from "../support/runtime.mjs";
@@ -34,7 +34,7 @@ test("MCP resource identity binds HTML and retires backend credentials across re
       const { resources } = await client.listResources();
       assert.deepEqual(resources.map(resource => resource.uri), [uri]);
       const resource = await client.readResource({ uri });
-      const slot = /<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+      const slot = /<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
       const { graphBackend, serverInfo } = JSON.parse(slot.exec(resource.contents[0].text)[1]);
       assert.equal(uri, `ui://graph-skill/canvas-${createHash("sha256").update(snapshotHtml(html, { graphBackend, serverInfo })).digest("hex")}.html`);
       assert.equal(resource.contents[0].text.replace(slot, SNAPSHOT_SLOT), html);
@@ -69,10 +69,10 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.deepEqual(tools.map(tool => tool.name).sort(), ["inspect_graph", "list_canvas_tools", "show_graph", "watch_graph"]);
-    const inventory = await client.callTool({ name: "list_canvas_tools", arguments: {} });
+    assert.deepEqual(tools.map(tool => tool.name).sort(), ["inspect_graph", "list_page_tools", "show_graph", "watch_graph"]);
+    const inventory = await client.callTool({ name: "list_page_tools", arguments: {} });
     assert.equal(inventory.structuredContent.scope, "originating-server");
-    assert.deepEqual(inventory.structuredContent.tools.map(item => item.name), ["inspect_graph", "watch_graph", "list_canvas_tools"]);
+    assert.deepEqual(inventory.structuredContent.tools.map(item => item.name), ["inspect_graph", "watch_graph", "list_page_tools"]);
     const tool = tools.find(tool => tool.name === "show_graph");
     const inspect = tools.find(tool => tool.name === "inspect_graph");
     assert.equal(inspect.annotations.readOnlyHint, true);
@@ -125,7 +125,7 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     const { contents } = await client.readResource({ uri: tool._meta.ui.resourceUri });
     assert.deepEqual(contents[0]._meta["openai/ui"], codexDisplay);
     assert.equal(contents[0].mimeType, RESOURCE_MIME_TYPE);
-    const slot=/<script id="graph-skill-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
+    const slot=/<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
     const startup = JSON.parse(slot.exec(contents[0].text)[1]);
     assert.deepEqual(startup.hostInfo,hostInfo);
     assert.equal(tool._meta.ui.resourceUri, `ui://graph-skill/canvas-${createHash("sha256").update(snapshotHtml(template, {graphBackend:startup.graphBackend,serverInfo:startup.serverInfo})).digest("hex")}.html`);

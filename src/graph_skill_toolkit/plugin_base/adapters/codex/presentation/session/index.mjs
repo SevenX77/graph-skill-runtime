@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 // Opaque view keys for one MCP connection. Codex additionally scopes reuse to
 // its host, conversation, server and verified resource identity.
-export function createCodexCanvasSessions() {
+export function createCodexPageSessions() {
   const roots = new Map();
   return {
     metadata(canonicalRoot) {

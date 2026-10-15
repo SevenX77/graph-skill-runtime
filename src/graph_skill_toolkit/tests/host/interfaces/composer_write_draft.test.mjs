@@ -57,7 +57,7 @@ test("Codex refuses replace or missing draft declaration, and does not replay an
 test("Claude prompt.fill uses both draft modes without prompt.submit and distinguishes host refusal", async () => {
   const state = createModState(), fills = [];
   const root = "C:/business/skill";
-  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: root };
+  const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: root };
   let response = { isFilled: true, text: "draft", cursor: 5 };
   const $ = {
     session: { id: async () => "session-a" }, tool: { list: async () => [] },
@@ -66,7 +66,7 @@ test("Claude prompt.fill uses both draft modes without prompt.submit and disting
       submit: () => assert.fail("draft must not submit"),
     },
   };
-  const request = (id, mode) => ({ id, action: "composer.writeDraft", args: { text: "draft", mode }, skillRoot: root });
+  const request = (id, mode) => ({ id, action: "composer.writeDraft", args: { text: "draft", mode }, key: root });
   assert.equal((await executeBridgeAction($, state, bridge, request("one", "replace"))).status, "completed");
   assert.equal((await executeBridgeAction($, state, bridge, request("two", "append"))).status, "completed");
   assert.deepEqual(fills, [{ text: "draft", mode: "replace" }, { text: "draft", mode: "append" }]);

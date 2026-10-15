@@ -51,7 +51,7 @@ function documentValue(source) {
   return { ...value, configurations: value.configurations ?? [] };
 }
 
-async function writeRevision(path, expected, bytes, parents, report) {
+async function writeRevision(path, expected, bytes, parents, report, prefix) {
   for (const parent of parents) await directory(parent);
   await unchanged(path, expected);
   if (expected === null) {
@@ -65,7 +65,7 @@ async function writeRevision(path, expected, bytes, parents, report) {
     if (!after || after.hash !== hash(bytes) || !sameFile(after.info, written)) throw new Error(`Preview configuration changed after creation; preserved: ${path}`);
     return;
   }
-  const temporary = join(parents.at(-1), `.graph-skill-preview-${randomUUID()}.tmp`);
+  const temporary = join(parents.at(-1), `.${prefix}-preview-${randomUUID()}.tmp`);
   const file = await open(temporary, "wx", 0o600);
   try { await file.writeFile(bytes); await file.sync(); }
   finally { await file.close(); }
@@ -86,7 +86,8 @@ async function writeRevision(path, expected, bytes, parents, report) {
 }
 
 /** Own only URL attach entries; the MCP process retains the HTTP server. */
-export function createPreviewConfiguration({ report = message => console.error(message) } = {}) {
+export function createPreviewConfiguration({ namePrefix, report = message => console.error(message) } = {}) {
+  if (typeof namePrefix !== "string" || !/^[a-z0-9][a-z0-9-]{0,40}$/.test(namePrefix)) throw new Error("Preview configuration requires a lowercase name prefix.");
   const owned = new Map(), createdDirectories = new Set();
   let queue = Promise.resolve(), closed = false, closing;
   function serial(action) {
@@ -100,7 +101,7 @@ export function createPreviewConfiguration({ report = message => console.error(m
     try { await mkdir(folder, { mode: 0o700 }); createdDirectories.add(folder); }
     catch (error) { if (error.code !== "EEXIST") throw error; }
     await directory(folder);
-    const lockPath = join(folder, ".graph-skill-preview.lock");
+    const lockPath = join(folder, `.${namePrefix}-preview.lock`);
     let lock;
     try { lock = await open(lockPath, "wx", 0o600); }
     catch (error) {
@@ -139,14 +140,14 @@ export function createPreviewConfiguration({ report = message => console.error(m
             if (before.hash !== owner.lastWritten) owner.createdFile = false;
             if (owner.entry.url === endpoint.url) return { name: owner.entry.name, projectRoot };
           } else {
-            const name = `graph-skill-${randomUUID()}`;
+            const name = `${namePrefix}-${randomUUID()}`;
             if (document.configurations.some(item => item?.name === name)) throw new Error(`Preview configuration name is already occupied: ${name}`);
             owner = { createdFile: before === null, entry: { name, ...endpoint }, lastWritten: null };
           }
           const next = { name: owner.entry.name, ...endpoint };
           document.configurations = document.configurations.filter(item => item?.name !== owner.entry.name).concat(next);
           const bytes = Buffer.from(JSON.stringify(document, null, 2) + "\n");
-          await writeRevision(path, before, bytes, parents, report);
+          await writeRevision(path, before, bytes, parents, report, namePrefix);
           owner.entry = next; owner.lastWritten = hash(bytes); owned.set(projectRoot, owner);
           return { name: next.name, projectRoot };
         });
@@ -170,7 +171,7 @@ export function createPreviewConfiguration({ report = message => console.error(m
                 await unchanged(path, before); await unlink(path);
               } else {
                 document.configurations = document.configurations.filter(item => item?.name !== owner.entry.name);
-                await writeRevision(path, before, Buffer.from(JSON.stringify(document, null, 2) + "\n"), parents, report);
+                await writeRevision(path, before, Buffer.from(JSON.stringify(document, null, 2) + "\n"), parents, report, namePrefix);
               }
             });
           } catch (error) { report(`Preview configuration cleanup preserved files: ${error.message}`); }

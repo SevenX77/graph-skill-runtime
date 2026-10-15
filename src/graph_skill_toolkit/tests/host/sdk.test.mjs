@@ -29,7 +29,7 @@ test("default iframe transport sends to its parent and completes the SDK handsha
   const oldWindow = globalThis.window;
   globalThis.window = view;
   const bridge = new AppBridge(null, { name: "chatgpt", version: "3.2" }, {});
-  const connection = createMcpConnection({ window: view });
+  const connection = createMcpConnection({ window: view, appInfo: { name: "Plugin page", version: "0.0.0" } });
   t.after(async () => { await connection.dispose(); await bridge.close(); globalThis.window = oldWindow; });
   await bridge.connect(peer);
   await connection.connect({ receive() {}, fail: assert.fail });
@@ -98,7 +98,7 @@ test("MCP App lists its originating server tools through the SDK bridge", async 
   const result = await codexAdapter(app, { originatingServer: "graph-skill-canvas" }).invoke("tools.list", {});
   assert.equal(result.status, "completed");
   assert.deepEqual(result.data.tools.map(tool => tool.name), ["inspect_graph"]);
-  assert.deepEqual(calls.map(({ name, arguments: args }) => ({ name, arguments: args })), [{ name: "list_canvas_tools", arguments: {} }]);
+  assert.deepEqual(calls.map(({ name, arguments: args }) => ({ name, arguments: args })), [{ name: "list_page_tools", arguments: {} }]);
 });
 
 test("Codex delivers the startup path without using a host tool to read graph data", async t => {
@@ -114,7 +114,7 @@ test("Codex delivers the startup path without using a host tool to read graph da
   await connection.connect({ receive: value => received.push(value), fail: error => failed.push(error) });
   await bridge.sendToolInput({ arguments: { skill_root: root } });
   for (let i = 0; i < 30 && received.length === 0; i++) await new Promise(resolve => setTimeout(resolve, 10));
-  assert.deepEqual(received, [{ skillRoot: root }]);
+  assert.deepEqual(received, [{ toolInput: { skill_root: root } }]);
   assert.deepEqual(failed, []);
 });
 
@@ -128,7 +128,7 @@ test("Codex reports missing initial graph delivery instead of waiting forever", 
   const failed = [];
   await connection.connect({ receive: assert.fail, fail: error => failed.push(error) });
   for (let i = 0; i < 30 && failed.length === 0; i++) await new Promise(resolve => setTimeout(resolve, 10));
-  assert.match(failed[0]?.message ?? "", /没有向画布交付/);
+  assert.match(failed[0]?.message ?? "", /没有向页面交付/);
 });
 
 test("Codex can receive the startup path from the result when the host omits input", async t => {

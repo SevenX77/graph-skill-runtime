@@ -7,7 +7,7 @@ export function requestClientInfo(server, context) {
   return envelope !== undefined ? envelope["io.modelcontextprotocol/clientInfo"] : server.getClientVersion();
 }
 
-/** Capture launch facts before graph/file work. MCP client versions describe the
+/** Capture launch facts before business work. MCP client versions describe the
  * calling engine, not the UI shell; only UI initialization grants UI capabilities. */
 export function launchHostInfo({ clientInfo, presentation, nativeHost }) {
   const transport = presentation === "html" ? "http-bridge" : "mcp-app";

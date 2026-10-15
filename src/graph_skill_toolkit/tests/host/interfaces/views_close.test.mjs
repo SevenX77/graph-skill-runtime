@@ -7,8 +7,8 @@ import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.m
 import { capability as codexCapability } from "../../../plugin_base/host_interfaces/views/close/codex.mjs";
 
 const root = "C:/business/hello-world";
-const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: root };
-const request = (id, viewId) => ({ id, action: "views.close", args: { viewId }, skillRoot: root });
+const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: root };
+const request = (id, viewId) => ({ id, action: "views.close", args: { viewId }, key: root });
 
 test("views.close validates an opaque connection view ID and rejects extra host tab IDs", () => {
   assert.deepEqual(validateArguments("views.close", { viewId: "view-1" }), { viewId: "view-1" });
@@ -40,7 +40,7 @@ test("Claude does not close existing or forged tabs even when native tabs_close 
     },
   };
   const listed = await executeBridgeAction(api, state, bridge,
-    { id: "list", action: "views.list", args: {}, skillRoot: root });
+    { id: "list", action: "views.list", args: {}, key: root });
   assert.equal(listed.status, "completed");
   assert.equal(listed.data.views[0].owned, false);
   for (const viewId of [listed.data.views[0].viewId, "existing", "forged-view-id"]) {

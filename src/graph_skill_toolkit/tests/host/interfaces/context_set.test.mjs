@@ -5,8 +5,8 @@ import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.m
 import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
-const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), skillRoot: "C:/skill" };
-const request = (id, args) => ({ id, action: "context.set", args, skillRoot: bridge.skillRoot });
+const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "C:/skill" };
+const request = (id, args) => ({ id, action: "context.set", args, key: bridge.key });
 
 test("context.set requires an explicit portable JSON value and safe key", () => {
   for (const args of [{ key: "k" }, { key: "__proto__", content: 1 },

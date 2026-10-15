@@ -51,9 +51,9 @@ test("Claude removes only the current page owner's key before a later submit", a
     session: { id: async () => "session-a" }, tool: { list: async () => [] },
     prompt: { submit: async input => { messages.push(input); return { text: input.text }; } },
   };
-  const bridge = token => ({ url: "http://127.0.0.1:12345", token, skillRoot: "C:/skill" });
+  const bridge = token => ({ url: "http://127.0.0.1:12345", token, key: "C:/skill" });
   const a = bridge("a".repeat(64)), b = bridge("b".repeat(64));
-  const action = (id, name, args) => ({ id, action: name, args, skillRoot: "C:/skill" });
+  const action = (id, name, args) => ({ id, action: name, args, key: "C:/skill" });
   const run = (owner, id, name, args) => executeBridgeAction(api, state, owner, action(id, name, args));
   await run(a, "set-a", "context.set", { key: "selection", content: "first" });
   await run(b, "set-b", "context.set", { key: "selection", content: "second" });
