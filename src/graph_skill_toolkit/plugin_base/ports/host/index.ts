@@ -98,5 +98,25 @@ export interface HostAdapter extends HostDriver {
   readonly tools: { list(args?: { scope?: "session" | "originating-server" }): Promise<HostResult>; call(args: { tool: ToolReference; arguments: Record<string, unknown> }): Promise<HostResult> };
   readonly views: { open(args: { resource: ViewResource; reuseKey: string; activate: boolean }): Promise<HostResult>; list(): Promise<HostResult>; close(args: { viewId: string }): Promise<HostResult>; requestDisplayMode(args: { mode: "inline" | "fullscreen" | "pip" }): Promise<HostResult> };
   readonly skills: { list(): Promise<HostResult>; invoke(args: { skill: string; input?: unknown }): Promise<HostResult> };
+  /** The plugin process's local capabilities; they never pass through the host. */
+  readonly local: LocalClient;
   dispose(): void | Promise<void>;
+}
+
+export type LocalAction = "local.files.read" | "local.files.write" | "local.files.watch" | "local.system.openExternal" | "local.system.revealInFileManager";
+export interface LocalFileChange { type: "local.files.changed"; at: string; data: { watchId: string; path: string; change: "created" | "modified" | "deleted"; size: number | null; mtimeMs: number | null } }
+export type LocalWatchResult = HostResult & { stop(): Promise<HostResult> };
+
+/** Operations the plugin's own Node process performs on the local machine. */
+export interface LocalClient {
+  readonly available: boolean;
+  readonly operations: readonly LocalAction[];
+  call(operation: LocalAction, args: Record<string, unknown>): Promise<HostResult>;
+  readonly files: {
+    read(args: { path: string; encoding?: "utf8" | "base64"; maxBytes?: number }): Promise<HostResult>;
+    write(args: { path: string; content: string; encoding?: "utf8" | "base64" }): Promise<HostResult>;
+    watch(args: { paths: string[] }, listener: (event: LocalFileChange) => void): Promise<LocalWatchResult>;
+  };
+  readonly system: { openExternal(args: { url: string }): Promise<HostResult>; revealInFileManager(args: { path: string }): Promise<HostResult> };
+  dispose(): void;
 }

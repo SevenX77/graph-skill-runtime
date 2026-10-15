@@ -19,6 +19,7 @@ BUILD_MEMBERS = (
     "dist/server.mjs",
     "dist/after-tool.mjs",
     "dist/canvas.html",
+    "dist/interface-lab.html",
     *("dist/" + member for member in CLAUDE_MOD_FILES),
 )
 SOURCE_MEMBERS = ("bin/graph-skill.mjs",)
@@ -45,7 +46,7 @@ def test_source(path: Path) -> tuple[Path, Path, dict[str, str], str]:
     spec = root.parents[1] / "docs/skill-spec" / SOURCE_SPEC
     required = [*(root / member for member in (*BUILD_MEMBERS, *SOURCE_MEMBERS)), spec]
     skill_members = []
-    for skill in ("graph-skill", "graph-skill-canvas"):
+    for skill in ("graph-skill", "graph-skill-canvas", "plugin-interface-lab"):
         skill_root = root / "skills" / skill
         required.append(skill_root / "SKILL.md")
         for path in sorted(skill_root.rglob("*.md")):
@@ -123,7 +124,7 @@ def switch(mode: str, source: Path | None, dry_run: bool = False) -> dict:
         mod_root = payload / "dist/claude-mod"
         resources = projections(
             Path.home(), payload, python, node, targets, payload,
-            mod_root=mod_root, mod_assets=payload / "dist", portable_spec=spec,
+            mod_root=mod_root, mod_assets=payload / "dist", portable_spec=spec, interface_lab=True,
         )
     else:
         payload, hashes, mod_root, source_version = release, {}, None, old["version"]

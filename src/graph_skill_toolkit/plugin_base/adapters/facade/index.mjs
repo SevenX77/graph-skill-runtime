@@ -3,14 +3,16 @@ import { HOST_ACTIONS, validateArguments, validateResult, failureResult } from "
 import { FACADE_ACTIONS } from "../../ports/host/catalog.mjs";
 import { identifyHost, unknownHost, hostIdentityKey, readLaunchHostInfo } from "../detection/index.mjs";
 import { launchMatchesConnection } from "../launch/index.mjs";
+import { createLocalClient } from "../../local/page/index.mjs";
 
 /** Each instance owns one page connection. It never changes host after selection.
  * @param {() => import('../../ports/host/index').HostConnection} createConnection
  * @param {(info:import('../../ports/host/index').HostInfo, connection:import('../../ports/host/index').HostConnection) => import('../../ports/host/index').HostDriver} selectDriver
  * @param {import('../../ports/host/index').HostInfo} [launchInfo]
+ * @param {{local?: ReturnType<typeof createLocalClient>}} [options]
  * @returns {import('../../ports/host/index').HostAdapter}
  */
-export function hostAdapter(createConnection, selectDriver, launchInfo = unknownHost()) {
+export function hostAdapter(createConnection, selectDriver, launchInfo = unknownHost(), { local = createLocalClient(null) } = {}) {
   /** @type {import('../../ports/host/index').HostState} */
   let state = "new";
   /** @type {import('../../ports/host/index').HostDriver | undefined} */
@@ -151,6 +153,7 @@ export function hostAdapter(createConnection, selectDriver, launchInfo = unknown
     async dispose() {
       state = "disposed";
       subscribers.clear();
+      local.dispose();
       info = unknownHost("画布连接已关闭。", info);
       await closeDriver();
     },
@@ -166,6 +169,7 @@ export function hostAdapter(createConnection, selectDriver, launchInfo = unknown
   }
   (/** @type {any} */ (adapter)).host = Object.freeze({ getInfo: async () => { await refreshIdentity(); return info; }, getCapabilities: () => adapter.capabilities(),
     getContext: () => adapter.invoke("host.getContext", {}) });
+  (/** @type {any} */ (adapter)).local = local;
   (/** @type {any} */ (adapter)).events = Object.freeze({
     subscribe(/** @type {(event:import('../../ports/host/index').HostEvent)=>void} */ listener, /** @type {string[]|undefined} */ types) {
       if (typeof listener !== "function") throw new Error("事件订阅需要监听函数。");

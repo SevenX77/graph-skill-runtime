@@ -10,7 +10,7 @@ import {launchHostInfo,requestClientInfo} from '../../plugin_base/adapters/launc
 import {readLaunchHostInfo,discoverConnection} from '../../plugin_base/adapters/detection/index.mjs';
 import {createHostAdapter} from '../../plugin_base/adapters/factory/index.mjs';
 import {pollBridges} from '../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
-import {register} from '../../apps/graph_canvas/claude_mod/hooks/register.js';
+import {register} from '../../composition/claude_mod/hooks/register.js';
 import {createHostBridge} from '../../plugin_base/adapters/claude/bridge/server.mjs';
 import {graph} from '../../apps/graph_canvas/application/demo/graph.mjs';
 import {SNAPSHOT_SLOT} from '../../plugin_base/template/publisher.mjs';

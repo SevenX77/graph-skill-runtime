@@ -7,3 +7,6 @@ export { createCodexPageSessions } from "../adapters/codex/presentation/session/
 export { launchHostInfo, requestClientInfo } from "../adapters/launch/index.mjs";
 export { snapshotHtml, SNAPSHOT_SLOT } from "../template/publisher.mjs";
 export { registerPageToolList } from "./page_tools.mjs";
+export { createLocalCapabilities } from "../local/node/index.mjs";
+export { registerLocalCapabilityTools } from "../local/node/mcp.mjs";
+export { servePlugin } from "./serve.mjs";

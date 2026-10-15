@@ -16,6 +16,9 @@ from runtime_layout import PORTABLE_SPEC_NAME
 SERVER = "graph-skill-canvas"
 MARKER = "graph-skill-toolkit:canvas"
 PLUGIN_DIRS = "CLAUDE_CODE_PLUGIN_DIRS"
+# Source test mode also serves the developer Interface Lab and installs its Skill.
+INTERFACE_LAB_ENV = "GRAPH_SKILL_INTERFACE_LAB"
+INTERFACE_LAB_SKILL = "plugin-interface-lab"
 CLAUDE_MOD_FILES = (
     "claude-mod/.claude-plugin/plugin.json",
     "claude-mod/hooks/hooks.json",
@@ -49,12 +52,15 @@ def hook_group(node: Path, script: Path, target: str) -> dict:
 def projections(
     home: Path, payload: Path, python: Path, node: Path, targets: list[str], source_root: Path,
     *, mod_root: Path | None = None, mod_assets: Path | None = None,
-    portable_spec: Path | None = None,
+    portable_spec: Path | None = None, interface_lab: bool = False,
 ) -> list[dict]:
     mod_root = mod_root or payload / "claude-mod"
     mod_assets = mod_assets or source_root
     portable_spec = portable_spec or payload / "references" / PORTABLE_SPEC_NAME
     result = []
+    environment = {"NODE_OPTIONS": "", "NODE_PATH": "", **({INTERFACE_LAB_ENV: "1"} if interface_lab else {})}
+    skill_ids = ("graph-skill", "graph-skill-canvas", *((INTERFACE_LAB_SKILL,) if interface_lab else ()))
+    toml_environment = ", ".join(f"{key} = {json.dumps(value)}" for key, value in environment.items())
     for target in targets:
         if target == "codex":
             skills = home / ".agents" / "skills"
@@ -63,7 +69,7 @@ def projections(
                 f'# >>> {MARKER} >>>\n[mcp_servers."{SERVER}"]\n'
                 f"command = {json.dumps(str(node))}\n"
                 f"args = [{json.dumps(str(payload / 'dist/server.mjs'))}]\n"
-                'env = { NODE_OPTIONS = "", NODE_PATH = "" }\n'
+                f"env = {{ {toml_environment} }}\n"
                 f"# <<< {MARKER} <<<\n"
             )
             result.append({"kind": "toml", "path": str(config), "value": block, "target": target})
@@ -77,7 +83,7 @@ def projections(
                     "value": {
                         "command": str(node),
                         "args": [str(payload / "dist/server.mjs")],
-                        "env": {"NODE_OPTIONS": "", "NODE_PATH": ""},
+                        "env": dict(environment),
                     },
                     "target": target,
                 }
@@ -100,7 +106,7 @@ def projections(
             "{{TOOLKIT_COMMAND}}": quoted_command([str(node), str(payload / "bin/graph-skill.mjs")]),
             "{{PORTABLE_SPEC}}": str(portable_spec),
         }
-        for skill_id in ("graph-skill", "graph-skill-canvas"):
+        for skill_id in skill_ids:
             skill_source = source_root / "skills" / skill_id
             if not (skill_source / "SKILL.md").is_file():
                 raise InstallError(f"Missing packaged Skill: {skill_source}")

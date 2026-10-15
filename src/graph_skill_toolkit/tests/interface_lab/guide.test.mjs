@@ -1,0 +1,64 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { GUIDES } from "../../apps/interface_lab/application/guide.mjs";
+import { contextReadout, recordPath, runOperation } from "../../apps/interface_lab/application/runner.mjs";
+import { HOST_ACTIONS, validateArguments } from "../../plugin_base/ports/host/contract.mjs";
+import { LOCAL_ACTIONS, validateLocalArguments } from "../../plugin_base/local/definitions.mjs";
+
+const lab = { stateDirectory: "C:\\lab", sandbox: "C:\\lab\\sandbox", records: "C:\\lab\\records", sampleFile: "C:\\lab\\sandbox\\sample.txt" };
+
+test("the lab guides every host interface and local capability exactly once", () => {
+  assert.deepEqual(GUIDES.map(guide => guide.id), [...HOST_ACTIONS, ...LOCAL_ACTIONS]);
+  for (const guide of GUIDES) {
+    assert.ok(guide.purpose && guide.expect.claude && guide.expect.codex && guide.check, guide.id);
+    assert.ok(guide.presets.length, guide.id);
+  }
+});
+
+test("every preset is valid input for its operation on both hosts", () => {
+  for (const guide of GUIDES) for (const preset of guide.presets) for (const host of ["claude", "codex"]) {
+    const args = preset.args({ lab, host, lastViewId: "view-1" });
+    if (guide.kind === "local") validateLocalArguments(guide.id, args);
+    else validateArguments(guide.id, args);
+  }
+});
+
+test("the Codex message guidance states that model and effort cannot be specified", () => {
+  const guide = GUIDES.find(item => item.id === "conversation.submitMessage");
+  assert.match(guide.expect.codex, /没有模型和 effort 字段/);
+});
+
+test("context readout shows the exact text each host sends", () => {
+  assert.deepEqual(contextReadout({ status: "completed", message: "", evidence: { sent: { attachAs: "Plugin page context: {}" } } }), ["Plugin page context: {}"]);
+  assert.deepEqual(contextReadout({ status: "completed", message: "", evidence: { sent: { content: [{ type: "text", text: "Plugin page context: {\"a\":1}" }], structuredContent: { a: 1 } } } }), ["Plugin page context: {\"a\":1}"]);
+  assert.deepEqual(contextReadout({ status: "completed", message: "" }), []);
+});
+
+test("records are named per host and session start with the directory's separator", () => {
+  assert.equal(recordPath("C:\\lab\\records", "codex", "2026-10-14T01:02:03.456Z"), "C:\\lab\\records\\codex-2026-10-14T01-02-03-456Z.json");
+  assert.equal(recordPath("/state/records/", "claude", "2026-10-14T01:02:03.456Z"), "/state/records/claude-2026-10-14T01-02-03-456Z.json");
+});
+
+test("the runner sends host interfaces to invoke, local capabilities to local, and runs subscriptions live", async () => {
+  const calls = [], listeners = [];
+  const adapter = {
+    invoke: async (action, args) => { calls.push(["invoke", action, args]); return { status: "completed", message: "ok" }; },
+    capabilities: async () => ({ "events.subscribe": { state: "available", detail: "d", constraints: { types: ["tool.completed"] }, limits: ["l"] } }),
+    events: { subscribe: (listener, types) => { listeners.push([listener, types]); return () => calls.push(["unsubscribe"]); } },
+    local: {
+      call: async (operation, args) => { calls.push(["local", operation, args]); return { status: "completed", message: "ok" }; },
+      files: { watch: async (args, listener) => { listeners.push([listener, args]); return { status: "completed", message: "ok", data: { watchId: "w-1" }, stop: async () => ({ status: "completed", message: "stopped" }) }; } },
+    },
+  };
+  const seen = [];
+  await runOperation(adapter, "composer.writeDraft", { text: "x", mode: "append" }, () => {});
+  await runOperation(adapter, "local.files.read", { path: "C:/a" }, () => {});
+  const watched = await runOperation(adapter, "local.files.watch", { paths: ["C:/a"] }, (event, source) => seen.push([event.type, source]));
+  assert.equal(typeof watched.stop, "function");
+  const subscribed = await runOperation(adapter, "events.subscribe", { types: ["tool.completed", "turn.completed"] }, (event, source) => seen.push([event.type, source]));
+  assert.deepEqual(subscribed.result.evidence.observed.requestedButNotDeliverable, ["turn.completed"]);
+  listeners[1][0]({ type: "tool.completed", at: "t" });
+  assert.match(subscribed.stop().message, /收到 1 个事件/);
+  assert.deepEqual(calls.slice(0, 2), [["invoke", "composer.writeDraft", { text: "x", mode: "append" }], ["local", "local.files.read", { path: "C:/a" }]]);
+  assert.deepEqual(seen, [["tool.completed", "events.subscribe"]]);
+});

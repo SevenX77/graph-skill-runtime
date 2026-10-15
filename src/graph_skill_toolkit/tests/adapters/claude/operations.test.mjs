@@ -5,7 +5,7 @@ import { httpConnection } from "../../../plugin_base/adapters/claude/connection/
 import { createHostBridge } from "../../../plugin_base/adapters/claude/bridge/server.mjs";
 import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 import { createModState, pollBridges } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
-import { register } from "../../../apps/graph_canvas/claude_mod/hooks/register.js";
+import { register } from "../../../composition/claude_mod/hooks/register.js";
 
 const root = "C:/business/hello-world";
 const identity = { name: "Claude Code", version: "2.1.295", client_type: "claude_code", sessionId: "session-a", source: "claude-mod-session" };

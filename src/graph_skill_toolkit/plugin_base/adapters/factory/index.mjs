@@ -6,6 +6,7 @@ import { claudeAdapter } from "../claude/driver/index.mjs";
 import { httpConnection } from "../claude/connection/index.mjs";
 import { createMcpConnection } from "../codex/connection/index.mjs";
 import { SNAPSHOT_ELEMENT_ID } from "../../template/publisher.mjs";
+import { createLocalClient, httpLocalTransport, mcpLocalTransport } from "../../local/page/index.mjs";
 
 /** The browser composition boundary. Environment and drivers can be supplied
  * by an isolated test; normal consumers pass only their own appInfo.
@@ -25,14 +26,32 @@ export function createHostAdapter({ appInfo, document: page = globalThis.documen
   }
   if (!detected) return null;
   const { transport, snapshot, hostInfo } = detected;
-  const createConnection = connections[transport] ?? (transport === "http-bridge"
+  const baseConnection = connections[transport] ?? (transport === "http-bridge"
     ? () => httpConnection({ snapshot: () => snapshot, pageOrigin: view?.location?.origin })
     : () => createMcpConnection({ window: /** @type {any} */ (view), originatingServer: /** @type {any} */ (snapshot)?.serverInfo?.name, appInfo: /** @type {any} */ (appInfo) }));
+  /** @type {any} */ let current;
+  const createConnection = () => (current = baseConnection());
   return hostAdapter(createConnection, (info, connection) => {
     // This registry is consulted only after the connection returns identity and
     // capabilities. Unknown hosts have no execution adapter.
     if (info.id === "codex" && info.transport === "mcp-app") return drivers.codex?.(connection) ?? codexAdapter((/** @type {any} */ (connection)).app, { originatingServer: (/** @type {any} */ (connection)).originatingServer });
     if (info.id === "claude" && info.transport === "http-bridge") return drivers.claude?.(connection) ?? claudeAdapter(/** @type {ReturnType<typeof httpConnection>} */(connection));
     throw new Error("当前连接没有匹配的宿主适配器。");
-  }, hostInfo);
+  }, hostInfo, { local: createLocalClient(localTransport(transport, /** @type {any} */ (snapshot)?.local, () => current)) });
+}
+
+/** The page's route to its plugin process's local capabilities, from the
+ * server's bootstrap: an HTTP credential for a loopback page, page-only MCP
+ * tools for an MCP App page, or nothing.
+ * @param {string} transport @param {any} declared @param {() => any} connection */
+function localTransport(transport, declared, connection) {
+  try {
+    if (transport === "http-bridge" && declared?.transport === "http") return httpLocalTransport(declared);
+    if (transport === "mcp-app" && declared?.transport === "mcp-tools") return mcpLocalTransport((name, args) => {
+      const owner = connection();
+      if (!owner?.callTool) throw new Error("宿主尚未连接。");
+      return owner.callTool(name, args);
+    });
+  } catch { /* An invalid declaration leaves the page without local capabilities. */ }
+  return null;
 }

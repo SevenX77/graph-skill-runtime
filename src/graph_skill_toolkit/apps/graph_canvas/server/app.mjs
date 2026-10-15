@@ -1,6 +1,4 @@
 import { readFile } from "node:fs/promises";
-import { McpServer } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 import { describeDiagnostics, readGraphState } from "../application/service/index.mjs";
@@ -9,17 +7,10 @@ import { createRuntimeCompiler } from "../backend/runtime/index.mjs";
 import { createGraphBackend } from "../backend/graph/index.mjs";
 import { createGraphRelay } from "../backend/relay/index.mjs";
 import { createLiveGraphSource } from "../application/live_source/index.mjs";
-import { createLocalHttpServer, snapshotHtml, createHostBridge, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo, registerPageToolList } from "../../../plugin_base/server/index.mjs";
-import packageInfo from "../../../package.json" with { type: "json" };
+import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "../../../plugin_base/server/index.mjs";
 
 // The build places this self-contained resource alongside the bundled server.
 const html = await readFile(new URL("./canvas.html", import.meta.url), "utf8");
-const localHttp = createLocalHttpServer();
-// One live source per root serves both page transports: SSE for the Claude
-// HTTP page and long poll (watch_graph) for the sandboxed Codex MCP App page.
-// The runtime compiler is the only validity authority behind that source.
-const compiler = createRuntimeCompiler();
-const liveSource = createLiveGraphSource({ read: root => readGraphState(root, { compiler }) });
 
 // Tool-facing graph state: the drawable graph when the runtime accepts the
 // skill, otherwise no graph plus the runtime's compile diagnostics.
@@ -29,19 +20,24 @@ function canvasState(event) {
   throw new Error(event?.message ?? "Graph state is unavailable.");
 }
 const invalidText = state => `The graph is currently invalid. Runtime compile reported ${state.compile.diagnostics.length} diagnostic(s); the canvas lists them and redraws once the files compile again:\n${describeDiagnostics(state.compile.diagnostics)}`;
-const graphBackend = createGraphBackend({ http: localHttp, source: liveSource });
-const graphRelay = createGraphRelay({ source: liveSource });
-const previewConfiguration = createPreviewConfiguration({ namePrefix: "graph-skill" });
-const hostBridge = createHostBridge({ http: localHttp });
-const serverInfo = Object.freeze({ name: "graph-skill-canvas", version: packageInfo.version });
-await localHttp.open();
 
-const stdio = serveStdio(() => {
-  const server = new McpServer(serverInfo);
+/** The Graph Skill canvas app: show_graph, inspect_graph and watch_graph. */
+export function graphCanvasApp({ http, hostBridge, serverInfo }) {
+  // One live source per root serves both page transports: SSE for the Claude
+  // HTTP page and long poll (watch_graph) for the sandboxed Codex MCP App page.
+  // The runtime compiler is the only validity authority behind that source.
+  const compiler = createRuntimeCompiler();
+  const liveSource = createLiveGraphSource({ read: root => readGraphState(root, { compiler }) });
+  const graphBackend = createGraphBackend({ http, source: liveSource });
+  const graphRelay = createGraphRelay({ source: liveSource });
+  const previewConfiguration = createPreviewConfiguration({ namePrefix: "graph-skill" });
+  return { register, close };
+
+  function register(server, { local }) {
   const graphConnection = graphBackend.createConnection();
-  const bootstrap = { graphBackend: graphConnection.descriptor, serverInfo };
+  const bootstrap = { graphBackend: graphConnection.descriptor, serverInfo, local: { transport: "mcp-tools" } };
   const resourceUri = pageResourceUri("graph-skill", "canvas", snapshotHtml(html, bootstrap));
-  const ui = { csp: { connectDomains: [localHttp.origin], resourceDomains: [] }, prefersBorder: false };
+  const ui = { csp: { connectDomains: [http.origin], resourceDomains: [] }, prefersBorder: false };
   const selectedRoots = new Map();
   const codexSessions = createCodexPageSessions();
   registerAppTool(server, "show_graph", {
@@ -69,13 +65,14 @@ const stdio = serveStdio(() => {
       // diagnostics and redraws when a later save compiles.
       const presentationData = canvasState(await liveSource.current(await selectSkillRoot(skill_root)));
       selectedRoots.set(skill_root, presentationData.skillRoot);
+      await local.allow(presentationData.skillRoot);
       graphConnection.select(skill_root, presentationData.skillRoot);
       const payload = { ...presentationData, hostInfo, serverInfo };
       const projected = presentationData.graph;
       const bridge = presentation === "html" ? await hostBridge.createView(payload.skillRoot, hostInfo) : undefined;
       let httpPresentation;
       if (bridge) {
-        const document = snapshotHtml(html, { ...payload, ...bootstrap, hostBridge: bridge.browser });
+        const document = snapshotHtml(html, { ...payload, ...bootstrap, hostBridge: bridge.browser, local: { transport: "http", ...local.descriptor } });
         const preview = await previewConfiguration.ensure(preview_project_root, bridge.browser.url);
         const url = hostBridge.publish(payload.skillRoot, document);
         httpPresentation = { kind: "http", url, preview, bridge: bridge.mod };
@@ -124,29 +121,21 @@ const stdio = serveStdio(() => {
       };
     } catch (error) { return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }] }; }
   });
-  registerPageToolList(server, [
-    { name: "inspect_graph", description: "Read the selected graph without executing it." },
-    { name: "watch_graph", description: "Wait for the selected graph's next change." },
-  ]);
   registerAppResource(server, "Graph Skill canvas", resourceUri, {
     description: "Viewport-filling graph canvas with a host-owned Skill folder shortcut.",
     _meta: { ui, ...codexResourceMetadata },
   }, async (_uri, context) => ({ contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE,
     text: snapshotHtml(html, {...bootstrap,hostInfo:launchHostInfo({clientInfo:requestClientInfo(server.server, context)})}),
     _meta: { ui, ...codexResourceMetadata } }] }));
-  return server;
-}, { onerror: (error) => console.error(error.message) });
+  return [
+    { name: "inspect_graph", description: "Read the selected graph without executing it." },
+    { name: "watch_graph", description: "Wait for the selected graph's next change." },
+  ];
+  }
 
-// Normal shutdown removes only exact owned attach entries and closes HTTP.
-const cleanup = async () => {
-  graphRelay.close();
-  graphBackend.close();
-  await Promise.all([previewConfiguration.close(), hostBridge.close()]);
-  await localHttp.close();
-};
-process.stdin.once("end", () => void cleanup());
-process.stdin.once("close", () => void cleanup());
-for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, async () => {
-  await cleanup();
-  await stdio.close();
-});
+  async function close() {
+    graphRelay.close();
+    graphBackend.close();
+    await previewConfiguration.close();
+  }
+}

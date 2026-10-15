@@ -35,8 +35,9 @@ test("MCP resource identity binds HTML and retires backend credentials across re
       assert.deepEqual(resources.map(resource => resource.uri), [uri]);
       const resource = await client.readResource({ uri });
       const slot = /<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
-      const { graphBackend, serverInfo } = JSON.parse(slot.exec(resource.contents[0].text)[1]);
-      assert.equal(uri, `ui://graph-skill/canvas-${createHash("sha256").update(snapshotHtml(html, { graphBackend, serverInfo })).digest("hex")}.html`);
+      const { graphBackend, serverInfo, local } = JSON.parse(slot.exec(resource.contents[0].text)[1]);
+      assert.deepEqual(local, { transport: "mcp-tools" });
+      assert.equal(uri, `ui://graph-skill/canvas-${createHash("sha256").update(snapshotHtml(html, { graphBackend, serverInfo, local })).digest("hex")}.html`);
       assert.equal(resource.contents[0].text.replace(slot, SNAPSHOT_SLOT), html);
       if (index === 2) await assert.rejects(client.readResource({ uri: uris[0] }));
       uris.push(uri);
@@ -69,7 +70,9 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.deepEqual(tools.map(tool => tool.name).sort(), ["inspect_graph", "list_page_tools", "show_graph", "watch_graph"]);
+    assert.deepEqual(tools.map(tool => tool.name).sort(), ["inspect_graph", "list_page_tools", "local_call", "local_events", "show_graph", "watch_graph"]);
+    // Local capabilities reach a Codex page through page-only tools the model never sees.
+    for (const name of ["local_call", "local_events"]) assert.deepEqual(tools.find(tool => tool.name === name)._meta.ui.visibility, ["app"]);
     const inventory = await client.callTool({ name: "list_page_tools", arguments: {} });
     assert.equal(inventory.structuredContent.scope, "originating-server");
     assert.deepEqual(inventory.structuredContent.tools.map(item => item.name), ["inspect_graph", "watch_graph", "list_page_tools"]);
@@ -128,7 +131,7 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     const slot=/<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
     const startup = JSON.parse(slot.exec(contents[0].text)[1]);
     assert.deepEqual(startup.hostInfo,hostInfo);
-    assert.equal(tool._meta.ui.resourceUri, `ui://graph-skill/canvas-${createHash("sha256").update(snapshotHtml(template, {graphBackend:startup.graphBackend,serverInfo:startup.serverInfo})).digest("hex")}.html`);
+    assert.equal(tool._meta.ui.resourceUri, `ui://graph-skill/canvas-${createHash("sha256").update(snapshotHtml(template, {graphBackend:startup.graphBackend,serverInfo:startup.serverInfo,local:startup.local})).digest("hex")}.html`);
     assert.equal(contents[0].text.replace(slot,SNAPSHOT_SLOT), await readFile(join(root, "dist/canvas.html"), "utf8"));
     assert.deepEqual(contents[0]._meta.ui.csp, { connectDomains: [startup.graphBackend.url], resourceDomains: [] });
     assert.doesNotMatch(contents[0].text, /<script[^>]+src=|<link[^>]+href=/i);
@@ -141,6 +144,38 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
   }
   assert.equal(stderr, "");
   assert.deepEqual(await readdir(isolated), before);
+});
+
+test("the Interface Lab is served only when enabled, and its page reaches local capabilities through page-only tools", async (context) => {
+  const isolated = await mkdtemp(join(tmpdir(), "interface lab 中文 "));
+  context.after(() => rm(isolated, { recursive: true, force: true }));
+  for (const file of ["server.mjs", "canvas.html", "interface-lab.html"]) await copyFile(join(root, "dist", file), join(isolated, file));
+  const state = join(isolated, "state");
+  const env = { ...fakeRuntimeEnv(), GRAPH_SKILL_INTERFACE_LAB: "1", LOCALAPPDATA: state, XDG_STATE_HOME: state, HOME: state, USERPROFILE: state };
+  const client = new Client({ name: "lab-test", version: "1" });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(isolated, "server.mjs")], cwd: tmpdir(), stderr: "pipe", env }));
+  try {
+    const { tools } = await client.listTools();
+    assert.ok(["open_interface_lab", "lab_echo", "show_graph"].every(name => tools.some(tool => tool.name === name)));
+    const lab = tools.find(tool => tool.name === "open_interface_lab");
+    assert.match(lab._meta.ui.resourceUri, /^ui:\/\/plugin-interface-lab\/lab-[a-f0-9]{64}\.html$/);
+    assert.notEqual(lab._meta.ui.resourceUri, tools.find(tool => tool.name === "show_graph")._meta.ui.resourceUri);
+    const opened = await client.callTool({ name: "open_interface_lab", arguments: {} });
+    assert.notEqual(opened.isError, true);
+    const paths = opened.structuredContent.lab;
+    const echo = await client.callTool({ name: "lab_echo", arguments: { text: "接口 ✓" } });
+    assert.deepEqual(echo.structuredContent.echo, { text: "接口 ✓" });
+    const listed = await client.callTool({ name: "list_page_tools", arguments: {} });
+    assert.ok(listed.structuredContent.tools.some(item => item.name === "lab_echo"));
+    const read = await client.callTool({ name: "local_call", arguments: { operation: "local.files.read", args: { path: paths.sampleFile } } });
+    assert.equal(read.structuredContent.status, "completed");
+    assert.match(read.structuredContent.data.content, /接口测试样例文件/);
+    const outside = await client.callTool({ name: "local_call", arguments: { operation: "local.files.read", args: { path: join(isolated, "server.mjs") } } });
+    assert.equal(outside.structuredContent.status, "rejected");
+    const { contents } = await client.readResource({ uri: lab._meta.ui.resourceUri });
+    const startup = JSON.parse(/<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/.exec(contents[0].text)[1]);
+    assert.deepEqual([startup.local, startup.lab.sampleFile], [{ transport: "mcp-tools" }, paths.sampleFile]);
+  } finally { await client.close(); }
 });
 
 test("both host manifests resolve to the same bundled implementation", async () => {
