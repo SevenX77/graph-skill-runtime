@@ -1,31 +1,13 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
+import { labStateDirectory, prepareLab } from "./state.mjs";
 import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "../../../plugin_base/server/index.mjs";
 
 // The build places this self-contained page alongside the bundled server.
 const html = await readFile(new URL("./interface-lab.html", import.meta.url), "utf8");
 const PAGE_KEY = "plugin-interface-lab";
 export const ECHO_TOOL = "lab_echo";
-
-/** The lab's own state directory: comparison records and the sandbox the local
- * capability tests read, write, watch and reveal. */
-export function labStateDirectory({ platform = process.platform, env = process.env, home = homedir() } = {}) {
-  if (platform === "win32") return join(env.LOCALAPPDATA || join(home, "AppData", "Local"), "plugin-interface-lab");
-  if (platform === "darwin") return join(home, "Library", "Application Support", "plugin-interface-lab");
-  return join(env.XDG_STATE_HOME || join(home, ".local", "state"), "plugin-interface-lab");
-}
-
-async function prepareLab(stateDirectory) {
-  const sandbox = join(stateDirectory, "sandbox"), records = join(stateDirectory, "records");
-  await mkdir(sandbox, { recursive: true });
-  await mkdir(records, { recursive: true });
-  const sampleFile = join(sandbox, "sample.txt");
-  await writeFile(sampleFile, "Plugin Interface Lab sample file.\n接口测试样例文件。\n", { flag: "wx" }).catch(error => { if (error.code !== "EEXIST") throw error; });
-  return { stateDirectory, sandbox, records, sampleFile };
-}
 
 /** The Plugin Interface Lab app: a developer page that calls every Plugin Base
  * operation and shows its evidence. It shares no tool or page with the canvas. */

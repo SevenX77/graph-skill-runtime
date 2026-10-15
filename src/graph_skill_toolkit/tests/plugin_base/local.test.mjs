@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
-import { mkdtemp, mkdir, readFile, rm, writeFile, unlink } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalCapabilities, systemCommand } from "../../plugin_base/local/node/index.mjs";
@@ -96,6 +96,26 @@ test("system actions are shell-free platform commands with honest evidence", asy
   const failing = createLocalCapabilities({ spawnProcess: () => { const child = new EventEmitter(); setImmediate(() => child.emit("error", new Error("ENOENT xdg-open"))); return child; } }).createConnection();
   const failed = await failing.call("local.system.openExternal", { url: "https://example.com/" });
   assert.deepEqual([failed.status, failed.evidence.observed.launched], ["error", false]);
+});
+
+test("reveal hands the file manager the real path behind a redirected one", async t => {
+  const { root, allowed } = await sandbox(t);
+  const alias = join(root, "alias");
+  await symlink(allowed, alias, process.platform === "win32" ? "junction" : "dir");
+  const spawned = [];
+  const spawnProcess = (command, args) => {
+    const child = new EventEmitter();
+    spawned.push(args);
+    setImmediate(() => { child.emit("spawn"); child.emit("exit", 0); });
+    return child;
+  };
+  const connection = createLocalCapabilities({ platform: "darwin", spawnProcess }).createConnection();
+  await connection.allow(allowed);
+  const revealed = await connection.call("local.system.revealInFileManager", { path: join(alias, "a.txt") });
+  const real = await realpath(join(allowed, "a.txt"));
+  assert.equal(revealed.status, "accepted");
+  assert.equal(revealed.evidence.sent.realPath, real);
+  assert.deepEqual(spawned[0], ["-R", real]);
 });
 
 test("the page client reaches the HTTP route with its credential and delivers watch events", async t => {

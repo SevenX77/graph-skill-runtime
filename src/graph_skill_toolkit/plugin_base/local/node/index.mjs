@@ -179,11 +179,14 @@ export function createLocalCapabilities({ http, platform = process.platform, env
       let isDirectory = false;
       if (kind === "reveal") {
         if (!await within(target).catch(() => false)) return outside(sent, target);
+        // The file manager runs outside this process's filesystem view (for example a
+        // Windows packaged host redirects writes under %LOCALAPPDATA%), so it receives the real path.
+        target = await realpath(target);
         isDirectory = (await stat(target)).isDirectory();
       }
       const { command, args, options } = systemCommand(kind, target, { platform, env, isDirectory });
       const receipt = await launch(spawnProcess, command, args, options);
-      const evidence = { sent: { ...sent, command, args }, receipt, observed: { launched: !receipt.error }, limits: [LAUNCH_LIMIT,
+      const evidence = { sent: { ...sent, ...(kind === "reveal" && target !== sent.path ? { realPath: target } : {}), command, args }, receipt, observed: { launched: !receipt.error }, limits: [LAUNCH_LIMIT,
         ...(kind === "reveal" && platform === "win32" ? ["资源管理器的退出码不表示成败（通常为 1）；以系统窗口是否选中目标为准。"] : []),
         ...(kind === "reveal" && platform !== "win32" && platform !== "darwin" ? ["Linux 打开所在目录，不能选中文件本身。"] : [])] };
       if (receipt.error) return result("error", "系统程序未能启动：" + receipt.error, evidence);
