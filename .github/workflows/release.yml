@@ -33,13 +33,13 @@ jobs:
           --manifest build/release-artifacts.json
           --source-commit "${{ github.sha }}"
       - name: Upload distributions
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-distributions
           path: dist/
           if-no-files-found: error
       - name: Upload release artifact manifest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-artifact-manifest
           path: build/release-artifacts.json
@@ -97,7 +97,7 @@ jobs:
           --agent-skill tests/fixtures/demo-echo-agent
           --evidence build/package-acceptance-${{ matrix.os }}.json
       - name: Upload package acceptance evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-package-acceptance-${{ matrix.os }}-python-3.11
           path: build/package-acceptance-${{ matrix.os }}.json
