@@ -455,15 +455,15 @@ The page uses them through `adapter.local`:
 ### local.system.revealInFileManager
 
 - **Arguments:** `path` (absolute, existing, inside a granted root).
-- **Effect:** shows the path in the operating system's file manager.
-- **Command:** Windows `%SystemRoot%\explorer.exe /select,"<path>"` with verbatim arguments; macOS `/usr/bin/open -R <path>`; Linux `xdg-open` on the containing directory (on the directory itself when the path is a directory).
-- **Result:** see [System launches](#system-launches).
+- **Effect:** shows the path in the operating system's file manager. After the granted-root check, the executor resolves the target with Node.js `fs.realpath`, which returns its real on-disk path, and uses that path for the file-manager command on every platform. This gives the file manager a usable target across filesystem redirection, where a process's requested path leads to another on-disk location.
+- **Command:** Windows `%SystemRoot%\explorer.exe /select,"<real path>"` with verbatim arguments; macOS `/usr/bin/open -R <real path>`; Linux `xdg-open` on the real containing directory (on the real directory itself when the target is a directory).
+- **Result:** `sent.path` retains the requested path; `sent.realPath` is present when the real path differs from it. See [System launches](#system-launches) for the launch evidence and [the dated validation record](../VALIDATION.md#native-observation-of-the-local-capabilities-on-claude-desktop-2026-10-15) for source-test and native-observation scope.
 - **Limits:** Explorer's exit code does not indicate success (it is usually 1). Linux opens the containing directory and does not select the file.
 - **Related:** `files.revealDirectory` is an independent function that targets the host's own file browser.
 
 ### System launches
 
-Both system operations launch the program without a shell (`shell: false`). The result is `accepted`, with `sent` holding the arguments plus `command` and `args`, `receipt` holding the process id and, when the program exited within 3 seconds, its exit code, and `observed` holding `{ launched }`. A program that fails to start returns `error`. The operating system reports only whether the process started; whether a window appeared is observed on the machine.
+Both system operations launch the program without a shell (`shell: false`). The result is `accepted`, with `sent` holding the requested arguments plus `command` and `args`. For reveal, the command uses the real path and `sent.realPath` records it when it differs from `sent.path`. The `receipt` holds the process id and, when the program exited within 3 seconds, its exit code; `observed` holds `{ launched }`. A program that fails to start returns `error`. The operating system reports only whether the process started; the visible window and selected target require observation on the machine. [The dated validation record](../VALIDATION.md#native-observation-of-the-local-capabilities-on-claude-desktop-2026-10-15) separates those observations from source-tested command behavior.
 
 ## Verifying on a host: the Interface Lab
 

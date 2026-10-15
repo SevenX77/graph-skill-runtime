@@ -50,13 +50,16 @@ Each call has comparison controls for **matches**, **differs** and **not observe
 
 ### Lab state and comparison files
 
-The server app creates `sandbox/`, `records/` and an initial `sandbox/sample.txt` under the lab state directory. It preserves an existing sample file at preparation time.
+[The lab state module](apps/interface_lab/server/state.mjs) selects and creates the nominal state directory, then resolves its real on-disk path with Node.js `fs.realpath`. The nominal path is the path the process requests; the real path is the location returned by that filesystem lookup. The server creates `sandbox/`, `records/` and an initial `sandbox/sample.txt` under the real directory. It preserves an existing sample file at preparation time. The returned `stateDirectory`, `sandbox`, `records` and `sampleFile` all use real paths. The page header and open-tool text show those paths, and comparison files are written under the real records directory.
 
-| System | Lab state directory |
+| System | Nominal lab state directory and real-path handling |
 | --- | --- |
-| Windows | `%LOCALAPPDATA%\plugin-interface-lab`; with no `LOCALAPPDATA`, `<home>/AppData/Local/plugin-interface-lab`. |
-| macOS | `~/Library/Application Support/plugin-interface-lab`. |
-| Linux | `$XDG_STATE_HOME/plugin-interface-lab`, or `~/.local/state/plugin-interface-lab`. |
+| Windows | `%LOCALAPPDATA%\plugin-interface-lab`; with no `LOCALAPPDATA`, `<home>/AppData/Local/plugin-interface-lab`. Preparation resolves the real path. |
+| Windows packaged host | MSIX is the Windows packaged-app format. Windows can redirect a packaged host's and its descendant processes' writes under `%LOCALAPPDATA%` into the package's private directory. For Claude Desktop on the measured Windows installation, the real lab directory is `C:\Users\test\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\plugin-interface-lab`. The lab reports and uses the resolved directory. |
+| macOS | `~/Library/Application Support/plugin-interface-lab`, resolved to its real path. |
+| Linux | `$XDG_STATE_HOME/plugin-interface-lab`, or `~/.local/state/plugin-interface-lab`, resolved to its real path. |
+
+[The dated validation record](VALIDATION.md#native-observation-of-the-local-capabilities-on-claude-desktop-2026-10-15) owns the packaged-host finding, source-tested path behavior and remaining native confirmation.
 
 One page session saves `<lab state directory>/records/<host>-<session start>.json`. The session-start timestamp has colons and periods converted to hyphens. The schema is `plugin-interface-lab.records.v1`. It stores host information, session start, and each call's operation, arguments, time, status, message, evidence, comparison verdict and note. The page writes it through `local.files.write`.
 

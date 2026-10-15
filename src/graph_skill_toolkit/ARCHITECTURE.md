@@ -67,6 +67,7 @@ src/graph_skill_toolkit/
     hooks/after-tool.mjs           follow-up display guidance after related tool calls
   apps/interface_lab/              the Plugin Interface Lab app (developer tool)
     server/app.mjs                 open_interface_lab, lab_echo and the lab resource
+    server/state.mjs               lab state directory location and preparation
     app/main.tsx, ui/{index.tsx,template/lab.html}
                                    lab page entry, UI and template
     application/{guide.mjs,runner.mjs}
