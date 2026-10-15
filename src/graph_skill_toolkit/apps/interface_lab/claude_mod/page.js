@@ -1,5 +1,5 @@
 /** Read the lab payload from an open_interface_lab tool result as the Mod sees it. */
-function labPayload(result) {
+export function labPayload(result) {
   const value = result.result;
   if (value?.structuredContent) return value.structuredContent;
   if (value?.lab) return value;
@@ -8,6 +8,8 @@ function labPayload(result) {
     if (block.type !== 'text') continue;
     try { const data = JSON.parse(block.text); if (data?.lab) return data; } catch {}
   }
+  // The Claude host delivers an MCP result's structured content as JSON text.
+  if (typeof value === 'string') { const data = JSON.parse(value); if (data?.lab) return data; }
   throw new Error('The tool returned no Interface Lab data.');
 }
 
