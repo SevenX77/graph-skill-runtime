@@ -94,3 +94,19 @@ test("Claude refuses a changed session or host denial before claiming file displ
   await assert.rejects(executeBridgeAction(api,state,bridge,{...request,id:"open4"}),error=>error.outcome==="not-sent");
   assert.equal(calls,1);
 });
+
+
+test("Claude rejects an unchanged file view and retains the exact host reply", async () => {
+  const sentence = "This session isn't open in any window right now, so its view was left alone.";
+  for (const raw of [
+    { result: { content: [{ type: "text", text: sentence + '\n{"views":[]}' }] } },
+    { structuredContent: { views: [] } },
+    { text: sentence },
+  ]) {
+    const api = { session: { id: async () => "s" }, tool: { list: async () => [{ name: "mcp__ccd_view__show_pane" }], call: async () => raw } };
+    const bridge = { url: "http://127.0.0.1:12345", token: "t", key: "p" };
+    const result = await executeBridgeAction(api, createModState(), bridge, { id: "file", action, args: { path: file }, key: "p" });
+    assert.equal(result.status, "rejected"); assert.deepEqual(result.evidence.receipt, raw);
+    if (!raw.structuredContent) assert.equal(result.message, sentence);
+  }
+});

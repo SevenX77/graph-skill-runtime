@@ -57,3 +57,16 @@ export function recordPath(directory, host, startedAt) {
   const separator = directory.includes("\\") ? "\\" : "/";
   return directory.replace(/[\\/]+$/, "") + separator + `${host}-${startedAt.replace(/[:.]/g, "-")}.json`;
 }
+
+/** Session workspace used by host-file presets; local tests keep the sandbox.
+ * @param {HostResult} result @returns {string | null} */
+export function workspaceRoot(result) {
+  const data = /** @type {{workspaceRoots?: unknown[], cwd?: unknown} | undefined} */ (result.data);
+  const root = data?.workspaceRoots?.[0];
+  return typeof root === "string" && root ? root : typeof data?.cwd === "string" && data.cwd ? data.cwd : null;
+}
+
+/** One local clock format for run cards and host events. @param {string} at */
+export function localTime(at) {
+  return new Date(at).toLocaleTimeString(undefined, { timeZoneName: "short" });
+}

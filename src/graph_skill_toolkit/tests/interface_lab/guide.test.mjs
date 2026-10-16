@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GUIDES } from "../../apps/interface_lab/application/guide.mjs";
-import { contextReadout, recordPath, runOperation } from "../../apps/interface_lab/application/runner.mjs";
+import { contextReadout, recordPath, runOperation, workspaceRoot, localTime } from "../../apps/interface_lab/application/runner.mjs";
 import { HOST_ACTIONS, validateArguments } from "../../plugin_base/ports/host/contract.mjs";
 import { LOCAL_ACTIONS, validateLocalArguments } from "../../plugin_base/local/definitions.mjs";
 
@@ -17,7 +17,7 @@ test("the lab guides every host interface and local capability exactly once", ()
 
 test("every preset is valid input for its operation on both hosts", () => {
   for (const guide of GUIDES) for (const preset of guide.presets) for (const host of ["claude", "codex"]) {
-    const args = preset.args({ lab, host, lastViewId: "view-1" });
+    const args = preset.args({ lab, host, lastViewId: "view-1", workspaceRoot: "C:/workspace" });
     if (guide.kind === "local") validateLocalArguments(guide.id, args);
     else validateArguments(guide.id, args);
   }
@@ -61,4 +61,34 @@ test("the runner sends host interfaces to invoke, local capabilities to local, a
   assert.match(subscribed.stop().message, /收到 1 个事件/);
   assert.deepEqual(calls.slice(0, 2), [["invoke", "composer.writeDraft", { text: "x", mode: "append" }], ["local", "local.files.read", { path: "C:/a" }]]);
   assert.deepEqual(seen, [["tool.completed", "events.subscribe"]]);
+});
+
+
+test("host-file presets use the session workspace while local presets keep the sandbox", () => {
+  for (const root of ["C:/project with spaces/中文", "C:\\project with spaces\\中文", "/workspace/project/"]) {
+    const context = { lab, host: "claude", lastViewId: null, workspaceRoot: root };
+    const file = GUIDES.find(item => item.id === "files.openFile").presets[0].args(context);
+    assert.equal(file.path.replaceAll("\\", "/"), root.replaceAll("\\", "/").replace(/\/$/, "") + "/README.md");
+    assert.equal(file.line, 2);
+    assert.equal(GUIDES.find(item => item.id === "files.revealDirectory").presets[0].args(context).path, root);
+    assert.equal(GUIDES.find(item => item.id === "local.files.read").presets[0].args(context).path, lab.sampleFile);
+  }
+});
+
+test("lab workspace reads workspaceRoots first and cwd only as fallback", () => {
+  const reply = data => ({ status: "completed", message: "ok", data });
+  assert.equal(workspaceRoot(reply({ workspaceRoots: ["C:/root"], cwd: "C:/cwd" })), "C:/root");
+  assert.equal(workspaceRoot(reply({ workspaceRoots: [], cwd: "C:/cwd" })), "C:/cwd");
+  assert.equal(workspaceRoot(reply({})), null);
+});
+
+test("context clear preset sends the required empty snapshot envelope", () => {
+  const clear = GUIDES.find(item => item.id === "context.update").presets.find(item => item.label === "清空");
+  assert.deepEqual(clear.args({ lab, host: "claude", lastViewId: null }), { snapshot: {} });
+  assert.throws(() => validateArguments("context.update", {}));
+});
+
+test("lab run cards and events share a local time with zone indication", () => {
+  const at = "2026-10-16T05:53:51.286Z";
+  assert.equal(localTime(at), new Date(at).toLocaleTimeString(undefined, { timeZoneName: "short" }));
 });

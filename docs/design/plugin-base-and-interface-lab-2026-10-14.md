@@ -134,6 +134,8 @@ Source checks establish their tested contracts. Native effects require candidate
 
 ## Open items
 
+The [2026-10-16 Claude connection verdicts](interface-connect-verdicts-2026-10-16.md) own the current host-interface decisions, dated native findings and displayed-window re-observation requirements.
+
 Each item names the evidence that settles it.
 
 - **Native acceptance on both hosts.** The [2026-10-15 record](../../src/graph_skill_toolkit/VALIDATION.md#native-observation-of-the-local-capabilities-on-claude-desktop-2026-10-15) supplies five local-capability observations on Claude Desktop's earlier running build, including the failed reveal. Settling evidence: a new Claude Desktop session loads the real-path server and the Mod payload reader, confirms reveal and covers the 17 host interfaces; a Codex Desktop session covers all 22 operations. Each host's saved comparison must include the actual effect or declared unsupported state and notes, accompanied by candidate identity and supplemental observations.
@@ -159,3 +161,5 @@ The [2026-10-15 observation](../../src/graph_skill_toolkit/VALIDATION.md#native-
 - 2026-10-14: Synchronized the eight-document set with the implemented layout, recorded the completed usage reference, specified five-string effort validation and added the graph-credential lifetime open item.
 
 - 2026-10-15: Recorded the first five local-capability observations on Claude Desktop, the filesystem-redirection finding, the source-tested real-path behavior and the remaining new-session and Codex Desktop observation scope.
+
+- 2026-10-16: Linked the Claude host-interface connection decision and its native re-observation scope.

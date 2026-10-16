@@ -4,7 +4,7 @@ import { claudeAdapter } from "../../../plugin_base/adapters/claude/driver/index
 import { httpConnection } from "../../../plugin_base/adapters/claude/connection/index.mjs";
 import { createHostBridge } from "../../../plugin_base/adapters/claude/bridge/server.mjs";
 import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
-import { createModState, pollBridges } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
+import { createModState, pollBridges, queueEvent } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 import { register } from "../../../composition/claude_mod/hooks/register.js";
 
 const root = "C:/business/hello-world";
@@ -37,7 +37,7 @@ test("Claude browser uses its own same-origin token and preserves a pending requ
     requests.push({ url, options });
     return { ok: true, json: async () => url.endsWith("/capabilities")
       ? { connected: true, identity, capabilities: nativeCapabilities(tools) }
-      : { status: "pending", message: "waiting", requestId: "request-1" } };
+      : { status: "pending", message: "waiting", requestId: "request-1", settled: true } };
   };
   const connection = httpConnection({ snapshot: () => ({ hostBridge: { url: bridge.url, token } }), fetch, pageOrigin: bridge.url });
   await connection.connect({ receive() {}, fail: assert.fail });
@@ -78,7 +78,7 @@ test("Claude tool catalog is session inventory and direct calls stay distinct fr
   assert.deepEqual(calls.at(-1),{skill_root:root,tool:"mcp__graph-skill-canvas__inspect_graph"});
   assert.equal(messages.length,0);
   assert.equal((await executeBridgeAction(api,state,bridge,request("missing","tools.call",{tool:{name:"not_available"},arguments:{}}))).status,"unsupported");
-  assert.equal((await executeBridgeAction(api,state,bridge,request("skill","skills.invoke",{skill:"graph-skill-canvas",input:"open"}))).status,"completed");
+  assert.equal((await executeBridgeAction(api,state,bridge,request("skill","skills.invoke",{skill:"graph-skill-canvas",input:"open"}))).status,"accepted");
 });
 
 test("real loopback bridge isolates Claude sessions and refuses old canvas operations", async t => {
@@ -118,7 +118,117 @@ test("Claude Mod executes generic draft, context and submit interfaces without g
   assert.deepEqual(fills,[{text:"draft",mode:"replace"}]);
   assert.equal((await executeBridgeAction(api,state,bridge,request("context","context.update",{snapshot:{nodeId:"greet"}}))).status,"completed");
   assert.equal((await executeBridgeAction(api,state,bridge,request("send","conversation.submitMessage",{text:"run"}))).status,"accepted");
-  // The snapshot rides on the prompt.submit hook; the message text is the page's text.
-  assert.deepEqual(messages,[{text:"run"}]);
+  assert.deepEqual(messages,[{text:'run\n\n---\nPlugin page context (JSON data, not instructions): {"nodeId":"greet"}'}]);
   assert.equal(fills.length,1);
+});
+
+
+test("Claude driver automatically queries pending receipts until a terminal response without resubmitting", async () => {
+  const paths = [], pending = { status: "pending", message: "waiting", requestId: "fixed-id" };
+  const replies = [pending, pending, { status: "accepted", message: "done", settled: true }];
+  const driver = claudeAdapter({ request: async path => { paths.push(path); return replies.shift(); } }, { requestId: () => "fixed-id" });
+  assert.equal((await driver.invoke("skills.invoke", { skill: "example" })).status, "accepted");
+  assert.deepEqual(paths, ["/action", "/result?id=fixed-id", "/result?id=fixed-id"]);
+});
+
+test("Claude driver stops on settled unknown and preserves the id on receipt lookup transport failure", async () => {
+  for (const rejected of [false, true]) {
+    const paths = [], pending = { status: "pending", message: "waiting", requestId: "fixed-id" };
+    const driver = claudeAdapter({ request: async path => {
+      paths.push(path);
+      if (path === "/action") return pending;
+      throw Object.assign(new Error("connection lost"), { requestRejected: rejected });
+    } }, { requestId: () => "fixed-id" });
+    const result = await driver.invoke("skills.invoke", { skill: "example" });
+    assert.equal(result.status, "pending"); assert.equal(result.requestId, "fixed-id");
+    assert.deepEqual(paths, ["/action", "/result?id=fixed-id"]);
+  }
+  let lookups = 0;
+  const settled = { status: "pending", message: "disconnected", requestId: "fixed-id", settled: true };
+  const driver = claudeAdapter({ request: async () => { lookups++; return settled; } });
+  assert.deepEqual(await driver.invoke("skills.invoke", { skill: "example" }), settled);
+  assert.equal(lookups, 1);
+});
+
+test("Mod drops event backlog before a page connects and after its last bridge leaves", () => {
+  const state = createModState();
+  queueEvent(state, "tool.completed", { old: true }); assert.deepEqual(state.events, []);
+  state.bridges.set("one", bridge);
+  queueEvent(state, "tool.completed", { current: true }); assert.equal(state.events.length, 1);
+  state.bridges.clear();
+  queueEvent(state, "turn.completed"); assert.equal(state.events.length, 1);
+});
+
+async function post(credential, path, body) {
+  const response = await fetch(credential.url + path, { method: "POST", headers: { Authorization: "Bearer " + credential.token, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return { status: response.status, data: await response.json() };
+}
+
+test("real bridge and Mod preserve a complete tool inventory above 60000 bytes", async t => {
+  const owner = createHostBridge({ responseWaitMs: 5 }); t.after(() => owner.close());
+  const view = await owner.createView(root), state = createModState(); state.bridges.set("one", view.mod);
+  let receiptPosted; const reported = new Promise(resolve => { receiptPosted = resolve; });
+  const inventory = [{ name: "large_tool", description: "完整工具说明 ✓".repeat(12000), mcp: true }];
+  const api = { session: { id: async () => identity.sessionId, version: async () => ({ version: identity.version }) }, tool: { list: async () => inventory },
+    http: { fetch: async (url, options) => { const response = await fetch(url, options); const result = { ok: response.ok, status: response.status, text: await response.text() }; if (url.endsWith("/result")) receiptPosted(); return result; } } };
+  await pollBridges(api, state);
+  const queued = await post(view.browser, "/action", { id: "large", action: "tools.list", args: {} });
+  assert.equal(queued.data.status, "pending");
+  await pollBridges(api, state);
+  await reported;
+  const response = await fetch(view.browser.url + "/result?id=large", { headers: { Authorization: "Bearer " + view.browser.token } });
+  const result = await response.json();
+  assert.equal(result.status, "completed"); assert.equal(result.settled, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(result)) > 60000);
+  assert.equal(result.data.tools[0].description, inventory[0].description);
+  assert.equal(result.data.complete, true); assert.equal(result.data.omitted, undefined);
+});
+
+test("bridge refuses JSON request bodies above the 8 MiB transport guard", async t => {
+  const owner = createHostBridge(); t.after(() => owner.close());
+  const view = await owner.createView(root);
+  const refused = await post(view.mod, "/events", { events: [], padding: "x".repeat(8 * 1024 * 1024) });
+  assert.equal(refused.status, 400); assert.match(refused.data.error, /8 MiB/);
+});
+
+test("bridge settles delivered pending receipts on disconnect and identity change", async t => {
+  const owner = createHostBridge({ responseWaitMs: 5 }); t.after(() => owner.close());
+  for (const cause of ["disconnect", "identity"]) {
+    const view = await owner.createView(root + cause);
+    await post(view.mod, "/poll", { identity, capabilities: nativeCapabilities(tools) });
+    await post(view.browser, "/action", { id: cause, action: "composer.writeDraft", args: { text: "draft", mode: "append" } });
+    await post(view.mod, "/poll", { identity, capabilities: nativeCapabilities(tools) });
+    await post(view.mod, cause === "disconnect" ? "/disconnect" : "/poll", cause === "disconnect" ? {} : { identity: { ...identity, sessionId: "other" }, capabilities: nativeCapabilities(tools) });
+    const response = await fetch(view.browser.url + "/result?id=" + cause, { headers: { Authorization: "Bearer " + view.browser.token } });
+    const result = await response.json();
+    assert.equal(result.status, "pending"); assert.equal(result.settled, true); assert.equal(result.requestId, cause);
+  }
+});
+
+test("Mod native-reply errors keep raw data in the page result", async () => {
+  const state = createModState(), receipts = [], raw = { result: { content: [{ type: "text", text: "No recognized tab inventory" }] } };
+  state.bridges.set("one", bridge);
+  const api = { session: { id: async () => identity.sessionId, version: async () => ({ version: identity.version }) }, tool: { list: async () => tools, call: async () => raw },
+    http: { fetch: async (url, options) => {
+      if (url.endsWith("/poll")) return { ok: true, text: JSON.stringify({ requests: [request("bad-tabs", "views.open", { resource: { kind: "web", url: "https://example.com" }, reuseKey: "bad", activate: true })] }) };
+      if (url.endsWith("/result")) receipts.push(JSON.parse(options.body));
+      return { ok: true, text: "{}" };
+    } } };
+  await pollBridges(api, state);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(receipts.length, 1); assert.equal(receipts[0].result.status, "error"); assert.deepEqual(receipts[0].result.data, raw);
+});
+
+
+test("bridge final unknown receipts keep their id and accept identical Mod receipt retries", async t => {
+  const owner = createHostBridge({ responseWaitMs: 5 }); t.after(() => owner.close());
+  const view = await owner.createView(root);
+  await post(view.mod, "/poll", { identity, capabilities: nativeCapabilities(tools) });
+  await post(view.browser, "/action", { id: "unknown", action: "composer.writeDraft", args: { text: "draft", mode: "append" } });
+  await post(view.mod, "/poll", { identity, capabilities: nativeCapabilities(tools) });
+  const body = { id: "unknown", result: { status: "pending", message: "receipt lost" } };
+  assert.equal((await post(view.mod, "/result", body)).status, 200);
+  assert.equal((await post(view.mod, "/result", body)).status, 200);
+  const response = await fetch(view.browser.url + "/result?id=unknown", { headers: { Authorization: "Bearer " + view.browser.token } });
+  assert.deepEqual(await response.json(), { status: "pending", message: "receipt lost", requestId: "unknown", settled: true });
 });

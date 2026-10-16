@@ -60,10 +60,11 @@ test("Claude stores one snapshot per page without submitting or filling a draft"
   assert.deepEqual(calls, []);
 });
 
-test("Claude attaches this session's snapshots to the next prompt from any sender and reports them", async () => {
+test("Claude attaches snapshots to another sender prompt and reports them", async () => {
   const hooks = new Map();
   const on = (name, ...rest) => { const handler = rest.at(-1); if (rest.length === 1) hooks.set(name, handler); };
   const state = registerPluginBase(on, { pages: [] });
+  state.bridges.set("owner", bridge);
   state.contexts.set("owner", { snapshot: { node: "α" } });
   let entered;
   const result = await hooks.get("prompt.submit")({}, { text: "change this node", origin: { kind: "composer" } }, async e => { entered = e; return { text: e.text, context: e.context }; });
@@ -74,4 +75,18 @@ test("Claude attaches this session's snapshots to the next prompt from any sende
   const plain = await hooks.get("prompt.submit")({}, { text: "unrelated", origin: { kind: "composer" } }, async e => ({ text: e.text, context: e.context }));
   assert.equal(plain.context, undefined);
   assert.equal(state.events.length, 1);
+});
+
+
+test("Claude prompt hook skips its own plugin origin and preserves other plugins' hidden context", async () => {
+  const hooks = new Map();
+  const state = registerPluginBase((name, ...rest) => { if (rest.length === 1) hooks.set(name, rest[0]); });
+  state.bridges.set("owner", bridge); state.contexts.set("owner", { snapshot: { a: 1 } });
+  const own = { text: "already inline", origin: { kind: "plugin", name: "graph-skill-canvas-mod" }, context: ["existing"] };
+  let entered;
+  await hooks.get("prompt.submit")({}, own, async e => { entered = e; return e; });
+  assert.equal(entered, own); assert.deepEqual(state.events, []);
+  await hooks.get("prompt.submit")({}, { ...own, origin: { kind: "plugin", name: "another-plugin" } }, async e => { entered = e; return e; });
+  assert.deepEqual(entered.context, ["existing", contextText({ a: 1 })]);
+  assert.equal(state.events[0].data.origin, "plugin");
 });

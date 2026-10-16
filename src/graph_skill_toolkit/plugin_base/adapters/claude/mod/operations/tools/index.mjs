@@ -1,4 +1,16 @@
-export const notSent = message => Object.assign(new Error(message), { outcome: "not-sent" });
+export const notSent = (message, data) => Object.assign(new Error(message), { outcome: "not-sent", ...(data === undefined ? {} : { data }) });
+
+/** Plain text from the native reply, retaining the host's exact sentences. */
+export function nativeText(value) {
+  if (typeof value?.text === "string") return value.text;
+  if (Array.isArray(value?.content)) return value.content.filter(block => typeof block.text === "string").map(block => block.text).join("\n");
+  return value?.result !== undefined ? nativeText(value.result) : "";
+}
+
+export function noWindowMessage(value) {
+  const text = nativeText(value);
+  return text.split("\n").find(line => /session (?:isn't|is not) open in any window/i.test(line)) ?? null;
+}
 
 export function nativeData(value) {
   if (value?.structuredContent) return value.structuredContent;

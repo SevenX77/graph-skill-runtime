@@ -87,9 +87,10 @@ export function registerPluginBase(on, { pages = [] } = {}) {
     return next(e);
   });
   // context.update: this session's page snapshots ride along with the next
-  // prompt from any sender, visible to the model and hidden from the user.
+  // prompt from another sender, visible to the model and hidden from the user.
   // A failure in this bookkeeping never blocks the user's prompt.
   on('prompt.submit', async ($, e, next) => {
+    if (e.origin?.kind === 'plugin' && e.origin.name === 'graph-skill-canvas-mod') return next(e);
     let blocks = [];
     try { blocks = [...state.contexts.values()].filter(item => item && Object.keys(item.snapshot).length).map(item => contextText(item.snapshot)); }
     catch { blocks = []; }

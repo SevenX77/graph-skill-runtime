@@ -9,7 +9,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {launchHostInfo,requestClientInfo} from '../../plugin_base/adapters/launch/index.mjs';
 import {readLaunchHostInfo,discoverConnection} from '../../plugin_base/adapters/detection/index.mjs';
 import {createHostAdapter} from '../../plugin_base/adapters/factory/index.mjs';
-import {pollBridges} from '../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
+import {pollBridges,createModState} from '../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
 import {register} from '../../composition/claude_mod/hooks/register.js';
 import {createHostBridge} from '../../plugin_base/adapters/claude/bridge/server.mjs';
 import {graph} from '../../apps/graph_canvas/application/demo/graph.mjs';
@@ -149,14 +149,17 @@ test('real stdio and HTTP deliver startup identity before any page handshake and
       const a=createHostAdapter({document:{querySelector:()=>({textContent:JSON.stringify(snapshot)})},window:{parent:null,location:{origin:new URL(view.url).origin}}});
       const graphFailures=[];
       await a.connect({receive(){},fail:error=>graphFailures.push(error)});assert.equal(a.hostId,'unknown');
-      let filled=0,posted;
-      const state={bridges:new Map([['native',{...view.bridge,skillRoot:temp}]]),running:new Set(),seen:new Set(),receipts:new Map(),reported:new Set(),context:null,polling:false,closed:false,generation:0};
+      let filled=0;
+      const state=createModState();state.bridges.set('native',{...view.bridge,skillRoot:temp});
       const api={session:{id:async()=>native.sessionId,version:async()=>({version:native.version})},tool:{list:async()=>[]},prompt:{fill:async()=>{filled++;return {isFilled:true};}},ui:{log:assert.fail},
-        http:{fetch:async(url,init)=>{const r=await fetch(url,init),v={ok:r.ok,text:await r.text()};if(url.endsWith('/result'))posted?.();return v;}}};
+        http:{fetch:async(url,init)=>{const r=await fetch(url,init);return {ok:r.ok,status:r.status,text:await r.text()};}}};
       await pollBridges(api,state);await a.capabilities();assert.equal(a.hostId,'claude');assert.equal(a.hostInfo.sessionId,info.sessionId);
-      const receipt=await a.invoke('composer.writeDraft',{text:'launch-bound',mode:'append'});
-      const delivered=new Promise(r=>{posted=r;});await pollBridges(api,state);await delivered;
-      assert.equal((await a.getResult(receipt.requestId)).status,'completed');assert.equal(filled,1);
+      let heartbeatWork;
+      const heartbeat=setInterval(()=>{if(!state.polling)heartbeatWork=pollBridges(api,state);},10);
+      let receipt;
+      try { receipt=await a.invoke('composer.writeDraft',{text:'launch-bound',mode:'append'}); }
+      finally { clearInterval(heartbeat);await heartbeatWork; }
+      assert.equal(receipt.status,'completed');assert.equal(receipt.settled,true);assert.equal(filled,1);
       const second=await client.callTool({name:'show_graph',arguments:{...args,native_host:{...native,sessionId:'session-B'}}});
       assert.notEqual(second.structuredContent.presentation.url,view.url);
       await a.capabilities();assert.equal(a.hostId,'unknown');

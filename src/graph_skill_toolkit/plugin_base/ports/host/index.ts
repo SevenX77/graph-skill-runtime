@@ -71,6 +71,8 @@ export interface HostResult {
   message: string;
   data?: unknown;
   requestId?: string;
+  /** The bridge has finished this receipt, even when the effect remains unknown. */
+  settled?: boolean;
   evidence?: CallEvidence;
 }
 

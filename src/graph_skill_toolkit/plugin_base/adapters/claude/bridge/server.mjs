@@ -12,7 +12,7 @@ async function readJson(request) {
   const chunks = []; let length = 0;
   for await (const chunk of request) {
     length += chunk.length;
-    if (length > 65536) throw new Error("Bridge request exceeds 64 KiB.");
+    if (length > 8 * 1024 * 1024) throw new Error("Bridge request exceeds 8 MiB.");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
@@ -33,8 +33,12 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http 
   listener.mount(path => path === "/" || pages.has(path) || paths.has(path), handle);
   let base, closing, closed = false;
   const connected = view => view.confirmed && !view.disconnected && now() - view.lastPoll < 5000;
+  function settledReceipt(entry, result) {
+    return { ...result, ...(result.status === "pending" ? { requestId: entry.request.id } : {}), settled: true };
+  }
   function finish(entry, result) {
     if (entry.result) return;
+    result = settledReceipt(entry, result);
     entry.result = result;
     for (const resolve of entry.waiters) resolve(result);
     entry.waiters.clear();
@@ -91,7 +95,7 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http 
         if (view.identityKey && view.identityKey !== identityKey) {
           view.disconnected = true;
           credentials.delete(view.mod.token);
-          for (const entry of view.requests.values()) finish(entry, {status:entry.delivered ? "pending" : "error",message:"会话身份已改变；旧画布操作不会交给新会话。",requestId:entry.request.id});
+          for (const entry of view.requests.values()) finish(entry, {status:entry.delivered ? "pending" : "error",message:"会话身份已改变；旧画布操作不会交给新会话。",settled: true, requestId:entry.request.id});
           return send(409, {error:"The bridge belongs to another host session. Open a new page."});
         }
         view.identityKey = identityKey;
@@ -110,7 +114,7 @@ export function createHostBridge({ responseWaitMs = 20000, now = Date.now, http 
       if (request.method === "POST" && url.pathname === "/result" && role === "mod") {
         const input = await readJson(request), entry = view.requests.get(input.id);
         if (!entry?.delivered || !statuses.has(input.result?.status) || typeof input.result?.message !== "string") throw new Error("Invalid result receipt.");
-        if (entry.result && JSON.stringify(entry.result) !== JSON.stringify(input.result)) throw new Error("Conflicting result receipt.");
+        if (entry.result && JSON.stringify(entry.result) !== JSON.stringify(settledReceipt(entry, input.result))) throw new Error("Conflicting result receipt.");
         finish(entry, input.result); return send(200, {});
       }
       if (request.method === "POST" && url.pathname === "/events" && role === "mod") {

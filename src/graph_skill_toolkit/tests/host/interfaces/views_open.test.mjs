@@ -64,3 +64,13 @@ test("Claude opens an own Browser tab, reuses it by reuseKey and reports a hidde
   const fileView = await executeBridgeAction(browser.api, state, claudeBridge, open("o3", file));
   assert.equal(fileView.status, "unsupported");
 });
+
+
+test("Claude view inventory errors keep raw replies and no-window replies are rejected", async () => {
+  for (const [raw, outcome] of [[{ text: "unrecognized inventory" }, "not-sent"], [{ text: "This session isn't open in any window right now, so its view was left alone." }, "rejected"]]) {
+    const browser = fakeBrowser(); browser.api.tool.call = async () => raw;
+    await assert.rejects(executeBridgeAction(browser.api, createModState(), claudeBridge, open("bad", web)), error => {
+      assert.equal(error.outcome, outcome); assert.deepEqual(error.data, raw); return true;
+    });
+  }
+});

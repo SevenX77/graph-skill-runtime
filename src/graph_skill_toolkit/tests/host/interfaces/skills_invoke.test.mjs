@@ -6,69 +6,52 @@ import { capability as claudeCapability } from "../../../plugin_base/host_interf
 import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 
-const root = "C:/business/example";
-const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: root };
-const request = (id, args) => ({ id, action: "skills.invoke", args, key: root });
-const nativeTools = [{ name: "Skill", description: "Activate a Skill", mcp: false }];
-function host(reply, tools = nativeTools) {
-  const calls = [];
-  const $ = {
-    session: { id: async () => "session-a" },
-    tool: { list: async () => tools, call: async input => { calls.push(input); return typeof reply === "function" ? reply(input) : reply; } },
-  };
-  return { $, calls };
+const bridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "page" };
+function host(reply) {
+  const sends = [];
+  const api = { session: { id: async () => "session-a" }, tool: { list: async () => [], call: assert.fail },
+    prompt: { submit: async input => { sends.push(input); return typeof reply === "function" ? reply(input) : reply; } } };
+  return { api, sends };
 }
-const execute = (api, id, args) => executeBridgeAction(api, createModState(), bridge, request(id, args));
+const execute = (api, args) => executeBridgeAction(api, createModState(), bridge, { id: "invoke", action: "skills.invoke", args, key: bridge.key });
 
-test("Skill input is generic, named, and optional JSON; Codex does not substitute a message", () => {
+test("Skill input remains named optional JSON; Claude slash submission is independent of the Skill tool", () => {
   assert.deepEqual(validateArguments("skills.invoke", { skill: "example", input: { query: "中文" } }), { skill: "example", input: { query: "中文" } });
   for (const skill of ["", "  ", "one\ntwo"]) assert.throws(() => validateArguments("skills.invoke", { skill }));
   assert.equal(codexCapability().state, "unknown");
-  assert.equal(claudeCapability([]).state, "unavailable");
-  assert.equal(claudeCapability(nativeTools).state, "available");
+  assert.equal(claudeCapability([]).state, "available");
 });
 
-test("Claude uses the actual flat Skill tool envelope and acknowledges only native activation", async () => {
-  const { $, calls } = host({ result: { success: true, commandName: "example", status: "inline" }, text: "loaded" });
-  const result = await execute($, "invoke", { skill: "example", input: "run this" });
-  assert.deepEqual(calls, [{ tool: "Skill", skill: "example", args: "run this" }]);
-  assert.equal(result.status, "completed");
-  assert.match(result.message, /业务任务结果须另行核对/);
-  assert.equal(result.data.result.commandName, "example");
-});
-
-test("Claude does not coerce JSON input or call the host without a listed Skill tool", async () => {
-  const a = host({ result: { success: true, commandName: "example" } });
-  assert.equal((await execute(a.$, "object", { skill: "example", input: { id: 1 } })).status, "unsupported");
-  assert.deepEqual(a.calls, []);
-  const b = host(null, []);
-  assert.equal((await execute(b.$, "unlisted", { skill: "example" })).status, "unsupported");
-  assert.deepEqual(b.calls, []);
-});
-
-test("Claude distinguishes refused, failed, read-only, background and missing activation receipts", async () => {
-  for (const [response, status, pattern] of [
-    [{ deny: "Denied" }, "rejected", /拒绝/],
-    [{ isError: true, text: "not found" }, "error", /返回错误/],
-    [{ result: { success: false, commandName: "missing" } }, "error", /激活失败/],
-    [{ result: { success: true, commandName: "example", status: "inline", readOnly: true } }, "completed", /只读加载/],
-    [{ result: { success: true, commandName: "example", status: "forked", agentId: "agent-1", result: "launched", background: true } }, "accepted", /业务结果仍待/],
-    [{ result: { ok: true } }, "pending", /不要重试/],
-  ]) {
-    const { $, calls } = host(response);
-    const result = response.deny
-      ? await execute($, "case", { skill: "example" }).catch(error => failureResult(error, true))
-      : await execute($, "case", { skill: "example" });
-    assert.equal(result.status, status);
-    assert.match(result.message, pattern);
-    assert.deepEqual(calls, [{ tool: "Skill", skill: "example" }]);
+test("Claude skills.invoke submits /name input and reports acceptance rather than hidden activation", async () => {
+  const { api, sends } = host(input => ({ text: input.text }));
+  const result = await execute(api, { skill: "example", input: "run this" });
+  assert.deepEqual(sends, [{ text: "/example run this" }]);
+  assert.equal(result.status, "accepted");
+  assert.deepEqual(result.evidence.receipt, { text: "/example run this" });
+  assert.match(result.message, /对话.*turn.completed/);
+  for (const input of [undefined, ""]) {
+    const result = await execute(api, { skill: "example", ...(input === undefined ? {} : { input }) });
+    assert.equal(result.status, "accepted"); assert.deepEqual(sends.at(-1), { text: "/example" });
   }
 });
 
-test("lost native reply is not silently reported as activation or resent", async () => {
-  const { $, calls } = host(() => { throw new Error("receipt lost"); });
-  const result = await execute($, "lost", { skill: "example" }).catch(error => failureResult(error, true));
-  assert.equal(result.status, "pending");
-  assert.match(result.message, /receipt lost/);
-  assert.equal(calls.length, 1);
+test("Claude refuses non-string Skill input without coercion or submission", async () => {
+  const { api, sends } = host({ text: "unused" });
+  assert.equal((await execute(api, { skill: "example", input: { id: 1 } })).status, "unsupported");
+  assert.deepEqual(sends, []);
+});
+
+test("Claude Skill command reports a prompt drop or missing receipt without claiming activation", async () => {
+  const dropped = host({ drop: "blocked" });
+  const result = await execute(dropped.api, { skill: "example" });
+  assert.equal(result.status, "rejected"); assert.equal(result.evidence.receipt.drop, "blocked");
+  const ambiguous = host({});
+  await assert.rejects(execute(ambiguous.api, { skill: "example" }), /回执无法确认/);
+  assert.equal(ambiguous.sends.length, 1);
+});
+
+test("lost Skill submit reply stays unknown and is never replayed", async () => {
+  const { api, sends } = host(() => { throw new Error("receipt lost"); });
+  const result = await execute(api, { skill: "example" }).catch(error => failureResult(error, true));
+  assert.equal(result.status, "pending"); assert.match(result.message, /receipt lost/); assert.equal(sends.length, 1);
 });

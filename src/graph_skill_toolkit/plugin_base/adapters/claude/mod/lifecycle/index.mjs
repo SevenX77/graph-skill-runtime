@@ -35,12 +35,7 @@ async function executeAndReport($, state, bridge, request, sessionId) {
     if (await $.session.id() !== sessionId || state.closed || state.generation !== generation) throw new Error('The originating Claude session has ended.');
     result = await executeBridgeAction($, state, bridge, request, { sessionId, generation });
   }
-  catch (error) { result = {status:error.outcome === 'not-sent' ? 'error' : error.outcome === 'rejected' ? 'rejected' : 'pending',message:String(error.message || error)}; }
-  const resultBytes = new TextEncoder().encode(JSON.stringify(result)).length;
-  if (resultBytes > 60000) result = {
-    status:result.status,message:result.message + ' 返回数据超过画布回执上限，完整结果未传回页面。',
-    data:{resultBytes,omitted:true},
-  };
+  catch (error) { result = {status:error.outcome === 'not-sent' ? 'error' : error.outcome === 'rejected' ? 'rejected' : 'pending',message:String(error.message || error), ...(error.data === undefined ? {} : { data: error.data })}; }
   state.running.delete(key);
   if (state.closed || state.generation !== generation) return;
   state.receipts.set(key, {bridge,id:request.id,result});
@@ -58,7 +53,7 @@ async function flushReceipts($, state) {
 
 /** Queue a host event for every page of this session; bounded so a closed page cannot grow it. */
 export function queueEvent(state, type, data) {
-  if (state.closed || !state.events) return;
+  if (state.closed || !state.events || state.bridges.size === 0) return;
   state.events.push({ type, at: new Date().toISOString(), ...(data === undefined ? {} : { data }) });
   if (state.events.length > 200) state.events.splice(0, state.events.length - 200);
 }

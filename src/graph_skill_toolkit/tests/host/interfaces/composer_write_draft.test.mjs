@@ -76,3 +76,15 @@ test("Claude prompt.fill uses both draft modes without prompt.submit and disting
   await assert.rejects(executeBridgeAction($, state, bridge, request("four", "append")), /回执无法确认/);
   assert.equal(fills.length, 4);
 });
+
+
+test("Claude draft refusal reports no_composer, dialog or an unknown cause", async () => {
+  for (const [refusal, pattern] of [["no_composer", /没有绑定输入框/], ["dialog", /对话框占用输入/], [undefined, /原因未知/]]) {
+    const raw = { isFilled: false, ...(refusal ? { refusal } : {}) };
+    const api = { session: { id: async () => "s" }, tool: { list: async () => [] }, prompt: { fill: async () => raw } };
+    const bridge = { url: "http://127.0.0.1:12345", token: "t", key: "p" };
+    const result = await executeBridgeAction(api, createModState(), bridge, { id: "draft", action: "composer.writeDraft", args: { text: "draft", mode: "append" }, key: "p" });
+    assert.equal(result.status, "rejected"); assert.match(result.message, pattern);
+    assert.equal(result.data.refusal, refusal ?? null); assert.deepEqual(result.evidence.receipt, raw);
+  }
+});

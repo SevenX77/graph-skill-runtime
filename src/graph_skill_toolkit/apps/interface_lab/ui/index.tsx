@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { HostAdapter, HostCapabilities, HostInfo, HostResult } from "../../../plugin_base/page/types";
 import { GUIDES, GROUPS, CONTEXT_PROBE, type LabPaths } from "../application/guide.mjs";
-import { runOperation, contextReadout, recordPath } from "../application/runner.mjs";
+import { runOperation, contextReadout, recordPath, workspaceRoot, localTime } from "../application/runner.mjs";
 
 type Verdict = "" | "matches" | "differs" | "not-observed";
 type Run = { id: number; op: string; args: unknown; result: HostResult; at: string; verdict: Verdict; note: string; stop?: () => Promise<HostResult> | HostResult; stopped?: HostResult };
@@ -25,6 +25,9 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
   const [events, setEvents] = useState<EventRow[]>([]);
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const [workspace, setWorkspace] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState<{ op: string; since: number } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const [saved, setSaved] = useState("");
   const sequence = useRef(0);
   const startedAt = useRef(new Date().toISOString());
@@ -34,7 +37,7 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
     for (const run of runs) { const id = (run.result.data as { viewId?: unknown } | undefined)?.viewId; if (run.op === "views.open" && typeof id === "string") return id; }
     return null;
   }, [runs]);
-  const presetContext = { lab, host, lastViewId };
+  const presetContext = { lab, host, lastViewId, workspaceRoot: workspace };
   const draft = drafts[selected] ?? show(guide.presets[0].args(presetContext));
 
   function addEvent(event: { type: string; at: string; data?: unknown }, source: string) {
@@ -54,9 +57,17 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
       unsubscribe = adapter.events.subscribe(event => addEvent(event, "页面启动时的全量订阅"));
       setCapabilities(await adapter.capabilities());
       setHostInfo(adapter.hostInfo);
+      const context = await adapter.host.getContext();
+      if (!disposed) setWorkspace(workspaceRoot(context));
     }).catch(error => { if (!disposed) { setConnection("连接失败"); setFailure(String(error instanceof Error ? error.message : error)); } });
     return () => { disposed = true; unsubscribe(); void adapter.dispose(); };
   }, [adapter]);
+
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - waiting.since) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [waiting]);
 
   function stateOf(id: string) {
     if (id.startsWith("local.")) return adapter?.local.available ? "available" : "unavailable";
@@ -66,6 +77,8 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
   async function run(op = selected, text = draft) {
     if (!adapter || busy) return;
     setBusy(true);
+    setElapsed(0);
+    setWaiting({ op, since: Date.now() });
     let args: unknown = null, outcome: { result: HostResult; stop?: Run["stop"] };
     try {
       args = JSON.parse(text);
@@ -74,8 +87,9 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
     } catch (error) {
       outcome = { result: { status: "error", message: error instanceof Error ? error.message : String(error), evidence: { sent: args ?? text, limits: [] } } };
     }
-    setRuns(previous => [{ id: ++sequence.current, op, args, result: outcome.result, stop: outcome.stop, at: new Date().toLocaleTimeString(), verdict: "", note: "" }, ...previous]);
+    setRuns(previous => [{ id: ++sequence.current, op, args, result: outcome.result, stop: outcome.stop, at: new Date().toISOString(), verdict: "", note: "" }, ...previous]);
     if (op === "host.getCapabilities") setCapabilities(await adapter.capabilities().catch(() => capabilities));
+    setWaiting(null);
     setBusy(false);
   }
 
@@ -112,6 +126,8 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
       <span className="facts">连接 <b>{connection}</b>（{hostInfo?.transport ?? "none"}）</span>
       <span className="facts">本地能力 <b>{adapter?.local.available ? "可用" : "不可用"}</b></span>
       <span className="facts">实验室目录 <code>{lab?.stateDirectory ?? "未知"}</code></span>
+      <span className="facts">sample.txt 是首次打开时在插件状态目录的 sandbox 中创建的临时样例，用于本地文件读写、监听与系统定位。宿主文件面板使用工作区路径。</span>
+      <span className="facts">会话工作区 <code>{workspace ?? "未知；宿主文件预设中的路径需手动编辑"}</code></span>
     </header>
     <div className="lab-body">
       <nav className="op-list" aria-label="接口列表">
@@ -145,17 +161,18 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
           {selected === "context.update" ? <button type="button" disabled={!adapter || busy || connection !== "已连接"} onClick={() => void run("conversation.submitMessage", JSON.stringify({ text: CONTEXT_PROBE }))}>让模型复述上下文</button> : null}
           <span className="muted">结果显示四段证据：发送了什么、宿主回执、观察到的实际效果、适用的限制。</span>
         </div>
+        {waiting ? <p className="muted" role="status">宿主处理中…已等待 {elapsed} 秒。{["conversation.submitMessage", "skills.invoke"].includes(waiting.op) ? "会话忙时，提交排队到空闲；等待回执不会重复提交。" : "正在等待宿主回执。"}</p> : null}
         {saved ? <p className="muted">{saved}</p> : null}
         <h3>调用记录（{opRuns.length}）</h3>
         {opRuns.length === 0 ? <p className="muted">还没有调用。</p> : opRuns.map(item => <article className="run" key={item.id}>
-          <div className="run-head"><code>{item.op}</code><span className={"status " + item.result.status}>{statusText[item.result.status]}</span>
-            {item.result.requestId ? <code className="muted">请求 {item.result.requestId}</code> : null}<time>{item.at}</time></div>
+          <div className="run-head"><code>{item.op}</code><span className={"status " + item.result.status}>{item.result.status === "accepted" && host === "claude" ? "已受理（效果需观察）" : statusText[item.result.status]}</span>
+            {item.result.requestId ? <code className="muted">请求 {item.result.requestId}</code> : null}<time>{localTime(item.at)}</time></div>
           <p className="run-message">{item.result.message}</p>
           {item.op === "context.update" && item.result.status === "completed" ? <div className="readout">
             <h4>模型将读到的原文（插件实际发送）</h4>
             {contextReadout(item.result).map((text, index) => <pre key={index}>{text}</pre>)}
             {(item.result.data as { cleared?: boolean } | undefined)?.cleared ? <p className="muted">这是一次清除：宿主收到空上下文。</p> : null}
-            {host === "claude" ? <p className="muted">Claude 会在下一条提交时附上这段文字；实际附上的原文见事件记录里的 context.attached。</p> : <p className="muted">Codex 只确认收到；用“让模型复述上下文”核对模型实际读到的内容。</p>}
+            {host === "claude" ? <p className="muted">Claude 对其他来源的提交使用隐藏段落；本页提交在可见消息后内联段落。原文与路径见 context.attached。</p> : <p className="muted">Codex 只确认收到；用“让模型复述上下文”核对模型实际读到的内容。</p>}
           </div> : null}
           <div className="evidence">
             <section><h4>发送了什么（sent）</h4><pre>{show(item.result.evidence?.sent)}</pre></section>
@@ -178,7 +195,7 @@ export function InterfaceLab({ adapter, lab: initialLab }: { adapter: HostAdapte
         <div className="events-head"><h2>事件记录</h2><input placeholder="按类型或来源过滤" value={filter} onChange={event => setFilter(event.target.value)} /><button type="button" onClick={() => setEvents([])}>清空</button></div>
         <div className="event-list" role="log" aria-live="polite">
           {visibleEvents.length === 0 ? <p className="muted">还没有事件。在对话里发消息、调用工具，或在本页运行“监听文件变化”。</p> : visibleEvents.map(event => <details className="event" key={event.id}>
-            <summary><code>{event.type}</code><span>{new Date(event.at).toLocaleTimeString()}</span></summary>
+            <summary><code>{event.type}</code><span>{localTime(event.at)}</span></summary>
             <div className="source">来源：{event.source}</div>
             <pre>{show(event.data)}</pre>
           </details>)}

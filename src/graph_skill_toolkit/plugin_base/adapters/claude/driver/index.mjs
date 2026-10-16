@@ -6,9 +6,17 @@ export function claudeAdapter(connection, { requestId = () => globalThis.crypto.
     async invoke(action, args = {}) {
       if (!ACTIONS.includes(action)) return { status: "unsupported", message: "未知的画布测试操作。" };
       const id = requestId();
-      try { return await connection.request("/action", { id, action, args }); }
+      let querying = false;
+      try {
+        let result = await connection.request("/action", { id, action, args });
+        while (result.status === "pending" && result.requestId && result.settled !== true) {
+          querying = true;
+          result = await connection.request("/result?id=" + encodeURIComponent(result.requestId));
+        }
+        return result;
+      }
       catch (error) {
-        if (error.requestRejected) return {status:"rejected",message:error.message};
+        if (!querying && error.requestRejected) return {status:"rejected",message:error.message};
         // A lost HTTP response cannot tell us whether the Mod already acted.
         // Keep the identity so the UI queries this operation instead of resending.
         return {status:"pending",message:"提交结果未确认；请查询这次请求，避免重复执行。",requestId:id};

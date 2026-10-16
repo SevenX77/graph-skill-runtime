@@ -7,6 +7,7 @@ import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.m
 import { validateArguments } from "../../../plugin_base/ports/host/contract.mjs";
 import { bridgeKey, createModState, pollBridges } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
+import { contextText } from "../../../plugin_base/host_interfaces/context/update/index.mjs";
 import { registerPluginBase } from "../../../plugin_base/adapters/claude/mod/hooks/base.js";
 
 const action = "conversation.submitMessage";
@@ -81,15 +82,19 @@ function claudeApi(submit, session = () => "session-a") {
   return { session: { id: async () => session(), model: async () => "claude-session-model" }, tool: { list: async () => [] }, prompt: { submit } };
 }
 
-test("Claude Mod submits the page's text once, unchanged, and accepts only an affirmative prompt.submit receipt", async () => {
+test("Claude Mod inlines its page snapshot once and records inline delivery on an affirmative receipt", async () => {
   const state = createModState(), sends = [], owner = bridge.url + "/" + bridge.token;
+  state.bridges.set(owner, bridge);
   state.contexts.set(owner, { snapshot: { node: { id: "one" } } });
   const api = claudeApi(async input => { sends.push(input); return { text: input.text, origin: {kind: "plugin", name: "graph-skill"} }; });
   const result = await executeBridgeAction(api, state, bridge, request("r1", "run"));
   assert.equal(result.status, "accepted");
   assert.deepEqual(result.data, { modified: false });
-  // Page context rides on the prompt.submit hook, never inside the message text.
-  assert.deepEqual(sends, [{ text: "run" }]);
+  const block = contextText({ node: { id: "one" } });
+  assert.deepEqual(sends, [{ text: "run\n\n---\n" + block }]);
+  assert.deepEqual(result.evidence.sent, { text: "run", inlinedContext: [block] });
+  assert.equal(result.evidence.observed.contextDelivery, "inline");
+  assert.deepEqual(state.events.map(e => [e.type, e.data.origin, e.data.blocks]), [["context.attached", "plugin-inline", [block]]]);
   assert.equal(result.evidence.observed.sessionModel, "claude-session-model");
   const other = { ...bridge, token: "b".repeat(64) };
   await executeBridgeAction(api, state, other, request("r2", "other"));
@@ -142,14 +147,16 @@ test("Claude applies a specified model and effort only to the turn its message s
   const hooks = new Map();
   const on = (name, ...rest) => { if (rest.length === 1) hooks.set(name, rest[0]); };
   const state = registerPluginBase(on, { pages: [] });
+  state.bridges.set(bridgeKey(bridge), bridge);
   const api = claudeApi(async input => ({ text: input.text }));
   const unsupported = await executeBridgeAction(api, state, bridge, { id: "d", action, args: { text: "x", model: { source: "default" } }, key: bridge.key });
   assert.equal(unsupported.status, "unsupported");
+  state.contexts.set(bridgeKey(bridge), { snapshot: { node: "one" } });
   const result = await executeBridgeAction(api, state, bridge, { id: "s", action, args: { text: "use haiku", model: { source: "specified", value: "haiku" }, effort: { source: "specified", value: "low" } }, key: bridge.key });
   assert.equal(result.status, "accepted");
   assert.deepEqual(result.evidence.observed.turnOverride, { model: "haiku", effort: "low", turnId: null });
   await hooks.get("turn.start")({}, { text: "someone else", turnId: "t0" }, async e => ({ turnId: e.turnId }));
-  await hooks.get("turn.start")({}, { text: "use haiku", turnId: "t1" }, async e => ({ turnId: e.turnId }));
+  await hooks.get("turn.start")({}, { text: state.overrides[0].text, turnId: "t1" }, async e => ({ turnId: e.turnId }));
   const seen = [];
   async function drive(turnId, agentId) {
     const stream = hooks.get("turn.step")({}, { turnId, index: 0, model: "opus", effort: "high", messageCount: 1, ...(agentId ? { agentId } : {}) },

@@ -38,7 +38,7 @@ export function validateResult(value) {
   const result = record(value);
   if (typeof result.status !== "string" || !["completed", "accepted", "pending", "unsupported", "rejected", "error"].includes(result.status) ||
       typeof result.message !== "string" || (result.requestId !== undefined && typeof result.requestId !== "string") ||
-      !validEvidence(result.evidence)) {
+      (result.settled !== undefined && typeof result.settled !== "boolean") || !validEvidence(result.evidence)) {
     throw Object.assign(new Error("适配器返回了无效结果，无法确认操作状态。"),
       typeof result.requestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(result.requestId) ? { requestId: result.requestId } : {});
   }

@@ -6,7 +6,7 @@ The Plugin Base is the shared foundation for plugin pages: web pages that a plug
 - a **page**: a self-contained HTML document that runs in the host and calls host interfaces and local capabilities through one page object;
 - a **Claude Mod registration**: the hook module that lets Claude Code present the page and carry its host operations.
 
-This document owns plugin construction and the argument, effect, host behavior, limit and evidence reference for all 22 operations. [The adapter architecture](../ADAPTER.md) owns connection authority and transport behavior. [The application map](../ARCHITECTURE.md) owns process composition and lifecycle. [Page behavior](../PROTOTYPE.md) owns the Interface Lab display, and [the manual procedure](../MANUAL-TESTS.md) owns native observation. [The validation ledger](../VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) records the measured source checks and the pending native acceptance.
+This document owns plugin construction and the argument, effect, host behavior, limit and evidence reference for all 22 operations. The [Claude connection verdicts](../../../docs/design/interface-connect-verdicts-2026-10-16.md) own the dated native findings, connection decisions and required re-observation. [The adapter architecture](../ADAPTER.md) owns connection authority and transport behavior. [The application map](../ARCHITECTURE.md) owns process composition and lifecycle. [Page behavior](../PROTOTYPE.md) owns the Interface Lab display, and [the manual procedure](../MANUAL-TESTS.md) owns native observation. [The validation ledger](../VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) records the measured source checks and the pending native acceptance.
 
 ## Terms
 
@@ -231,7 +231,7 @@ if (adapter) {
 - `adapter.events.subscribe(listener, types?)` receives host events and returns the unsubscribe function.
 - `adapter.local` is the local capability client.
 - `adapter.hostInfo`, `adapter.hostId`, `adapter.hostName` and `adapter.state` (`new`, `connecting`, `connected`, `failed`, `disposed`) describe the connection.
-- `adapter.getResult(requestId)` exists on Claude; it looks up a `pending` result by its `requestId` without sending the operation again.
+- `adapter.getResult(requestId)` exists on Claude; it queries the receipt for an existing request. Normal invocation follows pending receipts automatically under the [waiting contract](#claude-host-operation-waiting-and-evidence-sizes).
 - `adapter.dispose()` closes the connection and the local client.
 
 ## Results and evidence
@@ -246,7 +246,7 @@ if (adapter) {
 | --- | --- |
 | `completed` | The operation's defined effect is established, such as reading data or storing context. Visible focus, a model reply and a business result each need their own observation. |
 | `accepted` | The host accepted the request; the effect is observed separately. |
-| `pending` | The request was dispatched and its outcome is unknown; check the host before sending it again. Claude pending results carry a `requestId` for `adapter.getResult`. |
+| `pending` | The request was dispatched and its outcome is unknown. Claude follows its `requestId` automatically until settlement or a transport failure; the retained identity supports receipt lookup. See [waiting semantics](#claude-host-operation-waiting-and-evidence-sizes). |
 | `unsupported` | The current host cannot perform the operation as requested. A capability whose state is `unavailable` or `unknown` yields this status with `data.capabilityState`. |
 | `rejected` | The host, the scope rule or the target refused the request. |
 | `error` | The operation failed or its arguments were invalid. |
@@ -258,11 +258,21 @@ The four evidence slots are defined by `CallEvidence` in [ports/host/index.ts](p
 - `observed`: data read back about the actual effect.
 - `limits`: plain-text host limits that applied, merged from the capability's `limits` and the implementation's own.
 
+Native-reply errors preserve the raw host reply in result `data`: a Mod error raised from that reply carries `error.data`, and result reporting copies it to the page. This includes an unrecognized view inventory. The result's message states the error; the raw data supports diagnosis.
+
+### Claude host-operation waiting and evidence sizes
+
+The bridge's `/action` response waits up to 20 seconds for the Mod. A `pending` response carries the existing `requestId`. The Claude driver then queries `GET /result?id=<requestId>` automatically; each query waits up to 20 seconds. It follows that same request until a non-pending result or a pending result with `settled: true`.
+
+Session disconnection or an identity change can settle a dispatched request with an unknown outcome. A transport failure ends automatic waiting and returns `pending` with the retained request id. Receipt lookup queries that operation; it sends no additional host action. The [lab waiting display](../PROTOTYPE.md#plugin-interface-lab-page) shows elapsed time and provides manual receipt lookup for a remaining unknown outcome.
+
+The Mod forwards complete result receipts. The bridge applies the [request-body transport bound](#toolslist) to protect its process. This bound governs encoded bridge requests, separately from the argument limits below and the local-capability limits.
+
 The page facade validates arguments before any host contact. Arguments are plain JSON objects whose fields are exactly the interface's declared fields, nested at most 32 levels and at most 48,000 UTF-8 bytes when encoded. Message and draft text contains non-whitespace content and is at most 8000 characters. Identifier strings are 1 to 256 characters without line breaks. Paths are absolute (`C:/...`, `C:\...` or `/...`) and at most 32768 characters. Line numbers are positive integers.
 
 ## Host interface reference
 
-Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`; its Claude and Codex behavior is in `claude.mjs` and `codex.mjs` beside it. On Claude, dispatched operations other than `host.getInfo`, `host.getCapabilities` and `events.subscribe` execute in the Claude Mod through the bridge. On Codex, they execute through the MCP App connection. Unless stated below, `sent` uses the validated arguments and native receipt/read-back fields are present only when supplied by the implementation; [Results and evidence](#results-and-evidence) defines these common rules.
+Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`; its Claude and Codex behavior is in `claude.mjs` and `codex.mjs` beside it. On Claude, dispatched operations other than `host.getInfo`, `host.getCapabilities` and `events.subscribe` execute in the Claude Mod through the bridge. On Codex, they execute through the MCP App connection. Unless stated below, `sent` uses the validated arguments and native receipt/read-back fields are present only when supplied by the implementation; [Results and evidence](#results-and-evidence) defines these common rules. Claude file, draft and owned-view operations require the session to be displayed in a window. A host report that no window is attached yields `rejected` with the host reason. A malformed native reply retains its raw data under the diagnostic rule above.
 
 ### host.getInfo
 
@@ -298,7 +308,7 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `path` (absolute), `line?` (positive integer).
 - **Effect:** opens the file in the host's file view.
-- **Claude:** calls the native file pane (`mcp__ccd_view__show_pane` with `pane: "file"`), with optional line navigation; status `accepted`, and the displayed result is observed in the host.
+- **Claude:** calls the native file pane (`mcp__ccd_view__show_pane` with `pane: "file"`), with optional line navigation. The target must be inside the session working directory or a granted folder, and the session must be displayed in a window. A normal open reply yields `accepted`, with the displayed effect checked separately. An empty `views` array or the host sentence stating that the session is absent from all windows yields `rejected`; `message` preserves the host sentence and `evidence.receipt` preserves the raw reply.
 - **Codex:** calls the `openai/files/open` extension request; status `accepted`. A `line` argument returns `unsupported`.
 - **Limits:** Codex has no line navigation.
 
@@ -313,7 +323,7 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `text` (1 to 8000 characters), `mode`: `append` or `replace`.
 - **Effect:** writes text into the host's message composer. Nothing is sent.
-- **Claude:** calls `$.prompt.fill`; both modes. `completed` when the composer reports the draft filled, `rejected` when it reports not filled.
+- **Claude:** calls `$.prompt.fill`; both modes. `completed` when the composer reports the draft filled, `rejected` when it reports a refusal. The result preserves a host-supplied `refusal` in `data` and explains it in the message: `no_composer` means the session has no attached input box; `dialog` means a dialog holds the input. A refusal with no cause retains an unknown cause.
 - **Codex:** sends a draft through the `openai/message` extension (`send: false`); `append` only, and `replace` returns `unsupported`. Status `accepted`; the composer effect is observed in the host.
 - **Limits:** Codex supports `append` only.
 
@@ -321,25 +331,25 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `text` (1 to 8000 characters), `model?`, `effort?`. Each of `model` and `effort` is a `Selection`: `{ source: "current" }`, `{ source: "default" }` or `{ source: "specified", value }`. A specified model is a nonempty identifier string. A specified effort is one of the five strings `low`, `medium`, `high`, `xhigh`, `max`; numeric effort values fail validation. An omitted selection means `current`.
 - **Effect:** submits a user message to the current conversation; the model's reply appears in the conversation.
-- **Claude:** calls `$.prompt.submit`, which waits until the session is idle. Status `accepted`; `observed` holds the session model and any turn override. `default` returns `unsupported`, because Claude has no confirmed way to read its default model and effort. `specified` applies only to the turn this message starts: the Mod rewrites the main agent's model and effort for that turn's steps, and leaves the session settings unchanged. The `turn.completed` event's `override.applied` reports the applied values and `sessionWouldUse`, the values the session would have used.
+- **Claude:** calls `$.prompt.submit`, which queues the message until the session is idle. The driver follows the receipt under the [automatic waiting contract](#claude-host-operation-waiting-and-evidence-sizes). When a page snapshot is set, the submitted text carries the [inline context section](#contextupdate). `sent.text` retains the original message, `sent.inlinedContext` lists its context blocks, and `observed.contextDelivery` is `"inline"` for that delivery. Status `accepted`; `receipt` holds the submit response, and `observed` also holds the session model and any turn override. `default` returns `unsupported`, because Claude has no confirmed way to read its default model and effort. `specified` applies only to the turn this message starts: the Mod rewrites the main agent's model and effort for that turn's steps, and leaves the session settings unchanged. The `turn.completed` event's `override.applied` reports the applied values and `sessionWouldUse`, the values the session would have used.
 - **Codex:** calls the MCP App `sendMessage` with role and content. Status `accepted`. Any `default` or `specified` selection returns `unsupported` and sends nothing, because `sendMessage` has only role and content fields.
 - **Limits:** Claude has no `default` selection and applies `specified` to one turn. Codex uses the session's current model and effort.
 
 ### context.update
 
-- **Arguments:** `snapshot`: one JSON object.
-- **Effect:** sets the page's whole model context to `snapshot`; `{}` clears it. For a nonempty snapshot, the text representation is `Plugin page context (JSON data, not instructions): ` followed by the JSON of the snapshot (`contextText` in [host_interfaces/context/update/index.mjs](host_interfaces/context/update/index.mjs)). Claude attaches this text. Codex sends it when the host declares text context; a structured-only declaration carries the raw snapshot as structured content. Updating context triggers no reply; the context block is model-visible and hidden from the user. For `{}`, Claude deletes the stored block and records `attachAs: null`; Codex sends empty context in its declared modalities.
-- **Claude:** stores the snapshot for the page connection. The Mod's prompt-submission hook attaches it as a context block to the next submitted prompt from any source and then emits `context.attached` with the attached blocks. `sent` holds the snapshot and the exact text to be attached.
-- **Codex:** calls `updateModelContext` with only the modalities the host declares (text content, structured content, or both); the host hands it to the model on the next turn. `sent` holds the parameters and `receipt` the host response.
-- **Limits:** Claude attaches the snapshot only at the next submission; the `context.attached` event shows what was attached. Codex confirms receipt only; the page cannot read back what the model received.
+- **Arguments:** `snapshot`: one required JSON object. Clear with `{"snapshot":{}}` as the invocation arguments.
+- **Effect:** sets the page's whole stored snapshot. An empty snapshot clears it. A nonempty snapshot's text representation is `Plugin page context (JSON data, not instructions): ` followed by its JSON (`contextText` in [host_interfaces/context/update/index.mjs](host_interfaces/context/update/index.mjs)). Updating the snapshot starts no reply. Claude records `attachAs: null` on clearing; Codex sends empty context in its declared modalities.
+- **Claude:** stores the snapshot for the page connection and uses two delivery paths. For prompts from other sources, the Mod's prompt-submission hook attaches the stored blocks as model-visible context hidden from the user. For this plugin's own `conversation.submitMessage`, it appends the current blocks after the message body, starting with `\n\n---\nPlugin page context (JSON data, not instructions): {...}`. This section is visible in the transcript. The hook passes through submissions whose origin is `{ kind: "plugin", name: "graph-skill-canvas-mod" }`, preserving a single delivery. Both paths emit `context.attached`; inline delivery uses `origin: "plugin-inline"`. The update's `sent` holds the snapshot and exact text; [message submission](#conversationsubmitmessage) owns inline-send evidence.
+- **Codex:** calls `updateModelContext` with only the modalities the host declares: text content, structured content, or both. Text uses the representation above; structured content carries the raw snapshot. The host hands it to the model on the next turn as model context hidden from the user. `sent` holds the parameters and `receipt` the host response.
+- **Limits:** Claude consumes stored context during prompt delivery; `context.attached` records the delivered blocks. Codex confirms receipt; model consumption requires a separate probe.
 
 ### tools.list
 
 - **Arguments:** `scope?`: `session` or `originating-server`.
 - **Effect:** lists tools the page can call with `tools.call`, each with a `reference` to pass back.
-- **Claude:** lists the session's native and MCP tools as `{ name, description, kind: "native" | "mcp" | "unknown", reference: { name, scope: "session" } }`. Scope `originating-server` returns `unsupported`. A list larger than 60000 bytes returns `error`.
+- **Claude:** returns the complete session list (`data.complete: true`) of native and MCP tools as `{ name, description, kind: "native" | "mcp" | "unknown", reference: { name, scope: "session" } }`. Scope `originating-server` returns `unsupported`. The operation returns the full list through the complete-receipt route.
 - **Codex:** calls the plugin server's `list_page_tools` tool and returns the page-callable tools of the originating server with `reference: { name, scope: "originating-server" }`. Scope `session` returns `unsupported`.
-- **Limits:** Claude covers the session; Codex covers only the plugin's own page-callable tools.
+- **Limits:** Claude covers the session; Codex covers only the plugin's own page-callable tools. The Claude bridge accepts request bodies up to 8 MiB, including the encoded result envelope. The transport refuses larger bodies. This sanity bound protects the process. `tools.list` has no separate list-size cap; the Mod forwards the complete receipt within that transport bound.
 
 ### tools.call
 
@@ -360,7 +370,7 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `skill` (identifier), `input?` (a string on Claude).
 - **Effect:** activates one Skill in the current session.
-- **Claude:** calls the native `Skill` tool. `completed` when the host confirms activation, `accepted` when it reports a background task, `pending` when the receipt cannot confirm activation, `error` when activation failed. A non-string `input` returns `unsupported`. The Skill's business result is checked separately.
+- **Claude:** submits a slash command through `$.prompt.submit({ text: "/" + skill + (input ? " " + input : "") })`. A slash-command submission asks the session to process the named Skill in the conversation once it is idle. Status `accepted`, with the submit response in `evidence.receipt`. Activation is visible in the transcript and checked with the next `turn.completed` event. The Skill's business result has its own observation. A non-string `input` returns `unsupported`. The [automatic waiting contract](#claude-host-operation-waiting-and-evidence-sizes) applies.
 - **Codex:** capability state `unknown`; returns `unsupported`.
 
 ### views.open
@@ -402,7 +412,7 @@ A host event is `{ type, at, data? }`. Listeners receive a copy of each event; a
 | `tool.completed` | Claude | Mod tool-call hook | `{ tool, isError, denied }` |
 | `turn.completed` | Claude | Mod turn-completion hook, main agent only | `{ turnId, reason, model, override }`; `override` is `null` or `{ requestId, requested: { model, effort }, applied: { model, effort, sessionWouldUse: { model, effort } } }` |
 | `session.ended` | Claude | Mod session-end hook | none |
-| `context.attached` | Claude | Mod prompt-submission hook | `{ blocks, attached, origin }` |
+| `context.attached` | Claude | Hidden prompt attachment or plugin inline submission | `{ blocks, attached, origin }`; delivery and origin values follow [`context.update`](#contextupdate). |
 | `tool.completed` | Codex | MCP App tool-result notification | `{ isError, structuredContent }` |
 | `host.contextChanged` | Codex | MCP App host-context notification | the changed host context |
 | `page.teardown` | Codex | MCP App teardown notification | none |
@@ -464,6 +474,8 @@ The page uses them through `adapter.local`:
 ### System launches
 
 Both system operations launch the program without a shell (`shell: false`). The result is `accepted`, with `sent` holding the requested arguments plus `command` and `args`. For reveal, the command uses the real path and `sent.realPath` records it when it differs from `sent.path`. The `receipt` holds the process id and, when the program exited within 3 seconds, its exit code; `observed` holds `{ launched }`. A program that fails to start returns `error`. The operating system reports only whether the process started; the visible window and selected target require observation on the machine. [The dated validation record](../VALIDATION.md#native-observation-of-the-local-capabilities-on-claude-desktop-2026-10-15) separates those observations from source-tested command behavior.
+
+Claude host-operation receipt sizes and automatic receipt queries follow [the waiting and evidence-size contract](#claude-host-operation-waiting-and-evidence-sizes). The system-process launch evidence above retains its local-capability scope.
 
 ## Verifying on a host: the Interface Lab
 

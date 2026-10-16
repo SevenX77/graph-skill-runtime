@@ -72,8 +72,9 @@ test("Claude does not claim a completed inventory for malformed native ToolInfo"
   }
 });
 
-test("Claude rejects an inventory larger than the Mod bridge receipt instead of completing without data", async () => {
+test("Claude returns the complete inventory above the former 60000 byte receipt cap", async () => {
   const result = await claude.invoke(undefined, { tools: [{ name: "Read", description: "x".repeat(60000), mcp: false }], args: {} });
-  assert.equal(result.status, "error");
-  assert.equal(result.data, undefined);
+  assert.equal(result.status, "completed");
+  assert.equal(result.data.tools[0].description, "x".repeat(60000));
+  assert.equal(result.data.complete, true);
 });

@@ -1,5 +1,5 @@
 import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, CLOSE_TOOL } from "../../host_tools/index.mjs";
-import { callNative, nativeData, notSent } from "../tools/index.mjs";
+import { callNative, nativeData, noWindowMessage, notSent } from "../tools/index.mjs";
 
 export const HIDDEN_PANE_LIMIT = "Claude 的 Browser 面板隐藏时，宿主没有可调用的显示方法：标签会打开并激活，但面板保持隐藏，需要用户点击预览卡片的 Open 或 Browser 开关。";
 
@@ -15,9 +15,11 @@ function store(state, owner) {
 async function readTabs($, tools, guard) {
   await guard();
   const result = await callNative($, tools, CONTEXT_TOOL, {});
-  if (result.status !== "completed") throw notSent("无法读取宿主浏览器标签。");
+  const noWindow = noWindowMessage(result.data);
+  if (noWindow) throw Object.assign(new Error(noWindow), { outcome: "rejected", data: result.data });
+  if (result.status !== "completed") throw notSent("无法读取宿主浏览器标签。", result.data);
   const data = nativeData(result.data);
-  if (!Array.isArray(data?.tabs) || data.tabs.some(tab => typeof tab?.tabId !== "string" || !tab.tabId)) throw notSent("宿主没有返回可识别的标签页清单。");
+  if (!Array.isArray(data?.tabs) || data.tabs.some(tab => typeof tab?.tabId !== "string" || !tab.tabId)) throw notSent("宿主没有返回可识别的标签页清单。", result.data);
   const text = JSON.stringify(result.data);
   const paneDisplayed = /pane is (currently )?displayed/i.test(text) ? true : /pane is (currently )?hidden/i.test(text) ? false : null;
   return { tabs: data.tabs, paneDisplayed, receipt: result.data };
