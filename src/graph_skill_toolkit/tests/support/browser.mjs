@@ -1,10 +1,11 @@
 // A fake Claude Browser: preview_start opens tabs, tabs_context reports them in
-// the host's text shape (JSON then a pane-visibility line), select/close mutate.
-import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, CLOSE_TOOL } from "../../plugin_base/adapters/claude/mod/host_tools/index.mjs";
+// the host's text shape (JSON then a pane-visibility line), select/close mutate,
+// and show_pane preview reveals the pane unless the session has no window.
+import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, CLOSE_TOOL, SHOW_PANE_TOOL } from "../../plugin_base/adapters/claude/mod/host_tools/index.mjs";
 
 export const BROWSER_TOOLS = [PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, CLOSE_TOOL].map(name => ({ name }));
 
-export function fakeBrowser({ tabs = [], paneDisplayed = false, tools = BROWSER_TOOLS } = {}) {
+export function fakeBrowser({ tabs = [], paneDisplayed = false, tools = BROWSER_TOOLS, showReveals = true } = {}) {
   const calls = [];
   let next = 0;
   const text = data => ({ content: [{ type: "text", text: JSON.stringify(data) }] });
@@ -18,11 +19,12 @@ export function fakeBrowser({ tabs = [], paneDisplayed = false, tools = BROWSER_
         if (input.tool === PREVIEW_TOOL) { const tab = { tabId: "tab-new-" + (++next), origin: new URL(input.url).origin, isActive: false }; tabs.push(tab); return text({ tabId: tab.tabId }); }
         if (input.tool === NAVIGATE_TOOL) { const tab = tabs.find(item => item.tabId === input.tabId); tab.origin = new URL(input.url).origin; return text({ ok: true }); }
         if (input.tool === SELECT_TOOL) { for (const tab of tabs) tab.isActive = tab.tabId === input.tabId; return text({ ok: true }); }
+        if (input.tool === SHOW_PANE_TOOL && input.pane === "preview") { if (browser.showReveals) browser.paneDisplayed = true; return { content: [{ type: "text", text: browser.showReveals ? "Showing the preview pane." : "This session isn't open in any window right now, so its view was left alone." }] }; }
         if (input.tool === CLOSE_TOOL) { tabs.splice(tabs.findIndex(tab => tab.tabId === input.tabId), 1); return text({ ok: true }); }
         return text({});
       },
     },
   };
-  const browser = { api, calls, tabs, paneDisplayed };
+  const browser = { api, calls, tabs, paneDisplayed, showReveals };
   return browser;
 }

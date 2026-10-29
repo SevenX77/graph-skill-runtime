@@ -1,7 +1,8 @@
-import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, CLOSE_TOOL } from "../../host_tools/index.mjs";
+import { PREVIEW_TOOL, NAVIGATE_TOOL, CONTEXT_TOOL, SELECT_TOOL, CLOSE_TOOL, SHOW_PANE_TOOL } from "../../host_tools/index.mjs";
 import { callNative, nativeData, noWindowMessage, notSent } from "../tools/index.mjs";
 
-export const HIDDEN_PANE_LIMIT = "Claude 的 Browser 面板隐藏时，宿主没有可调用的显示方法：标签会打开并激活，但面板保持隐藏，需要用户点击预览卡片的 Open 或 Browser 开关。";
+export const HIDDEN_PANE_LIMIT = "Browser 面板只有在会话显示于某个窗口时才能由插件显示；显示请求后面板仍隐藏时，需要用户点击预览卡片的 Open 或 Browser 开关。";
+export const NO_SHOW_PANE_LIMIT = "当前会话未开放 " + SHOW_PANE_TOOL + "：Browser 面板隐藏时插件无法显示它，需要用户点击预览卡片的 Open 或 Browser 开关。";
 
 // Own views only: a viewId names a Browser tab this page connection opened.
 // User tabs never receive a handle and cannot be listed, selected or closed.
@@ -65,9 +66,16 @@ export async function openView($, { state, owner, request, tools, guard, args })
   }
   if (args.activate) receipts.push({ select: await select($, tools, guard, view.tabId) });
   inventory = await readTabs($, tools, guard);
+  // A hidden Browser pane is shown through the host's pane tool, then read back.
+  if (args.activate && inventory.paneDisplayed !== true && tools.some(tool => tool.name === SHOW_PANE_TOOL)) {
+    await guard();
+    const shown = await callNative($, tools, SHOW_PANE_TOOL, { pane: "preview" });
+    receipts.push({ show: shown.data });
+    inventory = await readTabs($, tools, guard);
+  }
   const observed = describe(view, inventory);
   const visible = observed.active && observed.paneDisplayed === true;
-  const limits = args.activate && observed.paneDisplayed !== true ? [HIDDEN_PANE_LIMIT] : [];
+  const limits = args.activate && observed.paneDisplayed !== true ? [tools.some(tool => tool.name === SHOW_PANE_TOOL) ? HIDDEN_PANE_LIMIT : NO_SHOW_PANE_LIMIT] : [];
   return {
     status: !args.activate || visible ? "completed" : "accepted",
     message: !args.activate ? "视图已在后台打开。" : visible ? "视图已打开并显示在前台。" : "视图已打开并激活，但 Browser 面板没有确认显示。",

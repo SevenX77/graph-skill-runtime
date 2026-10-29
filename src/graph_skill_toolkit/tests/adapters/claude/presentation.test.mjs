@@ -43,14 +43,16 @@ test('Claude binds HTTP preview to the actual session root and requests normal a
   assert.match(reminder,/normal host tool mcp__Claude_Browser__preview_start once with \{"name":"graph-skill-test"\}/);
   assert.match(reminder,/Pass only name, without url/);
   assert.match(reminder,/2\. Use the normal host tool mcp__Claude_Browser__preview_start once with/);
-  const steps=['1. Use','2. Use','3. Use','4. Use','5. Only after selection completes'].map(step=>reminder.indexOf(step));
+  const steps=['1. Use','2. Use','3. Use','4. Use','5. Only after selection completes','6. If the Browser pane is hidden'].map(step=>reminder.indexOf(step));
   assert.ok(steps.every((index,i)=>index>=0&&(i===0||index>steps[i-1])),reminder);
-  assert.equal(reminder.indexOf('6. '),-1);
-  // The canvas is the only view this sequence opens: no document tab, file preview or file tool.
-  assert.doesNotMatch(reminder,/SKILL\.md|DOCUMENT_TAB|document|file preview|open_in_codex|show_pane|fileUrl/i);
+  assert.equal(reminder.indexOf('7. '),-1);
+  // The canvas is the only view this sequence opens: no document tab, file preview or file pane.
+  assert.doesNotMatch(reminder,/SKILL\.md|DOCUMENT_TAB|document|file preview|open_in_codex|"pane":"file"|fileUrl/i);
+  // A hidden Browser pane is shown once through the host pane tool, then read back.
+  assert.match(reminder,/6\. If the Browser pane is hidden, use mcp__ccd_view__show_pane once with \{"pane":"preview"\}, then mcp__Claude_Browser__tabs_context with \{\} once more/);
   assert.match(reminder,/Open no other page or file for this flow/);
-  // A hidden pane is revealed by the user; the agent never opens a file to reveal it.
-  assert.match(reminder,/If the Browser pane is hidden, the page is ready but not visible: ask the user in one sentence to open it manually/);
+  // A pane still hidden after that request is revealed by the user; the agent never opens a file to reveal it.
+  assert.match(reminder,/or the pane is still hidden, the page is ready but not visible: ask the user in one sentence to open it manually/);
   assert.match(reminder,/do not open any file or other page to reveal it/);
   assert.match(reminder,/HTTP_TAB active at the returned HTTP origin/);
   assert.ok(reminder.includes(JSON.stringify(url)));assert.ok(reminder.includes(JSON.stringify(projectRoot)));

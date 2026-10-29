@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { lstat, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { LOCAL_LIMITS, LOCAL_TRANSPORT_OPERATIONS, validateLocalArguments } from "../definitions.mjs";
 
 const EVENT_LIMIT = 500, WATCH_LIMIT = 16;
@@ -40,9 +40,9 @@ export function systemCommand(kind, target, { platform = process.platform, env =
 
 /** Local capabilities for one plugin process. Every page connection receives
  * its own credential, its own allowed roots and its own event queue.
- * @param {{http?: any, platform?: string, env?: Record<string, string|undefined>, spawnProcess?: typeof spawn, pollMs?: number}} [options]
+ * @param {{http?: any, platform?: string, env?: Record<string, string|undefined>, spawnProcess?: typeof spawn, pollMs?: number, realpathOf?: (path: string) => Promise<string>}} [options]
  */
-export function createLocalCapabilities({ http, platform = process.platform, env = process.env, spawnProcess = spawn, pollMs = 300 } = {}) {
+export function createLocalCapabilities({ http, platform = process.platform, env = process.env, spawnProcess = spawn, pollMs = 300, realpathOf = realpath } = {}) {
   const tokens = new Map();
   let closed = false;
   const fold = value => platform === "win32" || platform === "darwin" ? value.toLowerCase() : value;
@@ -80,9 +80,30 @@ export function createLocalCapabilities({ http, platform = process.platform, env
     const roots = [], events = [], waiters = new Set(), watches = new Map();
     let seq = 0, watchSeq = 0, ended = false;
 
+    const under = (path, root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
+    /** True when no component between the granted root and the target is a link. */
+    async function linkFree(root, rel) {
+      let current = root;
+      for (const part of rel.split(sep)) {
+        current = join(current, part);
+        if ((await lstat(current)).isSymbolicLink()) return false;
+      }
+      return true;
+    }
     async function within(target) {
-      const real = fold(await realpath(target));
-      return roots.some(root => real === root || real.startsWith(root.endsWith(sep) ? root : root + sep));
+      const real = fold(await realpathOf(target));
+      if (roots.some(root => under(real, root.real))) return true;
+      // A packaged Windows host redirects a file's real location into its own
+      // storage while the file's directories still resolve to their nominal
+      // paths. The nominal path then decides, provided no link component lies
+      // between the granted root and the target.
+      const nominal = resolve(target);
+      for (const root of roots) {
+        const rel = relative(root.nominal, nominal);
+        if (rel === "" || rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel)) continue;
+        if (await linkFree(root.nominal, rel)) return true;
+      }
+      return false;
     }
     /** The scope check for a path that may not exist yet: its directory decides. */
     async function parentWithin(target) {
@@ -95,7 +116,7 @@ export function createLocalCapabilities({ http, platform = process.platform, env
       if (events.length > EVENT_LIMIT) events.splice(0, events.length - EVENT_LIMIT);
       for (const wake of [...waiters]) wake();
     }
-    const outside = (sent, path) => result("rejected", `路径不在此插件授权的目录内：${path}`, { sent, observed: { allowedRoots: [...roots] } });
+    const outside = (sent, path) => result("rejected", `路径不在此插件授权的目录内：${path}`, { sent, observed: { allowedRoots: roots.map(root => root.real) } });
 
     async function read(args) {
       const sent = { ...args };
@@ -230,10 +251,10 @@ export function createLocalCapabilities({ http, platform = process.platform, env
       /** Grant this page connection the directory tree under root. */
       async allow(root) {
         const real = fold(await realpath(root));
-        if (!roots.includes(real)) roots.push(real);
+        if (!roots.some(item => item.real === real)) roots.push({ real, nominal: resolve(root) });
         return real;
       },
-      get roots() { return [...roots]; },
+      get roots() { return roots.map(root => root.real); },
       call, wait,
       close() {
         ended = true;

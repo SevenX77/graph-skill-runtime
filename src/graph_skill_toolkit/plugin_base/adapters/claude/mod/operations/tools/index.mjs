@@ -2,6 +2,8 @@ export const notSent = (message, data) => Object.assign(new Error(message), { ou
 
 /** Plain text from the native reply, retaining the host's exact sentences. */
 export function nativeText(value) {
+  // Claude Code 2.1.309 returns a native MCP reply as `result: [{ type, text }]`.
+  if (Array.isArray(value)) return value.filter(block => typeof block?.text === "string").map(block => block.text).join("\n");
   if (typeof value?.text === "string") return value.text;
   if (Array.isArray(value?.content)) return value.content.filter(block => typeof block.text === "string").map(block => block.text).join("\n");
   return value?.result !== undefined ? nativeText(value.result) : "";
@@ -16,7 +18,7 @@ export function nativeData(value) {
   if (value?.structuredContent) return value.structuredContent;
   if (value?.result !== undefined) return nativeData(value.result);
   if (value?.tabs || value?.tabId) return value;
-  const blocks = Array.isArray(value?.content) ? value.content : [{ text: value?.text }];
+  const blocks = Array.isArray(value) ? value : Array.isArray(value?.content) ? value.content : [{ text: value?.text }];
   for (const block of blocks) {
     if (typeof block.text !== "string") continue;
     const text = block.text;
@@ -41,7 +43,10 @@ export async function callNative($, tools, name, args) {
   if (!tools.some(tool => tool.name === name)) throw notSent("当前会话未开放工具：" + name);
   if (Object.hasOwn(args, "tool") || Object.hasOwn(args, "tool_use_id")) throw notSent("此原生工具的平铺参数与宿主工具信封冲突；请使用明确的 MCP 服务标识。");
   const response = await $.tool.call({ ...args, tool: name });
-  if (response?.deny || response?.denied) throw Object.assign(new Error("宿主拒绝工具请求。"), { outcome: "rejected" });
+  if (response?.deny || response?.denied) {
+    const reason = typeof response.deny === "string" && response.deny ? response.deny : null;
+    throw Object.assign(new Error(reason ? "宿主拒绝工具请求：" + reason : "宿主拒绝工具请求，未给出原因。"), { outcome: "rejected", data: response });
+  }
   if (response?.isError) return { status: "error", message: "原生工具返回错误。", data: response };
   return { status: "completed", message: "原生工具调用已返回。", data: response };
 }

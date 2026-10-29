@@ -316,7 +316,8 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `path` (absolute).
 - **Effect:** reveals a directory in the host's own file browser.
-- **Claude and Codex:** capability state `unknown`; neither host has a confirmed directory-reveal route, so the call returns `unsupported`.
+- **Claude:** capability state `unknown`; returns `unsupported`. The Claude file pane opens files only: `mcp__ccd_view__show_pane` with `pane: "file"` refuses a directory path as unresolvable and requires a path.
+- **Codex:** capability state `unknown`; the host file extension confirms opening a file only, so the call returns `unsupported`.
 - **Related:** `local.system.revealInFileManager` is an independent function that reveals a path in the operating system's file manager.
 
 ### composer.writeDraft
@@ -377,9 +378,9 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `resource`: `{ kind: "web", url }` (http or https, no credentials) or `{ kind: "file", path, line? }`; `reuseKey` (identifier); `activate` (boolean).
 - **Effect:** opens or reuses a view owned by the page and returns `data.viewId`.
-- **Claude:** opens a Browser pane tab with `preview_start`, reuses the tab with the same `reuseKey` (navigating it when the URL differs), selects it when `activate` is true, then reads the tab list back. `observed` holds `{ viewId, reuseKey, url, present, active, paneDisplayed }`. With `activate: false`, status is `completed` once the tab exists in the background. With `activate: true`, status is `completed` when the tab is active and the pane is displayed, and `accepted` when the tab is active and the pane is not confirmed displayed. `kind: "file"` returns `unsupported`; files open with `files.openFile`.
+- **Claude:** opens a Browser pane tab with `preview_start`, reuses the tab with the same `reuseKey` (navigating it when the URL differs), selects it when `activate` is true, then reads the tab list back. When `activate` is true and the pane is hidden, it shows the pane once with `mcp__ccd_view__show_pane` (`pane: "preview"`) and reads the tab list again. `observed` holds `{ viewId, reuseKey, url, present, active, paneDisplayed }`. With `activate: false`, status is `completed` once the tab exists in the background. With `activate: true`, status is `completed` when the tab is active and the pane is displayed, and `accepted` when the tab is active and the pane is not confirmed displayed. `kind: "file"` returns `unsupported`; files open with `files.openFile`.
 - **Codex:** capability state `unknown`; returns `unsupported`.
-- **Limits:** a hidden Browser pane cannot be revealed by the plugin; the tab opens and activates while the pane stays hidden until the user opens it. User tabs never receive a `viewId`.
+- **Limits:** the pane can be shown only while the session is displayed in a window; a pane still hidden after the show request stays hidden until the user opens it. User tabs never receive a `viewId`.
 
 ### views.list
 
@@ -399,7 +400,7 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `mode`: `inline`, `fullscreen` or `pip`.
 - **Effect:** requests a display mode for the page's own container.
-- **Claude:** capability state `unknown`; returns `unsupported`.
+- **Claude:** capability state `unknown`; returns `unsupported`. The page's container is the Browser pane; the host can show or close that pane and collapse the sidebar, and has no route that places the page inline in the transcript, fullscreen or picture-in-picture.
 - **Codex:** calls `App.requestDisplayMode` for a mode the host context declares; `completed` when the host returns the requested mode, `rejected` when it returns another. Plugin Base resources advertise `fullscreen` only through `codexResourceMetadata`.
 - **Limits:** the returned mode does not indicate tab focus.
 

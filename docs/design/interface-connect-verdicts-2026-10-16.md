@@ -84,6 +84,20 @@ The Mod queues events while a page bridge is connected. The lab renders run-card
 
 Evidence: `/entries/4` notes pre-connection events and a page clock inconsistent with the observer's local time. `/entries/18` and `/entries/20` distinguish a missing snapshot argument from a successful empty snapshot. The [file-view status finding](#5-status-and-diagnostics-preserve-the-hosts-answer) supplies the distinction between acceptance and observed effects.
 
+### 8. A hidden Browser pane is shown through the host pane tool
+
+On Claude, `views.open` with `activate: true`, and the ordered presentation guidance shared by the canvas and the lab, show a hidden Browser pane once with `mcp__ccd_view__show_pane` and `pane: "preview"`, then read the tab inventory again. The user opens the pane manually only when the pane is still hidden after that request, for example when the session is not displayed in any window.
+
+Evidence (Claude Code `2.1.309`, Claude Desktop `4.29.0.0`, 2026-10-29): with the lab tab active and the pane hidden, `show_pane` with `pane: "preview"` replied `Showing the preview pane.` and the following `tabs_context` reply ended `The Browser pane is currently displayed.` The same call made before any Browser tab existed was refused with `This session's built-in browser has no page open, so there is nothing to show.`
+
+### 9. Native replies are read in the 2.1.309 shape
+
+The Mod reads a native tool reply whose `result` is an array of `{ type, text }` blocks, and reports a host refusal with the host's reason. Evidence: on 2026-10-29 `views.open` and `views.list` reported "宿主没有返回可识别的标签页清单" (gloss: "the host returned no recognizable tab inventory") although the raw reply held the tab JSON inside `result[0].text`; `tools.call` reported a refusal without the host's `deny` text.
+
+### 10. Local paths are checked under a packaged-host redirect
+
+A local-capability target is inside a granted root when its real path lies under the root's real path, or when its nominal path lies under the granted root with no link component between them. Evidence: on 2026-10-29 Claude Desktop's packaged view resolved `...\AppData\Local\plugin-interface-lab\sandbox` to itself but `...\sandbox\sample.txt` to `...\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\plugin-interface-lab\sandbox\sample.txt`, so read, write, watch and reveal of the lab's own sample file were rejected as outside the granted directory. The link-component check keeps a junction or symbolic link inside the root from reaching a target outside it.
+
 ## Claude interface verdicts
 
 “Connects” means the current contract provides a host route under the stated conditions. API-availability verdicts apply to the inspected Claude Code `2.1.299` surface; another host build requires its own declaration review and native observation. Fresh native acceptance uses the checks below. “Cannot connect on Claude” identifies a missing host API and produces an explicit unsupported result. File, draft and owned-view operations require a displayed session window; a host report that the session lacks a window yields `rejected` with the host's reason.
@@ -95,7 +109,7 @@ Evidence: `/entries/4` notes pre-connection events and a page clock inconsistent
 | [`host.getContext`](../../src/graph_skill_toolkit/plugin_base/README.md#hostgetcontext) | Connects | Live session facts. |
 | [`events.subscribe`](../../src/graph_skill_toolkit/plugin_base/README.md#eventssubscribe) | Connects | Events from the connected page interval. |
 | [`files.openFile`](../../src/graph_skill_toolkit/plugin_base/README.md#filesopenfile) | Connects | Workspace or granted file; displayed session window. |
-| [`files.revealDirectory`](../../src/graph_skill_toolkit/plugin_base/README.md#filesrevealdirectory) | Cannot connect on Claude | Claude exposes no host-file-browser directory-reveal API. |
+| [`files.revealDirectory`](../../src/graph_skill_toolkit/plugin_base/README.md#filesrevealdirectory) | Cannot connect on Claude | The file pane opens files only: `show_pane` with `pane: "file"` refuses a directory path as unresolvable and requires a path (observed on `2.1.309`). |
 | [`composer.writeDraft`](../../src/graph_skill_toolkit/plugin_base/README.md#composerwritedraft) | Connects | Displayed session with a composer and no blocking dialog. |
 | [`conversation.submitMessage`](../../src/graph_skill_toolkit/plugin_base/README.md#conversationsubmitmessage) | Connects | Runs when idle; current or specified settings. |
 | [`context.update`](../../src/graph_skill_toolkit/plugin_base/README.md#contextupdate) | Connects | Hidden for other senders; inline for this plugin's messages. |
@@ -103,10 +117,10 @@ Evidence: `/entries/4` notes pre-connection events and a page clock inconsistent
 | [`tools.call`](../../src/graph_skill_toolkit/plugin_base/README.md#toolscall) | Connects | Session tool and normal host permission checks. |
 | [`skills.list`](../../src/graph_skill_toolkit/plugin_base/README.md#skillslist) | Connects | Host confirms a complete listing. |
 | [`skills.invoke`](../../src/graph_skill_toolkit/plugin_base/README.md#skillsinvoke) | Connects | Slash-command submission; transcript activation observed separately. |
-| [`views.open`](../../src/graph_skill_toolkit/plugin_base/README.md#viewsopen) | Connects | Web view owned by the page; displayed session window. |
+| [`views.open`](../../src/graph_skill_toolkit/plugin_base/README.md#viewsopen) | Connects | Web view owned by the page; a hidden pane is shown through `show_pane`; displayed session window. |
 | [`views.list`](../../src/graph_skill_toolkit/plugin_base/README.md#viewslist) | Connects | Page-owned views; displayed session window. |
 | [`views.close`](../../src/graph_skill_toolkit/plugin_base/README.md#viewsclose) | Connects | Existing page-owned view; displayed session window. |
-| [`views.requestDisplayMode`](../../src/graph_skill_toolkit/plugin_base/README.md#viewsrequestdisplaymode) | Cannot connect on Claude | Claude exposes no page-container fullscreen/pane display-mode API. |
+| [`views.requestDisplayMode`](../../src/graph_skill_toolkit/plugin_base/README.md#viewsrequestdisplaymode) | Cannot connect on Claude | The page's container is the Browser pane; the host can show or close it and collapse the sidebar, and has no inline, fullscreen or picture-in-picture route (inspected on `2.1.309`). |
 
 ## Acceptance criteria
 
@@ -137,4 +151,5 @@ C:/Users/test/AppData/Roaming/Claude/claude-code/2.1.299/f0584be0fbaf/claude.exe
 
 ## Revision log
 
+- 2026-10-29: Adds decisions 8 to 10 from a Claude Code `2.1.309` run: the hidden Browser pane is shown through `show_pane`, native replies are read in the array shape with refusal reasons, and local paths are checked under the packaged-host redirect. Restates the two unsupported verdicts with the observed host facts.
 - 2026-10-16: Establishes the Claude connection verdicts, source-specific context delivery, complete-receipt transport, workspace presets, automatic receipt waiting and evidence-based status rules from the dated native record and installed engine declarations.

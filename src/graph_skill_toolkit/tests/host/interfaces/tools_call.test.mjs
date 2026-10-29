@@ -71,7 +71,7 @@ test("Claude refuses missing/unlisted or ambiguous targets without dispatch", as
 test("Claude denial and errored tool result do not claim completion", async () => {
   const responses = [{ deny: "not allowed" }, { isError: true, text: "execution failed", result: "failure" }];
   const api = { tool: { call: async () => responses.shift() } };
-  await assert.rejects(invokeClaude(api, { name: "Read" }), error => error.outcome === "rejected");
+  await assert.rejects(invokeClaude(api, { name: "Read" }), error => error.outcome === "rejected" && /not allowed/.test(error.message) && error.data.deny === "not allowed");
   const errored = await invokeClaude(api, { name: "Read" });
   assert.equal(errored.status, "error");
   assert.equal(errored.data.isError, true);

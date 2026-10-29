@@ -5,7 +5,9 @@ import { mcpCapabilities } from "../../../plugin_base/adapters/codex/driver/regi
 import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
 import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
-import { fakeBrowser } from "../../support/browser.mjs";
+import { fakeBrowser, BROWSER_TOOLS } from "../../support/browser.mjs";
+import { SHOW_PANE_TOOL } from "../../../plugin_base/adapters/claude/mod/host_tools/index.mjs";
+import { HIDDEN_PANE_LIMIT } from "../../../plugin_base/adapters/claude/mod/operations/views/index.mjs";
 
 const web = { resource: { kind: "web", url: "https://example.com/docs" }, reuseKey: "docs", activate: true };
 const file = { resource: { kind: "file", path: "C:/business/SKILL.md", line: 3 }, reuseKey: "skill", activate: false };
@@ -45,13 +47,30 @@ test("Codex advertised openLink, files and display do not supply a manageable vi
 const claudeBridge = { url: "http://127.0.0.1:12345", token: "a".repeat(64), key: "page-a" };
 const open = (id, args) => ({ id, action: "views.open", args, key: claudeBridge.key });
 
+test("Claude shows a hidden Browser pane through the host pane tool and reads it back", async () => {
+  const browser = fakeBrowser({ tools: [...BROWSER_TOOLS, { name: SHOW_PANE_TOOL }] });
+  const opened = await executeBridgeAction(browser.api, createModState(), claudeBridge, open("s1", web));
+  assert.equal(opened.status, "completed");
+  assert.equal(opened.evidence.observed.paneDisplayed, true);
+  assert.deepEqual(opened.evidence.limits, []);
+  assert.deepEqual(browser.calls.filter(call => call.tool === SHOW_PANE_TOOL), [{ tool: SHOW_PANE_TOOL, pane: "preview" }]);
+  assert.ok(opened.evidence.receipt.some(item => item.show));
+});
+
+test("Claude reports a pane that stays hidden after the show request", async () => {
+  const browser = fakeBrowser({ tools: [...BROWSER_TOOLS, { name: SHOW_PANE_TOOL }], showReveals: false });
+  const opened = await executeBridgeAction(browser.api, createModState(), claudeBridge, open("s2", web));
+  assert.equal(opened.status, "accepted");
+  assert.equal(opened.evidence.limits[0], HIDDEN_PANE_LIMIT);
+});
+
 test("Claude opens an own Browser tab, reuses it by reuseKey and reports a hidden pane honestly", async () => {
   const browser = fakeBrowser({ tabs: [{ tabId: "user-tab", origin: "https://user.example", isActive: true }] });
   const state = createModState();
   assert.equal(nativeCapabilities(browser.api ? (await browser.api.tool.list()) : [])["views.open"].state, "available");
   const first = await executeBridgeAction(browser.api, state, claudeBridge, open("o1", web));
   assert.equal(first.status, "accepted");
-  assert.match(first.evidence.limits[0], /面板保持隐藏/);
+  assert.match(first.evidence.limits[0], /未开放 mcp__ccd_view__show_pane/);
   assert.equal(first.evidence.observed.active, true);
   assert.equal(first.evidence.observed.paneDisplayed, false);
   browser.paneDisplayed = true;

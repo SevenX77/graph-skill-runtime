@@ -98,6 +98,27 @@ test("system actions are shell-free platform commands with honest evidence", asy
   assert.deepEqual([failed.status, failed.evidence.observed.launched], ["error", false]);
 });
 
+test("a packaged-host file redirect stays inside its nominal root, a link out of the root does not", async t => {
+  const { root, allowed } = await sandbox(t);
+  const storage = join(root, "package-storage");
+  await mkdir(storage);
+  await writeFile(join(storage, "a.txt"), "第一行\n");
+  // A packaged host resolves the file into its own storage; its directory resolves nominally.
+  const realpathOf = async path => path === join(allowed, "a.txt") ? join(storage, "a.txt") : realpath(path);
+  const connection = createLocalCapabilities({ realpathOf }).createConnection();
+  await connection.allow(allowed);
+  const read = await connection.call("local.files.read", { path: join(allowed, "a.txt") });
+  assert.deepEqual([read.status, read.data.content], ["completed", "第一行\n"]);
+  const write = await connection.call("local.files.write", { path: join(allowed, "a.txt"), content: "新\n" });
+  assert.equal(write.status, "completed");
+  const outside = join(root, "outside-dir");
+  await mkdir(outside);
+  await writeFile(join(outside, "b.txt"), "secret");
+  await symlink(outside, join(allowed, "link"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal((await connection.call("local.files.read", { path: join(allowed, "link", "b.txt") })).status, "rejected");
+  assert.equal((await connection.call("local.files.read", { path: join(root, "secret.txt") })).status, "rejected");
+});
+
 test("reveal hands the file manager the real path behind a redirected one", async t => {
   const { root, allowed } = await sandbox(t);
   const alias = join(root, "alias");
