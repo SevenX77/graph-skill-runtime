@@ -5,7 +5,7 @@ export interface HostEvent { type: HostEventType; at: string; data?: unknown }
 export type Selection = { source: "current" } | { source: "default" } | { source: "specified"; value: string };
 export type HostId = "codex" | "claude" | "unknown";
 export type HostState = "new" | "connecting" | "connected" | "failed" | "disposed";
-export type HostTransport = "mcp-app" | "http-bridge" | "none";
+export type HostTransport = "mcp-app" | "http-bridge" | "http-page" | "none";
 
 /** Connection-reported identity; confirmation is not cryptographic attestation. */
 export interface HostInfo {
