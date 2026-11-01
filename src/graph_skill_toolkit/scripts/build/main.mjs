@@ -14,7 +14,15 @@ async function page(entry, template, output) {
   });
   // Keep script contents inside the HTML resource even if a dependency contains a closing tag.
   const script = browser.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
-  const html = (await readFile(new URL("../../" + template, import.meta.url), "utf8")).replace("/* APP_BUNDLE */", () => script);
+  const templateUrl = new URL("../../" + template, import.meta.url);
+  const source = await readFile(templateUrl, "utf8");
+  // A template names the stylesheets it inlines, so the page stays one file while reading them from their owner.
+  const styles = await Promise.all([...source.matchAll(/\/\* INLINE_CSS (\S+) \*\//g)].map(async ([marker, path]) => {
+    const file = new URL(path, templateUrl);
+    try { return [marker, await readFile(file, "utf8")]; }
+    catch (error) { throw new Error(`${template} names ${fileURLToPath(file)}, which cannot be read. Run: git submodule update --init vendor/ui-ux-template`, { cause: error }); }
+  }));
+  const html = styles.reduce((text, [marker, css]) => text.replace(marker, () => css), source).replace("/* APP_BUNDLE */", () => script);
   await writeFile(new URL(output, dist), html);
   return Buffer.byteLength(html);
 }

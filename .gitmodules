@@ -1,0 +1,4 @@
+[submodule "vendor/ui-ux-template"]
+	path = vendor/ui-ux-template
+	url = https://github.com/SevenX77/ui-ux-template.git
+	shallow = true

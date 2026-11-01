@@ -61,7 +61,7 @@ packages = ["src/graph_skill_runtime"]
 
 [tool.hatch.build.targets.sdist]
 # Host UI assets ship through their plugin, independently of the runtime package.
-exclude = ["/plugins", "/.agents/plugins", "/src/graph_skill_toolkit"]
+exclude = ["/plugins", "/.agents/plugins", "/src/graph_skill_toolkit", "/vendor"]
 
 [tool.pytest.ini_options]
 minversion = "9.0"
