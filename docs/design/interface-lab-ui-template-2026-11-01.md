@@ -34,4 +34,4 @@ The template repository is private and this repository is public. The `toolkit-b
 - `dist/interface-lab.html` contains no `INLINE_CSS` marker, no `link` element and no external script.
 - The page has no horizontal page scroll at 1294, 829 and 375 CSS pixels, in both schemes.
 - A real call produces a record with its evidence; hovering the record shows the comparison tools; choosing a comparison writes the record file.
-- A fresh Claude session opens the page through `open_interface_lab` and `open_browser_lab` and reports the result of each interface.
+- A fresh Claude session opens the page through `open_interface_lab` and `open_browser_lab` and reports the result of each interface. Done once on 2026-11-01 before the fixes that its report caused. Open item: a fresh session has not yet exercised those fixes, including the Mod route's `skills.invoke` through `$.command.run`.
