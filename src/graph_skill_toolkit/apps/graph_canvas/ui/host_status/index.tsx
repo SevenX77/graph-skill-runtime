@@ -1,5 +1,5 @@
 import packageInfo from "../../../../package.json" with { type: "json" };
-import type { HostInfo } from "../../../../plugin_base/page/types";
+import type { HostInfo } from "hostpane/page/types";
 
 export function HostStatus({ info, connection }: { info: HostInfo | null; connection: string }) {
   const name = info?.status === "confirmed" ? info.id === "codex" ? "ChatGPT(Codex)" : info.name : "未知宿主";

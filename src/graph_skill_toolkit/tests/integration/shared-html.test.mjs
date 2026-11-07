@@ -7,11 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { get } from 'node:http';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { codexAdapter } from '../../plugin_base/adapters/codex/driver/index.mjs';
-import { httpConnection } from '../../plugin_base/adapters/claude/connection/index.mjs';
-import { mcpConnection } from '../../plugin_base/adapters/codex/connection/index.mjs';
-import { snapshotHtml, SNAPSHOT_SLOT } from '../../plugin_base/template/publisher.mjs';
-import { createHostBridge } from '../../plugin_base/adapters/claude/bridge/server.mjs';
+import { snapshotHtml, SNAPSHOT_SLOT, createHostBridge } from 'hostpane/server';
 import { validateCanvas } from '../../apps/graph_canvas/ui/canvas/index.mjs';
 import { graph } from '../../apps/graph_canvas/application/demo/graph.mjs';
 import { createGraphConnection } from '../../apps/graph_canvas/application/client/index.mjs';
@@ -20,26 +16,6 @@ import { fakeRuntimeEnv } from "../support/runtime.mjs";
 const payload = {graph:{...graph,width:352,height:548},skillRoot:'/business/中文 skill'};
 const slot = /<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/;
 const snapshot = text => JSON.parse(slot.exec(text)[1]);
-test('both browser connections deliver the same graph and Codex uses only a declared file interface',async()=>{
-  const received=[],failed=[],actions=[];
-  const app={connect:async()=>{},getHostCapabilities:()=>({experimental:{'openai/files':{}},message:{}}),request:async value=>actions.push(value),sendMessage:async value=>{actions.push(value);return {};},close:()=>{}};
-  const codex=codexAdapter(app);
-  const claude=httpConnection({snapshot:()=>({...payload,hostBridge:{url:'http://127.0.0.1:12345',token:'a'.repeat(48)}})});
-  const codexConnection=mcpConnection(app);
-  try {
-  await codexConnection.connect({receive:p=>received.push(p),fail:e=>failed.push(e)});
-  app.ontoolresult({structuredContent:payload});
-  await claude.connect({receive:p=>received.push(p),fail:e=>failed.push(e)});
-  assert.deepEqual(received.map(({hostBridge,...rest})=>rest),[payload,payload]);assert.equal(failed.length,0);
-  assert.equal((await codex.invoke('files.revealDirectory',{path:payload.skillRoot})).status,'unsupported');
-  assert.equal(actions.length,0);
-  app.ontoolresult({isError:true,content:[{type:'text',text:'bad graph'}]});
-  assert.equal(failed[0].message,'bad graph');
-  await codex.invoke('files.openFile',{path:payload.skillRoot+'/SKILL.md'});
-  assert.equal(actions[0].params.path,payload.skillRoot+'/SKILL.md');
-  await httpConnection({snapshot:()=>({error:'invalidated'})}).connect({receive:()=>assert.fail(),fail:e=>assert.equal(e.message,'invalidated')});
-  } finally { claude.dispose(); await codexConnection.dispose(); }
-});
 test('shared validation rejects malformed roots, topology and bounds before rendering',()=>{
   assert.deepEqual(validateCanvas(payload),payload);
   for(const mutate of [p=>p.skillRoot=undefined,p=>p.graph.nodes=[],p=>p.graph.width=Infinity,p=>p.graph.nodes.push(p.graph.nodes[0]),p=>p.graph.nodes[0].x=NaN,p=>p.graph.nodes[0].x=10000,p=>p.graph.edges.push({from:'missing',to:'output'})]) {
@@ -159,4 +135,3 @@ test('HTTP page identity and same-origin boundary reject ambient cross-site read
   const next=await owner.createView('/business/one');assert.notEqual(next.url,a.url);
   await owner.close();await assert.rejects(fetch(a.url));
 });
-

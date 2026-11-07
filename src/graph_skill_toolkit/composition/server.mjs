@@ -1,4 +1,4 @@
-import { servePlugin } from "../plugin_base/server/index.mjs";
+import { servePlugin } from "hostpane/server";
 import { graphCanvasApp } from "../apps/graph_canvas/server/app.mjs";
 import packageInfo from "../package.json" with { type: "json" };
 

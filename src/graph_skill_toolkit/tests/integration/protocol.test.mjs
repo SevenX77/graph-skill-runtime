@@ -11,7 +11,7 @@ import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { graph, matchesProbeGraph } from "../../apps/graph_canvas/application/demo/graph.mjs";
 import { graphPayload } from "../../apps/graph_canvas/claude_mod/payload.js";
 import { validateCanvas } from "../../apps/graph_canvas/ui/canvas/index.mjs";
-import { SNAPSHOT_SLOT, snapshotHtml } from "../../plugin_base/template/publisher.mjs";
+import { SNAPSHOT_SLOT, snapshotHtml } from "hostpane/server";
 import { fakeRuntimeEnv } from "../support/runtime.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));

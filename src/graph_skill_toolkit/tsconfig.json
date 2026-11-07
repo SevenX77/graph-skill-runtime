@@ -13,5 +13,5 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["apps/**/*.tsx", "apps/**/*.ts", "plugin_base/**/*.ts", "plugin_base/**/*.tsx"]
+  "include": ["apps/**/*.tsx", "apps/**/*.ts"]
 }

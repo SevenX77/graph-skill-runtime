@@ -1,9 +1,9 @@
 // @ts-check
 /** Keep each lab call tied to the host that produced it. */
 
-/** @typedef {Pick<import('../../../../plugin_base/page/types').HostInfo, 'id' | 'status' | 'name' | 'version' | 'transport' | 'sessionId'>} RunHost */
+/** @typedef {Pick<import('hostpane/page/types').HostInfo, 'id' | 'status' | 'name' | 'version' | 'transport' | 'sessionId'>} RunHost */
 
-/** @param {import('../../../../plugin_base/page/types').HostInfo} info @returns {RunHost} */
+/** @param {import('hostpane/page/types').HostInfo} info @returns {RunHost} */
 export function snapshotHost(info) {
   return { id: info.id, status: info.status, name: info.name, version: info.version, transport: info.transport, sessionId: info.sessionId };
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { HostAdapter, HostInfo } from "../../../../plugin_base/page/types";
+import type { HostAdapter, HostInfo } from "hostpane/page/types";
 import type { GraphConnection } from "../../ports/graph/index";
 import { graph as demoGraph } from "../../application/demo/graph.mjs";
 import { validateCanvas } from "../canvas/index.mjs";

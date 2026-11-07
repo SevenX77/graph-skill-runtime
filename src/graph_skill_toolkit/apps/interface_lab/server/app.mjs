@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 import { labStateDirectory, prepareLab } from "./state.mjs";
-import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "../../../plugin_base/server/index.mjs";
+import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "hostpane/server";
 
 // The build places this self-contained page alongside the bundled server.
 const html = await readFile(new URL("./interface-lab.html", import.meta.url), "utf8");

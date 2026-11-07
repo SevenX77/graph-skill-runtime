@@ -1,5 +1,5 @@
 // @ts-check
-import { createHostAdapter, discoverConnection, createMcpConnection, SNAPSHOT_ELEMENT_ID } from "../../../plugin_base/page/index.mjs";
+import { createHostAdapter, discoverConnection, createMcpConnection, SNAPSHOT_ELEMENT_ID } from "hostpane/page";
 import packageInfo from "../../../package.json" with { type: "json" };
 
 const appInfo = Object.freeze({ name: "Graph Skill canvas", version: packageInfo.version });
@@ -10,7 +10,7 @@ import { createPageGraphConnection, createRelayGraphConnection } from "../applic
  * admits only https/wss), so it long-polls the backend through the same MCP
  * connection the adapter uses; every other page reads the backend's SSE.
  * @param {Parameters<typeof createHostAdapter>[0]} [options]
- * @returns {{ adapter: import('../../../plugin_base/page/types').HostAdapter | null, source: import('../ports/graph/index').GraphConnection | null }}
+ * @returns {{ adapter: import('hostpane/page/types').HostAdapter | null, source: import('../ports/graph/index').GraphConnection | null }}
  */
 export function createCanvasComposition(options = {}) {
   const page = options.document ?? globalThis.document, view = options.window ?? globalThis.window;

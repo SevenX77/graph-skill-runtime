@@ -1,5 +1,7 @@
 # Plugin Base and Interface Lab
 
+> Since 2026-11-07 the Plugin Base this record names is the separate package Hostpane; see [the extraction decision](hostpane-extraction-2026-11-07.md). Paths below are as of this record's date.
+
 Date: 2026-10-14. The toolkit has one closed, business-independent Plugin Base, two business apps and one composition root. The Plugin Base implements 17 host interfaces and 5 local capabilities. The apps are the Graph Skill canvas and the separate Plugin Interface Lab. Source-level checks are recorded in the [validation ledger](../../src/graph_skill_toolkit/VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14). Native acceptance of all 22 operations on both hosts is pending.
 
 ## Goal and authority

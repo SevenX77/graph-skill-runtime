@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { createHostAdapter, SNAPSHOT_ELEMENT_ID } from "../../../plugin_base/page/index.mjs";
+import { createHostAdapter, SNAPSHOT_ELEMENT_ID } from "hostpane/page";
 import { InterfaceLab } from "../ui/index";
 import type { LabPaths } from "../application/guide.mjs";
 import packageInfo from "../../../package.json" with { type: "json" };

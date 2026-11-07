@@ -2,6 +2,52 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format. Earlier sections below the current baseline preserve historical candidates and their stated cutoffs; their old paths and action names do not define the current source contract.
 
+## Hostpane extraction candidate, 2026-11-07
+
+Paths in the sections below this one refer to the former layout, in which the host-integration layer lived in the toolkit at `plugin_base/` and the toolkit carried its own `ADAPTER.md`; dated evidence keeps those paths.
+
+**Hostpane** is the toolkit's host-integration layer, formerly the in-toolkit Plugin Base, now a separately versioned package in the private GitHub repository `SevenX77/hostpane` (local checkout `D:/coding/hostpane`). A **commit pin** is a dependency declaration naming one exact 40-hexadecimal git commit, so every install reads the same bytes. [The extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) owns the package boundary, the commit pin, the division of tests and documents, and the acceptance criteria. The subjects that moved with the layer are documented in Hostpane: [its README](https://github.com/SevenX77/hostpane/blob/main/README.md) (plugin construction, entry files and the full host-interface and local-capability reference, formerly `plugin_base/README.md`), [`docs/ADAPTER.md`](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md) (connection authority, identity and per-host routes, formerly the toolkit's `ADAPTER.md`), [the Claude connection verdicts](https://github.com/SevenX77/hostpane/blob/main/docs/design/interface-connect-verdicts-2026-10-16.md), [the page tool-call approval decision](https://github.com/SevenX77/hostpane/blob/main/docs/design/page-tool-calls-person-approval-2026-11-01.md), and [Hostpane's own validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md).
+
+### Source identity
+
+| Item | Identity |
+| --- | --- |
+| Toolkit source | Working tree of branch `claude/toolkit-host-interfaces` on top of commit `9461416a`, uncommitted at observation time. |
+| Hostpane pin | `package.json` declares `"hostpane": "git+https://github.com/SevenX77/hostpane.git#2edc5415e2cad55d305fc0f752cb3ab5be8fe371"`; that commit is Hostpane's `main`. |
+| Shared dependency | `zod` is `4.6.7` (was `4.3.6`; advisory GHSA-mrhx-c7xc-m3w5). npm installs one shared `zod` copy for the toolkit and Hostpane. |
+
+The toolkit has no `plugin_base/` directory. Production code imports Hostpane only through the four package exports `hostpane/page`, `hostpane/page/types`, `hostpane/server` and `hostpane/claude-mod`. For example, `composition/server.mjs` line 1 is `import { servePlugin } from "hostpane/server";`, and `composition/claude_mod/hooks/register.js` calls `registerPluginBase(on, { pluginName: 'graph-skill-canvas-mod', pages: [canvasPage, labPage] });`, where `graph-skill-canvas-mod` is the `name` in `composition/claude_mod/.claude-plugin/plugin.json`. Hostpane at the pinned commit exports `validateArguments` and `validateLocalArguments` from `hostpane/page`, ships generated declarations under `types/` through `types` export conditions, and requires `pluginName` in `registerPluginBase`.
+
+### Tests
+
+The toolkit suite has 81 tests. The test files that cover the Hostpane boundary and the toolkit's composition of Hostpane are:
+
+- `tests/graph/hostpane-boundary.test.mjs`: the toolkit reaches Hostpane only through the four entries, has no `plugin_base/` directory, and pins Hostpane by a 40-hexadecimal commit;
+- `tests/graph/composition.test.mjs` and `tests/graph/claude-payload.test.mjs`: the toolkit's composition of Hostpane;
+- `tests/integration/launch.test.mjs` and `tests/integration/codex-views.test.mjs`: real stdio against the built `dist/server.mjs`.
+
+The remaining toolkit tests are in `tests/{backend,graph,installation,integration,interface_lab,support}/`. The toolkit has no test files under `tests/plugin_base`, `tests/host` or `tests/adapters`; their Plugin Base cases are in Hostpane's suite of 182 tests.
+
+### Checks, 2026-11-07
+
+Environment: Windows 11 x64, Node.js 24.18.0, toolkit with the Hostpane pin above.
+
+| Check | Observed result |
+| --- | --- |
+| Toolkit `npm install` | 0 vulnerabilities. |
+| Toolkit `npm run build` | Passed. Canvas 818,051 bytes, Interface Lab 888,799 bytes (696,582 and 767,306 bytes before the `zod` upgrade). Measured on the pre-extraction commit `9461416a`, `zod`'s share of the canvas bundle is 310,643 bytes at 4.3.6 and 454,152 bytes at 4.6.7, which accounts for the growth. |
+| Toolkit `npm run typecheck` | Passed. |
+| Toolkit `npm test` | 81 passed, 0 failed. |
+| Toolkit `npm audit` | 0 vulnerabilities. |
+| Hostpane `npm run typecheck` at `2edc5415` | Passed. |
+| Hostpane `npm test` at `2edc5415` | 182 passed. |
+
+Test count: 182 Hostpane tests + 81 toolkit tests = 263 = the baseline 255 at `9461416a` + 8 new tests.
+
+### Pending acceptance
+
+Native observation in a loaded host is pending for this candidate: the extraction decision's final acceptance item, in which the rebuilt toolkit loads in a new Claude Code session, the Interface Lab page opens and one host interface call returns a result, has not been observed. Native acceptance of all 22 operations in both hosts remains pending as stated in the 2026-10-14 baseline below.
+
 ## Current baseline: Plugin Base, local capabilities and Interface Lab, 2026-10-14
 
 The working source has one closed Plugin Base, a Graph Skill canvas app, a separate developer Interface Lab app and one composition root. The Plugin Base implements 17 host interfaces and 5 local capabilities. The [decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) owns design choices, acceptance criteria and open items. [Plugin Base usage](plugin_base/README.md) owns construction and the full 22-operation reference. [ADAPTER.md](ADAPTER.md) owns host identity, authority and route mappings. [ARCHITECTURE.md](ARCHITECTURE.md) owns the module map, process and lifecycle. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns native observation through the Interface Lab.

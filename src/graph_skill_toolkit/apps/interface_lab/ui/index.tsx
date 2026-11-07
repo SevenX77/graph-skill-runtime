@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { UX } from "../../../../../vendor/ui-ux-template/core/behavior/ux.js";
-import type { HostAdapter, HostInfo, HostResult } from "../../../plugin_base/page/types";
+import type { HostAdapter, HostInfo, HostResult } from "hostpane/page/types";
 import { GUIDES, GROUPS, CONTEXT_PROBE, type LabPaths } from "../application/guide.mjs";
 import { runOperation, contextReadout, recordPath, workspaceRoot, localTime } from "../application/runner.mjs";
 import { hostLabel, permissionModeLabel, snapshotHost } from "../application/result_status/index.mjs";

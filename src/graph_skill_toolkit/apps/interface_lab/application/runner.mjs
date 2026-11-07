@@ -1,10 +1,10 @@
 // @ts-check
 /** Running one lab operation and reading its evidence. The page owns display;
  * this module owns how each operation reaches the Plugin Base. */
-import { LOCAL_ACTIONS } from "../../../plugin_base/page/index.mjs";
+import { LOCAL_ACTIONS } from "hostpane/page";
 
-/** @typedef {import('../../../plugin_base/page/types').HostAdapter} HostAdapter */
-/** @typedef {import('../../../plugin_base/page/types').HostResult} HostResult */
+/** @typedef {import('hostpane/page/types').HostAdapter} HostAdapter */
+/** @typedef {import('hostpane/page/types').HostResult} HostResult */
 /** @typedef {{type:string, at:string, data?:unknown}} LabEvent */
 
 /** @param {HostAdapter} adapter @param {string} id @param {Record<string, unknown>} args

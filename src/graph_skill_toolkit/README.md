@@ -4,21 +4,21 @@ The toolkit helps users run and understand their Graph Skills in their desktop h
 
 Graph Skill toolkit supplies local runtime commands, shared agent instructions and a Graph Skill canvas for Codex Desktop and Claude Code Desktop. A **Graph Skill** is a user-owned directory containing `SKILL.md`, `graph.yaml` and phase definitions. The working source is version `0.3.5`; the independent Python runtime is `0.1.0a1`. Business skills remain in user-selected directories.
 
-The toolkit has one **Plugin Base**, the reusable foundation for pages that interact with an agent host, and two separate apps. The canvas shows the graph, selected node and host/version status. The developer **Plugin Interface Lab** exercises the 17 host interfaces and 5 local capabilities. Host interfaces ask the desktop host for information or actions. Local capabilities execute file and operating-system actions in the plugin's own process. The lab is available in source test mode.
+The toolkit is built on **Hostpane**, a separately versioned package that is the foundation for pages that interact with an agent host, and has two separate apps. The toolkit pins Hostpane by one exact git commit in `package.json`; [Hostpane's guide](https://github.com/SevenX77/hostpane/blob/main/README.md) is its reference. The canvas shows the graph, selected node and host/version status. The developer **Plugin Interface Lab** exercises the 17 host interfaces and 5 local capabilities. Host interfaces ask the desktop host for information or actions. Local capabilities execute file and operating-system actions in the plugin's own process. The lab is available in source test mode.
 
 ## Documentation
 
 | Question | Owner |
 | --- | --- |
-| How do I build a plugin and call all 22 operations? | [Plugin Base usage](plugin_base/README.md) |
-| How does a page connect and gain operation authority in each host? | [Host Port and adapters](ADAPTER.md) |
+| How do I build a plugin and call all 22 operations? | [Hostpane usage](https://github.com/SevenX77/hostpane/blob/main/README.md) |
+| How does a page connect and gain operation authority in each host? | [Hostpane's host Port and adapters](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md) |
 | Where do modules, processes, routes and graph data belong? | [Architecture map](ARCHITECTURE.md) |
 | What does each page show? | [Visible page behavior](PROTOTYPE.md) |
 | How do I observe native effects and save comparisons? | [Manual tests](MANUAL-TESTS.md) |
-| What design and acceptance boundaries apply? | [Plugin Base decision](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) |
+| What design and acceptance boundaries apply? | [Plugin Base decision](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) and [Hostpane extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) |
 | What has been measured? | [Current validation baseline](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) |
 
-The current baseline records source, build and installer checks and a configured source-mode switch. Codex's `skills.invoke` source route submits a named Skill request through the current conversation's declared text-message channel; its receipt establishes message acceptance, while activation requires separate observation. [Host Port and adapters](ADAPTER.md#interface-mapping) owns the route and its limits. Native acceptance of all 22 operations in both hosts is pending. Historical release and native results retain their own candidate scope in [VALIDATION.md](VALIDATION.md).
+The current baseline records source, build and installer checks and a configured source-mode switch. Codex's `skills.invoke` source route submits a named Skill request through the current conversation's declared text-message channel; its receipt establishes message acceptance, while activation requires separate observation. [Hostpane's interface mapping](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md#interface-mapping) owns the route and its limits. Native acceptance of all 22 operations in both hosts is pending. Historical release and native results retain their own candidate scope in [VALIDATION.md](VALIDATION.md).
 
 
 ## Install
@@ -157,7 +157,7 @@ uv run gskill compile examples/hello-world
 npm start --prefix src/graph_skill_toolkit
 ```
 
-`npm start` starts the built stdio MCP server from `composition/server.mjs` and its loopback listener. The canvas app lives under `apps/graph_canvas/`; the separate lab app lives under `apps/interface_lab/`; reusable host integration lives under `plugin_base/`. The built Claude Mod comes from `composition/claude_mod/`. The [architecture map](ARCHITECTURE.md#build-outputs) owns output paths and page transports. A desktop host must load the selected server and matching Mod before native results can be attributed to that source. The Python package remains independently installable and unpublished on PyPI. [VALIDATION.md](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) records source checks and pending loaded-host acceptance.
+`npm start` starts the built stdio MCP server from `composition/server.mjs` and its loopback listener. The canvas app lives under `apps/graph_canvas/`; the separate lab app lives under `apps/interface_lab/`; host integration comes from the Hostpane package, installed under `node_modules/hostpane` and imported only through `hostpane/page`, `hostpane/page/types`, `hostpane/server` and `hostpane/claude-mod`. The built Claude Mod comes from `composition/claude_mod/`. The [architecture map](ARCHITECTURE.md#build-outputs) owns output paths and page transports. A desktop host must load the selected server and matching Mod before native results can be attributed to that source. The Python package remains independently installable and unpublished on PyPI. [VALIDATION.md](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) records source checks and pending loaded-host acceptance.
 
 ## Build and acceptance
 

@@ -1,4 +1,4 @@
-import { SNAPSHOT_ELEMENT_ID } from "../../../../plugin_base/page/index.mjs";
+import { SNAPSHOT_ELEMENT_ID } from "hostpane/page";
 export function validateGraphBackend(value) {
   if (!value || typeof value.url !== "string" || !/^[A-Za-z0-9_-]{32,256}$/.test(value.token ?? "")) throw new Error("本地画布后端连接信息无效。");
   const url = new URL(value.url);

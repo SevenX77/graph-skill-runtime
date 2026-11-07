@@ -3,9 +3,9 @@
  * the record, the header and the side list always agree. Yellow means a test
  * is still open; a closed test is green or red. */
 
-/** @typedef {import('../../../../plugin_base/page/types').HostInfo} HostInfo */
-/** @typedef {import('../../../../plugin_base/page/types').HostCapability} HostCapability */
-/** @typedef {import('../../../../plugin_base/page/types').HostResult} HostResult */
+/** @typedef {import('hostpane/page/types').HostInfo} HostInfo */
+/** @typedef {import('hostpane/page/types').HostCapability} HostCapability */
+/** @typedef {import('hostpane/page/types').HostResult} HostResult */
 /** @typedef {import('../result_status/index.mjs').RunHost} RunHost */
 /** @typedef {{op:string, connection:object, host:RunHost, result:HostResult, verdict?:''|'matches'|'differs'|'not-observed'}} Call */
 /** @typedef {'success'|'testing'|'failure'|'untested'} SignalCode */

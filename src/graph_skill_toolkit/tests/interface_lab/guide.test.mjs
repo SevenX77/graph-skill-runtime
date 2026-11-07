@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { GUIDES } from "../../apps/interface_lab/application/guide.mjs";
 import { contextReadout, recordPath, runOperation, workspaceRoot, localTime } from "../../apps/interface_lab/application/runner.mjs";
-import { HOST_ACTIONS, validateArguments } from "../../plugin_base/ports/host/contract.mjs";
-import { LOCAL_ACTIONS, validateLocalArguments } from "../../plugin_base/local/definitions.mjs";
+import { HOST_ACTIONS, validateArguments, LOCAL_ACTIONS, validateLocalArguments } from "hostpane/page";
 
 const lab = { stateDirectory: "C:\\lab", sandbox: "C:\\lab\\sandbox", records: "C:\\lab\\records", sampleFile: "C:\\lab\\sandbox\\sample.txt" };
 

@@ -1,5 +1,7 @@
 # Canvas as the single presentation owner
 
+> Since 2026-11-07 the Plugin Base this record names is the separate package Hostpane; see [the extraction decision](hostpane-extraction-2026-11-07.md). Paths below are as of this record's date.
+
 Date: 2026-10-14. Decision: the canvas is the only view the Graph Skill presentation sequence opens, selects and verifies on both hosts; the `SKILL.md`-opening instructions, the `document` payload member and its server guard are removed; `SKILL.md` stays reachable on demand. In Claude Code, when the Browser pane stays hidden after the sequence, the user reveals it with one manual click on a host control. Native desktop observation of the manual-reveal sentence in Claude Code and of the Codex sequence is pending.
 
 ## Goal and authority

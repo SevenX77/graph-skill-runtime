@@ -7,7 +7,7 @@ import { createRuntimeCompiler } from "../backend/runtime/index.mjs";
 import { createGraphBackend } from "../backend/graph/index.mjs";
 import { createGraphRelay } from "../backend/relay/index.mjs";
 import { createLiveGraphSource } from "../application/live_source/index.mjs";
-import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "../../../plugin_base/server/index.mjs";
+import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "hostpane/server";
 
 // The build places this self-contained resource alongside the bundled server.
 const html = await readFile(new URL("./canvas.html", import.meta.url), "utf8");
