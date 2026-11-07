@@ -9,24 +9,24 @@
 /** @typedef {{label:string, args:(context:PresetContext)=>Record<string, unknown>}} Preset */
 /** @typedef {{id:string, group:string, kind:"host"|"local", purpose:string, expect:{claude:string, codex:string}, check:string, presets:Preset[], note?:string}} Guide */
 
-const sample = (/** @type {PresetContext} */ { lab }) => lab?.sampleFile ?? "C:/example/sample.txt";
-const workspace = (/** @type {PresetContext} */ { workspaceRoot }) => workspaceRoot ?? "C:/workspace";
+const sample = (/** @type {PresetContext} */ { lab }) => lab?.sampleFile ?? "";
+const workspace = (/** @type {PresetContext} */ { workspaceRoot }) => workspaceRoot ?? "";
 const workspaceReadme = (/** @type {PresetContext} */ context) => {
   const root = workspace(context).replace(/[\\/]+$/, "");
-  return root + (root.includes("\\") ? "\\" : "/") + "README.md";
+  return root ? root + (root.includes("\\") ? "\\" : "/") + "README.md" : "";
 };
 export const CONTEXT_PROBE = "请逐字复述你在这一轮收到的、以“Plugin page context”开头的上下文段落；如果没有收到这样的段落，只回答“未收到页面上下文”。不要调用任何工具。";
 
 /** @type {Guide[]} */
 export const GUIDES = [
   { id: "host.getInfo", group: "宿主信息", kind: "host",
-    purpose: "读取当前连接确认的宿主身份：宿主名称、版本、会话标识和连接方式。",
-    expect: { claude: "返回 Claude Code、版本号和会话 ID；身份来自 Claude Mod 的会话接口。", codex: "返回 MCP 客户端声明的名称和版本；连接方式为 mcp-app。" },
-    check: "把返回的名称和版本与宿主“关于”界面或设置里的版本号对照。", presets: [{ label: "读取", args: () => ({}) }] },
+    purpose: "读取当前连接确认的宿主身份：宿主名称、版本、会话标识、权限模式和连接方式。",
+    expect: { claude: "返回 Claude Code、版本号和会话 ID，身份来自 Claude Mod 的会话接口；permissionMode 是当前权限模式，读不到时为 null。", codex: "返回 MCP 客户端声明的名称和版本；连接方式为 mcp-app；permissionMode 为 null。" },
+    check: "把返回的名称和版本与宿主“关于”界面或设置里的版本号对照；切换权限模式后约 10 秒内，左侧“权限模式”应随之改变。", presets: [{ label: "读取", args: () => ({}) }] },
   { id: "host.getCapabilities", group: "宿主信息", kind: "host",
     purpose: "读取 17 个宿主接口在当前连接上的可用状态、范围和限制说明。",
-    expect: { claude: "大多数接口为 available；宿主文件浏览器定位和显示模式为 unknown。", codex: "依宿主声明而定；Skill、视图管理和宿主目录定位为 unknown。" },
-    check: "左侧列表的状态点就来自这份结果；不可用接口的原因写在每个接口的限制说明里。", presets: [{ label: "读取", args: () => ({}) }] },
+    expect: { claude: "大多数接口为 available；宿主文件浏览器定位和显示模式为 unknown。", codex: "依宿主声明而定；Skill 调用请求取决于文本消息能力，Skill 清单、视图管理和宿主目录定位为 unknown。" },
+    check: "左侧列表的状态点就来自这份结果；不可用接口的原因写在每个接口的限制说明里。自动模式下，受影响的接口带 modeLimit，左侧标“不可用”或“部分”，详情写明原因。", presets: [{ label: "读取", args: () => ({}) }] },
   { id: "host.getContext", group: "宿主信息", kind: "host",
     purpose: "读取宿主环境：Claude 给出项目目录、工作目录和当前模型；Codex 给出主题、语言和显示模式。",
     expect: { claude: "data 含 workspaceRoots（会话项目目录）、cwd、model；不含主题和语言。", codex: "data 含 theme、locale、displayMode、availableDisplayModes；不含工作区目录。" },
@@ -40,11 +40,13 @@ export const GUIDES = [
   { id: "files.openFile", group: "宿主文件", kind: "host",
     purpose: "请宿主在它自己的文件面板里打开一个文件。",
     expect: { claude: "会话在窗口中显示时，宿主文件面板打开工作区 README.md 并跳到指定行；无窗口时返回 rejected 和宿主原因。", codex: "宿主经文件扩展打开所选工作区文件；不支持跳到指定行。" },
-    check: "看宿主界面里的文件面板。Claude 只允许工作区或已授权目录；实验室 sandbox 是插件状态目录，不能用于宿主文件面板预设。工作区未知时请先编辑路径。", presets: [{ label: "工作区 README.md 第 2 行", args: context => ({ path: workspaceReadme(context), line: 2 }) }] },
+    check: "看宿主界面里的文件面板。Claude 只允许工作区或已授权目录；实验室 sandbox 是插件状态目录，不能用于宿主文件面板预设。工作区未知时请先编辑路径。", presets: [
+      { label: "打开工作区 README.md", args: context => ({ path: workspaceReadme(context) }) },
+      { label: "跳到第 2 行（Claude）", args: context => ({ path: workspaceReadme(context), line: 2 }) }] },
   { id: "files.revealDirectory", group: "宿主文件", kind: "host",
-    purpose: "请宿主在它自己的文件浏览器里定位一个目录。这与“在系统资源管理器中定位”是两个独立功能。",
-    expect: { claude: "当前不可用：Claude Mod 没有开放宿主文件浏览器的目录定位接口。", codex: "当前不可用：宿主文件扩展只声明了打开文件。" },
-    check: "预期结果是“当前不可用”并说明原因，宿主界面不应有任何变化。要在系统文件管理器里定位，请用本地能力分组的同名功能。",
+    purpose: "请宿主用它自己的定位接口选中一个目录。与本地能力分组的“在系统资源管理器中定位”的区别：这一个由宿主执行，路径受宿主会话目录限制，并走宿主的审批；那一个由插件进程执行，路径受插件授权目录限制。",
+    expect: { claude: "宿主工具 mcp__ccd_host__reveal_path 在系统文件管理器里打开该目录的上一级并选中它；返回“已受理”和宿主的回复句。默认权限模式下宿主先弹卡片请你批准，Windows 上自动模式也要批准。路径在会话目录之外时宿主拒绝。", codex: "当前不可用：宿主文件扩展只声明了打开文件。" },
+    check: "Claude：看系统文件管理器是否新开一个窗口并选中该目录，宿主回复句是否写明定位的路径。Codex：预期结果是“当前不可用”并说明原因，宿主界面不应有任何变化。",
     presets: [{ label: "工作区根目录", args: context => ({ path: workspace(context) }) }] },
   { id: "composer.writeDraft", group: "对话", kind: "host",
     purpose: "把文字写进宿主的消息输入框，不发送。",
@@ -81,9 +83,9 @@ export const GUIDES = [
     expect: { claude: "宿主确认清单完整时返回全部名称；被上下文预算截断时返回不支持。", codex: "当前不可用：MCP App 没有 Skill 清单接口。" },
     check: "核对清单里是否有 plugin-interface-lab。", presets: [{ label: "读取", args: () => ({}) }] },
   { id: "skills.invoke", group: "Skill", kind: "host",
-    purpose: "让宿主直接激活一个 Skill。",
-    expect: { claude: "提交 /plugin-interface-lab echo 接口测试；会话空闲后运行斜杠命令，加载记录和回复在对话中可见。", codex: "当前不可用：MCP App 没有原生 Skill 调用接口。" },
-    check: "看对话里是否出现斜杠命令、Skill 加载记录和模型确认；订阅下一次 turn.completed 核对轮次完成。",
+    purpose: "向当前会话提交 Skill 激活请求，并分别核对受理、技能加载与执行结果。",
+    expect: { claude: "以插件身份运行 /plugin-interface-lab echo 接口测试；会话空闲后运行斜杠命令，加载记录和回复在对话中可见。清单里没有的 Skill 直接报告拒绝。", codex: "宿主声明文本消息能力时，提交 $plugin-interface-lab echo 接口测试；accepted 只确认消息受理，由模型查找技能，实际加载和回复需在对话中核对。" },
+    check: "Claude：看斜杠命令、Skill 加载记录和模型确认，并用下一次 turn.completed 核对轮次完成。Codex：核对发送的 $技能名 消息、技能加载记录和回复；仅有受理回执或复述测试文字时，保留实际激活未验证的结论。",
     presets: [{ label: "激活本实验室 Skill", args: () => ({ skill: "plugin-interface-lab", input: "echo 接口测试" }) }] },
   { id: "views.open", group: "视图", kind: "host",
     purpose: "在宿主里打开一个由本页面拥有的视图（网页标签），返回它的 viewId。",
@@ -98,11 +100,12 @@ export const GUIDES = [
     purpose: "关闭本页面打开的一个视图。",
     expect: { claude: "会话在窗口中显示时，关闭对应标签；无窗口、用户标签或伪造的 viewId 会报告拒绝原因。", codex: "当前不可用。" },
     check: "看 Browser 面板里那个标签是否消失，其余标签保持不变。",
-    presets: [{ label: "关闭最近打开的视图", args: ({ lastViewId }) => ({ viewId: lastViewId ?? "先运行“打开视图”" }) }] },
+    presets: [{ label: "关闭最近打开的视图", args: ({ lastViewId }) => ({ viewId: lastViewId ?? "" }) }], note: "viewId 为空时先运行 views.open；空值由插件直接报错，不发给宿主。" },
   { id: "views.requestDisplayMode", group: "视图", kind: "host",
     purpose: "请求改变当前页面容器的显示模式（内嵌、全屏、画中画）。",
-    expect: { claude: "当前不可用：Claude Mod 没有同等语义的接口。", codex: "本页面声明只支持全屏；请求 fullscreen 时宿主返回实际模式。" },
-    check: "看页面容器是否变成全屏，返回的 mode 是否与请求一致。", presets: [{ label: "全屏", args: () => ({ mode: "fullscreen" }) }] },
+    expect: { claude: "页面容器是 Browser 面板。inline：面板显示、侧边栏展开；fullscreen：面板显示、侧边栏折叠（宿主能给的最大面积）。Mod 先显示面板、再设置侧边栏，然后从宿主布局读回实际模式：与请求一致返回“已完成”，不一致返回“被拒绝”并附实际模式。pip 不支持：面板弹出窗口只能由用户拖出。会话不在主窗口显示时宿主拒绝改布局。", codex: "本页面声明只支持全屏；请求 fullscreen 时宿主返回实际模式。" },
+    check: "Claude：看侧边栏是否随请求折叠或展开、Browser 面板是否显示，返回的 mode 和 layout 是否与窗口一致。Codex：看页面容器是否变成全屏，返回的 mode 是否与请求一致。",
+    presets: [{ label: "全屏", args: () => ({ mode: "fullscreen" }) }, { label: "内嵌", args: () => ({ mode: "inline" }) }, { label: "画中画", args: () => ({ mode: "pip" }) }] },
   { id: "local.files.read", group: "本地能力", kind: "local",
     purpose: "由插件自己的 Node 进程读取一个文件，不经过宿主。只能读插件授权的目录。",
     expect: { claude: "返回文件内容、大小、修改时间和 SHA-256 摘要；页面经本机 HTTP 调用插件进程。", codex: "同左；页面经只对页面可见的 MCP 工具 local_call 调用插件进程。" },

@@ -6,6 +6,8 @@ import { createHostBridge } from "../../../plugin_base/adapters/claude/bridge/se
 import { nativeCapabilities, executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
 import { createModState, pollBridges, queueEvent } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 import { register } from "../../../composition/claude_mod/hooks/register.js";
+import { registerPluginBase } from "../../../plugin_base/adapters/claude/mod/hooks/base.js";
+import { callNative, mcpReference, nativeData } from "../../../plugin_base/adapters/claude/mod/operations/tools/index.mjs";
 
 const root = "C:/business/hello-world";
 const identity = { name: "Claude Code", version: "2.1.295", client_type: "claude_code", sessionId: "session-a", source: "claude-mod-session" };
@@ -26,10 +28,85 @@ function modApi(overrides = {}) {
       ? { result: { success: true, commandName: input.skill, status: "inline" } } : { result: { ok: true } }; } },
     mcp: { call: async (server, name, args) => { calls.push({ server, name, args }); return { content: [{ type: "text", text: "done" }] }; } },
     prompt: { fill: async input => { fills.push(input); return { isFilled: true }; }, submit: async input => { messages.push(input); return { text: input.text }; } },
+    command: { list: async () => [{ name: "graph-skill-canvas" }], run: async input => { messages.push(input); return { text: "" }; } },
     ...overrides,
   };
   return { api, calls, messages, fills };
 }
+
+function approvalHarness(verdict, answer) {
+  const hooks = new Map();
+  registerPluginBase((event, ...rest) => { hooks.set(event, rest.at(-1)); }, { pages: [] });
+  const asked = [], ran = [];
+  const api = modApi({
+    tool: { check: async () => verdict, call: async input => { ran.push(input.tool); return { result: { ok: true } }; } },
+    mcp: { call: async (server, tool, args) => { ran.push("mcp:" + server + "/" + tool); return { content: [{ type: "text", text: JSON.stringify({ echo: args }) }] }; } },
+    ui: { ask: async question => { asked.push(question); if (answer instanceof Error) throw answer; return answer; } },
+  }).api;
+  return { api, asked, ran, hooks };
+}
+
+test("a page's tool call asks the person once per action when the engine would ask", async () => {
+  const { api, asked, ran } = approvalHarness({ decision: "ask" }, "允许");
+  const tools = [{ name: "Read" }, { name: "Grep" }];
+  await callNative(api, tools, "Read", {});
+  await callNative(api, tools, "Grep", {});
+  assert.equal(asked.length, 1); assert.match(asked[0], /页面.*Read/);
+  assert.deepEqual(ran, ["Read", "Grep"]);
+  await callNative(api, [{ name: "Read" }], "Read", {});
+  assert.equal(asked.length, 2, "the next action asks again");
+});
+
+test("an MCP tool the person allowed runs through the engine's MCP call, the plugin's own grant", async () => {
+  const { api, asked, ran, hooks } = approvalHarness({ decision: "ask" }, "允许");
+  const tools = [{ name: "mcp__Claude_Browser__tabs_context" }, { name: "mcp__graph-skill-canvas__lab_echo", mcp: true }];
+  await callNative(api, tools, "mcp__Claude_Browser__tabs_context", {});
+  const echoed = await callNative(api, tools, "mcp__graph-skill-canvas__lab_echo", { text: "接口测试 ✓" });
+  assert.equal(asked.length, 1);
+  assert.deepEqual(ran, ["mcp:Claude_Browser/tabs_context", "mcp:graph-skill-canvas/lab_echo"], "no call reaches the permission decision");
+  assert.equal(echoed.status, "completed");
+  assert.deepEqual(nativeData(echoed.data), { echo: { text: "接口测试 ✓" } });
+  assert.equal(hooks.has("tool.check"), false, "the Mod answers no tool.check");
+});
+
+test("a deny on a later tool of an approved action stands", async () => {
+  const { api, asked, ran } = approvalHarness({ decision: "ask" }, "允许");
+  api.tool.check = async ({ tool }) => ({ decision: tool === "mcp__x__denied" ? "deny" : "ask" });
+  const tools = [{ name: "mcp__x__asked" }, { name: "mcp__x__denied" }];
+  await callNative(api, tools, "mcp__x__asked", {});
+  await callNative(api, tools, "mcp__x__denied", {});
+  assert.equal(asked.length, 1);
+  assert.deepEqual(ran, ["mcp:x/asked", "mcp__x__denied"], "the denied tool goes to the session's own decision, not the MCP grant");
+});
+
+test("mcpReference reads a session tool name as the MCP call's server and tool", () => {
+  assert.deepEqual(mcpReference("mcp__Claude_Browser__tabs_context"), { server: "Claude_Browser", tool: "tabs_context" });
+  assert.deepEqual(mcpReference("mcp__graph-skill-canvas__lab_echo"), { server: "graph-skill-canvas", tool: "lab_echo" });
+  for (const name of ["Read", "mcp__", "mcp__server", "mcp__server__", "mcp____tool", undefined]) assert.equal(mcpReference(name), null, String(name));
+});
+
+test("a refused or dismissed question runs no tool", async () => {
+  for (const [answer, message] of [["拒绝", /你拒绝了/], [new Error("dismissed"), /已关闭或无法显示/]]) {
+    const { api, ran } = approvalHarness({ decision: "ask" }, answer);
+    await assert.rejects(callNative(api, [{ name: "Read" }], "Read", {}), error => message.test(error.message) && error.outcome === "rejected" && error.data.failureScope === "request");
+    assert.deepEqual(ran, []);
+  }
+});
+
+test("the engine's allow or deny raises no question and keeps the session's own tool call", async () => {
+  for (const decision of ["allow", "deny"]) {
+    const { api, asked, ran } = approvalHarness({ decision }, "拒绝");
+    await callNative(api, [{ name: "Read" }], "Read", {});
+    await callNative(api, [{ name: "mcp__Claude_Browser__tabs_context" }], "mcp__Claude_Browser__tabs_context", {});
+    assert.deepEqual(asked, []); assert.deepEqual(ran, ["Read", "mcp__Claude_Browser__tabs_context"]);
+  }
+});
+
+test("a failed approved call reports the engine's error", async () => {
+  const { api } = approvalHarness({ decision: "ask" }, "允许");
+  api.mcp.call = async () => { throw new Error("aborted"); };
+  await assert.rejects(callNative(api, [{ name: "mcp__x__y" }], "mcp__x__y", {}), /aborted/);
+});
 
 test("Claude browser uses its own same-origin token and preserves a pending request id", async () => {
   const requests = [];

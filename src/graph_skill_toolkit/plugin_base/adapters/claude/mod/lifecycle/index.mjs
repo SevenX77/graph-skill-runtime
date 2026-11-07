@@ -1,4 +1,8 @@
 import { executeBridgeAction, nativeCapabilities, sessionFacts } from '../operations/index.mjs';
+import { readPermissionMode } from '../operations/tools/index.mjs';
+
+// The page learns a changed permission mode within this many one-second polls.
+const MODE_READ_POLLS = 5;
 export const bridgeKey = bridge => bridge.url + '/' + bridge.token;
 
 export function bridgeDescriptor(payload) {
@@ -66,6 +70,16 @@ export async function flushEvents($, state) {
   }
 }
 
+// Runs beside the poll: a slow host tool must not delay the page's heartbeat.
+async function refreshPermissionMode($, state, tools, generation) {
+  if (state.modeReading || state.modeCountdown-- > 0) return;
+  state.modeReading = true;state.modeCountdown = MODE_READ_POLLS - 1;
+  try {
+    const mode = await readPermissionMode($, tools);
+    if (!state.closed && state.generation === generation) state.permissionMode = mode;
+  } finally { state.modeReading = false; }
+}
+
 export async function pollBridges($, state) {
   if (state.polling || state.closed || state.bridges.size === 0) return;
   const generation = state.generation;
@@ -75,8 +89,11 @@ export async function pollBridges($, state) {
     await flushEvents($, state);
     const tools = await $.tool.list();
     if (state.closed || state.generation !== generation) return;
-    const identity = await readHostIdentity($);
-    const capabilities = nativeCapabilities(tools, await sessionFacts($, state, identity?.sessionId ?? null));
+    void refreshPermissionMode($, state, tools, generation);
+    const session = await readHostIdentity($);
+    const permissionMode = state.permissionMode;
+    const identity = session && permissionMode ? {...session,permission_mode:permissionMode} : session;
+    const capabilities = nativeCapabilities(tools, {...await sessionFacts($, state, identity?.sessionId ?? null),permissionMode});
     if (state.closed || state.generation !== generation) return;
     for (const bridge of state.bridges.values()) {
       try {
@@ -104,7 +121,7 @@ export async function pollBridges($, state) {
 
 
 export function createModState() {
-  return { bridges: new Map(), running: new Set(), seen: new Set(), receipts: new Map(), reported: new Set(), contexts: new Map(), views: new Map(), viewQueues: new Map(), nextViewId: 0, sessionFacts: null, polling: false, closed: false, generation: 0,
+  return { bridges: new Map(), running: new Set(), seen: new Set(), receipts: new Map(), reported: new Set(), contexts: new Map(), views: new Map(), viewQueues: new Map(), nextViewId: 0, sessionFacts: null, permissionMode: null, modeReading: false, modeCountdown: 0, polling: false, closed: false, generation: 0,
     events: [], overrides: [], turns: new Map() };
 }
 

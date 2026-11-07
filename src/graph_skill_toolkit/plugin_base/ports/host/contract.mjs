@@ -21,7 +21,9 @@ export function validateCapabilities(value) {
     if (capability.scope !== undefined && typeof capability.scope !== "string") throw new Error("无效的接口范围。");
     if (capability.constraints !== undefined) record(capability.constraints);
     if (capability.limits !== undefined && (!Array.isArray(capability.limits) || capability.limits.some(item => typeof item !== "string"))) throw new Error("无效的接口限制说明。");
-    return [action, { state: capability.state, detail: capability.detail, ...(capability.scope ? {scope: capability.scope} : {}), ...(capability.constraints ? { constraints: structuredClone(capability.constraints) } : {}), ...(capability.limits ? { limits: [...capability.limits] } : {}) }];
+    const modeLimit = capability.modeLimit === undefined ? undefined : record(capability.modeLimit);
+    if (modeLimit && (typeof modeLimit.mode !== "string" || !["blocked", "partial"].includes(/** @type {string} */ (modeLimit.effect)) || typeof modeLimit.detail !== "string")) throw new Error("无效的权限模式限制说明。");
+    return [action, { state: capability.state, detail: capability.detail, ...(capability.scope ? {scope: capability.scope} : {}), ...(capability.constraints ? { constraints: structuredClone(capability.constraints) } : {}), ...(capability.limits ? { limits: [...capability.limits] } : {}), ...(modeLimit ? { modeLimit: { mode: modeLimit.mode, effect: modeLimit.effect, detail: modeLimit.detail } } : {}) }];
   })));
 }
 

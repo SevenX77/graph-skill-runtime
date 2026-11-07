@@ -277,9 +277,9 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 ### host.getInfo
 
 - **Arguments:** none.
-- **Effect:** returns the confirmed host identity as `HostInfo` (`id`, `status`, `name`, `version`, `clientType`, `sessionId`, `transport`, `identitySource`, `reason`, `capabilities`). The page facade answers it.
-- **Claude:** identity from the Mod session: name `Claude Code`, version and session id.
-- **Codex:** identity from MCP App initialization.
+- **Effect:** returns the confirmed host identity as `HostInfo` (`id`, `status`, `name`, `version`, `clientType`, `sessionId`, `permissionMode`, `transport`, `identitySource`, `reason`, `capabilities`). The page facade answers it.
+- **Claude:** identity from the Mod session: name `Claude Code`, version and session id. `permissionMode` is the session's permission mode as the host names it. The Mod reads it every five polls from the desktop host's `mcp__ccd_session_mgmt__get_session`, only when `$.tool.check` already allows that call, so the read shows no card. It is `null` when the host has no such tool or the call would need asking.
+- **Codex:** identity from MCP App initialization; `permissionMode` is `null`.
 - **Limits:** identity is what the connection reports; it is not cryptographic attestation.
 
 ### host.getCapabilities
@@ -292,7 +292,7 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** none.
 - **Effect:** returns the host environment as `{ workspaceRoots, cwd?, model?, theme, locale, displayMode, availableDisplayModes, raw? }`.
-- **Claude:** returns `workspaceRoots: [root]`, `cwd` and `model` from the Mod session; `theme`, `locale` and display fields are `null`. `receipt` holds `{ root, cwd, model }`.
+- **Claude:** returns `workspaceRoots: [root]`, `cwd` and `model` from the Mod session; `theme` and `locale` are `null`. When the session lists the layout tools that `views.requestDisplayMode` uses, `availableDisplayModes` is `["inline", "fullscreen"]` and `displayMode` is the current mode read from the host layout (`null` while the Browser pane is not shown); otherwise both are `null`. `receipt` holds `{ root, cwd, model }` and, when read, `layout`.
 - **Codex:** returns `theme`, `locale`, `displayMode`, `availableDisplayModes` and the raw MCP App host context; `workspaceRoots` is `null`. `receipt` holds the raw context.
 - **Limits:** Claude provides no theme or locale. Codex provides no workspace roots.
 
@@ -315,10 +315,10 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 ### files.revealDirectory
 
 - **Arguments:** `path` (absolute).
-- **Effect:** reveals a directory in the host's own file browser.
-- **Claude:** capability state `unknown`; returns `unsupported`. The Claude file pane opens files only: `mcp__ccd_view__show_pane` with `pane: "file"` refuses a directory path as unresolvable and requires a path.
+- **Effect:** asks the host to reveal a directory through the host's own reveal interface.
+- **Claude:** calls the host tool `mcp__ccd_host__reveal_path`, which selects the directory inside its parent folder in the system file manager (File Explorer on Windows, Finder on macOS). The host resolves the path inside the session's working directory or granted folders and, in default permission mode, asks the person on a card before each reveal; on Windows the person also approves in auto mode. Status `accepted`; `message` and `data.reply` carry the host's sentence (`Revealed folder … in File Explorer.`) and the window is observed in the file manager. A host error, such as a path outside the session's folders, returns `error` with the host's sentence; a denial returns `rejected`. The tool is absent in a session running over SSH, and the capability is then `unavailable`.
 - **Codex:** capability state `unknown`; the host file extension confirms opening a file only, so the call returns `unsupported`.
-- **Related:** `local.system.revealInFileManager` is an independent function that reveals a path in the operating system's file manager.
+- **Related:** `local.system.revealInFileManager` is an independent function: the plugin's own Node process reveals a path, under the plugin's directory grants, without the host.
 
 ### composer.writeDraft
 
@@ -332,7 +332,7 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `text` (1 to 8000 characters), `model?`, `effort?`. Each of `model` and `effort` is a `Selection`: `{ source: "current" }`, `{ source: "default" }` or `{ source: "specified", value }`. A specified model is a nonempty identifier string. A specified effort is one of the five strings `low`, `medium`, `high`, `xhigh`, `max`; numeric effort values fail validation. An omitted selection means `current`.
 - **Effect:** submits a user message to the current conversation; the model's reply appears in the conversation.
-- **Claude:** calls `$.prompt.submit`, which queues the message until the session is idle. The driver follows the receipt under the [automatic waiting contract](#claude-host-operation-waiting-and-evidence-sizes). When a page snapshot is set, the submitted text carries the [inline context section](#contextupdate). `sent.text` retains the original message, `sent.inlinedContext` lists its context blocks, and `observed.contextDelivery` is `"inline"` for that delivery. Status `accepted`; `receipt` holds the submit response, and `observed` also holds the session model and any turn override. `default` returns `unsupported`, because Claude has no confirmed way to read its default model and effort. `specified` applies only to the turn this message starts: the Mod rewrites the main agent's model and effort for that turn's steps, and leaves the session settings unchanged. The `turn.completed` event's `override.applied` reports the applied values and `sessionWouldUse`, the values the session would have used.
+- **Claude:** calls `$.prompt.submit`, which queues the message until the session is idle. The driver follows the receipt under the [automatic waiting contract](#claude-host-operation-waiting-and-evidence-sizes). When a page snapshot is set, the submitted text carries the [inline context section](#contextupdate). `sent.text` retains the original message, `sent.inlinedContext` lists its context blocks, and `observed.contextDelivery` is `"inline"` for that delivery. Status `accepted`; `receipt` holds the submit response, and `observed` also holds the session model and any turn override. `default` returns `unsupported`, because Claude has no confirmed way to read its default model and effort. `specified` applies only to the turn this message starts: the Mod rewrites the main agent's model and effort for that turn's steps, and leaves the session settings unchanged. The Mod binds the turn in its `turn.start` hook by text; because Claude Code frames a plugin's prompt for the model (`The <plugin> plugin sent a message: …`), the turn's text is matched when it equals or contains the submitted text, exact matches first. The `turn.completed` event's `override.applied` reports the applied values and `sessionWouldUse`, the values the session would have used.
 - **Codex:** calls the MCP App `sendMessage` with role and content. Status `accepted`. Any `default` or `specified` selection returns `unsupported` and sends nothing, because `sendMessage` has only role and content fields.
 - **Limits:** Claude has no `default` selection and applies `specified` to one turn. Codex uses the session's current model and effort.
 
@@ -369,10 +369,10 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 ### skills.invoke
 
-- **Arguments:** `skill` (identifier), `input?` (a string on Claude).
-- **Effect:** activates one Skill in the current session.
+- **Arguments:** `skill` (identifier), `input?` (a string on either host). Codex accepts up to 256 characters in `skill`, matching `^[A-Za-z0-9][A-Za-z0-9_-]*(?::[A-Za-z0-9][A-Za-z0-9_-]*)?$`: a simple name or `plugin:skill`, with each segment starting with a letter or digit.
+- **Effect:** requests activation of one Skill in the current session; the receipt, instruction loading and business outcome have separate evidence.
 - **Claude:** submits a slash command through `$.prompt.submit({ text: "/" + skill + (input ? " " + input : "") })`. A slash-command submission asks the session to process the named Skill in the conversation once it is idle. Status `accepted`, with the submit response in `evidence.receipt`. Activation is visible in the transcript and checked with the next `turn.completed` event. The Skill's business result has its own observation. A non-string `input` returns `unsupported`. The [automatic waiting contract](#claude-host-operation-waiting-and-evidence-sizes) applies.
-- **Codex:** capability state `unknown`; returns `unsupported`.
+- **Codex:** when the current host declares `message.text`, submits `"$" + skill + (input ? " " + input : "")` as user text through `App.sendMessage` (`ui/message`). The [documented text entry](https://learn.chatgpt.com/docs/app-server#skills) lets the model resolve the Skill name. The request contains a text item; typed Skill-item injection belongs to the app-server interface. Status `accepted` confirms message acceptance, with the exact sent message and response in `evidence.sent` and `evidence.receipt`. Observe Skill resolution, instruction loading and outcome separately in the conversation. An invalid name or non-string input returns `unsupported` before dispatch. Native activation through this page remains pending acceptance.
 
 ### views.open
 
@@ -400,9 +400,9 @@ Each interface's shared definition is `host_interfaces/<group>/<name>/index.mjs`
 
 - **Arguments:** `mode`: `inline`, `fullscreen` or `pip`.
 - **Effect:** requests a display mode for the page's own container.
-- **Claude:** capability state `unknown`; returns `unsupported`. The page's container is the Browser pane; the host can show or close that pane and collapse the sidebar, and has no route that places the page inline in the transcript, fullscreen or picture-in-picture.
+- **Claude:** the page's container is the Browser pane beside the conversation, and a display mode names how much of the host window that container gets. `inline` is the pane shown with the sidebar expanded; `fullscreen` is the pane shown with the sidebar collapsed, the widest layout the host offers. The Mod shows the pane with `mcp__ccd_view__show_pane`, sets the sidebar with `mcp__ccd_window__set_sidebar_collapsed`, then reads the layout back through `mcp__ccd_window__get_window_layout` and `mcp__ccd_view__get_layout`: `completed` when the read-back mode equals the request, `rejected` with the actual mode when it differs (the session is not shown in the main window, or the window is too narrow for a sidebar). `data` carries `mode` and `layout: { onScreen, sidebarCollapsed, paneOpen }`. The host sentence that the session is open in no window returns `rejected` before the sidebar is touched. `pip` returns `unsupported`: a pane can be popped out into a window of its own only by the person. `host.getContext` reports the same two modes in `availableDisplayModes` and the current one in `displayMode`.
 - **Codex:** calls `App.requestDisplayMode` for a mode the host context declares; `completed` when the host returns the requested mode, `rejected` when it returns another. Plugin Base resources advertise `fullscreen` only through `codexResourceMetadata`.
-- **Limits:** the returned mode does not indicate tab focus.
+- **Limits:** the returned mode does not indicate tab focus. Claude has no `pip`.
 
 ### Events
 

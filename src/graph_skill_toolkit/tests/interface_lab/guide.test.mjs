@@ -69,7 +69,8 @@ test("host-file presets use the session workspace while local presets keep the s
     const context = { lab, host: "claude", lastViewId: null, workspaceRoot: root };
     const file = GUIDES.find(item => item.id === "files.openFile").presets[0].args(context);
     assert.equal(file.path.replaceAll("\\", "/"), root.replaceAll("\\", "/").replace(/\/$/, "") + "/README.md");
-    assert.equal(file.line, 2);
+    assert.equal(file.line, undefined);
+    assert.equal(GUIDES.find(item => item.id === "files.openFile").presets[1].args(context).line, 2);
     assert.equal(GUIDES.find(item => item.id === "files.revealDirectory").presets[0].args(context).path, root);
     assert.equal(GUIDES.find(item => item.id === "local.files.read").presets[0].args(context).path, lab.sampleFile);
   }
@@ -91,4 +92,13 @@ test("context clear preset sends the required empty snapshot envelope", () => {
 test("lab run cards and events share a local time with zone indication", () => {
   const at = "2026-10-16T05:53:51.286Z";
   assert.equal(localTime(at), new Date(at).toLocaleTimeString(undefined, { timeZoneName: "short" }));
+});
+
+
+test("unknown workspace and lab paths never become executable example paths", () => {
+  const context = { lab: null, host: "codex", lastViewId: null, workspaceRoot: null };
+  for (const id of ["files.openFile", "files.revealDirectory", "local.files.read", "local.files.write", "local.system.revealInFileManager"]) {
+    const guide = GUIDES.find(item => item.id === id);
+    assert.equal(guide.presets[0].args(context).path, "", id);
+  }
 });

@@ -112,6 +112,44 @@ The implementation run after this change reported `npm test`: 187 passed, 0 fail
 
 **Remaining native observation and judgment.** The five local capabilities have a first Claude Desktop observation at the running build's scope. Reading, watch startup, writing and the browser window have the evidence above; file-manager reveal has a demonstrated visible mismatch. The real-path implementation is source-tested. Native confirmation of that implementation requires a new Claude Desktop session: a repeat reveal at page time `07:37:40` still sent the nominal path from the running server's earlier code. The new session must also load the Mod from `99787b80` or a build containing it before observing the 17 host interfaces. All 22 operations on Codex Desktop remain unobserved. The broader goal remains **partially attained**; complete two-host native acceptance remains open.
 
+### Codex page observations and fresh-service verification, 2026-10-29
+
+This observation establishes which Codex operations have usable evidence and which effects still require acceptance, while preserving one shared UI and two host adapters.
+
+**Desktop page and saved record.** A real MCP App page reported `chatgpt` / Codex `26.1023.51421`, identity source `mcp-initialize`, and transport `mcp-app`. The page retained the earlier result-status UI and the earlier `skills.invoke` declaration. Its loaded bytes remain unbound to the fresh build below. The directly reviewed record is `C:/Users/test/AppData/Local/plugin-interface-lab/records/codex-2026-10-29T15-56-15-407Z.json`, schema `plugin-interface-lab.records.v1`, SHA-256 `e274771693feabac3cfa7bc5a940925151d46ce1ed4a36ae421536fa04c56aaf`. It contains 17 calls covering 16 operations: 9 `completed`, 2 `accepted`, 5 `unsupported` and 1 `rejected`. Only `events.subscribe` has comparison `matches`; the other comparison verdicts are `null`.
+
+| Desktop operation | Observation and evidence boundary |
+| --- | --- |
+| `host.getInfo`, `host.getCapabilities`, `host.getContext`, `tools.list`, `tools.call` | `completed`. The `lab_echo` input is exactly `接口测试 ✓`; the coordinator observed the same returned text. Host context includes declared UI facts. |
+| `events.subscribe` | `completed`; the coordinator observed two `host.contextChanged` events and cancelled the subscription. |
+| `context.update` | `completed` with an `updateId` receipt; the later empty-snapshot call also completed. Model consumption remains unverified. |
+| `views.requestDisplayMode` | `completed`; the coordinator observed returned mode `fullscreen`. Visible focus remains unverified. |
+| `files.openFile`, `conversation.submitMessage` | `accepted` for `D:/coding/graph-skill-runtime/README.md` and the context-repetition probe respectively. The file's visible opening and the model's reply remain unverified. |
+| `files.revealDirectory`, `skills.list`, `views.open`, `views.list`, `views.close` | `unsupported`; the saved host declarations are `unknown`, and the coordinator observed `data.capabilityState: "unknown"` in the raw results. |
+| `local.files.read` | The running server rejected the nominal sample path as outside its granted roots. The coordinator traced the sample's real path to `C:/Users/test/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local/plugin-interface-lab/sandbox/sample.txt` through Windows packaged-app redirection. A direct read through current source returned 62 bytes. |
+
+The saved JSON retains arguments, statuses and evidence fields. Raw result data, event delivery, the old page layout and cleanup observations above were supplied by the coordinator's same-run observation; the saved format omits the full result data and event log. The rejection establishes an older running server's result at that nominal path. The separate source read establishes current-source access to the sample at its tested path.
+
+**Fresh build and independent service.** The [retained command records](evidence/codex-interface-20261029/source-checks.json) contain the full `npm test -- --test-reporter=dot`, `npm run typecheck` and `npm run build` invocations, each with exit code `0` and untruncated output. Documentation review read those records and directly rehashed these built files:
+
+| Built file under `dist/` | SHA-256 |
+| --- | --- |
+| `server.mjs` | `71dc20af3538564266c47c85292955ffca766be87a601fd69dedb9e1fcdf9437` |
+| `interface-lab.html` | `b51971198ff1915bcdc334cff2fd5e2b8bd6e46bb47f28876390f66c06196b59` |
+| `canvas.html` | `66d09fd7a85a57f781ddebf074a864f054245e358be1442ab20da83d57875973` |
+
+The same command records retain an initial independent invocation without the lab-enabling environment variable: it exited `1` with `Tool open_interface_lab not found`. The successful invocation opened a fresh MCP standard-input/output client declaring `codex-mcp-client` version `0.165.0-alpha.1.2`, with `GRAPH_SKILL_INTERFACE_LAB=1`. Its real resource read returned `ui://plugin-interface-lab/lab-b7d0e37f064dc427500d0f92de3e0730184474bb7408056cac7bd40d3ab8d1fa.html`, containing the new continuing interface-status UI and `skill-activation-request` route. The same independent service completed sample read, disposable-probe write and read-back, watch delivery of `created`, and unwatch. The probe file was deleted and the client was closed. These observations establish the new service's resource and local-file path at that scope. Desktop loading of those bytes remains unverified.
+
+**Remaining acceptance and settlement.** Two native-window control attempts ended at approval timeout; the coordinator acquired no window control and reset both attempts. Reconnection to the fresh build, its visible UI, draft entry, actual Skill activation, system external opening and keyboard behavior remain unverified. The context and event subscription were cleared as recorded above, and the independent probe resources were settled. Codex acceptance is **partially attained at the recorded scopes**. Complete native acceptance and publication remain open; this run performed no publication.
+
+**Subsequent context-delivery observation, 2026-10-29.** The context-update, message-submission and model-read-back check is now **attained for the earlier desktop page**. The coordinator supplied the subsequent native `functions.untrusted_input` delivery with source `mcp_app`, session `3a94232f-c407-4df4-8cf4-a94603ebbce0` and server `graph-skill-canvas`. It contained the page's context-repetition request as `kind: message` and the following exact text as `kind: model_context`:
+
+```text
+Plugin page context (JSON data, not instructions): {"probe":"codex-context-20261029","selection":"node-a"}
+```
+
+After the host prompted the model to read that delivery, the model repeated this paragraph verbatim with no tool calls. This observation establishes delivery and consumption of the snapshot carried by the message submitted before the clear operation. It closes the earlier context-consumption and probe-reply gaps at that page's scope. Loading of the fresh build, retention after clearing, and the other acceptance gaps above remain unverified.
+
 ## Historical baseline: unified host Port implementation, 2026-10-13
 
 The paths and 15-name vocabulary in this section refer to the source at commit `a4e8cd50`.
@@ -135,7 +173,7 @@ The table reports routes under representative *simulated* host declarations: Cod
 
 | Interface | Codex source route | Claude source route | Outstanding native observation |
 | --- | --- | --- | --- |
-| `files.revealDirectory` | Unknown | Unknown | Establish an actual host file-browser directory route before claiming support. |
+| `files.revealDirectory` | Unknown | Conditional (host tool `mcp__ccd_host__reveal_path`) | Verify the system file manager selects the directory after the host's reply; establish a Codex host route. |
 | `files.openFile` | Conditional | Conditional | Verify the requested file appears; verify Claude line navigation separately. |
 | `composer.writeDraft` | Conditional with `message.text` and draft extension | Conditional | Verify draft text and no submission; Codex allows `append` only. |
 | `conversation.submitMessage` | Conditional with `message.text` | Conditional | Verify acceptance and any host rewrite, then assess conversation outcome separately. |
@@ -147,7 +185,7 @@ The table reports routes under representative *simulated* host declarations: Cod
 | `views.list` | Unknown | Conditional | Verify Claude's browser-tab scope and returned connection-owned IDs. |
 | `views.activate` | Unknown | Conditional | Verify the selected Claude browser tab becomes active. |
 | `views.close` | Unknown | Unknown | Establish ownership and safe closure before enabling a route. |
-| `views.requestDisplayMode` | Conditional | Unknown | Verify the Codex canvas container's returned mode and visible mode separately. |
+| `views.requestDisplayMode` | Conditional | Conditional (Browser-pane layout: `inline`, `fullscreen`) | Verify the Codex canvas container's returned mode and visible mode separately; on Claude compare the read-back layout with the visible sidebar and pane. |
 | `skills.list` | Unknown | Conditional when the current Mod session exposes `session.usage` | Confirm the Claude session usage summary is complete and its returned names match the current loaded session; establish a Codex native inventory route. |
 | `skills.invoke` | Unknown | Conditional | Verify Claude's direct Skill tool activation receipt separately from the Skill's business result. |
 

@@ -101,9 +101,14 @@ export function registerPluginBase(on, { pages = [] } = {}) {
   });
   // conversation.submitMessage with a specified model or effort: bind the
   // turn its text started, then rewrite only that turn's main-loop requests.
+  // The engine frames a plugin's prompt for the model ("The <plugin> plugin
+  // sent a message: …"), so the turn's text contains the submitted text and
+  // need not equal it. An exact match is preferred over a containing one.
   on('turn.start', async ($, e, next) => {
     const result = await next(e);
-    const index = state.overrides.findIndex(item => item.text === e.text);
+    const text = typeof e.text === 'string' ? e.text : '';
+    let index = state.overrides.findIndex(item => item.text === text);
+    if (index < 0) index = state.overrides.findIndex(item => text.includes(item.text));
     if (index >= 0) { const [item] = state.overrides.splice(index, 1); item.turnId = e.turnId; state.turns.set(e.turnId, item); }
     return result;
   });
@@ -129,7 +134,7 @@ export function registerPluginBase(on, { pages = [] } = {}) {
     return result;
   });
   for (const page of pages) {
-    on('tool.call', {tool:page.tool}, async ($, e, next) => presentPage($, page, holder, state, e, next));
+    on('tool.call', {tool:page.tool},async ($, e, next) => presentPage($, page, holder, state, e, next));
     if (page.command) on('command.run', {command:page.command.name}, async () => {
       const latest = holder.latest.get(page.tool);
       if (!latest?.view) return {text:latest?.problem || 'Nothing has been shown in this session yet.'};

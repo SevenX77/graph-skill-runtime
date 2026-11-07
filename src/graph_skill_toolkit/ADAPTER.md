@@ -1,5 +1,7 @@
 # Host Port and adapters
 
+Plugin pages can request host operations with clear authority and determine which effects each result actually establishes.
+
 <a id="current-baseline-adopted-architecture-direction-2026-10-12"></a>
 <a id="current-baseline-host-capability-interfaces-2026-10-12"></a>
 <a id="contract"></a>
@@ -48,7 +50,7 @@ Live recognition uses connection evidence:
 - Codex requires MCP App initialization reporting `chatgpt` with an absent or `codex_desktop` client type.
 - Claude requires a current Mod heartbeat and the identity `Claude Code`, source `claude-mod-session`, version, session id and client type `claude_code`.
 
-Other evidence yields an unknown host with unknown capabilities. The facade compares transport, host id and any recorded session id with the live connection. Name, version and client type are also compared when the records have the same identity source. Different identity sources identify different software layers, such as an MCP engine and a desktop shell. A mismatch yields an unknown host and a diagnostic asking the user to reopen the page in the current session.
+Other evidence yields an unknown host with unknown capabilities. The facade compares transport, host id and any recorded session id with the live connection. Name and client type are also compared when the records have the same identity source. Version is compared for those records except when both are Codex `mcp-client` facts on `mcp-app`: a fresh resource read can accompany a historical tool result from an earlier engine version. Those request-scoped engine facts can differ while the current UI connection remains the same. Different identity sources identify different software layers, such as an MCP engine and a desktop shell. The live UI identity remains fully pinned under the facade rules below. A mismatch in the required fields yields an unknown host and a diagnostic asking the user to reopen the page in the current session. [Launch regression cases](tests/host/launch.test.mjs) cover historical engine results and retained host, transport, session and live-UI checks.
 
 ## Identity, authority and facade behavior
 
@@ -107,18 +109,20 @@ This table owns routes and per-host behavior. [The full operation reference](plu
 | `host.getContext` | MCP App host context: theme, locale and display modes; workspace roots unavailable. | Mod session APIs: project root, working directory and model; theme and locale unavailable. |
 | `events.subscribe` | Facade listeners over MCP App notifications. | Facade listeners over Mod events and bridge long polls. |
 | `files.openFile` | `openai/files/open`; accepted request; line navigation unsupported. | Native file-pane tool; accepted request with optional line. |
-| `files.revealDirectory` | `unknown`; host file-browser directory route unconfirmed. | `unknown`; host file-browser directory route unconfirmed. |
+| `files.revealDirectory` | `unknown`; host file-browser directory route unconfirmed. | Host reveal tool `mcp__ccd_host__reveal_path`: the host selects the directory in the system file manager under its own path and approval rules; accepted request. |
 | `composer.writeDraft` | `openai/message` draft extension; append only. | Mod `prompt.fill`; append or replace. |
 | `conversation.submitMessage` | `sendMessage`; current session model and effort only. Other selection sources return `unsupported` without sending. | Mod `prompt.submit`; current or specified settings. A specified value applies to one main-agent turn through `turn.step`; default selection is unsupported. |
 | `context.update` | `updateModelContext` using declared modalities; receipt-only confirmation of a whole snapshot. | Per-page stored snapshot attached by the next prompt-submission hook; `context.attached` reports attached blocks. |
 | `tools.list` | `list_page_tools` on the originating server. | Session tool inventory with native and MCP entries. |
 | `tools.call` | `App.callServerTool` on the originating server. | Permission-checked Mod `tool.call` for a listed session tool. |
 | `skills.list` | `unknown`; native Skill inventory unconfirmed. | `session.usage` summary; complete names only. |
-| `skills.invoke` | `unknown`; native Skill activation unconfirmed. | Native `Skill` tool; activation receipt and business outcome assessed separately. |
+| `skills.invoke` | With declared `message.text`, `sendMessage` submits a `$<skill-name>` text request through `ui/message`; `accepted` confirms message acceptance. Skill resolution, activation and outcome require conversation observation. | Native `Skill` tool; activation receipt and business outcome assessed separately. |
 | `views.open` | `unknown`; owned reusable view handles unconfirmed. | Browser tools open or reuse this page's own web tab. |
 | `views.list` | `unknown`; host view inventory unconfirmed. | Browser inventory filtered to this page's own views. |
 | `views.close` | `unknown`; owned view closure unconfirmed. | Browser tools close this page's owned tab and read back inventory. |
-| `views.requestDisplayMode` | `App.requestDisplayMode` for host-declared modes; resources advertise fullscreen. | `unknown`; equivalent container-mode route unconfirmed. |
+| `views.requestDisplayMode` | `App.requestDisplayMode` for host-declared modes; resources advertise fullscreen. | Browser-pane layout: `inline` shows the pane with the sidebar expanded, `fullscreen` with it collapsed, set through the host's pane and sidebar tools and read back from the host layout; `pip` unsupported. |
+
+Codex's Skill route uses the [documented text invocation](https://learn.chatgpt.com/docs/app-server#skills): the model resolves the name from the marker. The adapter sends a user text message, with an optional string input. A typed Skill input item would let the server inject the selected instructions directly; the MCP App text route carries only the message. [The operation reference](plugin_base/README.md#skillsinvoke) owns accepted names and inputs. Native activation through this page remains pending acceptance.
 
 Claude's specified model/effort correlation matches submitted text to `turn.start`, then applies the override to that turn's main-agent steps. `turn.completed.override.applied` carries applied values and the values the session would have used. The [decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md#open-items) owns the unresolved correlation and host-default questions.
 

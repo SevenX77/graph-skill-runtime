@@ -156,7 +156,10 @@ test("Claude applies a specified model and effort only to the turn its message s
   assert.equal(result.status, "accepted");
   assert.deepEqual(result.evidence.observed.turnOverride, { model: "haiku", effort: "low", turnId: null });
   await hooks.get("turn.start")({}, { text: "someone else", turnId: "t0" }, async e => ({ turnId: e.turnId }));
-  await hooks.get("turn.start")({}, { text: state.overrides[0].text, turnId: "t1" }, async e => ({ turnId: e.turnId }));
+  // Claude Code 2.1.309 starts the turn of a plugin's prompt with the framed text the model reads.
+  await hooks.get("turn.start")({}, { text: "The graph-skill-canvas-mod plugin sent a message:\n" + state.overrides[0].text, turnId: "t1" }, async e => ({ turnId: e.turnId }));
+  assert.equal(state.overrides.length, 0);
+  assert.equal(state.turns.get("t1").turnId, "t1");
   const seen = [];
   async function drive(turnId, agentId) {
     const stream = hooks.get("turn.step")({}, { turnId, index: 0, model: "opus", effort: "high", messageCount: 1, ...(agentId ? { agentId } : {}) },

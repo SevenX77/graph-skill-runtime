@@ -4,6 +4,8 @@ import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { codexAdapter } from "../../../plugin_base/adapters/codex/driver/index.mjs";
 import { nativeCapabilities } from "../../../plugin_base/adapters/claude/mod/operations/registry.mjs";
+import { executeBridgeAction } from "../../../plugin_base/adapters/claude/mod/operations/index.mjs";
+import { createModState } from "../../../plugin_base/adapters/claude/mod/lifecycle/index.mjs";
 
 function pair() {
   const view = {}, host = {};
@@ -81,5 +83,62 @@ test("Claude tool inventory does not turn a preview or browser tab into a canvas
     { name: "tabs_context" }, { name: "tabs_select" }, { name: "mcp__ccd_view__show_pane" },
     { name: "preview_start" }, { name: "Skill" },
   ]);
-  assert.equal(result["views.requestDisplayMode"].state, "unknown");
+  assert.equal(result["views.requestDisplayMode"].state, "unavailable");
+});
+
+// Claude Code 2.1.309 layout tools, as the host answers them: the pane tool and the sidebar tool reply with a
+// sentence, the two layout readers with a sentence or a JSON object.
+const CLAUDE_TOOLS = ["mcp__ccd_view__show_pane", "mcp__ccd_window__set_sidebar_collapsed", "mcp__ccd_window__get_window_layout", "mcp__ccd_view__get_layout"]
+  .map(name => ({ name, mcp: true }));
+function claudeHost(layout) {
+  const calls = [];
+  const api = { session: { id: async () => "s" }, tool: { list: async () => CLAUDE_TOOLS, call: async input => {
+    calls.push(input);
+    const { tool, ...args } = input;
+    if (tool === "mcp__ccd_view__show_pane") return layout.onScreen === false
+      ? { result: [{ type: "text", text: "This session isn't open in any window right now, so its view was left alone." }] }
+      : (layout.panes.includes("preview") || layout.panes.push("preview"), { result: [{ type: "text", text: "Showing the preview pane." }] });
+    if (tool === "mcp__ccd_window__set_sidebar_collapsed") {
+      if (layout.refuseSidebar) return { result: [{ type: "text", text: "The window is too narrow to show the sidebar." }] };
+      layout.sidebarCollapsed = args.collapsed; return { result: [{ type: "text", text: args.collapsed ? "Collapsed the sidebar." : "Expanded the sidebar." }] };
+    }
+    if (tool === "mcp__ccd_window__get_window_layout") return { result: [{ type: "text", text: JSON.stringify({ main_window: { tab: "code", sidebar_collapsed: layout.sidebarCollapsed, panes: [] }, this_session: { on_screen: layout.onScreen !== false, shown_in: "the main pane" } }) }] };
+    if (tool === "mcp__ccd_view__get_layout") return { result: [{ type: "text", text: JSON.stringify({ views: [{ placement: "primary" }], open_panes: layout.panes, transcript_view: "normal" }) }] };
+    throw new Error("unexpected tool " + tool);
+  } } };
+  return { api, calls };
+}
+const claudeBridge = { url: "http://127.0.0.1:12345", token: "t", key: "p" };
+const claudeRequest = (id, mode) => ({ id, action: "views.requestDisplayMode", args: { mode }, key: "p" });
+
+test("Claude sets the container's display mode through the host's pane and sidebar tools and reads the mode back", async () => {
+  const layout = { sidebarCollapsed: false, panes: [] };
+  const { api, calls } = claudeHost(layout);
+  const cap = nativeCapabilities(CLAUDE_TOOLS)["views.requestDisplayMode"];
+  assert.equal(cap.state, "available");
+  assert.deepEqual(cap.constraints.modes, ["inline", "fullscreen"]);
+  const full = await executeBridgeAction(api, createModState(), claudeBridge, claudeRequest("full", "fullscreen"));
+  assert.equal(full.status, "completed");
+  assert.deepEqual(full.data, { mode: "fullscreen", layout: { onScreen: true, sidebarCollapsed: true, paneOpen: true } });
+  assert.deepEqual(calls.map(item => item.tool), ["mcp__ccd_view__show_pane", "mcp__ccd_window__set_sidebar_collapsed", "mcp__ccd_window__get_window_layout", "mcp__ccd_view__get_layout"]);
+  assert.deepEqual(calls[1], { tool: "mcp__ccd_window__set_sidebar_collapsed", collapsed: true });
+  const inline = await executeBridgeAction(api, createModState(), claudeBridge, claudeRequest("inline", "inline"));
+  assert.equal(inline.status, "completed");
+  assert.equal(inline.data.mode, "inline");
+  assert.equal(layout.sidebarCollapsed, false);
+});
+
+test("Claude reports a mode the host did not set as rejected, and pip as unsupported without a call", async () => {
+  const refused = claudeHost({ sidebarCollapsed: false, panes: [], refuseSidebar: true });
+  const result = await executeBridgeAction(refused.api, createModState(), claudeBridge, claudeRequest("narrow", "fullscreen"));
+  assert.equal(result.status, "rejected");
+  assert.deepEqual(result.data, { mode: "inline", layout: { onScreen: true, sidebarCollapsed: false, paneOpen: true } });
+  const offScreen = claudeHost({ sidebarCollapsed: false, panes: [], onScreen: false });
+  const away = await executeBridgeAction(offScreen.api, createModState(), claudeBridge, claudeRequest("away", "fullscreen"));
+  assert.equal(away.status, "rejected");
+  assert.match(away.message, /isn't open in any window/);
+  assert.equal(offScreen.calls.length, 1, "the sidebar is left alone when the session is off screen");
+  const pip = claudeHost({ sidebarCollapsed: false, panes: [] });
+  assert.equal((await executeBridgeAction(pip.api, createModState(), claudeBridge, claudeRequest("pip", "pip"))).status, "unsupported");
+  assert.deepEqual(pip.calls, []);
 });

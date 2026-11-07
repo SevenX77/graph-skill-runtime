@@ -1,5 +1,7 @@
 # Graph Skill toolkit
 
+The toolkit helps users run and understand their Graph Skills in their desktop host, and helps developers verify the effects of plugin operations in that host.
+
 Graph Skill toolkit supplies local runtime commands, shared agent instructions and a Graph Skill canvas for Codex Desktop and Claude Code Desktop. A **Graph Skill** is a user-owned directory containing `SKILL.md`, `graph.yaml` and phase definitions. The working source is version `0.3.5`; the independent Python runtime is `0.1.0a1`. Business skills remain in user-selected directories.
 
 The toolkit has one **Plugin Base**, the reusable foundation for pages that interact with an agent host, and two separate apps. The canvas shows the graph, selected node and host/version status. The developer **Plugin Interface Lab** exercises the 17 host interfaces and 5 local capabilities. Host interfaces ask the desktop host for information or actions. Local capabilities execute file and operating-system actions in the plugin's own process. The lab is available in source test mode.
@@ -16,7 +18,7 @@ The toolkit has one **Plugin Base**, the reusable foundation for pages that inte
 | What design and acceptance boundaries apply? | [Plugin Base decision](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) |
 | What has been measured? | [Current validation baseline](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) |
 
-The current baseline records source, build and installer checks and a configured source-mode switch. Native acceptance of all 22 operations in both hosts is pending. Historical release and native results retain their own candidate scope in [VALIDATION.md](VALIDATION.md).
+The current baseline records source, build and installer checks and a configured source-mode switch. Codex's `skills.invoke` source route submits a named Skill request through the current conversation's declared text-message channel; its receipt establishes message acceptance, while activation requires separate observation. [Host Port and adapters](ADAPTER.md#interface-mapping) owns the route and its limits. Native acceptance of all 22 operations in both hosts is pending. Historical release and native results retain their own candidate scope in [VALIDATION.md](VALIDATION.md).
 
 
 ## Install

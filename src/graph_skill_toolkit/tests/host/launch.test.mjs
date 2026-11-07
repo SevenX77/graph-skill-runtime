@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {Client} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
-import {launchHostInfo,requestClientInfo} from '../../plugin_base/adapters/launch/index.mjs';
+import {launchHostInfo,requestClientInfo,launchMatchesConnection} from '../../plugin_base/adapters/launch/index.mjs';
 import {readLaunchHostInfo,discoverConnection} from '../../plugin_base/adapters/detection/index.mjs';
 import {createHostAdapter} from '../../plugin_base/adapters/factory/index.mjs';
 import {pollBridges,createModState} from '../../plugin_base/adapters/claude/mod/lifecycle/index.mjs';
@@ -60,10 +60,10 @@ test('explicit startup transport replaces frame inference and never falls back a
   assert.equal(discoverConnection({snapshotText:JSON.stringify(snapshot),framed:true}).transport,'http-bridge');
 });
 
-function connectedFacade(initial,live) {
+function connectedFacade(initial,live,firstPayload=payload) {
   let evidence=live,called=0,callbacks;
   const adapter=createHostAdapter({document:{querySelector:()=>({textContent:JSON.stringify({hostInfo:initial})})},window:{parent:{}},
-    connections:{[initial.transport]:()=>({connect:async c=>{callbacks=c;c.receive(payload);},inspect:async()=>evidence,dispose(){}})},
+    connections:{[initial.transport]:()=>({connect:async c=>{callbacks=c;c.receive(firstPayload);},inspect:async()=>evidence,dispose(){}})},
     drivers:{codex:()=>({invoke:async()=>{called++;return {status:'accepted',message:'live'};}}),claude:()=>({invoke:async()=>{called++;return {status:'accepted',message:'live'};}})}});
   return {adapter,get called(){return called;},set:v=>{evidence=v;},deliver:v=>callbacks.receive(v)};
 }
@@ -79,6 +79,70 @@ test('known startup identity is visible before connect; real UI evidence enables
   assert.equal(a.hostInfo.identitySource,'mcp-initialize');
   assert.equal((await a.invoke('conversation.submitMessage',{text:'now'})).status,'accepted');
   assert.equal(f.called,1);await a.dispose();
+});
+
+for(const timing of ['during initialization','after UI identity is pinned']) {
+  test(`a historical Codex tool result ${timing} retains the unchanged UI connection`,async()=>{
+    // Native observation: resources/read used the updated engine, while the
+    // host replayed a prior tool result into the same Desktop UI connection.
+    const current=launch({name:'codex-mcp-client',version:'0.165.0-alpha.1.2'});
+    const historical=launch({name:'codex-mcp-client',version:'0.164.0-alpha.11.1'});
+    const live={...codexLive,identity:{name:'chatgpt',version:'26.1023.51421'}};
+    const replay={...payload,hostInfo:historical};
+    const f=connectedFacade(current,live,timing==='during initialization'?replay:payload),a=f.adapter;
+    try {
+      await a.connect(callbacks);
+      for(let repeat=0;repeat<2;repeat++) {
+        f.deliver(replay);
+        await a.capabilities();
+        assert.equal(a.hostInfo.id,'codex');
+        assert.equal(a.hostInfo.status,'confirmed');
+        assert.equal(a.hostInfo.identitySource,'mcp-initialize');
+        assert.equal(a.hostInfo.version,'26.1023.51421');
+      }
+      assert.equal((await a.invoke('conversation.submitMessage',{text:'still current'})).status,'accepted');
+      assert.equal(f.called,1);
+    } finally {await a.dispose();}
+  });
+}
+
+test('Codex engine-version replay keeps host, transport, session and engine identity checks',()=>{
+  const current=launch({name:'codex-mcp-client',version:'0.165.0-alpha.1.2',client_type:'codex_desktop'});
+  const historical=launch({name:'codex-mcp-client',version:'0.164.0-alpha.11.1',client_type:'codex_desktop'});
+  assert.equal(launchMatchesConnection(current,historical),true);
+  assert.equal(launchMatchesConnection(historical,current),true);
+  for(const different of [
+    {...historical,id:'claude'},
+    {...historical,transport:'http-bridge'},
+    {...historical,name:'chatgpt'},
+    {...historical,clientType:'other-client'},
+  ]) assert.equal(launchMatchesConnection(current,different),false);
+  assert.equal(launchMatchesConnection({...current,sessionId:'session-A'},{...historical,sessionId:'session-B'}),false);
+  assert.equal(launchMatchesConnection({...current,id:'claude',transport:'http-bridge',name:'claude-code'},
+    {...historical,id:'claude',transport:'http-bridge',name:'claude-code'}),false);
+  assert.equal(launchMatchesConnection({...current,identitySource:'mcp-initialize',name:'chatgpt'},
+    {...historical,identitySource:'mcp-initialize',name:'chatgpt'}),false);
+});
+
+test('a changed live Codex UI version stays revoked even after historical engine replay and UI recovery',async()=>{
+  const current=launch({name:'codex-mcp-client',version:'0.165.0-alpha.1.2'});
+  const historical=launch({name:'codex-mcp-client',version:'0.164.0-alpha.11.1'});
+  const live={...codexLive,identity:{name:'chatgpt',version:'26.1023.51421'}};
+  const f=connectedFacade(current,live),a=f.adapter;
+  try {
+    await a.connect(callbacks);
+    f.set({...live,identity:{...live.identity,version:'changed-ui-version'}});
+    await a.capabilities();
+    assert.equal(a.hostInfo.id,'unknown');
+    assert.match(a.hostInfo.reason,/身份发生改变/);
+    f.deliver({...payload,hostInfo:historical});
+    await a.capabilities();
+    assert.equal(a.hostInfo.id,'unknown');
+    f.set(live);
+    assert.equal((await a.invoke('conversation.submitMessage',{text:'never'})).status,'unsupported');
+    assert.equal(a.hostInfo.id,'unknown');
+    assert.equal(f.called,0);
+  } finally {await a.dispose();}
 });
 
 test('launch/live host or session mismatch permanently disables a page, including identity arriving in a later tool result',async()=>{

@@ -25,7 +25,7 @@ test('connection discovery never supplies product identity, even for a framed sn
 test('HostInfo preserves actual reports, freezes its data, and never invents versions or MCP session IDs',()=>{
   const input=evidence(), info=identifyHost(input);
   assert.deepEqual({...info,capabilities:undefined},{id:'codex',status:'confirmed',name:codex.name,version:codex.version,
-    clientType:'codex_desktop',sessionId:null,transport:'mcp-app',identitySource:'mcp-initialize',reason:'已读取当前连接的宿主身份和能力。',capabilities:undefined});
+    clientType:'codex_desktop',sessionId:null,permissionMode:null,transport:'mcp-app',identitySource:'mcp-initialize',reason:'已读取当前连接的宿主身份和能力。',capabilities:undefined});
   input.capabilities['conversation.submitMessage'].state='unavailable';
   assert.equal(info.capabilities['conversation.submitMessage'].state,'available');
   assert.throws(()=>{info.id='claude';});assert.throws(()=>{info.capabilities['conversation.submitMessage'].state='unavailable';});

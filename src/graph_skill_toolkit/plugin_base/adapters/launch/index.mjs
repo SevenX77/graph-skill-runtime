@@ -36,6 +36,12 @@ export function launchMatchesConnection(launch, current) {
   if (launch.id === "unknown" || current.status !== "confirmed") return true;
   if (launch.id !== current.id) return false;
   if (launch.sessionId && launch.sessionId !== current.sessionId) return false;
+  // A fresh resources/read can accompany a historical tool result after a
+  // Codex engine update. These request-scoped versions do not identify the
+  // live UI connection, whose full identity remains pinned by the facade.
+  const fields = launch.id === "codex" && launch.transport === "mcp-app" &&
+    launch.identitySource === "mcp-client" && current.identitySource === "mcp-client"
+    ? ["name", "clientType"] : ["name", "version", "clientType"];
   return launch.identitySource !== current.identitySource ||
-    ["name", "version", "clientType"].every(key => !launch[key] || launch[key] === current[key]);
+    fields.every(key => !launch[key] || launch[key] === current[key]);
 }

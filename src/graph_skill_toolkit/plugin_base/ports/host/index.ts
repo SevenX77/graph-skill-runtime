@@ -5,7 +5,7 @@ export interface HostEvent { type: HostEventType; at: string; data?: unknown }
 export type Selection = { source: "current" } | { source: "default" } | { source: "specified"; value: string };
 export type HostId = "codex" | "claude" | "unknown";
 export type HostState = "new" | "connecting" | "connected" | "failed" | "disposed";
-export type HostTransport = "mcp-app" | "http-bridge" | "http-page" | "none";
+export type HostTransport = "mcp-app" | "http-bridge" | "none";
 
 /** Connection-reported identity; confirmation is not cryptographic attestation. */
 export interface HostInfo {
@@ -15,6 +15,8 @@ export interface HostInfo {
   readonly version: string | null;
   readonly clientType: string | null;
   readonly sessionId: string | null;
+  /** The session's permission mode as the host names it (`default`, `auto`, `bypassPermissions`, ...); null when unreadable. */
+  readonly permissionMode: string | null;
   readonly transport: HostTransport;
   readonly identitySource: "mcp-client" | "mcp-initialize" | "claude-mod-session" | "none";
   readonly reason: string;
@@ -48,6 +50,8 @@ export interface HostCapability {
   constraints?: Record<string, unknown>;
   /** Host limits a caller must know before relying on the effect, in plain text. */
   limits?: string[];
+  /** What the session's current permission mode takes away from this operation; the operation still runs when called. */
+  modeLimit?: { mode: string; effect: "blocked" | "partial"; detail: string };
 }
 
 export type HostCapabilities = Record<string, HostCapability>;

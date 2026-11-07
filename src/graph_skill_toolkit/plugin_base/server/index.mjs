@@ -1,7 +1,6 @@
 /** Plugin Base server entry: everything a plugin's Node process may use. See ../README.md. */
 export { createLocalHttpServer } from "../backend/http/index.mjs";
 export { createHostBridge } from "../adapters/claude/bridge/server.mjs";
-export { createPageHost, pageHostInfo, registerPageContextTool } from "../adapters/claude_page/server/index.mjs";
 export { createPreviewConfiguration } from "../adapters/claude/presentation/preview_configuration/index.mjs";
 export { pageResourceUri, codexResourceMetadata } from "../adapters/codex/presentation/resource/index.mjs";
 export { createCodexPageSessions } from "../adapters/codex/presentation/session/index.mjs";

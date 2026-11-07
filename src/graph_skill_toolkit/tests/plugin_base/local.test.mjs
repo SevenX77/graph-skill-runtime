@@ -163,3 +163,19 @@ test("the page client reaches the HTTP route with its credential and delivers wa
   assert.equal((await none.files.read({ path: join(allowed, "a.txt") })).status, "unsupported");
   assert.equal((await none.system.openExternal({ url: "ftp://x" })).status, "error");
 });
+
+
+test("revealing a removed in-scope file reports missing path, not denied permission", async t => {
+  const { allowed } = await sandbox(t);
+  let spawned = 0;
+  const connection = createLocalCapabilities({ spawnProcess: () => { spawned++; throw new Error("must not launch"); } }).createConnection();
+  t.after(() => connection.close());
+  await connection.allow(allowed);
+  const path = join(allowed, "removed.txt");
+  await writeFile(path, "temporary"); await unlink(path);
+  const result = await connection.call("local.system.revealInFileManager", { path });
+  assert.equal(result.status, "rejected");
+  assert.match(result.message, /路径不存在/);
+  assert.deepEqual(result.data, { failureScope: "request", reason: "path-not-found", path });
+  assert.equal(spawned, 0);
+});

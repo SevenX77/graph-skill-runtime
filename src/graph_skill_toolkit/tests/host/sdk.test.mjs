@@ -65,9 +65,10 @@ test("official MCP Apps SDK establishes identity, capabilities and tool delivery
 test("MCP capability interpretation does not infer unadvertised host operations", () => {
   const caps = mcpCapabilities({ message: { text: {} } });
   assert.equal(caps["conversation.submitMessage"].state, "available");
+  assert.equal(caps["skills.invoke"].state, "available");
   assert.equal(caps["composer.writeDraft"].state, "unavailable");
   assert.equal(caps["tools.list"].state, "unavailable");
-  for (const name of ["files.revealDirectory", "views.open", "skills.invoke"]) {
+  for (const name of ["files.revealDirectory", "views.open"]) {
     assert.equal(caps[name].state, "unknown", name);
   }
 });
@@ -77,7 +78,7 @@ test("Codex text and structured-context operations require their declared conten
     message: { image: {} }, updateModelContext: { image: {} },
     experimental: { "openai/message": { draft: {} } },
   });
-  for (const action of ["composer.writeDraft", "conversation.submitMessage", "context.update"]) {
+  for (const action of ["composer.writeDraft", "conversation.submitMessage", "skills.invoke", "context.update"]) {
     assert.equal(caps[action].state, "unavailable", action);
   }
 });

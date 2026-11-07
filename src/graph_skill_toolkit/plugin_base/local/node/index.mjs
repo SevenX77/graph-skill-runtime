@@ -116,7 +116,8 @@ export function createLocalCapabilities({ http, platform = process.platform, env
       if (events.length > EVENT_LIMIT) events.splice(0, events.length - EVENT_LIMIT);
       for (const wake of [...waiters]) wake();
     }
-    const outside = (sent, path) => result("rejected", `路径不在此插件授权的目录内：${path}`, { sent, observed: { allowedRoots: roots.map(root => root.real) } });
+    const outside = (sent, path) => result("rejected", `路径不在此插件授权的目录内：${path}`, { sent, observed: { allowedRoots: roots.map(root => root.real) } },
+      { failureScope: "request", reason: "outside-grant", path });
 
     async function read(args) {
       const sent = { ...args };
@@ -199,7 +200,7 @@ export function createLocalCapabilities({ http, platform = process.platform, env
     async function system(kind, target, sent) {
       let isDirectory = false;
       if (kind === "reveal") {
-        if (!await within(target).catch(() => false)) return outside(sent, target);
+        if (!await parentWithin(target)) return outside(sent, target);
         // The file manager runs outside this process's filesystem view (for example a
         // Windows packaged host redirects writes under %LOCALAPPDATA%), so it receives the real path.
         target = await realpath(target);
@@ -230,7 +231,9 @@ export function createLocalCapabilities({ http, platform = process.platform, env
           default: return await system("reveal", resolve(args.path), args);
         }
       } catch (error) {
-        return result(error.code === "ENOENT" ? "rejected" : "error", error.code === "ENOENT" ? "路径不存在：" + (args.path ?? "") : error.message, { sent: args });
+        const missing = error.code === "ENOENT" || error.code === "ENOTDIR";
+        return result(missing ? "rejected" : "error", missing ? "路径不存在：" + (args.path ?? "") : error.message, { sent: args },
+          missing ? { failureScope: "request", reason: "path-not-found", path: args.path ?? "" } : undefined);
       }
     }
 

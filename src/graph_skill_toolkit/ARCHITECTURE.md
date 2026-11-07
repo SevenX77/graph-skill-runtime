@@ -72,6 +72,8 @@ src/graph_skill_toolkit/
                                    lab page entry, UI and template
     application/{guide.mjs,runner.mjs}
                                    per-operation guidance and call runner
+    application/result_status/     captured host identity and display label for each lab call
+    application/connection_status/ one reading of the latest call for its record and its interface signal
     claude_mod/page.js             the lab page as the Claude Mod presents it
   skills/{graph-skill,graph-skill-canvas,plugin-interface-lab}/
                                    host instruction assets
@@ -183,7 +185,7 @@ The page reaches its host through the Plugin Base host adapter. Startup data cho
 
 `show_graph` selects the root, returns graph diagnostics and provides the host-specific presentation. In Codex the presentation is the MCP App view attached to the tool result; [the Codex session module](plugin_base/adapters/codex/presentation/session/index.mjs) reuses one view per root. In Claude Code the presentation is the owned loopback HTTP page shown in the Browser pane: [the preview configuration](plugin_base/adapters/claude/presentation/preview_configuration/index.mjs) merges one temporary attach entry for the listener's origin into the session project's `.claude/launch.json`, and the Mod's guidance drives `preview_start`, navigation and tab selection. `inspect_graph` performs an explicit read of a root already selected with `show_graph` in the same session. The generic `views.*` host interfaces are a separate function from this graph display flow.
 
-[The follow-up hook](apps/graph_canvas/hooks/after-tool.mjs) runs after host tool calls. When an explicit write targets an included gSkill path or a shell call's skill fingerprint differs from its stored baseline, it adds guidance asking the agent to display the current canvas for each affected root with `show_graph`; it excludes the canvas's own tools and Browser-pane tools so that presentation does not trigger itself. The business `SKILL.md` remains user-owned and is reachable on request through the host's file tools.
+[The follow-up hook](apps/graph_canvas/hooks/after-tool.mjs) runs after host tool calls and responds when the agent is modifying or using a gSkill, never when it only reads or lists its files. An explicit write to an included gSkill path, a `gskill` runtime call naming a skill root, a shell call that starts the `gskill` CLI inside a skill, or any other shell call whose skill fingerprint differs from its stored baseline adds guidance asking the agent to display the current canvas for each affected root with `show_graph`; it excludes the canvas's own tools and Browser-pane tools so that presentation does not trigger itself. The business `SKILL.md` remains user-owned and is reachable on request through the host's file tools.
 
 The Plugin Interface Lab is a developer page served only in source test mode. `open_interface_lab` opens it as an MCP App in Codex and as a loopback HTTP page in Claude Code; the developer chooses each operation to run and compares its evidence with the actual effect. [PROTOTYPE.md](PROTOTYPE.md#plugin-interface-lab-page) owns the lab's visible behavior and state locations. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns its native procedure.
 

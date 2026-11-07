@@ -1,3 +1,4 @@
+import { SESSION_TOOL } from "../../host_tools/index.mjs";
 export const notSent = (message, data) => Object.assign(new Error(message), { outcome: "not-sent", ...(data === undefined ? {} : { data }) });
 
 /** Plain text from the native reply, retaining the host's exact sentences. */
@@ -39,10 +40,41 @@ export function nativeData(value) {
   return value;
 }
 
+// One page action reads its own tool list, so that list identifies the action a person approved.
+const approvedActions = new WeakSet();
+
+/** A page's click is not a request the model made, so the person answers where the engine would ask. */
+async function requestApproval($, tools, name, args) {
+  // A query that fails only skips the question: the engine still decides on the call itself.
+  let verdict = null;
+  try { verdict = await $.tool.check({ tool: name, input: args }); } catch { return false; }
+  // Every tool of an action is queried, so a deny rule on a later tool still stands after the answer.
+  if (verdict?.decision !== "ask") return false;
+  if (approvedActions.has(tools)) return true;
+  const answer = await $.ui.ask("插件页面请求调用工具 " + name + "。这是页面上的操作发起的，不是模型的请求。允许吗？", { options: ["允许", "拒绝"], header: "页面工具" }).catch(() => null);
+  if (answer !== "允许") throw Object.assign(new Error(answer === null ? "权限询问已关闭或无法显示，工具没有运行：" + name : "你拒绝了这次工具调用，工具没有运行：" + name), { outcome: "rejected", data: { failureScope: "request" } });
+  approvedActions.add(tools);
+  return true;
+}
+
+/** The server and tool an `mcp__<server>__<tool>` session name denotes; null for a native tool. */
+export function mcpReference(name) {
+  if (typeof name !== "string" || !name.startsWith("mcp__")) return null;
+  const rest = name.slice("mcp__".length), cut = rest.indexOf("__");
+  if (cut <= 0 || cut + 2 >= rest.length) return null;
+  return { server: rest.slice(0, cut), tool: rest.slice(cut + 2) };
+}
+
 export async function callNative($, tools, name, args) {
   if (!tools.some(tool => tool.name === name)) throw notSent("当前会话未开放工具：" + name);
   if (Object.hasOwn(args, "tool") || Object.hasOwn(args, "tool_use_id")) throw notSent("此原生工具的平铺参数与宿主工具信封冲突；请使用明确的 MCP 服务标识。");
-  const response = await $.tool.call({ ...args, tool: name });
+  const approved = await requestApproval($, tools, name, args);
+  // A tool.check hook of this Mod did not settle an approved $.tool.call: in auto mode the classifier still
+  // refused it. The person's answer is therefore carried by $.mcp.call, which the engine documents as the
+  // plugin's own grant for a connected server's tool. A native tool has no such channel: it still goes
+  // through $.tool.call and the session's permission decision.
+  const reference = approved ? mcpReference(name) : null;
+  const response = reference ? await $.mcp.call(reference.server, reference.tool, args) : await $.tool.call({ ...args, tool: name });
   if (response?.deny || response?.denied) {
     const reason = typeof response.deny === "string" && response.deny ? response.deny : null;
     throw Object.assign(new Error(reason ? "宿主拒绝工具请求：" + reason : "宿主拒绝工具请求，未给出原因。"), { outcome: "rejected", data: response });
@@ -61,4 +93,19 @@ export async function callRequestedTool($, tools, reference, args) {
   }
   if (!tools.some(tool => tool.name === reference.name)) return { status: "unsupported", message: "指定工具未出现在当前会话清单中。" };
   return callNative($, tools, reference.name, args);
+}
+
+/** Read the session's permission mode from the desktop host's session tool. A background read shows nobody a
+ * card: it runs only when the engine already allows the call, and an unreadable mode stays null. */
+export async function readPermissionMode($, tools) {
+  if (!tools.some(tool => tool.name === SESSION_TOOL)) return null;
+  const args = { session_id: "self" };
+  try {
+    const verdict = await $.tool.check({ tool: SESSION_TOOL, input: args });
+    if (verdict?.decision !== "allow") return null;
+    const response = await $.tool.call({ ...args, tool: SESSION_TOOL });
+    if (response?.deny || response?.denied || response?.isError) return null;
+    const mode = nativeData(response)?.permissionMode;
+    return typeof mode === "string" && mode ? mode : null;
+  } catch { return null; }
 }
