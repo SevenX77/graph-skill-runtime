@@ -23,7 +23,7 @@ Environment: Windows 11 x64, Node.js 24.18.0, toolkit with the Hostpane pin and 
 | Hostpane `npm run typecheck` at `be973a37` | Passed. |
 | Hostpane `npm test` at `be973a37` | 183 passed, 0 failed. |
 | Toolkit `npm install` | Completed. |
-| Toolkit `npm run build` | Passed. Canvas 904,015 bytes (final build, after the host-chip radius token), Interface Lab 911,462 bytes. |
+| Toolkit `npm run build` | Passed. Canvas 903,840 bytes (final build), Interface Lab 911,462 bytes. |
 | Toolkit `npm run typecheck` | Passed. |
 | Toolkit `npm test` | 85 passed, 0 failed: the 81 tests of the extraction candidate above and 4 in `tests/interface_lab/handbook.test.mjs`. |
 | Toolkit `npm audit` | 0 vulnerabilities. |
