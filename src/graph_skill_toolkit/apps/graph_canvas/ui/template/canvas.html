@@ -1,93 +1,102 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh" data-scheme="prism">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Graph Skill · 接口原型</title>
+  <title>Graph Skill 画布</title>
+  <script>
+    try {
+      var chosen = localStorage.getItem("canvas-scheme");
+      document.documentElement.dataset.scheme = chosen === "prism" || chosen === "aurora" ? chosen : matchMedia("(prefers-color-scheme: dark)").matches ? "aurora" : "prism";
+    } catch (error) { if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.scheme = "aurora"; }
+  </script>
+  <style>/* INLINE_CSS ../../../../../../vendor/ui-ux-template/core/dist/tokens.css */</style>
+  <style>/* INLINE_CSS ../../../../../../vendor/ui-ux-template/core/styles/base.css */</style>
+  <style>/* INLINE_CSS ../../../../../../vendor/ui-ux-template/core/styles/scenes.css */</style>
   <style>
-    :root { color-scheme: light dark; font: 13px/1.5 system-ui, sans-serif; color: #24304a; background: #f6f7f9; --surface: #fff; --surface-soft: #f6f7f9; --text: #24304a; --muted: #63718a; --border: #dce1e9; --accent: #675ec7; --accent-soft: #eeecfc; --grid: #d9dde6; --edge: #9ba8be; }
-    * { box-sizing: border-box; }
-    html, body, #app { width: 100%; height: 100%; margin: 0; }
-    body { overflow: hidden; }
-    button, textarea { font: inherit; }
-    button { border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; color: var(--text); background: var(--surface); cursor: pointer; white-space: nowrap; }
-    button:hover:enabled { border-color: var(--accent); background: var(--accent-soft); }
-    button:disabled { cursor: not-allowed; color: var(--muted); opacity: .58; }
-    button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-    .workbench { display: flex; flex-direction: column; width: 100%; height: 100dvh; }
-    .app-header { flex: 0 0 auto; padding: 14px 18px 10px; background: var(--surface); border-bottom: 1px solid var(--border); }
-    .heading { display: flex; align-items: center; gap: 9px; min-width: 0; }
-    .heading > strong { font-size: 17px; letter-spacing: -.4px; }
-    .prototype-badge { color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 5px; font-size: 11px; }
-    .connection { margin-left: auto; color: var(--muted); font-size: 12px; }
-    .connection.connected::before { content: ""; display: inline-block; width: 6px; height: 6px; background: #399476; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
-    .root-line { display: flex; align-items: baseline; gap: 9px; min-width: 0; margin-top: 8px; }
-    .field-label { color: var(--muted); font-size: 11px; }
-    #skill-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; font: 12px/1.5 ui-monospace, monospace; }
-    #status { margin: 5px 0 0; color: var(--muted); font-size: 11px; min-height: 17px; }
-    .content-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; flex: 1; min-height: 0; }
-    .graph-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 20px 20px; }
-    .graph-summary { display: flex; justify-content: space-between; gap: 10px; padding: 13px 18px 0; color: var(--muted); font-size: 11px; }
-    .graph-summary > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .graph-summary > :last-child { white-space: nowrap; }
-    .graph-area { flex: 1; min-height: 0; min-width: 0; padding: 8px 18px; }
-    .graph-area svg { display: block; width: 100%; height: 100%; }
-    .graph-hint { flex: 0 0 auto; margin: 0; padding: 9px 18px 12px; color: var(--muted); font-size: 11px; }
-    .invalid-graph { flex: 0 0 auto; max-height: 38%; overflow-y: auto; margin: 10px 18px 0; padding: 10px 12px; border: 1px solid #d9a3a3; border-left: 4px solid #b94a4a; border-radius: 7px; background: #fbeeee; color: #5c2222; scrollbar-width: thin; }
-    .invalid-graph h2 { margin: 0; font-size: 13px; color: #8f2f2f; }
-    .invalid-graph-note { margin: 4px 0 0; font-size: 11px; }
-    .invalid-graph ul { margin: 7px 0 0; padding: 0; list-style: none; }
-    .invalid-graph li { padding: 5px 0; border-top: 1px solid #ecc8c8; font-size: 12px; overflow-wrap: anywhere; }
-    .invalid-graph code { font: 11px/1.5 ui-monospace, monospace; color: #8f2f2f; }
-    .invalid-graph-where { display: block; color: #7a4a4a; font: 11px/1.5 ui-monospace, monospace; }
-    .graph-area.stale { opacity: .55; }
-    .empty-state { display: grid; place-content: center; height: 100%; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
-    .graph-node { cursor: pointer; outline: none; }
-    .node { fill: var(--surface); stroke: var(--border); stroke-width: 1.25; }
-    .graph-node:hover .node { stroke: var(--accent); }
-    .graph-node[aria-pressed="true"] .node { stroke: var(--accent); stroke-width: 2.5; fill: var(--accent-soft); }
-    .graph-node:focus-visible .node { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 6 3; }
-    .label { fill: var(--text); font-size: 19px; font-weight: 600; }
-    .kind { fill: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: 1.5px; }
-    .edge { fill: none; stroke: var(--edge); stroke-width: 1.5; }
-    .arrow { fill: var(--edge); }
-    .dot { fill: var(--accent); } .input { fill: #499c84; } .output { fill: #cb9350; }
-    .inspector { min-height: 0; overflow-y: auto; background: var(--surface); border-left: 1px solid var(--border); scrollbar-width: thin; }
-    .inspector-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
-    h2 { font-size: 12px; margin: 0 0 9px; font-weight: 650; }
-    p { margin: 7px 0; }
-    .muted { color: var(--muted); font-size: 11px; }
-    dl { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 5px; font-size: 12px; margin: 0 0 9px; }
-    dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
-    details { min-width: 0; } summary { cursor: pointer; color: var(--muted); font-size: 11px; }
-    pre { max-width: 100%; overflow-x: auto; font: 11px/1.5 ui-monospace, monospace; padding: 9px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    textarea { display: block; width: 100%; min-height: 78px; resize: vertical; border: 1px solid var(--border); border-radius: 7px; padding: 9px; background: var(--surface-soft); color: var(--text); font-size: 12px; }
-    .capabilities ul { list-style: none; padding: 0; margin: 10px 0 0; }
-    .capabilities li { padding: 7px 0; border-top: 1px solid var(--border); font-size: 11px; }
-    .capabilities li strong { display: flex; justify-content: space-between; gap: 8px; }
-    .capabilities li strong span { color: var(--muted); font-weight: normal; }
-    .capabilities li p { margin: 3px 0 0; color: var(--muted); overflow-wrap: anywhere; }
-    .section-heading { display: flex; align-items: baseline; justify-content: space-between; }
-    .section-heading > span { color: var(--muted); font-size: 11px; }
-    @media (max-width: 720px) {
-      body { overflow: auto; }
-      .workbench { height: auto; min-height: 100dvh; }
-      .app-header { padding: 12px 12px 8px; }
-      .heading { flex-wrap: wrap; gap: 7px; }
-      .connection { font-size: 10px; }
-      .content-layout { display: block; }
-      .graph-panel { height: min(66dvh, 620px); min-height: 320px; }
-      .inspector { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
-      .graph-summary, .graph-hint { padding-left: 12px; padding-right: 12px; }
-      .graph-area { padding: 8px 12px; }
-      .invalid-graph { margin: 8px 12px 0; }
-    }
-    @media (prefers-color-scheme: dark) {
-      :root { color: #edf1f8; background: #171b23; --surface: #222936; --surface-soft: #1c222d; --text: #edf1f8; --muted: #a1adc2; --border: #3a4557; --accent: #b1a6ff; --accent-soft: #332f4d; --grid: #303746; --edge: #68758e; }
-      .invalid-graph { background: #3a2226; border-color: #7a3c42; border-left-color: #ed9090; color: #f3d6d6; }
-      .invalid-graph h2, .invalid-graph code { color: #ffb3b3; }
-      .invalid-graph li { border-top-color: #5a3036; }
-      .invalid-graph-where { color: #d9a9a9; }
+    html, body, #app { height: 100%; }
+    body { overflow: hidden; padding-bottom: 0; }
+    h2 { margin: 0; }
+    code, pre { font-family: var(--mono); }
+
+    /* Full-bleed canvas with floats: the graph fills the window; the header, host chip and detail float over it. */
+    .workbench { position: relative; width: 100%; height: 100dvh; background: var(--app); }
+    .empty-state { display: grid; place-content: center; height: 100%; padding: 24px; color: var(--ink2); text-align: center; overflow-wrap: anywhere; }
+
+    .cv-board { position: absolute; inset: 0; }
+    .cv-stage { position: absolute; inset: 0; overflow: hidden; background-image: radial-gradient(var(--dot) .8px, transparent 1px); background-size: 18px 18px; cursor: grab; }
+    .cv-stage.cv-grabbing { cursor: grabbing; }
+    .cv-stage.cv-anim .cv-world { transition: transform .52s var(--ease); }
+    .cv-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; transition: opacity .3s; }
+    .cv-world.stale { opacity: .45; }
+    .cv-edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+    .cv-edges path.e { fill: none; stroke: var(--ink3); stroke-width: 1.4; stroke-linecap: round; transition: stroke .25s, opacity .3s; }
+    .cv-edges path.e.on { stroke-width: 1.8; }
+    .cv-edges marker path { fill: var(--ink3); }
+    :root:not([data-attention=raise]) .cv-board.ux-active .cv-edges path.e:not(.on) { opacity: .3; }
+
+    /* A node: kind badge and id. Selection is shown by background and depth, never by a ring. */
+    .cv-node { position: absolute; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: var(--r-ctl); background: var(--card); box-shadow: var(--e1); cursor: pointer; outline: none; transition: box-shadow var(--t-block) ease, background .25s, opacity .3s; }
+    .cv-node.ux-hover { box-shadow: var(--lift); z-index: 1; }
+    .cv-node.on { background: var(--sel); box-shadow: var(--e3); z-index: 2; }
+    .cv-node:focus-visible { box-shadow: var(--e2), inset 0 0 0 1.5px var(--signal); }
+    :root:not([data-attention=raise]) .cv-node.off { opacity: .3; }
+    /* With a selection, its neighbours stay readable: the selection, not the pointer, says what relates. */
+    .cv-board.ux-active .cv-node:not(.off).ux-dim { opacity: 1; }
+    .cv-node em { font: 700 11px/24px var(--font); font-style: normal; width: 24px; height: 24px; border-radius: var(--r-ctl); flex: none; text-align: center; background: color-mix(in srgb, var(--col) 20%, var(--card)); color: var(--col); }
+    .cv-node span { display: grid; min-width: 0; }
+    .cv-node b { font: 600 13px/1.3 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+    .cv-node small { font-size: 10.5px; letter-spacing: .06em; color: var(--ink2); }
+
+    /* Zoom and fit. */
+    .cvz { opacity: 1; }
+
+    /* The selected node's detail is an overlay; the nodes keep their places. */
+    .cv-side { position: absolute; z-index: 7; top: 54px; right: 10px; bottom: 10px; width: 280px; overflow: auto; visibility: hidden; background: var(--card); border-radius: var(--r-card); box-shadow: var(--e3); transform: translateX(calc(100% + 16px)); transition: transform .52s var(--ease), visibility 0s .52s; }
+    .cv-board.ux-active .cv-side { transform: none; visibility: visible; transition-delay: 0s; }
+    .cv-side-in { display: grid; gap: calc(8px * var(--y)); padding: calc(12px * var(--y)) 14px; }
+    .cv-side h2 { font: 650 16px/1.3 var(--mono); overflow-wrap: anywhere; }
+    .cv-side .tag { justify-self: start; }
+    .cv-kind-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--col); }
+    .cv-facts { display: grid; gap: calc(4px * var(--y)); margin: 0; font-size: 12.5px; }
+    .cv-facts > div { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; }
+    .cv-facts dt { color: var(--ink2); }
+    .cv-facts dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+
+    /* Floating header: what graph, from which Skill, and anything wrong with it. */
+    .cv-head { position: absolute; z-index: 8; top: 10px; left: 10px; max-width: min(560px, calc(100% - 340px)); display: grid; gap: calc(3px * var(--y)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e2); }
+    .cv-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+    .cv-title b { font: 650 14px/1.3 var(--mono); overflow-wrap: anywhere; }
+    #skill-path { font-size: 11.5px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; }
+    #status { font-size: 11.5px; color: var(--bad); }
+    #status:empty { display: none; }
+    .invalid-graph { margin-top: calc(6px * var(--y)); max-height: 42vh; overflow-y: auto; padding: calc(8px * var(--y)) 10px; border-radius: var(--r-ctl); background: color-mix(in srgb, var(--bad) 12%, var(--card)); }
+    .invalid-graph h2 { font-size: 13px; color: var(--bad); }
+    .invalid-graph-note { margin-top: 3px; font-size: 11.5px; color: var(--ink2); }
+    .invalid-graph ul { margin: calc(6px * var(--y)) 0 0; padding: 0; list-style: none; }
+    .invalid-graph li { padding: calc(4px * var(--y)) 0; font-size: 12px; overflow-wrap: anywhere; }
+    .invalid-graph li + li { box-shadow: inset 0 1px var(--line); }
+    .invalid-graph code { font-size: 11.5px; font-weight: 600; color: var(--bad); }
+    .invalid-graph-where { display: block; font: 11px/1.5 var(--mono); color: var(--ink2); }
+
+    /* Host chip, top right. */
+    .cv-host { position: absolute; z-index: 8; top: 10px; right: 10px; display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-radius: var(--r-card); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e1); font-size: 12px; font-weight: 600; color: var(--ink2); }
+    .connection { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .cv-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink3); }
+    .cv-dot.on { background: var(--good); } .cv-dot.wait { background: var(--c3); } .cv-dot.off { background: var(--bad); }
+    .cv-host .seg { margin-left: 4px; background: none; padding: 0; }
+    .cv-host .seg-ind { background: var(--sel); box-shadow: none; }
+    .cv-host .seg button { padding: 3px 9px; font-size: 12px; }
+    .cv-host .seg button.on { color: var(--ink); }
+    .cv-host-info { position: relative; }
+    .cv-host-info summary { list-style: none; cursor: pointer; padding: 2px 6px; border-radius: var(--r-ctl); }
+    .cv-host-info summary::-webkit-details-marker { display: none; }
+    .cv-host-info summary:hover { background: var(--sel); color: var(--ink); }
+    .cv-host-info pre { position: absolute; right: 0; top: calc(100% + 8px); width: min(380px, calc(100vw - 24px)); max-height: 60vh; overflow: auto; margin: 0; padding: 10px; border-radius: var(--r-card); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e3); font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); font-weight: 400; }
+
+    @media (max-width: 719px) {
+      .cv-head { right: 10px; max-width: none; top: 56px; }
+      .cv-side { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 55%; transform: translateY(calc(100% + 16px)); }
     }
   </style>
 </head>

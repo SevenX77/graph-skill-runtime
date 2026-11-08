@@ -5,6 +5,8 @@ import { GUIDES, GROUPS, CONTEXT_PROBE, type LabPaths } from "../application/gui
 import { runOperation, contextReadout, recordPath, workspaceRoot, localTime } from "../application/runner.mjs";
 import { hostLabel, permissionModeLabel, snapshotHost } from "../application/result_status/index.mjs";
 import { callSignal, connectionStatus } from "../application/connection_status/index.mjs";
+import { parseRoute, routeHash, switchMode, START, type Route } from "../application/route.mjs";
+import { GuideOperation, GuideStart } from "./guide";
 
 type Verdict = "" | "matches" | "differs" | "not-observed";
 type Run = { id: number; op: string; connection: HostAdapter; args: unknown; result: HostResult; host: ReturnType<typeof snapshotHost>; at: string; verdict: Verdict; note: string; stop?: () => Promise<HostResult> | HostResult; stopped?: HostResult };
@@ -22,7 +24,18 @@ function connectionKey(adapter: HostAdapter | null) {
 
 const verdictText: Record<Exclude<Verdict, "">, string> = { matches: "与预期一致", differs: "与预期不符", "not-observed": "未观察到效果" };
 const show = (value: unknown) => value === undefined || value === null ? "（无）" : JSON.stringify(value, null, 2);
-const SCHEMES = [{ id: "prism", name: "彩光" }, { id: "aurora", name: "极光" }];
+const SCHEMES = [{ id: "prism", name: "浅" }, { id: "aurora", name: "深" }];
+const MODES = [{ id: "guide", name: "指南" }, { id: "lab", name: "测试" }] as const;
+const IDS = GUIDES.map(guide => guide.id);
+const ROUTE_KEY = "lab-route";
+
+/** The URL hash wins; otherwise the page reopens where this browser last left it, or on the quick start. */
+function initialRoute(): Route {
+  let remembered: string | null = null;
+  try { remembered = localStorage.getItem(ROUTE_KEY); } catch { /* A blocked store opens the quick start. */ }
+  const fallback = parseRoute(remembered, IDS, { mode: "guide", id: START });
+  return parseRoute(location.hash, IDS, fallback);
+}
 
 /** Long evidence fades at the clipped edge only while it actually overflows (template rule 22). */
 function Evidence({ children }: { children: ReactNode }) {
@@ -47,7 +60,8 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
   const [failure, setFailure] = useState("");
   const [hostInfo, setHostInfo] = useState<HostInfo | null>(adapter?.hostInfo ?? null);
   const [lab, setLab] = useState<LabPaths | null>(initialLab);
-  const [selected, setSelected] = useState(GUIDES[0].id);
+  const [route, setRoute] = useState<Route>(initialRoute);
+  const selected = route.id === START ? IDS[0] : route.id;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [runs, setRuns] = useState<Run[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -107,7 +121,18 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
   }, [waiting]);
 
   useLayoutEffect(refreshTemplate);
-  useLayoutEffect(() => { main.current?.scrollTo({ top: 0, behavior: "instant" }); main.current?.classList.remove("scrolled"); }, [selected]);
+  useLayoutEffect(() => { main.current?.scrollTo({ top: 0, behavior: "instant" }); main.current?.classList.remove("scrolled"); }, [route.mode, route.id]);
+  useEffect(() => {
+    document.documentElement.dataset.mode = route.mode;
+    const hash = routeHash(route);
+    if (location.hash !== hash) history.replaceState(null, "", hash);
+    try { localStorage.setItem(ROUTE_KEY, hash); } catch { /* A blocked store only forgets the place. */ }
+  }, [route]);
+  useEffect(() => {
+    const follow = () => setRoute(current => parseRoute(location.hash, IDS, current));
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
   useEffect(() => {
     window.addEventListener("resize", refreshTemplate);
     return () => window.removeEventListener("resize", refreshTemplate);
@@ -196,137 +221,163 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
 
   const tally = GUIDES.reduce((counts, item) => { counts[signalOf(item.id).tone]++; return counts; }, { available: 0, unavailable: 0, unknown: 0, untested: 0 } as Record<"available" | "unavailable" | "unknown" | "untested", number>);
 
+  const open = (id: string, mode: Route["mode"] = route.mode) => { setRoute({ mode, id }); setOverlay(null); };
+  const connected = !!adapter && connection === "已连接";
+  const filesOp = selected === "files.openFile" || selected === "files.revealDirectory";
+  const hostTone = connection === "已连接" ? hostInfo?.status === "confirmed" ? "available" : "unknown" : connection === "连接中" ? "unknown" : "unavailable";
+  const otherHost = host === "codex" ? "claude" : "codex";
+  const emptySlots = (result: HostResult) => (["sent", "receipt", "observed", "limits"] as const).filter(slot => slot === "limits" ? !result.evidence?.limits?.length : result.evidence?.[slot] === undefined || result.evidence?.[slot] === null);
+
+  function runCard(item: Run, latest: boolean) {
+    const empty = emptySlots(item.result);
+    const body = <>
+      <p className="il-message">{item.result.message}</p>
+      {item.op === "context.update" && item.result.status === "completed" ? <div className="il-readout">
+        <span className="label">模型将读到的原文（插件实际发送）</span>
+        {contextReadout(item.result).map((text, index) => <pre key={index}>{text}</pre>)}
+        {(item.result.data as { cleared?: boolean } | undefined)?.cleared ? <p className="note">这是一次清除：宿主收到空上下文。</p> : null}
+        {host === "claude" ? <p className="note">Claude 对其他来源的提交使用隐藏段落；本页提交在可见消息后内联段落。原文与路径见 context.attached。</p> : <p className="note">Codex 只确认收到；用“让模型复述上下文”核对模型实际读到的内容。</p>}
+      </div> : null}
+      <div className="il-evidence">
+        {item.result.data !== undefined ? <section className="wide"><span className="label">返回数据 data</span><Evidence>{show(item.result.data)}</Evidence></section> : null}
+        {empty.includes("sent") ? null : <section><span className="label">发送 sent</span><Evidence>{show(item.result.evidence?.sent)}</Evidence></section>}
+        {empty.includes("receipt") ? null : <section><span className="label">回执 receipt</span><Evidence>{show(item.result.evidence?.receipt)}</Evidence></section>}
+        {empty.includes("observed") ? null : <section><span className="label">观察 observed</span><Evidence>{show(item.result.evidence?.observed)}</Evidence></section>}
+        {empty.includes("limits") ? null : <section><span className="label">限制 limits</span><Evidence>{item.result.evidence!.limits!.join("\n")}</Evidence></section>}
+      </div>
+      {empty.length ? <p className="xs mute il-empty">无内容：{empty.join(" · ")}</p> : null}
+      {item.stop && !item.stopped ? <div className="row il-gap"><button type="button" className="btn sec2 sm" onClick={async () => update(item.id, { stopped: await item.stop!() })}>停止{item.op === "local.files.watch" ? "监听" : "订阅"}</button></div> : null}
+      {item.stopped ? <p className="note">{item.stopped.message}</p> : null}
+      {item.result.status === "pending" && item.result.requestId && adapter?.getResult ? <div className="row il-gap"><button type="button" className="btn sec2 sm" onClick={() => void check(item)}>查询回执（不会重发）</button></div> : null}
+      <div className="il-compare" role="group" aria-label="对照结论">
+        <div className="seg">
+          <i className="seg-ind" />
+          {(Object.keys(verdictText) as Exclude<Verdict, "">[]).map(key => <button type="button" key={key} className={item.verdict === key ? "on" : ""} aria-pressed={item.verdict === key} onClick={() => void update(item.id, { verdict: key })}>{verdictText[key]}</button>)}
+        </div>
+        <input className="input" placeholder="备注（离开输入框时保存）" defaultValue={item.note} onBlur={event => { if (event.target.value !== item.note) void update(item.id, { note: event.target.value }); }} />
+      </div>
+    </>;
+    const head = <>
+      <span className="tag"><i className={"il-dot " + callSignal(item).tone} />{callSignal(item).label}</span>
+      {item.op !== selected ? <code className="xs">{item.op}</code> : null}
+      <span className="xs mute">{item.verdict ? verdictText[item.verdict] : "待对照"}</span>
+      {item.result.requestId ? <code className="xs mute">请求 {item.result.requestId}</code> : null}
+      <time title={(item.op.startsWith("local.") ? "页面宿主：" : "调用宿主：") + hostLabel(item.host)}>{localTime(item.at)}</time>
+    </>;
+    return latest
+      ? <article className="card" data-cmp data-nofocus key={item.id}><div className="il-run-head">{head}</div>{body}</article>
+      : <details className="card il-older" data-cmp data-nofocus key={item.id}><summary className="il-run-head">{head}<span className="il-older-msg">{item.result.message}</span></summary>{body}</details>;
+  }
+
+  const labView = <>
+    <section data-scope="lab-op" className="il-stack">
+      <article className="card" data-cmp data-nofocus>
+        <div className="il-head">
+          <h2>{guide.id}</h2>
+          <span className="tag" role="status"><i className={"il-dot " + selectedSignal.tone} />{selectedSignal.label}</span>
+          <button type="button" className="btn ghost sm il-try" onClick={() => open(selected, "guide")}>参数说明</button>
+        </div>
+        <p className="il-purpose">{guide.purpose}</p>
+        {selectedSignal.detail ? <p className="xs mute">{selectedSignal.detail}</p> : null}
+        {guide.kind === "host" && current && current.state !== "available" ? <p className="note il-warn">宿主声明 {current.state}：{current.detail}</p> : null}
+        {guide.kind === "local" && !adapter?.local.available ? <p className="note il-warn">插件服务没有为本页面提供本地能力。</p> : null}
+        {current?.modeLimit && guide.kind === "host" ? <p className="note il-warn">当前权限模式（{permissionModeLabel(current.modeLimit.mode)}）下{current.modeLimit.effect === "blocked" ? "不可用" : "部分可用"}：{current.modeLimit.detail}</p> : null}
+      </article>
+      <article className="card" data-cmp data-nofocus>
+        <div className="il-run-bar">
+          <div className="il-presets">{guide.presets.map(preset => <button type="button" className="btn sec2 sm" key={preset.label} onClick={() => setDrafts(previous => ({ ...previous, [selected]: show(preset.args(presetContext)) }))}>{preset.label}</button>)}</div>
+          {selected === "context.update" ? <button type="button" className="btn sec2" disabled={!connected || busy} onClick={() => void run("conversation.submitMessage", JSON.stringify({ text: CONTEXT_PROBE }))}>让模型复述</button> : null}
+          <button type="button" className="btn" disabled={!connected || busy} onClick={() => void run()}>{busy ? "运行中…" : "运行"}</button>
+        </div>
+        {filesOp ? <label className="il-field"><span className="label">工作区目录</span><input className="input" aria-label="工作区目录" placeholder="宿主未提供，请填写真实目录" value={workspace ?? ""} onChange={event => {
+          setWorkspace(event.target.value || null);
+          setDrafts(previous => { const next = { ...previous }; delete next["files.openFile"]; delete next["files.revealDirectory"]; return next; });
+        }} /></label> : null}
+        {guide.kind === "local" ? <p className="xs mute il-gap">样例文件在插件状态目录：<code>{lab?.sampleFile ?? "未知"}</code></p> : null}
+        {guide.note ? <p className="xs mute il-gap">{guide.note}</p> : null}
+        <textarea className="input" aria-label="接口参数" spellCheck={false} rows={Math.min(14, Math.max(3, draft.split("\n").length))} value={draft} onChange={event => setDrafts(previous => ({ ...previous, [selected]: event.target.value }))} />
+        {waiting ? <p className="note" role="status">宿主处理中…已等待 {elapsed} 秒。{["conversation.submitMessage", "skills.invoke"].includes(waiting.op) ? "会话忙时，提交排队到空闲；等待回执不会重复提交。" : "正在等待宿主回执。"}</p> : null}
+        {saved ? <p className="note">{saved}</p> : null}
+      </article>
+      <article className="card" data-cmp data-nofocus>
+        <div className="il-expect">
+          <span className="label">{host === "codex" ? "Codex" : "Claude"} 上的预期</span>
+          <p>{host === "codex" ? guide.expect.codex : guide.expect.claude}</p>
+          <span className="label">怎样核对</span>
+          <p>{guide.check}</p>
+          {limits.length ? <><span className="label">宿主声明的限制</span><ul className="il-limits">{limits.map(item => <li key={item}>{item}</li>)}</ul></> : null}
+          <details className="il-other"><summary className="xs mute">{otherHost === "codex" ? "Codex" : "Claude"} 上的预期</summary><p>{guide.expect[otherHost]}</p></details>
+        </div>
+      </article>
+    </section>
+    <section data-scope="runs" className="il-stack il-runs">
+      <div className="il-section-title">调用记录 <span className="mute">{opRuns.length}</span></div>
+      {opRuns.length === 0 ? <p className="xs mute">还没有调用。选一个预设，点“运行”。</p> : opRuns.map((item, index) => runCard(item, index === 0))}
+    </section>
+  </>;
+
+  const guideView = route.id === START
+    ? <GuideStart onOpen={id => open(id, "guide")} />
+    : <GuideOperation guide={guide} host={host} capability={current} localAvailable={adapter?.local.available ?? false} onTry={() => open(selected, "lab")} />;
+
   return <>
     <div className="bar">
       <div className="bar-in" data-scope="bar" data-dim="none" data-cmp data-nofocus>
         <button type="button" className="il-open nav" aria-expanded={overlay === "nav"} onClick={() => setOverlay(overlay === "nav" ? null : "nav")}>接口</button>
+        <div className="seg il-modes" role="tablist" aria-label="页面模式">
+          <i className="seg-ind" />
+          {MODES.map(item => <button type="button" role="tab" key={item.id} className={route.mode === item.id ? "on" : ""} aria-selected={route.mode === item.id} onClick={() => setRoute(switchMode(route, item.id, IDS))}>{item.name}</button>)}
+        </div>
+        <span className="sep" />
+        <span className="il-host" title={`连接：${connection}（${hostInfo?.transport ?? "none"}）· 权限模式：${permissionModeLabel(hostInfo?.permissionMode)} · 本地能力：${adapter?.local.available ? "可用" : "不可用"}`}><i className={"il-dot " + hostTone} />{hostLabel(hostInfo)}</span>
         <button type="button" className="il-open events" aria-expanded={overlay === "events"} onClick={() => setOverlay(overlay === "events" ? null : "events")}>事件 {events.length}</button>
-        <div className="seg quiet" role="group" aria-label="配色方案">
+        <span className="sep" />
+        <div className="seg quiet" role="group" aria-label="明暗">
           <i className="seg-ind" />
           {SCHEMES.map(item => <button type="button" key={item.id} className={scheme === item.id ? "on" : ""} aria-pressed={scheme === item.id} onClick={() => chooseScheme(item.id)}>{item.name}</button>)}
         </div>
-        <span className="sep" />
-        <span className="il-dim">隐藏周围<button type="button" role="switch" className="switch" aria-label="隐藏周围" aria-checked={dimming} onClick={() => { UX.dimOthers(!dimming); setDimming(!dimming); }} /></span>
+        <span className="il-dim" title="聚焦时淡化周围"><button type="button" role="switch" className="switch" aria-label="聚焦时淡化周围" aria-checked={dimming} onClick={() => { UX.dimOthers(!dimming); setDimming(!dimming); }} /></span>
       </div>
     </div>
     <div className="il-work">
       <nav className={"il-side nav" + (overlay === "nav" ? " show" : "")} aria-label="接口列表">
-        <h1 className="il-title">Plugin Interface Lab</h1>
-        <div className="il-fact">宿主<b>{hostLabel(hostInfo)}</b></div>
-        <div className="il-fact">连接<b>{connection}（{hostInfo?.transport ?? "none"}）</b></div>
-        <div className="il-fact">权限模式<b>{permissionModeLabel(hostInfo?.permissionMode)}</b></div>
-        <div className="il-fact">本地能力<b>{adapter?.local.available ? "可用" : "不可用"}</b></div>
-        <div className="il-tally">
-          <span><i className="il-dot available" /> 成功 {tally.available}</span>
-          <span><i className="il-dot unavailable" /> 失败 {tally.unavailable}</span>
-          <span><i className="il-dot unknown" /> 进行中 {tally.unknown}</span>
-          <span><i className="il-dot untested" /> 未测试 {tally.untested}</span>
+        <div className="il-brand"><b>Hostpane</b><span className="xs mute">17 个宿主接口 · 5 个本地能力</span></div>
+        <div className="il-tally" title="每个接口在本次连接上的测试状态">
+          <span><i className="il-dot available" />{tally.available}</span>
+          <span><i className="il-dot unavailable" />{tally.unavailable}</span>
+          <span><i className="il-dot unknown" />{tally.unknown}</span>
+          <span><i className="il-dot untested" />{tally.untested} 未测</span>
         </div>
         <div className="seg il-ops">
           <i className="seg-ind" />
+          {route.mode === "guide" ? <button type="button" className={route.id === START ? "on il-start" : "il-start"} aria-current={route.id === START} onClick={() => open(START, "guide")}>快速上手</button> : null}
           {GROUPS.flatMap(group => [
             <h2 key={"group-" + group}>{group}</h2>,
-            ...GUIDES.filter(item => item.group === group).map(item => <button type="button" key={item.id} className={item.id === selected ? "on" : ""} aria-current={item.id === selected} title={signalOf(item.id).label} onClick={() => { setSelected(item.id); setOverlay(null); }}>
+            ...GUIDES.filter(item => item.group === group).map(item => <button type="button" key={item.id} className={item.id === route.id ? "on" : ""} aria-current={item.id === route.id} title={signalOf(item.id).label} onClick={() => open(item.id)}>
               <i className={"il-dot " + signalOf(item.id).tone} /><span>{item.id.split(".").flatMap((part, index) => index ? [".", <wbr key={index} />, part] : [part])}</span>
               {capabilities[item.id]?.modeLimit ? <span className="il-mode-tag">{capabilities[item.id]?.modeLimit?.effect === "blocked" ? "不可用" : "部分"}</span> : null}
               {runsOf(item.id).length ? <span className="il-count">{runsOf(item.id).length}</span> : null}
             </button>),
           ])}
         </div>
-        <div className="il-env">
-          <span className="label">实验室目录</span>
-          <code className="xs mute">{lab?.stateDirectory ?? "未知"}</code>
-          <p className="note xs">sample.txt 是首次打开时在插件状态目录的 sandbox 中创建的临时样例，用于本地文件读写、监听与系统定位。宿主文件面板使用工作区路径。</p>
-          <span className="label">工作区目录（用于宿主文件测试）</span>
-          <input className="input" aria-label="工作区目录" placeholder="宿主未提供，请填写真实目录" value={workspace ?? ""} onChange={event => {
-            setWorkspace(event.target.value || null);
-            setDrafts(previous => { const next = { ...previous }; delete next["files.openFile"]; delete next["files.revealDirectory"]; return next; });
-          }} />
-        </div>
+        <details className="il-env">
+          <summary className="xs mute">连接与目录</summary>
+          <div className="il-fact">宿主<b>{hostLabel(hostInfo)}</b></div>
+          <div className="il-fact">连接<b>{connection}（{hostInfo?.transport ?? "none"}）</b></div>
+          <div className="il-fact">权限模式<b>{permissionModeLabel(hostInfo?.permissionMode)}</b></div>
+          <div className="il-fact">本地能力<b>{adapter?.local.available ? "可用" : "不可用"}</b></div>
+          <div className="il-fact">实验室目录<b><code>{lab?.stateDirectory ?? "未知"}</code></b></div>
+          <p className="note xs">sample.txt 是插件状态目录 sandbox 里的临时样例，供本地能力测试；宿主文件测试用工作区目录。</p>
+        </details>
       </nav>
-      <main ref={main} className="il-main" onScroll={event => event.currentTarget.classList.toggle("scrolled", event.currentTarget.scrollTop > 0)}>
+      <main ref={main} className={"il-main " + route.mode} onScroll={event => event.currentTarget.classList.toggle("scrolled", event.currentTarget.scrollTop > 0)}>
         {failure ? <p className="card il-banner">{failure}</p> : null}
-        <section data-scope="brief" className="il-stack">
-          <article className="card" data-cmp>
-            <div className="il-head"><h2>{guide.id}</h2><span className="tag">{guide.kind === "host" ? "宿主接口" : "本地能力（插件进程执行，不经过宿主）"}</span></div>
-            <p className="il-message">{guide.purpose}</p>
-            <div className="il-signal" role="status">
-              <span className="tag"><i className={"il-dot " + selectedSignal.tone} />{selectedSignal.label}</span>
-              <span className="mute">{guide.kind === "host" ? "当前宿主" : "页面宿主"}：<b>{hostLabel(hostInfo)}</b></span>
-              <span>{selectedSignal.detail}</span>
-            </div>
-            <p className="note">{guide.kind === "host" ? "宿主能力声明" : "插件本地能力声明"}：{guide.kind === "host" ? current?.state ?? "unknown" : adapter?.local.available ? "available" : "unavailable"} · {guide.kind === "host" ? current?.detail ?? "宿主尚未声明此能力。" : adapter?.local.available ? "插件服务为本页面提供了本地能力。" : "插件服务没有为本页面提供本地能力。"}</p>
-            {current?.modeLimit && guide.kind === "host" ? <p className="note il-mode-limit">当前权限模式（{permissionModeLabel(current.modeLimit.mode)}）下{current.modeLimit.effect === "blocked" ? "不可用" : "部分可用"}：{current.modeLimit.detail}</p> : null}
-          </article>
-          <article className="card" data-cmp>
-            <span className="label">预期效果</span>
-            <div className="il-expect">
-              <div className={host === "claude" ? "current" : ""}><b>Claude</b>{guide.expect.claude}</div>
-              <div className={host === "codex" ? "current" : ""}><b>Codex</b>{guide.expect.codex}</div>
-            </div>
-            <div className="il-block"><span className="label">怎样核对</span><p>{guide.check}</p></div>
-            {limits.length ? <div className="il-block"><span className="label">宿主声明的限制</span><ul className="il-limits">{limits.map(item => <li key={item}>{item}</li>)}</ul></div> : null}
-          </article>
-        </section>
-        <section data-scope="params">
-          <article className="card" data-cmp data-nofocus>
-            <span className="label">参数（JSON，可编辑）</span>
-            {guide.note ? <p className="note">{guide.note}</p> : null}
-            <div className="row il-gap">{guide.presets.map(preset => <button type="button" className="btn sec2 sm" key={preset.label} onClick={() => setDrafts(previous => ({ ...previous, [selected]: show(preset.args(presetContext)) }))}>{preset.label}</button>)}</div>
-            <textarea className="input" aria-label="接口参数" spellCheck={false} value={draft} onChange={event => setDrafts(previous => ({ ...previous, [selected]: event.target.value }))} />
-            <div className="row il-gap">
-              <button type="button" className="btn" disabled={!adapter || busy || connection !== "已连接"} onClick={() => void run()}>调用 {guide.id}</button>
-              {selected === "context.update" ? <button type="button" className="btn sec2" disabled={!adapter || busy || connection !== "已连接"} onClick={() => void run("conversation.submitMessage", JSON.stringify({ text: CONTEXT_PROBE }))}>让模型复述上下文</button> : null}
-              <span className="xs mute">结果显示四段证据：发送了什么、宿主回执、观察到的实际效果、适用的限制。</span>
-            </div>
-            {waiting ? <p className="note" role="status">宿主处理中…已等待 {elapsed} 秒。{["conversation.submitMessage", "skills.invoke"].includes(waiting.op) ? "会话忙时，提交排队到空闲；等待回执不会重复提交。" : "正在等待宿主回执。"}</p> : null}
-            {saved ? <p className="note">{saved}</p> : null}
-          </article>
-        </section>
-        <section data-scope="runs" className="il-stack">
-          <div className="sub">调用记录（{opRuns.length}）</div>
-          {opRuns.length === 0 ? <p className="xs mute">还没有调用。</p> : opRuns.map(item => <article className="card" data-cmp data-nofocus key={item.id}>
-            <div className="il-run-head">
-              <code className="b">{item.op}</code>
-              <span className="tag"><i className={"il-dot " + callSignal(item).tone} />{callSignal(item).label}</span>
-              <span className="xs mute">{item.op.startsWith("local.") ? "页面宿主" : "调用宿主"}：{hostLabel(item.host)}</span>
-              {item.result.requestId ? <code className="xs mute">请求 {item.result.requestId}</code> : null}
-              <time>{localTime(item.at)}</time>
-            </div>
-            <p className="il-message">{item.result.message}</p>
-            {item.op === "context.update" && item.result.status === "completed" ? <div className="il-readout">
-              <span className="label">模型将读到的原文（插件实际发送）</span>
-              {contextReadout(item.result).map((text, index) => <pre key={index}>{text}</pre>)}
-              {(item.result.data as { cleared?: boolean } | undefined)?.cleared ? <p className="note">这是一次清除：宿主收到空上下文。</p> : null}
-              {host === "claude" ? <p className="note">Claude 对其他来源的提交使用隐藏段落；本页提交在可见消息后内联段落。原文与路径见 context.attached。</p> : <p className="note">Codex 只确认收到；用“让模型复述上下文”核对模型实际读到的内容。</p>}
-            </div> : null}
-            <div className="il-evidence">
-              <section><span className="label">发送了什么（sent）</span><Evidence>{show(item.result.evidence?.sent)}</Evidence></section>
-              <section><span className="label">宿主回执（receipt）</span><Evidence>{show(item.result.evidence?.receipt)}</Evidence></section>
-              <section><span className="label">观察到的效果（observed）</span><Evidence>{show(item.result.evidence?.observed)}</Evidence></section>
-              <section><span className="label">适用的限制（limits）</span><Evidence>{item.result.evidence?.limits?.length ? item.result.evidence.limits.join("\n") : "（无）"}</Evidence></section>
-              {item.result.data !== undefined ? <section className="wide"><span className="label">返回数据（data）</span><Evidence>{show(item.result.data)}</Evidence></section> : null}
-            </div>
-            {item.stop && !item.stopped ? <div className="row il-gap"><button type="button" className="btn sec2 sm" onClick={async () => update(item.id, { stopped: await item.stop!() })}>停止{item.op === "local.files.watch" ? "监听" : "订阅"}</button></div> : null}
-            {item.stopped ? <p className="note">{item.stopped.message}</p> : null}
-            {item.result.status === "pending" && item.result.requestId && adapter?.getResult ? <div className="row il-gap"><button type="button" className="btn sec2 sm" onClick={() => void check(item)}>查询回执（不会重发）</button></div> : null}
-            <div className="il-compare" role="group" aria-label="对照结论">
-              <span className={"tag" + (item.verdict ? " on" : "")}>{item.verdict ? verdictText[item.verdict] : "待对照"}</span>
-              <div className="il-compare-tools" data-tool>
-                <div className="seg">
-                  <i className="seg-ind" />
-                  {(Object.keys(verdictText) as Exclude<Verdict, "">[]).map(key => <button type="button" key={key} className={item.verdict === key ? "on" : ""} aria-pressed={item.verdict === key} onClick={() => void update(item.id, { verdict: key })}>{verdictText[key]}</button>)}
-                </div>
-                <input className="input" placeholder="备注（离开输入框时保存）" defaultValue={item.note} onBlur={event => { if (event.target.value !== item.note) void update(item.id, { note: event.target.value }); }} />
-              </div>
-            </div>
-          </article>)}
-        </section>
+        {route.mode === "guide" ? guideView : labView}
       </main>
       <aside className={"il-side events" + (overlay === "events" ? " show" : "")} aria-label="事件记录">
-        <div className="il-events-head"><h2>事件记录</h2><input className="input" placeholder="按类型或来源过滤" value={filter} onChange={event => setFilter(event.target.value)} /><button type="button" className="btn ghost sm" onClick={() => setEvents([])}>清空</button></div>
+        <div className="il-events-head"><h2>事件 <span className="mute">{events.length}</span></h2><input className="input" placeholder="过滤类型或来源" value={filter} onChange={event => setFilter(event.target.value)} /><button type="button" className="btn ghost sm" onClick={() => setEvents([])}>清空</button></div>
         <div role="log" aria-live="polite">
-          {visibleEvents.length === 0 ? <p className="xs mute">还没有事件。在对话里发消息、调用工具，或在本页运行“监听文件变化”。</p> : visibleEvents.map(event => <details className="il-event" key={event.id}>
+          {visibleEvents.length === 0 ? <p className="xs mute">还没有事件。在对话里发消息、调用工具，或运行“监听文件变化”。</p> : visibleEvents.map(event => <details className="il-event" key={event.id}>
             <summary><code>{event.type}</code><span>{localTime(event.at)}</span></summary>
             <div className="il-event-body">
               <p className="xs mute">来源：{event.source}</p>

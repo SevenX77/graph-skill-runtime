@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { UX } from "../../../../../../vendor/ui-ux-template/core/behavior/ux.js";
 import type { HostAdapter, HostInfo } from "hostpane/page/types";
 import type { GraphConnection } from "../../ports/graph/index";
 import { graph as demoGraph } from "../../application/demo/graph.mjs";
@@ -94,23 +95,38 @@ export function GraphWorkbench({ adapter, source }: { adapter: HostAdapter | nul
     return () => { dispose(); window.removeEventListener("pagehide", dispose); };
   }, [adapter, source]);
 
+  const root = snapshot?.skillRoot ?? invalid?.skillRoot ?? null;
+  const status = failure || (hostInfo?.status === "unknown" ? hostInfo.reason : "");
   return <main className="workbench" aria-label="Graph Skill canvas">
-    <header className="app-header">
-      <div className="heading"><strong>Graph Skill</strong><HostStatus info={hostInfo} connection={connection} /></div>
-      <div className="root-line"><span className="field-label">Skill</span><span id="skill-path" title={snapshot?.skillRoot ?? invalid?.skillRoot ?? "示例画布未绑定实际 Skill"}>{snapshot?.skillRoot ?? invalid?.skillRoot ?? "示例画布 · 未选择 Skill"}</span></div>
-      <p id="status" role="status" aria-live="polite">{failure || (hostInfo?.status === "unknown" ? hostInfo.reason : "点击节点可查看数据。")}</p>
+    {snapshot ? <GraphCanvas graph={snapshot.graph} selectedId={selectedId} onSelect={setSelectedId} stale={!!invalid} /> : <div className="empty-state">{failure || (invalid ? "没有可显示的图" : "正在读取图…")}</div>}
+    <header className="cv-head card">
+      <div className="cv-title"><b>{snapshot?.graph.id ?? "Graph Skill"}</b>{snapshot ? <span className="tag">{snapshot.graph.nodes.length} 节点 · {snapshot.graph.edges.length} 连线</span> : null}</div>
+      <code id="skill-path" title={root ?? "示例画布未绑定实际 Skill"}>{root ?? "示例画布 · 未选择 Skill"}</code>
+      <p id="status" role="status" aria-live="polite">{status}</p>
+      {invalid ? <InvalidGraphNotice invalid={invalid} hasGraph={!!snapshot} /> : null}
     </header>
-    <div className="content-layout">
-      <section className="graph-panel" aria-label="图画布">
-        <div className="graph-summary"><span>{snapshot?.graph.id ?? "等待图数据"}</span><span>{snapshot ? `${snapshot.graph.nodes.length} 节点 · ${snapshot.graph.edges.length} 连线` : ""}</span></div>
-        {invalid ? <InvalidGraphNotice invalid={invalid} hasGraph={!!snapshot} /> : null}
-        <div className={invalid && snapshot ? "graph-area stale" : "graph-area"}>{snapshot ? <GraphCanvas graph={snapshot.graph} selectedId={selectedId} onSelect={setSelectedId} /> : <div className="empty-state">{failure || (invalid ? "没有可显示的图" : "正在读取图…")}</div>}</div>
-        <p className="graph-hint">{selectedNode ? `已选择 ${selectedNode.id}。` : "点击节点或用 Tab + Enter 选择。"}</p>
-      </section>
-      <aside className="inspector" aria-label="节点与连接详情">
-        <section className="inspector-section"><h2>所选节点</h2>{selectedNode ? <dl><dt>节点 ID</dt><dd data-selected-node>{selectedNode.id}</dd><dt>类型</dt><dd>{selectedNode.kind}</dd></dl> : <p className="muted">尚未选择节点。</p>}</section>
-        <section className="inspector-section"><details><summary>宿主连接信息</summary><pre data-host-info>{hostInfo ? JSON.stringify(hostInfo, null, 2) : "独立示例未连接宿主"}</pre></details></section>
-      </aside>
+    <div className="cv-host" data-scope="host" data-dim="none">
+      <HostStatus info={hostInfo} connection={connection} />
+      <SchemeSwitch />
+      <details className="cv-host-info"><summary aria-label="宿主连接信息">ⓘ</summary><pre data-host-info>{hostInfo ? JSON.stringify(hostInfo, null, 2) : "独立示例未连接宿主"}</pre></details>
     </div>
   </main>;
+}
+
+const SCHEMES = [{ id: "prism", name: "浅" }, { id: "aurora", name: "深" }];
+
+/** Light or dark within the Prism/Aurora pair, remembered for this page. */
+function SchemeSwitch() {
+  const [scheme, setScheme] = useState(document.documentElement.dataset.scheme ?? "prism");
+  // React rewrites className on commit, so the one UX engine reasserts the selector indicator.
+  useLayoutEffect(() => { document.querySelectorAll<HTMLElement>(".cv-host[data-scope]").forEach(scope => UX.paint(scope)); });
+  const choose = (id: string) => {
+    document.documentElement.dataset.scheme = id;
+    setScheme(id);
+    try { localStorage.setItem("canvas-scheme", id); } catch { /* A blocked store only loses the remembered choice. */ }
+  };
+  return <div className="seg quiet" role="group" aria-label="明暗">
+    <i className="seg-ind" />
+    {SCHEMES.map(item => <button type="button" key={item.id} className={scheme === item.id ? "on" : ""} aria-pressed={scheme === item.id} onClick={() => choose(item.id)}>{item.name}</button>)}
+  </div>;
 }

@@ -2,6 +2,64 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format. Earlier sections below the current baseline preserve historical candidates and their stated cutoffs; their old paths and action names do not define the current source contract.
 
+## Plugin page guide and template redesign, 2026-11-07
+
+This section records the candidate of [the plugin page guide and template decision](../../docs/design/plugin-pages-guide-and-template-2026-11-07.md). That candidate adds the Interface Lab's guide mode and redesigns the graph canvas and the Interface Lab on the template core, the shared interface design read through the submodule `vendor/ui-ux-template`. [PROTOTYPE.md](PROTOTYPE.md) describes the resulting page behaviour. The decision's acceptance list states which of its criteria these observations meet.
+
+### Source identity
+
+| Item | Identity |
+| --- | --- |
+| Toolkit source | Working tree of branch `claude/toolkit-host-interfaces` on top of commit `b58cfc37`, uncommitted at observation time. |
+| Hostpane pin | `package.json` declares `"hostpane": "git+https://github.com/SevenX77/hostpane.git#be973a37504bb6020b4948ae4ca82763480e76e6"`; that commit is on Hostpane's `main` in `SevenX77/hostpane`. At that commit every host-interface and local-capability definition carries `params`, one `{ name, type, required, note }` row per argument, and `returns`, one sentence describing the result's `data`; `INTERFACES` exposes `{ id, label, sample, params, returns }`. |
+| Template core | Submodule `vendor/ui-ux-template` at commit `b02291a`. |
+
+### Checks, 2026-11-07
+
+Environment: Windows 11 x64, Node.js 24.18.0, toolkit with the Hostpane pin and template commit above.
+
+| Check | Observed result |
+| --- | --- |
+| Hostpane `npm run typecheck` at `be973a37` | Passed. |
+| Hostpane `npm test` at `be973a37` | 183 passed, 0 failed. |
+| Toolkit `npm install` | Completed. |
+| Toolkit `npm run build` | Passed. Canvas 904,015 bytes (final build, after the host-chip radius token), Interface Lab 911,462 bytes. |
+| Toolkit `npm run typecheck` | Passed. |
+| Toolkit `npm test` | 85 passed, 0 failed: the 81 tests of the extraction candidate above and 4 in `tests/interface_lab/handbook.test.mjs`. |
+| Toolkit `npm audit` | 0 vulnerabilities. |
+
+The four tests in `tests/interface_lab/handbook.test.mjs` establish that:
+
+- the URL hash selects a mode and an operation, and an unknown hash falls back to the remembered or default place;
+- switching mode keeps the selected operation, and test mode opens the first operation in place of the quick start;
+- every guided operation has Hostpane's `params` and `returns`;
+- every README link of the guide, from the four quick-start steps and from each operation guide, names an existing heading of the README installed from the pinned Hostpane commit.
+
+### Browser observation
+
+The built `dist/` pages were served as static files and opened standalone, with no host connection, in the Claude Code Desktop Browser pane while the pane was hidden, at emulated viewport sizes.
+
+| Page | Observed views |
+| --- | --- |
+| Interface Lab | Guide mode quick start, an operation guide and test mode at 820 × 900 and 1210 × 900; test mode at 375 × 812; light and dark themes. Navigating guide → test → guide kept `composer.writeDraft` selected. |
+| Graph canvas | 820 × 900 in dark and in light theme with a node selected, and 375 × 812. Selecting the demonstration node set `data-selected-node=process` and coloured the edges `input:process` and `process:output`. |
+
+No view produced a console error. At 375 pixels wide the page did not scroll horizontally: `scrollWidth` was 375.
+
+### Live host observation
+
+In a Claude Code 2.1.317 session, `open_interface_lab` presented the lab in the Browser pane, and the page's `tools.call` → `lab_echo` returned `{"echo":{"text":"接口测试 ✓"},...}` through the Claude Mod. That session's MCP server had started before this rebuild, so it served the previous page build; the observation establishes the host-call path and leaves the redesigned pages unobserved in a live host.
+
+### Pending acceptance
+
+The following observations are pending for this candidate:
+
+- the redesigned canvas and lab inside a live Claude Code session started after this build, including a host-interface call and the guide → test → guide navigation;
+- the canvas at 1210 × 900, guide mode at a narrow width, and a narrow width of 390 pixels as the decision states it, each in light and dark theme;
+- any Codex Desktop observation of the redesigned pages.
+
+Native acceptance of all 22 operations in both hosts remains pending as stated in the 2026-10-14 baseline above.
+
 ## Hostpane extraction candidate, 2026-11-07
 
 Paths in the sections below this one refer to the former layout, in which the host-integration layer lived in the toolkit at `plugin_base/` and the toolkit carried its own `ADAPTER.md`; dated evidence keeps those paths.
