@@ -25,7 +25,7 @@
     h3 { font-size: 13px; }
 
     /* Main with aside: operation list | detail | event log. Regions separate by background, never by a line. */
-    .il-work { display: grid; grid-template-columns: 232px minmax(0, 1fr) 320px; gap: 8px; height: 100dvh; padding: 8px; }
+    .il-work { display: grid; grid-template-columns: 240px minmax(0, 1fr) 320px; gap: 8px; height: 100dvh; padding: 8px; }
     .il-side { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 60px 10px 12px; border-radius: var(--r-panel); background: var(--app); }
     .il-main { min-width: 0; margin-top: 52px; overflow-y: auto; padding: 4px 12px 44px; }
     .il-main > * { max-width: 920px; margin-inline: auto; }
@@ -37,12 +37,11 @@
     .bar-in .seg.il-modes button { padding: 0 14px; }
     .il-host { display: flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 12px; font-weight: 600; color: var(--ink2); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
     .bar-in > button.il-open { display: none; }
-    .il-dim { display: flex; align-items: center; padding: 0 6px; }
 
     /* Operation list. */
     .il-brand { display: grid; gap: 2px; padding: 0 8px; }
     .il-brand b { font-size: 15px; }
-    .il-tally { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: calc(6px * var(--y)) 8px 0; font-size: 11.5px; color: var(--ink2); }
+    .il-tally { display: grid; grid-template-columns: repeat(2, max-content); gap: 3px 14px; padding: calc(6px * var(--y)) 8px 0; font-size: 11.5px; color: var(--ink2); }
     .il-tally span { display: inline-flex; align-items: center; gap: 5px; }
     .il-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; background: var(--ink3); }
     .il-dot.available, .il-dot.completed { background: var(--good); }
@@ -51,7 +50,7 @@
     .seg.il-ops { display: flex; flex: none; flex-direction: column; gap: 1px; padding: 0; margin-top: calc(6px * var(--y)); background: none; }
     .il-ops .seg-ind { background: var(--sel); box-shadow: none; }
     .il-ops h2 { font-size: var(--lab-s); line-height: 1.3; font-weight: 600; letter-spacing: var(--lab-ls); text-transform: var(--lab-tt); color: var(--ink2); padding: calc(9px * var(--y)) 8px calc(2px * var(--y)); }
-    .seg.il-ops button { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font: 500 12px/1.4 var(--mono); text-align: left; overflow-wrap: anywhere; color: var(--ink2); }
+    .seg.il-ops button { display: flex; align-items: center; gap: 7px; padding: 4px 8px; font: 500 11.5px/1.4 var(--mono); text-align: left; overflow-wrap: anywhere; color: var(--ink2); }
     .seg.il-ops button.on { color: var(--ink); font-weight: 600; }
     .seg.il-ops button.il-start { font: 600 12.5px/1.4 var(--font); margin-top: calc(6px * var(--y)); }
     .il-count { margin-left: auto; font-size: 11px; color: var(--ink2); }
@@ -72,7 +71,7 @@
     .il-section-title { font-size: 13px; font-weight: 650; }
     .il-gap { margin-top: calc(8px * var(--y)); }
     .il-run-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .il-presets { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 200px; min-width: 0; }
+    .il-presets { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 200px; min-width: 0; margin: 0; font-size: 12.5px; }
     .il-field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; margin-top: calc(10px * var(--y)); }
     .il-field .input { font-size: 12px; padding: 6px 10px; }
     textarea.input { display: block; margin-top: calc(10px * var(--y)); white-space: pre; overflow: auto; resize: vertical; line-height: 1.5; }
@@ -103,6 +102,7 @@
     .il-compare .input { flex: 1 1 160px; width: auto; min-width: 0; font-size: 12px; padding: 6px 10px; }
     .il-compare .seg button { padding: 4px 9px; font-size: 12px; }
     .il-banner { margin-bottom: calc(10px * var(--y)); color: var(--bad); }
+    .il-notice { margin-bottom: calc(10px * var(--y)); font-size: 12.5px; color: var(--ink2); background: var(--sel); }
 
     /* Guide mode. */
     .il-hero h2 { font-size: 20px; margin-bottom: calc(6px * var(--y)); }
@@ -133,7 +133,7 @@
     .il-params tr + tr td { box-shadow: inset 0 1px var(--line); }
     .il-params td:nth-child(1) { white-space: nowrap; }
     .il-params td:nth-child(2) { width: 30%; color: var(--ink2); }
-    .il-params td:nth-child(3) { width: 36px; white-space: nowrap; }
+    .il-params td:nth-child(3) { width: 40px; white-space: nowrap; font-size: 12px; }
     .il-returns { margin-top: calc(10px * var(--y)); display: grid; gap: calc(4px * var(--y)); }
 
     /* Event log. */
@@ -149,14 +149,14 @@
     .il-event-body { padding: 0 8px calc(6px * var(--y)); }
 
     /* Reading the guide needs no event log beside it: there it opens as an overlay, as it does in narrower frames. */
-    :root[data-mode=guide] .il-work { grid-template-columns: 232px minmax(0, 1fr); }
+    :root[data-mode=guide] .il-work { grid-template-columns: 240px minmax(0, 1fr); }
     :root[data-mode=guide] .bar-in > button.il-open.events { display: flex; }
     :root[data-mode=guide] .il-side.events { position: fixed; z-index: 800; top: 8px; right: 8px; bottom: 8px; width: min(360px, calc(100vw - 16px)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e4); opacity: 0; visibility: hidden; translate: 12px 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s .25s; }
     :root[data-mode=guide] .il-side.events.show { opacity: 1; visibility: visible; translate: 0 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s; }
 
     /* Claude's side pane and Codex's inline view: the event log becomes an overlay; the detail keeps its place. */
     @media (max-width: 1179px) {
-      .il-work, :root[data-mode=guide] .il-work { grid-template-columns: 220px minmax(0, 1fr); }
+      .il-work, :root[data-mode=guide] .il-work { grid-template-columns: 236px minmax(0, 1fr); }
       .bar-in > button.il-open.events { display: flex; }
       .il-side.events { position: fixed; z-index: 800; top: 8px; right: 8px; bottom: 8px; width: min(360px, calc(100vw - 16px)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e4); opacity: 0; visibility: hidden; translate: 12px 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s .25s; }
       .il-side.events.show { opacity: 1; visibility: visible; translate: 0 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s; }
@@ -169,7 +169,7 @@
       .il-work, :root[data-mode=guide] .il-work { grid-template-columns: minmax(0, 1fr); padding: 0; }
       .il-main { margin-top: 56px; padding-inline: 16px; }
       .bar-in > button.il-open.nav { display: flex; }
-      .il-dim, .il-host { display: none; }
+      .il-host { display: none; }
       .il-side.nav { position: fixed; z-index: 800; top: 8px; left: 8px; bottom: 8px; width: min(300px, calc(100vw - 16px)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e4); opacity: 0; visibility: hidden; translate: -12px 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s .25s; }
       .il-side.nav.show { opacity: 1; visibility: visible; translate: 0 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s; }
       .il-evidence, .il-parts { grid-template-columns: minmax(0, 1fr); }

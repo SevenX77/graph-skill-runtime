@@ -6,6 +6,6 @@ export function HostStatus({ info, connection }: { info: HostInfo | null; connec
   const label = connection === "connected" ? info?.status === "confirmed" ? "已连接" : "身份未确认" : connection === "connecting" ? "连接中" : connection === "failed" ? "连接失败" : "未连接宿主";
   const tone = connection === "connected" ? info?.status === "confirmed" ? "on" : "wait" : connection === "connecting" ? "wait" : "off";
   return <span className={`connection ${connection}`} data-host={info?.id ?? "unknown"} title={`${label} · 插件 ${packageInfo.version}`}>
-    <i className={"cv-dot " + tone} />{name} {info?.version ?? "软件版本未知"}{connection !== "connected" ? ` · ${label}` : null}
+    <i className={"cv-dot " + tone} />{connection === "connected" && info?.status === "confirmed" ? `${name} ${info.version ?? "版本未知"}` : label}
   </span>;
 }

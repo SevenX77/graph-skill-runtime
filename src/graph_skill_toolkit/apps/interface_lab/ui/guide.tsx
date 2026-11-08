@@ -13,9 +13,10 @@ const link = (anchor: string) => `${README}#${anchor}`;
 
 /** The page-side call for an operation; a subscription takes a listener instead of a promise. */
 export function callExample(id: string, args: unknown) {
-  if (id === "events.subscribe") return `const stop = adapter.events.subscribe(event => log(event), ${JSON.stringify((args as { types?: unknown }).types ?? ["tool.completed"])});`;
-  if (id === "local.files.watch") return `const watch = await adapter.local.files.watch(${JSON.stringify(args)}, event => log(event));\n// 停止：await watch.stop()`;
-  return `const result = await adapter.${id}(${JSON.stringify(args)});`;
+  const json = (value: unknown) => { const line = JSON.stringify(value); return line.length > 48 ? JSON.stringify(value, null, 2) : line; };
+  if (id === "events.subscribe") return `const stop = adapter.events.subscribe(\n  event => log(event),\n  ${json((args as { types?: unknown }).types ?? ["tool.completed"]).replace(/\n/g, "\n  ")},\n);`;
+  if (id === "local.files.watch") return `const watch = await adapter.local.files.watch(${json(args)}, event => log(event));\n// 停止：await watch.stop()`;
+  return `const result = await adapter.${id}(${json(args)});`;
 }
 
 function Code({ children }: { children: string }) {
@@ -24,7 +25,7 @@ function Code({ children }: { children: string }) {
 
 /** The guide's first page: what a Hostpane plugin is and the four steps to build one. */
 export function GuideStart({ onOpen }: { onOpen: (id: string) => void }) {
-  return <div className="il-stack" data-scope="guide-start">
+  return <div className="il-stack" data-scope="guide-start" data-dim="none">
     <article className="card il-hero" data-cmp data-nofocus>
       <h2>快速上手</h2>
       <p>{QUICKSTART.summary}</p>
@@ -63,20 +64,20 @@ export function GuideStart({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 /** One operation's reference: fields, result, behaviour on each host, and the way to try it. */
-export function GuideOperation({ guide, host, capability, localAvailable, onTry }: {
-  guide: Guide; host: string; capability: HostCapability | undefined; localAvailable: boolean; onTry: () => void;
+export function GuideOperation({ guide, host, connected, capability, localAvailable, onTry }: {
+  guide: Guide; host: string; connected: boolean; capability: HostCapability | undefined; localAvailable: boolean; onTry: () => void;
 }) {
   const definition = DEFINITIONS.get(guide.id)!;
   const state = guide.kind === "host" ? capability?.state ?? "unknown" : localAvailable ? "available" : "unavailable";
-  const stateText = { available: "当前宿主可用", unavailable: "当前宿主不可用", unknown: "当前宿主未声明" }[state] ?? state;
-  const example = guide.presets[0]?.args({ lab: null, host, lastViewId: null, workspaceRoot: "C:/project" }) ?? definition.sample;
+  const stateText = connected ? { available: "当前宿主可用", unavailable: "当前宿主不可用", unknown: "当前宿主未声明" }[state] ?? state : "未连接宿主";
+  const example = definition.sample;
   const limits = guide.kind === "host" ? capability?.limits ?? [] : [];
-  return <div className="il-stack" data-scope="guide-op">
+  return <div className="il-stack" data-scope="guide-op" data-dim="none">
     <article className="card" data-cmp data-nofocus>
       <div className="il-head">
         <h2>{guide.id}</h2>
         <span className="tag">{definition.label}</span>
-        <span className="tag"><i className={"il-dot " + state} />{stateText}</span>
+        <span className="tag"><i className={"il-dot " + (connected ? state : "untested")} />{stateText}</span>
         <button type="button" className="btn sm il-try" onClick={onTry}>在测试页运行 →</button>
       </div>
       <p className="il-purpose">{guide.purpose}</p>
@@ -85,9 +86,9 @@ export function GuideOperation({ guide, host, capability, localAvailable, onTry 
     <article className="card" data-cmp data-nofocus>
       <div className="il-card-head"><h3>参数</h3><a className="xs mute" href={link(operationAnchor(guide.id))} target="_blank" rel="noreferrer">README ↗</a></div>
       {definition.params.length ? <table className="il-params">
-        <thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <thead><tr><th>字段</th><th>类型</th><th></th><th>说明</th></tr></thead>
         <tbody>{definition.params.map(param => <tr key={param.name}>
-          <td><code className="b">{param.name}</code></td><td><code>{param.type}</code></td><td>{param.required ? "是" : "否"}</td><td>{param.note}</td>
+          <td><code className="b">{param.name}</code></td><td><code>{param.type}</code></td><td>{param.required ? "必填" : <span className="mute">可选</span>}</td><td>{param.note}</td>
         </tr>)}</tbody>
       </table> : <p className="mute">无参数，传 <code>{"{}"}</code>。</p>}
       <div className="il-returns"><span className="label">返回 data</span><p>{definition.returns}</p></div>

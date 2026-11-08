@@ -42,7 +42,7 @@ export function GraphCanvas({ graph, selectedId, onSelect, stale }: CanvasProps)
     stage.current?.querySelector("[data-node]")?.dispatchEvent(new CustomEvent(selected ? "ux:focus" : "ux:blur", { bubbles: true }));
   }, [selected?.id]);
 
-  return <div ref={root} className={"cv-board" + (selected ? " ux-active" : "")} data-scope="graph">
+  return <div ref={root} className={"cv-board" + (selected ? " ux-active" : "")} data-scope="graph" data-dim="none">
     <div ref={stage} className="cv-stage" data-canvas onClick={event => { if (event.target === event.currentTarget && !stage.current?.dataset.dragged) onSelect(null); }}>
       <div ref={world} className={"cv-world" + (stale ? " stale" : "")} data-graph={graph.id} style={{ width: graph.width, height: graph.height }}
         role="group" aria-label={`${graph.id}：${graph.nodes.length} 个节点，${graph.edges.length} 条连线。用 Tab 选择节点，按 Enter 查看详情。`}>
@@ -65,7 +65,7 @@ export function GraphCanvas({ graph, selectedId, onSelect, stale }: CanvasProps)
             onClick={() => onSelect(node.id === selectedId ? null : node.id)}
             onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node.id); } if (event.key === "Escape") onSelect(null); }}>
             <em>{BADGE[node.kind] ?? node.kind.slice(0, 1)}</em>
-            <span><b>{node.label}</b><small>{node.kind}</small></span>
+            <span><b>{node.label}</b>{node.kind === "INPUT" || node.kind === "OUTPUT" ? null : <small>{node.kind}</small>}</span>
           </div>;
         })}
       </div>
