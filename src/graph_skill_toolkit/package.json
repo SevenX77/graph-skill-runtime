@@ -21,7 +21,7 @@
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "2.0.3",
     "@modelcontextprotocol/server": "2.3.1",
-    "hostpane": "git+https://github.com/SevenX77/hostpane.git#be973a37504bb6020b4948ae4ca82763480e76e6",
+    "hostpane": "git+https://github.com/SevenX77/hostpane.git#1d656b42227fc68203807b93fa57383a6a8f6d0e",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "yaml": "2.9.1",

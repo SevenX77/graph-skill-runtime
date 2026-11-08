@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 import { describeDiagnostics, readGraphState } from "../application/service/index.mjs";
@@ -7,10 +6,12 @@ import { createRuntimeCompiler } from "../backend/runtime/index.mjs";
 import { createGraphBackend } from "../backend/graph/index.mjs";
 import { createGraphRelay } from "../backend/relay/index.mjs";
 import { createLiveGraphSource } from "../application/live_source/index.mjs";
-import { snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "hostpane/server";
+import { createPageFile, snapshotHtml, createPreviewConfiguration, pageResourceUri, codexResourceMetadata, createCodexPageSessions, launchHostInfo, requestClientInfo } from "hostpane/server";
 
-// The build places this self-contained resource alongside the bundled server.
-const html = await readFile(new URL("./canvas.html", import.meta.url), "utf8");
+// The build places this self-contained resource alongside the bundled server. It is read
+// again whenever a rebuild replaces it, so the next open shows the new page.
+const page = createPageFile(new URL("./canvas.html", import.meta.url));
+const html = await page.read();
 
 // Tool-facing graph state: the drawable graph when the runtime accepts the
 // skill, otherwise no graph plus the runtime's compile diagnostics.
@@ -72,7 +73,7 @@ export function graphCanvasApp({ http, hostBridge, serverInfo }) {
       const bridge = presentation === "html" ? await hostBridge.createView(payload.skillRoot, hostInfo) : undefined;
       let httpPresentation;
       if (bridge) {
-        const document = snapshotHtml(html, { ...payload, ...bootstrap, hostBridge: bridge.browser, local: { transport: "http", ...local.descriptor } });
+        const document = snapshotHtml(await page.read(), { ...payload, ...bootstrap, hostBridge: bridge.browser, local: { transport: "http", ...local.descriptor } });
         const preview = await previewConfiguration.ensure(preview_project_root, bridge.browser.url);
         const url = hostBridge.publish(payload.skillRoot, document);
         httpPresentation = { kind: "http", url, preview, bridge: bridge.mod };
@@ -125,7 +126,7 @@ export function graphCanvasApp({ http, hostBridge, serverInfo }) {
     description: "Viewport-filling graph canvas with a host-owned Skill folder shortcut.",
     _meta: { ui, ...codexResourceMetadata },
   }, async (_uri, context) => ({ contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE,
-    text: snapshotHtml(html, {...bootstrap,hostInfo:launchHostInfo({clientInfo:requestClientInfo(server.server, context)})}),
+    text: snapshotHtml(await page.read(), {...bootstrap,hostInfo:launchHostInfo({clientInfo:requestClientInfo(server.server, context)})}),
     _meta: { ui, ...codexResourceMetadata } }] }));
   return [
     { name: "inspect_graph", description: "Read the selected graph without executing it." },

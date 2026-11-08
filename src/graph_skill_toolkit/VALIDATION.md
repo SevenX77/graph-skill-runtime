@@ -2,6 +2,68 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format. Earlier sections below the current baseline preserve historical candidates and their stated cutoffs; their old paths and action names do not define the current source contract.
 
+## Page triggers, 2026-11-08
+
+This section records the candidate of [the page-trigger decision](../../docs/design/page-triggers-2026-11-08.md). A page trigger is Hostpane's third interface kind: after a host tool call that changes or uses files a page presents, the plugin's PostToolUse hook returns guidance asking the agent to open that page. The candidate composes the toolkit hook `dist/after-tool.mjs` from Hostpane's `runTriggerHook` and the toolkit's rule files, adds the repository's project rules in `.hostpane/triggers.json`, serves each page through Hostpane's `createPageFile`, and adds the Interface Lab's 触发 (Triggers) mode and its tool `lab_triggers`. The canvas app holds no trigger code: `apps/graph_canvas/` has no hook file, only its rule file `triggers.json`, and the build bundles `dist/after-tool.mjs` from `composition/after_tool.mjs`, which calls `runTriggerHook`. [ARCHITECTURE.md](ARCHITECTURE.md#page-triggers) and [PROTOTYPE.md](PROTOTYPE.md#trigger-mode) describe the result.
+
+### Source identity
+
+| Item | Identity |
+| --- | --- |
+| Toolkit source | Working tree of branch `claude/toolkit-host-interfaces`, uncommitted at observation time. |
+| Hostpane pin | `package.json` and `package-lock.json` declare `"hostpane": "git+https://github.com/SevenX77/hostpane.git#1d656b42227fc68203807b93fa57383a6a8f6d0e"`; that commit is on Hostpane's `main`. Its parent `e8b50b9d2afa5737fa7a188cf52c395e27d706c0` adds the entry `hostpane/triggers` and the server helper `createPageFile`; `1d656b42` adds project-rule discovery from the session's working directory. |
+
+### Checks, 2026-11-08
+
+Environment: Windows 11 (10.0.26200), Node.js 24.18.0, toolkit with the Hostpane pin above.
+
+| Check | Observed result |
+| --- | --- |
+| Hostpane `npm test` at `e8b50b9d` | 213 tests, 213 passed, 0 failed. |
+| Hostpane `npm run typecheck` and `npm run types` at `e8b50b9d` | Both exited 0. |
+| Hostpane `npm test` at `1d656b42` | 214 tests, 214 passed, 0 failed. |
+| Hostpane `npm run typecheck` and `npm run types` at `1d656b42` | Both exited 0. |
+| Toolkit `npm run typecheck` | Exited 0. |
+| Toolkit `npm run build` | Passed. Canvas page 903,856 bytes, Interface Lab page 939,751 bytes. |
+| Toolkit `npm test` | 78 tests, 78 passed, 0 failed. The page guide and template candidate below had 85; its 11 canvas-hook cases are Hostpane tests in its `tests/triggers/`, written against the Graph Skill rule as data, and 4 toolkit tests are new. |
+| Toolkit `npm audit` | 0 vulnerabilities. |
+| `claude plugin validate dist/claude-mod` with the desktop engine 2.1.317 | Passed. |
+
+The four new tests in `tests/graph/graph-and-hook.test.mjs` establish that:
+
+- the toolkit declares the page tools and rules `show_graph` and `graph-skill.root`, and adds `open_interface_lab` and `interface-lab.probe` only for a build that serves the lab; a source build names its own folder for the rebuild step and a folder without the toolkit's manifest names none;
+- this repository's `.hostpane/triggers.json` parses without problems for the toolkit's page tools and holds the rules `interface-lab.source`, `graph-canvas.source` and `toolkit.shared`;
+- the built hook, run as a process, asks for `show_graph` with the skill's real path after an `Edit` of `graph.yaml`, without a rebuild step, and returns `{}` for a `Read`, for the plugin's own `show_graph` and for malformed input;
+- the built hook, run on an `Edit` of the lab's `ui/index.tsx` in this repository, asks for `open_interface_lab` with `{}` under the rule `interface-lab.source` and for `npm run build` first.
+
+### Live host observation, 2026-11-08
+
+Environment: Claude Code desktop 2.1.317 on Windows 11 (10.0.26200), with this repository's working tree as the session's workspace.
+
+| Observation | Result |
+| --- | --- |
+| The PostToolUse hook in a live session | After each of three `Edit` calls on `src/graph_skill_toolkit/apps/interface_lab/ui/triggers.tsx`, the agent received the guidance below, once per edit. The firing log `%LOCALAPPDATA%/hostpane/triggers/graph-skill-canvas/firings.jsonl` holds the matching record: rule `interface-lab.source`, reason `write`, tool `Edit`, origin the repository's `.hostpane/triggers.json`. |
+| A rebuilt page without a server restart | After `npm run build`, `open_interface_lab {}` served the rebuilt Interface Lab page from the same server process: the hint that the trigger views show for a missing `lab_triggers` appeared on `#trigger/test`. |
+| The session's server runs the latest build | The toolkit was built at 2026-11-08T09:32:45Z. The session's server process was then ended, and the host started process 33088 at 2026-11-08T09:33:59Z on the next tool call, `lab_echo`, after the build. |
+| An opening route | `open_interface_lab` with `route` set to `lab/tools.list` opened the page on that route. Trigger mode rendered with the navigation 机制 / 端到端测试 / 规则与记录 and the host identity "Claude Code 2.1.317". |
+| The 机制 (How it works) view | Read from the page on `#trigger/how`: the five steps carry the owners Agent, 宿主, Hostpane, Hostpane 和宿主 and Agent 和宿主, in that order. |
+| The session's tool list | Claude Code 2.1.317 keeps a session's MCP tool list from the server's first connection. After the session's stdio server process was replaced, the host restarted it on the next tool call, and the new process registered 9 tools: `show_graph`, `inspect_graph`, `watch_graph`, `open_interface_lab`, `lab_echo`, `lab_triggers`, `local_call`, `local_events` and `list_page_tools`. The session's connector status kept `tool_count: 8`, and the session tool list that the page's `tools.list` returned had no `lab_triggers`. A `notifications/tools/list_changed` notification sent by the server after initialization left the list unchanged. Consequence: after a plugin update within a session, the trigger views' `lab_triggers` calls are refused until the server is reconnected through `/mcp` or a new session starts, and the views say so. |
+
+The guidance, verbatim up to the rebuild sentence:
+
+```text
+Hostpane page trigger for plugin graph-skill-canvas: your last tool call changed or used files that its trigger rules watch. When the current change is finished, open each page below once, as the final presentation of the change, with exactly these arguments:
+1. Rule interface-lab.source (Interface Lab 源码), Edit wrote D:\coding\graph-skill-runtime-worktrees\toolkit-host-interfaces\src\graph_skill_toolkit\apps\interface_lab\ui\triggers.tsx: call open_interface_lab of the graph-skill-canvas MCP server with {}.
+Before opening: this plugin's pages are built from its source at D:\coding\graph-skill-runtime-worktrees\toolkit-host-interfaces\src\graph_skill_toolkit; run `npm run build` there first. …
+```
+
+### Pending acceptance
+
+The following observations are pending for this candidate:
+
+- the lab's end-to-end trigger test passing in Claude Code, which the session above could not run because its tool list lacked `lab_triggers`;
+- every Codex Desktop observation, including the end-to-end trigger test.
+
 ## Plugin page guide and template redesign, 2026-11-07
 
 This section records the candidate of [the plugin page guide and template decision](../../docs/design/plugin-pages-guide-and-template-2026-11-07.md). That candidate adds the Interface Lab's guide mode and redesigns the graph canvas and the Interface Lab on the template core, the shared interface design read through the submodule `vendor/ui-ux-template`. [PROTOTYPE.md](PROTOTYPE.md) describes the resulting page behaviour. The decision's acceptance list states which of its criteria these observations meet.

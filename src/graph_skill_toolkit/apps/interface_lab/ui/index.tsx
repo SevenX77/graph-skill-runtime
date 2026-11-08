@@ -7,11 +7,14 @@ import { hostLabel, permissionModeLabel, snapshotHost } from "../application/res
 import { callSignal, connectionStatus } from "../application/connection_status/index.mjs";
 import { parseRoute, routeHash, switchMode, START, type Route } from "../application/route.mjs";
 import { DEFINITIONS, GuideOperation, GuideStart } from "./guide";
+import { TRIGGER_NAV, TriggerView } from "./triggers";
 
 type Verdict = "" | "matches" | "differs" | "not-observed";
 type Run = { id: number; op: string; connection: HostAdapter; args: unknown; result: HostResult; host: ReturnType<typeof snapshotHost>; at: string; verdict: Verdict; note: string; stop?: () => Promise<HostResult> | HostResult; stopped?: HostResult };
 type EventRow = { id: number; type: string; at: string; data?: unknown; source: string };
-type LabProps = { adapter: HostAdapter | null; lab: LabPaths | null };
+/** Why a page tool opened this page: the route and the page-trigger firing it named. */
+export type Opened = { route: string | null; triggerFiring: string | null };
+type LabProps = { adapter: HostAdapter | null; lab: LabPaths | null; opened?: Opened };
 
 const connectionKeys = new WeakMap<HostAdapter, number>();
 let nextConnectionKey = 0;
@@ -25,16 +28,16 @@ function connectionKey(adapter: HostAdapter | null) {
 const verdictText: Record<Exclude<Verdict, "">, string> = { matches: "与预期一致", differs: "与预期不符", "not-observed": "未观察到效果" };
 const show = (value: unknown) => value === undefined || value === null ? "（无）" : JSON.stringify(value, null, 2);
 const SCHEMES = [{ id: "prism", name: "浅" }, { id: "aurora", name: "深" }];
-const MODES = [{ id: "guide", name: "指南" }, { id: "lab", name: "测试" }] as const;
+const MODES = [{ id: "guide", name: "指南" }, { id: "lab", name: "测试" }, { id: "trigger", name: "触发" }] as const;
 const IDS = GUIDES.map(guide => guide.id);
 const ROUTE_KEY = "lab-route";
 
-/** The URL hash wins; otherwise the page reopens where this browser last left it, or on the quick start. */
-function initialRoute(): Route {
+/** A route the opening tool named wins; then the URL hash; otherwise the page reopens where this browser last left it, or on the quick start. */
+function initialRoute(opened: string | null): Route {
   let remembered: string | null = null;
   try { remembered = localStorage.getItem(ROUTE_KEY); } catch { /* A blocked store opens the quick start. */ }
-  const fallback = parseRoute(remembered, IDS, { mode: "guide", id: START });
-  return parseRoute(location.hash, IDS, fallback);
+  const fallback = parseRoute(location.hash, IDS, parseRoute(remembered, IDS, { mode: "guide", id: START }));
+  return opened ? parseRoute("#" + opened, IDS, fallback) : fallback;
 }
 
 /** Long evidence fades at the clipped edge only while it actually overflows (template rule 22). */
@@ -55,13 +58,14 @@ export function InterfaceLab(props: LabProps) {
   return <InterfaceLabSession key={connectionKey(props.adapter)} {...props} />;
 }
 
-function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
+function InterfaceLabSession({ adapter, lab: initialLab, opened }: LabProps) {
   const [connection, setConnection] = useState(adapter ? "连接中" : "未在宿主中打开");
   const [failure, setFailure] = useState("");
   const [hostInfo, setHostInfo] = useState<HostInfo | null>(adapter?.hostInfo ?? null);
   const [lab, setLab] = useState<LabPaths | null>(initialLab);
-  const [route, setRoute] = useState<Route>(initialRoute);
-  const selected = route.id === START ? IDS[0] : route.id;
+  const [route, setRoute] = useState<Route>(() => initialRoute(opened?.route ?? null));
+  const [openedFiring, setOpenedFiring] = useState<string | null>(opened?.triggerFiring ?? null);
+  const selected = route.mode === "trigger" || route.id === START ? IDS[0] : route.id;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [runs, setRuns] = useState<Run[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -94,8 +98,11 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
     if (!adapter) return;
     let disposed = false, unsubscribe = () => {};
     const receive = (payload: unknown) => {
-      const value = payload as { lab?: LabPaths } | null;
+      const value = payload as { lab?: LabPaths; route?: unknown; triggerFiring?: unknown } | null;
       if (value?.lab && typeof value.lab.sandbox === "string") setLab(value.lab);
+      // A Codex view learns why it was opened from the tool result the host delivers to it.
+      if (typeof value?.route === "string") { const named = value.route; setRoute(current => parseRoute("#" + named, IDS, current)); }
+      if (typeof value?.triggerFiring === "string") setOpenedFiring(value.triggerFiring);
     };
     let refresh: ReturnType<typeof setInterval> | undefined;
     void adapter.connect({ receive, fail: error => { if (!disposed) setFailure(String(error instanceof Error ? error.message : error)); } }).then(async () => {
@@ -276,6 +283,7 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
         <div className="il-head">
           <h2>{guide.id}</h2>
           <span className="tag" role="status"><i className={"il-dot " + selectedSignal.tone} />{selectedSignal.label}</span>
+          <span className="tag xs il-way">{guide.kind === "host" ? "页面 → 宿主" : "页面 → 插件进程"}</span>
           <button type="button" className="btn sec2 sm il-try" onClick={() => open(selected, "guide")}>参数说明</button>
         </div>
         <p className="il-purpose">{guide.purpose}</p>
@@ -320,14 +328,16 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
     </section>
   </>;
 
+  const triggerView = <TriggerView view={route.id} adapter={adapter} connected={connected} host={host} hostInfo={hostInfo} workspace={workspace} openedFiring={openedFiring} onView={id => open(id, "trigger")} />;
+
   const guideView = route.id === START
-    ? <GuideStart onOpen={id => open(id, "guide")} />
+    ? <GuideStart onOpen={id => open(id, "guide")} onTriggers={() => open("how", "trigger")} />
     : <GuideOperation guide={guide} host={host} connected={connected} capability={current} localAvailable={adapter?.local.available ?? false} onTry={() => open(selected, "lab")} />;
 
   return <>
     <div className="bar">
       <div className="bar-in" data-scope="bar" data-dim="none" data-cmp data-nofocus>
-        <button type="button" className="il-open nav" aria-expanded={overlay === "nav"} onClick={() => setOverlay(overlay === "nav" ? null : "nav")}>接口</button>
+        <button type="button" className="il-open nav" aria-expanded={overlay === "nav"} onClick={() => setOverlay(overlay === "nav" ? null : "nav")}>目录</button>
         <div className="seg il-modes" role="tablist" aria-label="页面模式">
           <i className="seg-ind" />
           {MODES.map(item => <button type="button" role="tab" key={item.id} className={route.mode === item.id ? "on" : ""} aria-selected={route.mode === item.id} onClick={() => setRoute(switchMode(route, item.id, IDS))}>{item.name}</button>)}
@@ -344,7 +354,11 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
     </div>
     <div className="il-work">
       <nav className={"il-side nav" + (overlay === "nav" ? " show" : "")} aria-label="接口列表">
-        <div className="il-brand"><b>Hostpane</b><span className="xs mute">17 个宿主接口 · 5 个本地能力</span></div>
+        <div className="il-brand"><b>Hostpane</b><span className="xs mute">{route.mode === "trigger" ? "页面触发 · 宿主 → 页面" : "17 个宿主接口 · 5 个本地能力"}</span></div>
+        {route.mode === "trigger" ? <div className="seg il-ops il-trigger-nav">
+          <i className="seg-ind" />
+          {TRIGGER_NAV.map(item => <button type="button" key={item.id} className={item.id === route.id ? "on il-start" : "il-start"} aria-current={item.id === route.id} onClick={() => open(item.id, "trigger")}>{item.name}</button>)}
+        </div> : <>
         <div className="il-tally" title="每个接口在本次连接上的测试状态">
           <span><i className="il-dot available" />通过 {tally.available}</span>
           <span><i className="il-dot unavailable" />失败 {tally.unavailable}</span>
@@ -363,6 +377,7 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
             </button>),
           ])}
         </div>
+        </>}
         <details className="il-env">
           <summary className="xs mute">连接与目录</summary>
           <div className="il-fact">宿主<b>{hostLabel(hostInfo)}</b></div>
@@ -376,7 +391,7 @@ function InterfaceLabSession({ adapter, lab: initialLab }: LabProps) {
       <main ref={main} className={"il-main " + route.mode} onScroll={event => event.currentTarget.classList.toggle("scrolled", event.currentTarget.scrollTop > 0)}>
         {failure ? <p className="card il-banner">{failure}</p> : null}
         {!adapter && route.mode === "lab" ? <p className="card il-notice">这个页面没有连接宿主：可以查看参数和预期，不能运行。在 Claude Code 或 Codex 里调用 <code>open_interface_lab</code> 打开后即可测试。</p> : null}
-        {route.mode === "guide" ? guideView : labView}
+        {route.mode === "guide" ? guideView : route.mode === "trigger" ? triggerView : labView}
       </main>
       <aside className={"il-side events" + (overlay === "events" ? " show" : "")} aria-label="事件记录">
         <div className="il-events-head"><h2>事件 <span className="mute">{events.length}</span></h2><input className="input" placeholder="过滤类型或来源" value={filter} onChange={event => setFilter(event.target.value)} /><button type="button" className="btn ghost sm" onClick={() => setEvents([])}>清空</button></div>

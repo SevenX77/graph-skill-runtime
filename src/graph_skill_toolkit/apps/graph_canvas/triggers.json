@@ -1,0 +1,13 @@
+{
+  "schema": "hostpane.triggers.v1",
+  "rules": [
+    {
+      "id": "graph-skill.root",
+      "label": "Graph Skill 画布",
+      "scope": { "kind": "root", "markers": ["SKILL.md", "graph.yaml"] },
+      "use": { "tools": "^mcp__gskill__", "pathKeys": ["skill_root", "skill_path"], "commands": ["gskill"] },
+      "pages": [{ "tool": "show_graph", "pathArguments": { "skill_root": "." } }],
+      "note": "Follow the graph-skill-canvas skill."
+    }
+  ]
+}

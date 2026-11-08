@@ -23,14 +23,32 @@ function Code({ children }: { children: string }) {
   return <pre className="il-code">{children}</pre>;
 }
 
+/** Hostpane's three interface kinds, told apart by who starts them and in which direction. */
+const KINDS = [
+  { name: "宿主接口", count: "17 个", way: "页面 → 宿主", text: "页面调用宿主的功能，例如把文字写进输入框。", example: "composer.writeDraft", open: "composer.writeDraft" },
+  { name: "本地能力", count: "5 个", way: "页面 → 插件进程", text: "页面请插件自己的 Node 进程做事，例如读文件。", example: "local.files.read", open: "local.files.read" },
+  { name: "页面触发", count: "规则", way: "宿主 → 页面", text: "Agent 改了文件，插件的钩子请 Agent 打开展示它的页面。", example: "改 graph.yaml → 画布打开", open: null },
+] as const;
+
 /** The guide's first page: what a Hostpane plugin is and the four steps to build one. */
-export function GuideStart({ onOpen }: { onOpen: (id: string) => void }) {
+export function GuideStart({ onOpen, onTriggers }: { onOpen: (id: string) => void; onTriggers: () => void }) {
   return <div className="il-stack" data-scope="guide-start" data-dim="none">
     <article className="card il-hero" data-cmp data-nofocus>
       <h2>快速上手</h2>
       <p>{QUICKSTART.summary}</p>
       <div className="il-parts">
         {QUICKSTART.parts.map(part => <div key={part.name}><b>{part.name}</b><code>{part.entry}</code><span>{part.text}</span></div>)}
+      </div>
+    </article>
+    <article className="card" data-cmp data-nofocus>
+      <h3>三类接口</h3>
+      <div className="il-kinds">
+        {KINDS.map(kind => <button type="button" key={kind.name} className={"il-kind" + (kind.open ? "" : " trigger")} onClick={() => kind.open ? onOpen(kind.open) : onTriggers()}>
+          <span className="il-kind-head"><b>{kind.name}</b><span className="xs mute">{kind.count}</span></span>
+          <span className={"tag xs " + (kind.open ? "il-way" : "il-dir")}>{kind.way}</span>
+          <span className="xs">{kind.text}</span>
+          <code className="xs mute">{kind.example}</code>
+        </button>)}
       </div>
     </article>
     <article className="card" data-cmp data-nofocus>
@@ -78,6 +96,7 @@ export function GuideOperation({ guide, host, connected, capability, localAvaila
         <h2>{guide.id}</h2>
         <span className="tag">{definition.label}</span>
         <span className="tag"><i className={"il-dot " + (connected ? state : "untested")} />{stateText}</span>
+        <span className="tag xs il-way">{guide.kind === "host" ? "页面 → 宿主" : "页面 → 插件进程"}</span>
         <button type="button" className="btn sm il-try" onClick={onTry}>在测试页运行 →</button>
       </div>
       <p className="il-purpose">{guide.purpose}</p>

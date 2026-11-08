@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 import { posix } from "node:path";
 
 // The toolkit builds on Hostpane, the separately versioned host-integration
-// package, and reaches it only through its four public entries.
+// package, and reaches it only through its five public entries.
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const ENTRIES = new Set(["hostpane/page", "hostpane/page/types", "hostpane/server", "hostpane/claude-mod"]);
+const ENTRIES = new Set(["hostpane/page", "hostpane/page/types", "hostpane/server", "hostpane/claude-mod", "hostpane/triggers"]);
 const SKIP = new Set(["node_modules", "dist", "evidence", "build", ".git"]);
 const CODE = /\.(mjs|js|cjs|ts|tsx)$/;
 const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\bimport\(\s*)(["'])([^"']+)\1/g;

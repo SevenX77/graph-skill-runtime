@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { INTERFACES, LOCAL_DEFINITIONS } from "hostpane/page";
 import { GUIDES } from "../../apps/interface_lab/application/guide.mjs";
 import { QUICKSTART, operationAnchor } from "../../apps/interface_lab/application/handbook.mjs";
-import { parseRoute, routeHash, switchMode, START } from "../../apps/interface_lab/application/route.mjs";
+import { parseRoute, routeHash, switchMode, START, TRIGGER_VIEWS } from "../../apps/interface_lab/application/route.mjs";
 
 const IDS = GUIDES.map(guide => guide.id);
 const fallback = { mode: "guide", id: START };
@@ -17,12 +17,17 @@ test("the hash selects a mode and an operation, and anything else falls back", (
   assert.deepEqual(parseRoute("", IDS, fallback), fallback);
   assert.deepEqual(parseRoute("#other", IDS, { mode: "lab", id: "tools.call" }), { mode: "lab", id: "tools.call" });
   assert.equal(routeHash({ mode: "lab", id: "tools.call" }), "#lab/tools.call");
+  assert.deepEqual(parseRoute("#trigger/test", IDS, fallback), { mode: "trigger", id: "test" });
+  assert.deepEqual(parseRoute("#trigger/tools.call", IDS, fallback), { mode: "trigger", id: TRIGGER_VIEWS[0] });
 });
 
 test("switching mode keeps the operation; the lab opens the first operation instead of the quick start", () => {
   assert.deepEqual(switchMode({ mode: "guide", id: "tools.call" }, "lab", IDS), { mode: "lab", id: "tools.call" });
   assert.deepEqual(switchMode({ mode: "guide", id: START }, "lab", IDS), { mode: "lab", id: IDS[0] });
   assert.deepEqual(switchMode({ mode: "lab", id: "tools.call" }, "guide", IDS), { mode: "guide", id: "tools.call" });
+  assert.deepEqual(switchMode({ mode: "lab", id: "tools.call" }, "trigger", IDS), { mode: "trigger", id: "how" });
+  assert.deepEqual(switchMode({ mode: "trigger", id: "rules" }, "guide", IDS), { mode: "guide", id: START });
+  assert.deepEqual(switchMode({ mode: "trigger", id: "rules" }, "lab", IDS), { mode: "lab", id: IDS[0] });
 });
 
 test("every guided operation has Hostpane's field documentation and result summary", () => {

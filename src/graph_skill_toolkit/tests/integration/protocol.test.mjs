@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtemp, readFile, readdir, copyFile, rm, mkdir, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/client";
@@ -166,7 +166,20 @@ test("the Interface Lab is served only when enabled, and its page reaches local 
     const echo = await client.callTool({ name: "lab_echo", arguments: { text: "接口 ✓" } });
     assert.deepEqual(echo.structuredContent.echo, { text: "接口 ✓" });
     const listed = await client.callTool({ name: "list_page_tools", arguments: {} });
-    assert.ok(listed.structuredContent.tools.some(item => item.name === "lab_echo"));
+    assert.ok(["lab_echo", "lab_triggers"].every(name => listed.structuredContent.tools.some(item => item.name === name)));
+    // The page-trigger view: the rules in effect, the probe, a dry run and a lab opening that names a firing.
+    const triggers = await client.callTool({ name: "lab_triggers", arguments: { action: "state" } });
+    assert.deepEqual(triggers.structuredContent.rules.map(rule => rule.id), ["graph-skill.root", "interface-lab.probe"]);
+    const prepared = (await client.callTool({ name: "lab_triggers", arguments: { action: "prepare" } })).structuredContent;
+    assert.match(await readFile(join(dirname(prepared.file), "TRIGGER-PROBE.md"), "utf8"), /interface-lab\.probe/);
+    assert.ok(prepared.instruction.includes(prepared.file) && prepared.instruction.includes(prepared.nonce));
+    const dry = await client.callTool({ name: "lab_triggers", arguments: { action: "evaluate", event: { tool_name: "Edit", tool_input: { file_path: prepared.file } } } });
+    assert.deepEqual(dry.structuredContent.firings.map(firing => [firing.rule, firing.calls]),
+      [["interface-lab.probe", [{ tool: "open_interface_lab", arguments: { route: "trigger/test", trigger_firing: "dry-run" } }]]]);
+    const reopened = await client.callTool({ name: "open_interface_lab", arguments: { route: "trigger/test", trigger_firing: "firing-1" } });
+    assert.deepEqual([reopened.structuredContent.route, reopened.structuredContent.triggerFiring], ["trigger/test", "firing-1"]);
+    const after = (await client.callTool({ name: "lab_triggers", arguments: { action: "state" } })).structuredContent;
+    assert.deepEqual([after.arrivals[0].firing, after.probe.request.nonce], ["firing-1", prepared.nonce]);
     const read = await client.callTool({ name: "local_call", arguments: { operation: "local.files.read", args: { path: paths.sampleFile } } });
     assert.equal(read.structuredContent.status, "completed");
     assert.match(read.structuredContent.data.content, /接口测试样例文件/);

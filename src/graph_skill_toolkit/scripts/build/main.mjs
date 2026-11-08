@@ -43,7 +43,7 @@ await build({
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
 });
 await build({
-  absWorkingDir: root, entryPoints: ["apps/graph_canvas/hooks/after-tool.mjs"], outfile: "dist/after-tool.mjs",
+  absWorkingDir: root, entryPoints: ["composition/after_tool.mjs"], outfile: "dist/after-tool.mjs",
   bundle: true, platform: "node", format: "esm", target: "node22",
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
 });

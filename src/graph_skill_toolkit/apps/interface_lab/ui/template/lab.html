@@ -9,9 +9,6 @@
       var chosen = localStorage.getItem("lab-scheme");
       document.documentElement.dataset.scheme = chosen === "prism" || chosen === "aurora" ? chosen : matchMedia("(prefers-color-scheme: dark)").matches ? "aurora" : "prism";
     } catch (error) { if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.scheme = "aurora"; }
-    // The page's mode is known before the first paint, so the layout does not change once the app starts.
-    try { document.documentElement.dataset.mode = /^#lab\//.test(location.hash || localStorage.getItem("lab-route") || "") ? "lab" : "guide"; }
-    catch (error) { document.documentElement.dataset.mode = /^#lab\//.test(location.hash) ? "lab" : "guide"; }
   </script>
   <style>/* INLINE_CSS ../../../../../../vendor/ui-ux-template/core/dist/tokens.css */</style>
   <style>/* INLINE_CSS ../../../../../../vendor/ui-ux-template/core/styles/base.css */</style>
@@ -148,25 +145,57 @@
     .il-event summary span { margin-left: auto; flex: none; font-size: 11px; color: var(--ink2); }
     .il-event-body { padding: 0 8px calc(6px * var(--y)); }
 
-    /* Reading the guide needs no event log beside it: there it opens as an overlay, as it does in narrower frames. */
-    :root[data-mode=guide] .il-work { grid-template-columns: 240px minmax(0, 1fr); }
-    :root[data-mode=guide] .bar-in > button.il-open.events { display: flex; }
+    /* Page triggers: their own accent, and the direction that sets them apart from page calls. */
+    :root[data-mode=trigger] { --tg: var(--c4); }
+    .il-dir { color: var(--c4); background: color-mix(in srgb, var(--c4) 16%, transparent); font-weight: 650; }
+    .il-way { color: var(--ink2); background: var(--sel); }
+    :root[data-mode=trigger] .il-trigger-nav .seg-ind { background: color-mix(in srgb, var(--c4) 18%, var(--app)); }
+    :root[data-mode=trigger] .il-step-no { background: var(--c4); color: var(--on-c); }
+    .il-trigger-nav { margin-top: calc(10px * var(--y)); }
+    .il-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: calc(8px * var(--y)); }
+    .il-kind { display: grid; align-content: start; justify-items: start; gap: 4px; padding: calc(9px * var(--y)) 12px; border: 0; border-radius: var(--r-ctl); background: var(--sunk); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+    .il-kind:hover { background: var(--sel); }
+    .il-kind.trigger { background: color-mix(in srgb, var(--c4) 10%, var(--sunk)); }
+    .il-kind-head { display: flex; align-items: baseline; gap: 8px; }
+    .il-flow, .il-checks { list-style: none; padding: 0; margin: calc(6px * var(--y)) 0 0; display: grid; gap: calc(12px * var(--y)); }
+    .il-flow p { margin: 0 0 calc(5px * var(--y)) 28px; font-size: 12.5px; color: var(--ink2); }
+    .il-flow .il-code { margin-left: 28px; }
+    .il-flow .il-code, .il-checks .il-code { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .il-checks { gap: calc(9px * var(--y)); }
+    .il-checks > li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+    .il-checks > li p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink2); overflow-wrap: anywhere; }
+    .il-checks > li.idle b { color: var(--ink2); font-weight: 600; }
+    .il-rules { display: grid; gap: 8px; margin-top: calc(8px * var(--y)); }
+    .il-rule { padding: calc(9px * var(--y)) 12px; border-radius: var(--r-ctl); background: var(--sunk); }
+    .il-rule .il-kv > div { grid-template-columns: 72px minmax(0, 1fr); }
+    .il-inline { margin: 0; font-size: 12px; }
+    .il-block { display: block; font-size: 12px; overflow-wrap: anywhere; }
+    .il-firings { list-style: none; padding: 0; margin: calc(6px * var(--y)) 0 0; display: grid; gap: calc(7px * var(--y)); }
+    .il-firings > li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 12.5px; }
+    .il-firings time { font-size: 11.5px; color: var(--ink2); }
+    .il-firings p { margin: 1px 0 0; overflow-wrap: anywhere; }
+
+    /* Reading the guide or the trigger views needs no event log beside it: there it opens as an overlay, as it does in narrower frames. */
+    :root[data-mode=guide] .il-work, :root[data-mode=trigger] .il-work { grid-template-columns: 240px minmax(0, 1fr); }
+    :root[data-mode=guide] .bar-in > button.il-open.events, :root[data-mode=trigger] .bar-in > button.il-open.events { display: flex; }
+    :root[data-mode=trigger] .il-side.events { position: fixed; z-index: 800; top: 8px; right: 8px; bottom: 8px; width: min(360px, calc(100vw - 16px)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e4); opacity: 0; visibility: hidden; translate: 12px 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s .25s; }
+    :root[data-mode=trigger] .il-side.events.show { opacity: 1; visibility: visible; translate: 0 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s; }
     :root[data-mode=guide] .il-side.events { position: fixed; z-index: 800; top: 8px; right: 8px; bottom: 8px; width: min(360px, calc(100vw - 16px)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e4); opacity: 0; visibility: hidden; translate: 12px 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s .25s; }
     :root[data-mode=guide] .il-side.events.show { opacity: 1; visibility: visible; translate: 0 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s; }
 
     /* Claude's side pane and Codex's inline view: the event log becomes an overlay; the detail keeps its place. */
     @media (max-width: 1179px) {
-      .il-work, :root[data-mode=guide] .il-work { grid-template-columns: 236px minmax(0, 1fr); }
+      .il-work, :root[data-mode=guide] .il-work, :root[data-mode=trigger] .il-work { grid-template-columns: 236px minmax(0, 1fr); }
       .bar-in > button.il-open.events { display: flex; }
       .il-side.events { position: fixed; z-index: 800; top: 8px; right: 8px; bottom: 8px; width: min(360px, calc(100vw - 16px)); background: var(--glass); backdrop-filter: blur(22px) saturate(1.1); box-shadow: var(--e4); opacity: 0; visibility: hidden; translate: 12px 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s .25s; }
       .il-side.events.show { opacity: 1; visibility: visible; translate: 0 0; transition: opacity .25s, translate .35s var(--ease), visibility 0s; }
     }
     @media (max-width: 899px) {
       .il-host { max-width: 130px; }
-      .il-pair { grid-template-columns: minmax(0, 1fr); }
+      .il-pair, .il-kinds { grid-template-columns: minmax(0, 1fr); }
     }
     @media (max-width: 719px) {
-      .il-work, :root[data-mode=guide] .il-work { grid-template-columns: minmax(0, 1fr); padding: 0; }
+      .il-work, :root[data-mode=guide] .il-work, :root[data-mode=trigger] .il-work { grid-template-columns: minmax(0, 1fr); padding: 0; }
       .il-main { margin-top: 56px; padding-inline: 16px; }
       .bar-in > button.il-open.nav { display: flex; }
       .il-host { display: none; }
@@ -182,6 +211,17 @@
   <div id="app"></div>
   <noscript>Plugin Interface Lab 需要启用 JavaScript。</noscript>
   <script id="plugin-base-snapshot" type="application/json">null</script>
+  <script>
+    // The page's mode is known before the app first renders, so the layout does not change once it starts.
+    // A page tool that opened this page for a reason names its route in the startup snapshot above.
+    (function () {
+      function modeOf(value) { var match = /^#(lab|trigger)\//.exec(value || ""); return match ? match[1] : "guide"; }
+      var named = null, remembered = null;
+      try { named = JSON.parse(document.getElementById("plugin-base-snapshot").textContent || "null"); } catch (error) { named = null; }
+      try { remembered = localStorage.getItem("lab-route"); } catch (error) { remembered = null; }
+      document.documentElement.dataset.mode = modeOf(named && typeof named.route === "string" ? "#" + named.route : location.hash || remembered);
+    })();
+  </script>
   <script>/* APP_BUNDLE */</script>
 </body>
 </html>
