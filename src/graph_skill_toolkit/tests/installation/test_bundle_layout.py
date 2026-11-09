@@ -27,7 +27,8 @@ class BundleLayoutTests(unittest.TestCase):
             self.assertIn("installer/entry/mode.py", files)
             self.assertIn("installer/install/__init__.py", files)
             self.assertIn("installer/mode/__init__.py", files)
-            self.assertEqual(files["ADAPTER.md"], ROOT / "ADAPTER.md")
+            # Host connection is documented in Hostpane's docs/ADAPTER.md, not in the toolkit bundle.
+            self.assertNotIn("ADAPTER.md", files)
             self.assertFalse(any(name.startswith("packaging/") for name in files))
             self.assertEqual(
                 files["claude-mod/hooks/register.js"],

@@ -1,8 +1,6 @@
 node_modules/
 dist/
 evidence/*
-!evidence/prime-interface-20261013/
-!evidence/prime-interface-20261013/**
 release/
 __pycache__/
 !scripts/build/
