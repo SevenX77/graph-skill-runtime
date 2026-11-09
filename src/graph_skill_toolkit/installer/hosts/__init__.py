@@ -16,9 +16,6 @@ from runtime_layout import PORTABLE_SPEC_NAME
 SERVER = "graph-skill-canvas"
 MARKER = "graph-skill-toolkit:canvas"
 PLUGIN_DIRS = "CLAUDE_CODE_PLUGIN_DIRS"
-# Source test mode also serves the developer Interface Lab and installs its Skill.
-INTERFACE_LAB_ENV = "GRAPH_SKILL_INTERFACE_LAB"
-INTERFACE_LAB_SKILL = "plugin-interface-lab"
 CLAUDE_MOD_FILES = (
     "claude-mod/.claude-plugin/plugin.json",
     "claude-mod/hooks/hooks.json",
@@ -52,14 +49,14 @@ def hook_group(node: Path, script: Path, target: str) -> dict:
 def projections(
     home: Path, payload: Path, python: Path, node: Path, targets: list[str], source_root: Path,
     *, mod_root: Path | None = None, mod_assets: Path | None = None,
-    portable_spec: Path | None = None, interface_lab: bool = False,
+    portable_spec: Path | None = None,
 ) -> list[dict]:
     mod_root = mod_root or payload / "claude-mod"
     mod_assets = mod_assets or source_root
     portable_spec = portable_spec or payload / "references" / PORTABLE_SPEC_NAME
     result = []
-    environment = {"NODE_OPTIONS": "", "NODE_PATH": "", **({INTERFACE_LAB_ENV: "1"} if interface_lab else {})}
-    skill_ids = ("graph-skill", "graph-skill-canvas", *((INTERFACE_LAB_SKILL,) if interface_lab else ()))
+    environment = {"NODE_OPTIONS": "", "NODE_PATH": ""}
+    skill_ids = ("graph-skill", "graph-skill-canvas")
     toml_environment = ", ".join(f"{key} = {json.dumps(value)}" for key, value in environment.items())
     for target in targets:
         if target == "codex":

@@ -20,7 +20,7 @@ from ownership import InstallError, json_bytes  # noqa: E402
 
 
 def fixture_tree(root: Path, *, test: bool) -> None:
-    for skill in ("graph-skill", "graph-skill-canvas", *(("plugin-interface-lab",) if test else ())):
+    for skill in ("graph-skill", "graph-skill-canvas"):
         file = root / "skills" / skill / "SKILL.md"
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text("tool {{TOOLKIT_COMMAND}} spec {{PORTABLE_SPEC}}\n", encoding="utf-8")
@@ -29,7 +29,7 @@ def fixture_tree(root: Path, *, test: bool) -> None:
         file = mod_base / member
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text(member, encoding="utf-8")
-    for name in ("server.mjs", "after-tool.mjs", "canvas.html", *(("interface-lab.html",) if test else ())):
+    for name in ("server.mjs", "after-tool.mjs", "canvas.html"):
         file = root / "dist" / name
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text("test " + name if test else "installed " + name, encoding="utf-8")
@@ -119,15 +119,12 @@ class SourceModeTests(unittest.TestCase):
         self.assertIn(str(self.source / "dist/claude-mod"), settings["env"][hosts.PLUGIN_DIRS])
         skill_text = (self.home / ".claude" / "skills" / "graph-skill-canvas" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn((self.source / "bin/graph-skill.mjs").as_posix(), skill_text)
-        # Test mode alone serves the Interface Lab and installs its Skill.
-        self.assertEqual(codex["mcp_servers"][hosts.SERVER]["env"][hosts.INTERFACE_LAB_ENV], "1")
+        projected = [Path(record["path"]) for record in install.load_manifest(self.state)["resources"]]
+        self.assertFalse(any("plugin-interface-lab" in path.parts for path in projected))
         claude_config = json.loads((self.home / ".claude.json").read_text(encoding="utf-8"))
-        self.assertEqual(claude_config["mcpServers"][hosts.SERVER]["env"][hosts.INTERFACE_LAB_ENV], "1")
-        lab_skills = [
-            self.home / ".agents" / "skills" / "plugin-interface-lab" / "SKILL.md",
-            self.home / ".claude" / "skills" / "plugin-interface-lab" / "SKILL.md",
-        ]
-        self.assertTrue(all(path.is_file() for path in lab_skills))
+        for entry in (codex["mcp_servers"][hosts.SERVER], claude_config["mcpServers"][hosts.SERVER]):
+            self.assertNotIn("GRAPH_SKILL_INTERFACE_LAB", json.dumps(entry))
+        self.assertNotIn("GRAPH_SKILL_INTERFACE_LAB", (self.home / ".codex/config.toml").read_text(encoding="utf-8"))
         self.assertEqual(mode.source_status()["status"], "configured")
         self.assertEqual(mode.switch("test", self.source)["status"], "unchanged")
         (self.source / "dist/canvas.html").write_text("changed after selection", encoding="utf-8")
@@ -137,7 +134,6 @@ class SourceModeTests(unittest.TestCase):
         self.assertEqual(mode.source_status()["mode"], "installed")
         for path, content in self.installed_config.items():
             self.assertEqual(path.read_bytes(), content, str(path))
-        self.assertFalse(any(path.exists() for path in lab_skills))
         self.assertEqual(json.loads((self.home / ".claude.json").read_text(encoding="utf-8"))["unrelated"], "keep")
 
     def test_modified_managed_config_blocks_restore_without_overwriting(self) -> None:

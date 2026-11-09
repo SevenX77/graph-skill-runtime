@@ -2,13 +2,6 @@
   "schema": "hostpane.triggers.v1",
   "rules": [
     {
-      "id": "interface-lab.source",
-      "label": "Interface Lab 源码",
-      "plugin": "graph-skill-canvas",
-      "scope": { "kind": "paths", "include": ["src/graph_skill_toolkit/apps/interface_lab/**"] },
-      "pages": [{ "tool": "open_interface_lab", "arguments": {} }]
-    },
-    {
       "id": "graph-canvas.source",
       "label": "画布源码",
       "plugin": "graph-skill-canvas",
@@ -17,7 +10,7 @@
     },
     {
       "id": "toolkit.shared",
-      "label": "两个页面共用的部分",
+      "label": "组装与构建",
       "plugin": "graph-skill-canvas",
       "scope": { "kind": "paths", "include": [
         "src/graph_skill_toolkit/composition/**",
@@ -25,10 +18,7 @@
         "src/graph_skill_toolkit/package.json",
         "vendor/ui-ux-template/core/**"
       ] },
-      "pages": [
-        { "tool": "open_interface_lab", "arguments": {} },
-        { "tool": "show_graph", "pathArguments": { "skill_root": "examples/hello-world" } }
-      ]
+      "pages": [{ "tool": "show_graph", "pathArguments": { "skill_root": "examples/hello-world" } }]
     }
   ]
 }

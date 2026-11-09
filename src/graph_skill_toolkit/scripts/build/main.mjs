@@ -27,7 +27,6 @@ async function page(entry, template, output) {
   return Buffer.byteLength(html);
 }
 const canvasBytes = await page("apps/graph_canvas/app/main.tsx", "apps/graph_canvas/ui/template/canvas.html", "canvas.html");
-const labBytes = await page("apps/interface_lab/app/main.tsx", "apps/interface_lab/ui/template/lab.html", "interface-lab.html");
 await mkdir(new URL('claude-mod/hooks/', dist), { recursive: true });
 await mkdir(new URL('claude-mod/.claude-plugin/', dist), { recursive: true });
 await build({
@@ -52,4 +51,4 @@ await build({
   bundle: true, platform: "node", format: "esm", target: "node18",
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
 });
-console.log(`Built server, hook, canvas (${canvasBytes} bytes), interface lab (${labBytes} bytes), and npm installer`);
+console.log(`Built server, hook, canvas (${canvasBytes} bytes), and npm installer`);

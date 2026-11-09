@@ -230,7 +230,7 @@ def validate_resource(resource: dict, state: Path, *, test_mod: Path | None = No
                 raise InstallError("Manifest references an unowned Claude Mod directory")
         return
     for base in (home / ".agents/skills", home / ".claude/skills"):
-        for name in ("graph-skill", "graph-skill-canvas", "plugin-interface-lab"):
+        for name in ("graph-skill", "graph-skill-canvas"):
             if resource["kind"] == "file" and path.is_relative_to(base / name) and path.suffix == ".md":
                 return
     raise InstallError(f"Manifest references an unowned resource: {path}")

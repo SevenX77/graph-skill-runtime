@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtemp, readFile, readdir, copyFile, rm, mkdir, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/client";
@@ -71,6 +71,7 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
     await client.connect(transport);
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map(tool => tool.name).sort(), ["inspect_graph", "list_page_tools", "local_call", "local_events", "show_graph", "watch_graph"]);
+    assert.ok(!tools.some(tool => ["open_interface_lab", "lab_echo", "lab_triggers"].includes(tool.name)));
     // Local capabilities reach a Codex page through page-only tools the model never sees.
     for (const name of ["local_call", "local_events"]) assert.deepEqual(tools.find(tool => tool.name === name)._meta.ui.visibility, ["app"]);
     const inventory = await client.callTool({ name: "list_page_tools", arguments: {} });
@@ -144,51 +145,6 @@ test("bundled plugin serves the read-only graph and self-contained UI from an un
   }
   assert.equal(stderr, "");
   assert.deepEqual(await readdir(isolated), before);
-});
-
-test("the Interface Lab is served only when enabled, and its page reaches local capabilities through page-only tools", async (context) => {
-  const isolated = await mkdtemp(join(tmpdir(), "interface lab 中文 "));
-  context.after(() => rm(isolated, { recursive: true, force: true }));
-  for (const file of ["server.mjs", "canvas.html", "interface-lab.html"]) await copyFile(join(root, "dist", file), join(isolated, file));
-  const state = join(isolated, "state");
-  const env = { ...fakeRuntimeEnv(), GRAPH_SKILL_INTERFACE_LAB: "1", LOCALAPPDATA: state, XDG_STATE_HOME: state, HOME: state, USERPROFILE: state };
-  const client = new Client({ name: "lab-test", version: "1" });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(isolated, "server.mjs")], cwd: tmpdir(), stderr: "pipe", env }));
-  try {
-    const { tools } = await client.listTools();
-    assert.ok(["open_interface_lab", "lab_echo", "show_graph"].every(name => tools.some(tool => tool.name === name)));
-    const lab = tools.find(tool => tool.name === "open_interface_lab");
-    assert.match(lab._meta.ui.resourceUri, /^ui:\/\/plugin-interface-lab\/lab-[a-f0-9]{64}\.html$/);
-    assert.notEqual(lab._meta.ui.resourceUri, tools.find(tool => tool.name === "show_graph")._meta.ui.resourceUri);
-    const opened = await client.callTool({ name: "open_interface_lab", arguments: {} });
-    assert.notEqual(opened.isError, true);
-    const paths = opened.structuredContent.lab;
-    const echo = await client.callTool({ name: "lab_echo", arguments: { text: "接口 ✓" } });
-    assert.deepEqual(echo.structuredContent.echo, { text: "接口 ✓" });
-    const listed = await client.callTool({ name: "list_page_tools", arguments: {} });
-    assert.ok(["lab_echo", "lab_triggers"].every(name => listed.structuredContent.tools.some(item => item.name === name)));
-    // The page-trigger view: the rules in effect, the probe, a dry run and a lab opening that names a firing.
-    const triggers = await client.callTool({ name: "lab_triggers", arguments: { action: "state" } });
-    assert.deepEqual(triggers.structuredContent.rules.map(rule => rule.id), ["graph-skill.root", "interface-lab.probe"]);
-    const prepared = (await client.callTool({ name: "lab_triggers", arguments: { action: "prepare" } })).structuredContent;
-    assert.match(await readFile(join(dirname(prepared.file), "TRIGGER-PROBE.md"), "utf8"), /interface-lab\.probe/);
-    assert.ok(prepared.instruction.includes(prepared.file) && prepared.instruction.includes(prepared.nonce));
-    const dry = await client.callTool({ name: "lab_triggers", arguments: { action: "evaluate", event: { tool_name: "Edit", tool_input: { file_path: prepared.file } } } });
-    assert.deepEqual(dry.structuredContent.firings.map(firing => [firing.rule, firing.calls]),
-      [["interface-lab.probe", [{ tool: "open_interface_lab", arguments: { route: "trigger/test", trigger_firing: "dry-run" } }]]]);
-    const reopened = await client.callTool({ name: "open_interface_lab", arguments: { route: "trigger/test", trigger_firing: "firing-1" } });
-    assert.deepEqual([reopened.structuredContent.route, reopened.structuredContent.triggerFiring], ["trigger/test", "firing-1"]);
-    const after = (await client.callTool({ name: "lab_triggers", arguments: { action: "state" } })).structuredContent;
-    assert.deepEqual([after.arrivals[0].firing, after.probe.request.nonce], ["firing-1", prepared.nonce]);
-    const read = await client.callTool({ name: "local_call", arguments: { operation: "local.files.read", args: { path: paths.sampleFile } } });
-    assert.equal(read.structuredContent.status, "completed");
-    assert.match(read.structuredContent.data.content, /接口测试样例文件/);
-    const outside = await client.callTool({ name: "local_call", arguments: { operation: "local.files.read", args: { path: join(isolated, "server.mjs") } } });
-    assert.equal(outside.structuredContent.status, "rejected");
-    const { contents } = await client.readResource({ uri: lab._meta.ui.resourceUri });
-    const startup = JSON.parse(/<script id="plugin-base-snapshot" type="application\/json">([\s\S]*?)<\/script>/.exec(contents[0].text)[1]);
-    assert.deepEqual([startup.local, startup.lab.sampleFile], [{ transport: "mcp-tools" }, paths.sampleFile]);
-  } finally { await client.close(); }
 });
 
 test("both host manifests resolve to the same bundled implementation", async () => {

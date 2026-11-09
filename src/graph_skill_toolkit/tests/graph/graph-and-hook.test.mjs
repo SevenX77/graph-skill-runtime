@@ -36,11 +36,9 @@ function invokeHook(event, stateDirectory) {
   return JSON.parse(actual.stdout);
 }
 
-test("the toolkit declares its page tools and rules, the lab's only where the lab is served", () => {
-  const canvas = toolkitTriggers({ lab: false });
+test("the toolkit declares its page tool and rule", () => {
+  const canvas = toolkitTriggers();
   assert.deepEqual([canvas.name, canvas.pageTools, canvas.rules.map(rule => rule.id)], ["graph-skill-canvas", ["show_graph"], ["graph-skill.root"]]);
-  const withLab = toolkitTriggers({ lab: true });
-  assert.deepEqual([withLab.pageTools, withLab.rules.map(rule => rule.id)], [["show_graph", "open_interface_lab"], ["graph-skill.root", "interface-lab.probe"]]);
   // A source build names its own folder for the rebuild step; a folder without the toolkit's manifest names none.
   assert.deepEqual(toolkitTriggersAt(join(toolkitRoot, "dist")).source, { root: resolve(toolkitRoot), build: "npm run build" });
   assert.equal(toolkitTriggersAt(tmpdir()).source, null);
@@ -48,9 +46,9 @@ test("the toolkit declares its page tools and rules, the lab's only where the la
 
 test("this repository's project rules are valid for the toolkit's page tools", async () => {
   const file = join(repositoryRoot, ".hostpane", "triggers.json");
-  const parsed = parseTriggerFile(JSON.parse(await readFile(file, "utf8")), { origin: file, pageTools: ["show_graph", "open_interface_lab"], plugin: "graph-skill-canvas" });
+  const parsed = parseTriggerFile(JSON.parse(await readFile(file, "utf8")), { origin: file, pageTools: ["show_graph"], plugin: "graph-skill-canvas" });
   assert.deepEqual(parsed.problems, []);
-  assert.deepEqual(parsed.rules.map(rule => rule.id), ["interface-lab.source", "graph-canvas.source", "toolkit.shared"]);
+  assert.deepEqual(parsed.rules.map(rule => rule.id), ["graph-canvas.source", "toolkit.shared"]);
 });
 
 test("the built hook asks for the canvas after a Graph Skill write and ignores reads and bad input", async context => {
@@ -71,13 +69,14 @@ test("the built hook asks for the canvas after a Graph Skill write and ignores r
   assert.deepEqual(invokeHook("{", state), {});
 });
 
-test("the built hook opens the lab and rebuilds after an edit of the lab's source in this repository", async context => {
+test("the built hook opens the canvas and rebuilds after an edit of the canvas source in this repository", async context => {
   const state = await mkdtemp(join(tmpdir(), "graph hook state "));
   context.after(() => rm(state, { recursive: true, force: true }));
-  const file = join(toolkitRoot, "apps", "interface_lab", "ui", "index.tsx");
+  const file = join(toolkitRoot, "apps", "graph_canvas", "ui", "workbench", "index.tsx");
   const message = invokeHook({ hook_event_name: "PostToolUse", cwd: repositoryRoot, tool_name: "Edit", tool_input: { file_path: file } }, state).hookSpecificOutput.additionalContext;
-  assert.match(message, /Rule interface-lab\.source \(Interface Lab 源码\), Edit wrote .*: call open_interface_lab of the graph-skill-canvas MCP server with \{\}\./);
+  assert.match(message, /Rule graph-canvas\.source \(画布源码\), Edit wrote .*: call show_graph of the graph-skill-canvas MCP server with \{"skill_root":".*hello-world"\}\./);
   assert.match(message, /run `npm run build` there first/);
+  assert.doesNotMatch(message, /open_interface_lab/);
 });
 
 test("Skill loader rejects malformed graphs and ambiguous phase type files", async context => {
