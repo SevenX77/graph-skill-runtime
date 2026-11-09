@@ -1,10 +1,10 @@
 # Graph Skill toolkit
 
-The toolkit helps users run and understand their Graph Skills in their desktop host, and helps developers verify the effects of plugin operations in that host.
+The toolkit helps users run and understand their Graph Skills in their desktop host.
 
 Graph Skill toolkit supplies local runtime commands, shared agent instructions and a Graph Skill canvas for Codex Desktop and Claude Code Desktop. A **Graph Skill** is a user-owned directory containing `SKILL.md`, `graph.yaml` and phase definitions. The working source is version `0.3.5`; the independent Python runtime is `0.1.0a1`. Business skills remain in user-selected directories.
 
-The toolkit is built on **Hostpane**, a separately versioned package that is the foundation for pages that interact with an agent host, and has two separate apps. The toolkit pins Hostpane by one exact git commit in `package.json`; [Hostpane's guide](https://github.com/SevenX77/hostpane/blob/main/README.md) is its reference. The canvas shows the graph, selected node and host/version status. The developer **Plugin Interface Lab** exercises the 17 host interfaces and 5 local capabilities. Host interfaces ask the desktop host for information or actions. Local capabilities execute file and operating-system actions in the plugin's own process. The lab is available in source test mode.
+The toolkit is built on **Hostpane**, a separately versioned package that is the foundation for pages that interact with an agent host. The toolkit pins Hostpane by one exact git commit in `package.json`; [Hostpane's guide](https://github.com/SevenX77/hostpane/blob/main/README.md) is its reference. Hostpane provides 17 host interfaces, which ask the desktop host for information or actions, and 5 local capabilities, which execute file and operating-system actions in the plugin's own process. The toolkit has one page, the canvas, which shows the graph, selected node and host/version status. The **Interface Lab**, the developer page that exercises Hostpane's 22 operations on a host, is Hostpane's test page, served by Hostpane's own plugin `hostpane-lab`; [Hostpane's `docs/LAB.md`](https://github.com/SevenX77/hostpane/blob/main/docs/LAB.md) documents it.
 
 ## Documentation
 
@@ -13,12 +13,13 @@ The toolkit is built on **Hostpane**, a separately versioned package that is the
 | How do I build a plugin and call all 22 operations? | [Hostpane usage](https://github.com/SevenX77/hostpane/blob/main/README.md) |
 | How does a page connect and gain operation authority in each host? | [Hostpane's host Port and adapters](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md) |
 | Where do modules, processes, routes and graph data belong? | [Architecture map](ARCHITECTURE.md) |
-| What does each page show? | [Visible page behavior](PROTOTYPE.md) |
-| How do I observe native effects and save comparisons? | [Manual tests](MANUAL-TESTS.md) |
-| What design and acceptance boundaries apply? | [Plugin Base decision](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) and [Hostpane extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) |
-| What has been measured? | [Current validation baseline](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) |
+| What does the canvas show? | [Canvas page behavior](PROTOTYPE.md) |
+| How do I observe the canvas in a loaded host? | [Manual tests](MANUAL-TESTS.md) |
+| How do I test Hostpane's operations and page triggers on a host? | [Hostpane's Interface Lab](https://github.com/SevenX77/hostpane/blob/main/docs/LAB.md) |
+| What design and acceptance boundaries apply? | [Plugin Base decision](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md), [Hostpane extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) and [Hostpane's Interface Lab decision](https://github.com/SevenX77/hostpane/blob/main/docs/design/interface-lab-in-hostpane-2026-11-09.md) |
+| What has been measured? | [Validation ledger](VALIDATION.md) |
 
-The current baseline records source, build and installer checks and a configured source-mode switch. Codex's `skills.invoke` source route submits a named Skill request through the current conversation's declared text-message channel; its receipt establishes message acceptance, while activation requires separate observation. [Hostpane's interface mapping](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md#interface-mapping) owns the route and its limits. Native acceptance of all 22 operations in both hosts is pending. Historical release and native results retain their own candidate scope in [VALIDATION.md](VALIDATION.md).
+[VALIDATION.md](VALIDATION.md) records the toolkit's source, build and installer checks and its configured source-mode switch; historical release and native results retain their own candidate scope there. [Hostpane's validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md) records the measured behaviour of Hostpane's 22 operations and their pending native acceptance in both hosts, and [Hostpane's interface mapping](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md#interface-mapping) owns each operation's route and limits.
 
 
 ## Install
@@ -113,7 +114,7 @@ npm run mode:status
 npm run mode:installed
 ```
 
-`npm run mode:test` builds that checkout before selecting it. `npm run mode:installed` restores the active installed release. `npm run mode:status` reports the configured selection, `installed_version`, `source_version`, source path and any detected change to managed files or recorded source assets. The recorded source hashes cover the selected build assets, source command and Skill Markdown. Source test mode also registers the Interface Lab and its Skill; [ARCHITECTURE.md](ARCHITECTURE.md#installation-and-source-selection) owns this mode-specific projection. If one of those source files changes, status reports `configuration-changed`; rerun `npm run mode:test` to refresh the selection. Until a release containing this command is installed, use these npm scripts from the updated checkout: the older installed `graph-skill` executable does not contain the mode command.
+`npm run mode:test` builds that checkout before selecting it. `npm run mode:installed` restores the active installed release. `npm run mode:status` reports the configured selection, `installed_version`, `source_version`, source path and any detected change to managed files or recorded source assets. The recorded source hashes cover the selected build assets, source command and Skill Markdown. Both modes install the `graph-skill` and `graph-skill-canvas` Skills; [ARCHITECTURE.md](ARCHITECTURE.md#installation-and-source-selection) owns the projection. If one of those source files changes, status reports `configuration-changed`; rerun `npm run mode:test` to refresh the selection. Until a release containing this command is installed, use these npm scripts from the updated checkout: the older installed `graph-skill` executable does not contain the mode command.
 
 The direct source command also accepts an explicit checkout and a preview:
 
@@ -141,7 +142,7 @@ The canvas server exposes Graph-specific tools over **MCP (Model Context Protoco
 
 Graph changes reach Claude pages over a local HTTP event stream and Codex pages through `watch_graph`. The runtime compiler owns graph validity. [ARCHITECTURE.md](ARCHITECTURE.md#local-graph-data-and-authorization) owns those paths and credentials. [PROTOTYPE.md](PROTOTYPE.md#graph-skill-canvas-page) describes selection, current graph display and compile diagnostics.
 
-To test host and local operations, use the separate [plugin-interface-lab Skill](skills/plugin-interface-lab/SKILL.md) or `open_interface_lab` in source test mode. Opening the lab presents its page; the developer starts each operation. [MANUAL-TESTS.md](MANUAL-TESTS.md) gives the comparison procedure and saved-record checks.
+Host and local operations are tested on Hostpane's Interface Lab, which Hostpane's plugin `hostpane-lab` serves from a Hostpane checkout; [Hostpane's `docs/LAB.md`](https://github.com/SevenX77/hostpane/blob/main/docs/LAB.md) gives its build, installation and page behaviour.
 
 ## Run from source
 
@@ -157,8 +158,8 @@ uv run gskill compile examples/hello-world
 npm start --prefix src/graph_skill_toolkit
 ```
 
-`npm start` starts the built stdio MCP server from `composition/server.mjs` and its loopback listener. The canvas app lives under `apps/graph_canvas/`; the separate lab app lives under `apps/interface_lab/`; host integration comes from the Hostpane package, installed under `node_modules/hostpane` and imported only through `hostpane/page`, `hostpane/page/types`, `hostpane/server` and `hostpane/claude-mod`. The built Claude Mod comes from `composition/claude_mod/`. The [architecture map](ARCHITECTURE.md#build-outputs) owns output paths and page transports. A desktop host must load the selected server and matching Mod before native results can be attributed to that source. The Python package remains independently installable and unpublished on PyPI. [VALIDATION.md](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) records source checks and pending loaded-host acceptance.
+`npm start` starts the built stdio MCP server from `composition/server.mjs` and its loopback listener. The canvas app lives under `apps/graph_canvas/`; host integration comes from the Hostpane package, installed under `node_modules/hostpane` and imported only through `hostpane/page`, `hostpane/page/types`, `hostpane/server`, `hostpane/claude-mod` and `hostpane/triggers`. The built Claude Mod comes from `composition/claude_mod/`. The [architecture map](ARCHITECTURE.md#build-outputs) owns output paths and page transports. A desktop host must load the selected server and matching Mod before native results can be attributed to that source. The Python package remains independently installable and unpublished on PyPI. [VALIDATION.md](VALIDATION.md) records source checks and pending loaded-host acceptance.
 
 ## Build and acceptance
 
-[Installation decisions](INSTALLATION-DECISIONS.md) and [installer source](installer/) own payload and resource-ownership behavior. [ARCHITECTURE.md](ARCHITECTURE.md#build-outputs) owns the build outputs. [VALIDATION.md](VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) owns measured checks and remaining acceptance. [MANUAL-TESTS.md](MANUAL-TESTS.md) binds each loaded host to the selected candidate and compares actual effects with the operation contract. The working source has its own delivery boundary; historical publication evidence applies to the bytes recorded there.
+[Installation decisions](INSTALLATION-DECISIONS.md) and [installer source](installer/) own payload and resource-ownership behavior. [ARCHITECTURE.md](ARCHITECTURE.md#build-outputs) owns the build outputs. [VALIDATION.md](VALIDATION.md) owns measured checks and remaining acceptance. [MANUAL-TESTS.md](MANUAL-TESTS.md) binds each loaded host to the selected candidate and observes the canvas there. The working source has its own delivery boundary; historical publication evidence applies to the bytes recorded there.

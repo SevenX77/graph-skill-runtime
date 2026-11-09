@@ -2,67 +2,49 @@
 
 This record owns the current working baseline and evidence-bound acceptance for the [Graph Skill toolkit](README.md). The stable goal ID is `shared-graph-ui-feasibility`. It covers the shared graph view in Codex and Claude Code and the installation and runtime access needed to use that view. The record uses compact Markdown. Its file identity, references and content are reviewed directly; the JSON goal checker has no applicable interface for this format. Earlier sections below the current baseline preserve historical candidates and their stated cutoffs; their old paths and action names do not define the current source contract.
 
-## Page triggers, 2026-11-08
+## Interface Lab leaves the toolkit, 2026-11-09
 
-This section records the candidate of [the page-trigger decision](../../docs/design/page-triggers-2026-11-08.md). A page trigger is Hostpane's third interface kind: after a host tool call that changes or uses files a page presents, the plugin's PostToolUse hook returns guidance asking the agent to open that page. The candidate composes the toolkit hook `dist/after-tool.mjs` from Hostpane's `runTriggerHook` and the toolkit's rule files, adds the repository's project rules in `.hostpane/triggers.json`, serves each page through Hostpane's `createPageFile`, and adds the Interface Lab's 触发 (Triggers) mode and its tool `lab_triggers`. The canvas app holds no trigger code: `apps/graph_canvas/` has no hook file, only its rule file `triggers.json`, and the build bundles `dist/after-tool.mjs` from `composition/after_tool.mjs`, which calls `runTriggerHook`. [ARCHITECTURE.md](ARCHITECTURE.md#page-triggers) and [PROTOTYPE.md](PROTOTYPE.md#trigger-mode) describe the result.
+This section records the candidate of [Hostpane's decision that the Interface Lab is its test page](https://github.com/SevenX77/hostpane/blob/main/docs/design/interface-lab-in-hostpane-2026-11-09.md), after which the toolkit serves only the graph canvas.
 
 ### Source identity
 
 | Item | Identity |
 | --- | --- |
-| Toolkit source | Working tree of branch `claude/toolkit-host-interfaces`, uncommitted at observation time. |
-| Hostpane pin | `package.json` and `package-lock.json` declare `"hostpane": "git+https://github.com/SevenX77/hostpane.git#1d656b42227fc68203807b93fa57383a6a8f6d0e"`; that commit is on Hostpane's `main`. Its parent `e8b50b9d2afa5737fa7a188cf52c395e27d706c0` adds the entry `hostpane/triggers` and the server helper `createPageFile`; `1d656b42` adds project-rule discovery from the session's working directory. |
+| Toolkit commit `d6a5db0112b05ecd2080fb47d6233b2cfe5844c1` | Branch `claude/toolkit-host-interfaces`: the toolkit keeps only the canvas and pins Hostpane at `157141ef…`. |
+| Toolkit commit `c0fc0a8b` | The bundle inventory drops `ADAPTER.md`, which Hostpane holds since the extraction; the inventory test had failed on it since commit `b58cfc37`. |
+| Hostpane pin | `"hostpane": "git+https://github.com/SevenX77/hostpane.git#157141ef86f9fdc6aa67a479efe28a864a2267b4"`. The installed `node_modules/hostpane/` holds `LICENSE`, `README.md`, `package.json`, `src`, `types` and no `lab/`. |
+| Environment | Windows 11 Home China 10.0.26200 x64, Node.js 24.18.0, Claude Code engine 2.1.317 (`C:\Users\test\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.317\a33aa5518497\claude.exe`), Codex CLI 0.167.0. |
 
-### Checks, 2026-11-08
-
-Environment: Windows 11 (10.0.26200), Node.js 24.18.0, toolkit with the Hostpane pin above.
+### Checks
 
 | Check | Observed result |
 | --- | --- |
-| Hostpane `npm test` at `e8b50b9d` | 213 tests, 213 passed, 0 failed. |
-| Hostpane `npm run typecheck` and `npm run types` at `e8b50b9d` | Both exited 0. |
-| Hostpane `npm test` at `1d656b42` | 214 tests, 214 passed, 0 failed. |
-| Hostpane `npm run typecheck` and `npm run types` at `1d656b42` | Both exited 0. |
-| Toolkit `npm run typecheck` | Exited 0. |
-| Toolkit `npm run build` | Passed. Canvas page 903,856 bytes, Interface Lab page 939,751 bytes. |
-| Toolkit `npm test` | 78 tests, 78 passed, 0 failed. The page guide and template candidate below had 85; its 11 canvas-hook cases are Hostpane tests in its `tests/triggers/`, written against the Graph Skill rule as data, and 4 toolkit tests are new. |
-| Toolkit `npm audit` | 0 vulnerabilities. |
-| `claude plugin validate dist/claude-mod` with the desktop engine 2.1.317 | Passed. |
+| Toolkit `npm run typecheck` at `c0fc0a8b` | Passed. |
+| Toolkit `npm run build` at `c0fc0a8b` | "Built server, hook, canvas (903856 bytes), and npm installer"; `dist/interface-lab.html` is absent; `grep -c "open_interface_lab\\|lab_echo" dist/server.mjs` prints 0. |
+| Toolkit `npm test` at `c0fc0a8b` | 61 tests, 61 passed, including 11 canvas-trigger tests. |
+| Toolkit `npm audit` at `c0fc0a8b` | 0 vulnerabilities. |
+| `claude.exe plugin validate dist/claude-mod` (engine 2.1.317) | "Validation passed", exit 0, one warning `ICON_MISSING`. |
+| `uv run pytest src/graph_skill_toolkit/tests/installation` | 51 passed. |
+| `node bin/graph-skill.mjs mode installed` with the toolkit code at `1d89005a` | Status `configured`, mode `installed`; it removed `~/.agents/skills/plugin-interface-lab/SKILL.md` and `~/.claude/skills/plugin-interface-lab/SKILL.md` (the coordinator removed the two empty folders afterwards). |
+| `node bin/graph-skill.mjs mode test` with the code at `c0fc0a8b` | Status `switched`, then `mode status`: `configured`, mode `test`, no problems. The `graph-skill-canvas` MCP entry's `env` is `{"NODE_OPTIONS": "", "NODE_PATH": ""}` in `~/.claude.json` and in the Codex block. |
+| Hostpane `npm run lab:install` in `D:\coding\hostpane` | Installed the lab plugin `hostpane-lab`; [Hostpane's validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#interface-lab-in-hostpane-2026-11-09) owns its result. |
+| Both plugins coexist | `~/.claude.json` `mcpServers` holds `graph-skill-canvas` and `hostpane-lab`; `env.CLAUDE_CODE_PLUGIN_DIRS` is `D:\coding\graph-skill-runtime-worktrees\toolkit-host-interfaces\src\graph_skill_toolkit\dist\claude-mod;D:\coding\hostpane\lab\dist\claude-mod`; `hooks.PostToolUse` holds one group per plugin; the toolkit's `mode status` stays `configured` with no problems after the lab install. |
+| Canvas only on a canvas edit | A new headless Claude Code session edited `"当前页面缺少本地画布后端连接"` in `src/graph_skill_toolkit/apps/graph_canvas/ui/workbench/index.tsx` of the toolkit worktree; its Edit result carried exactly one guidance, from plugin `graph-skill-canvas`, rule `graph-canvas.source` (画布源码, gloss "canvas source"), `call show_graph of the graph-skill-canvas MCP server with {"skill_root":"D:\\coding\\graph-skill-runtime-worktrees\\toolkit-host-interfaces\\examples\\hello-world"}`, with the rebuild `npm run build` in the toolkit; no `hostpane-lab` guidance. The edit was reverted. |
 
-The four new tests in `tests/graph/graph-and-hook.test.mjs` establish that:
-
-- the toolkit declares the page tools and rules `show_graph` and `graph-skill.root`, and adds `open_interface_lab` and `interface-lab.probe` only for a build that serves the lab; a source build names its own folder for the rebuild step and a folder without the toolkit's manifest names none;
-- this repository's `.hostpane/triggers.json` parses without problems for the toolkit's page tools and holds the rules `interface-lab.source`, `graph-canvas.source` and `toolkit.shared`;
-- the built hook, run as a process, asks for `show_graph` with the skill's real path after an `Edit` of `graph.yaml`, without a rebuild step, and returns `{}` for a `Read`, for the plugin's own `show_graph` and for malformed input;
-- the built hook, run on an `Edit` of the lab's `ui/index.tsx` in this repository, asks for `open_interface_lab` with `{}` under the rule `interface-lab.source` and for `npm run build` first.
-
-### Live host observation, 2026-11-08
-
-Environment: Claude Code desktop 2.1.317 on Windows 11 (10.0.26200), with this repository's working tree as the session's workspace.
-
-| Observation | Result |
-| --- | --- |
-| The PostToolUse hook in a live session | After each of three `Edit` calls on `src/graph_skill_toolkit/apps/interface_lab/ui/triggers.tsx`, the agent received the guidance below, once per edit. The firing log `%LOCALAPPDATA%/hostpane/triggers/graph-skill-canvas/firings.jsonl` holds the matching record: rule `interface-lab.source`, reason `write`, tool `Edit`, origin the repository's `.hostpane/triggers.json`. |
-| A rebuilt page without a server restart | After `npm run build`, `open_interface_lab {}` served the rebuilt Interface Lab page from the same server process: the hint that the trigger views show for a missing `lab_triggers` appeared on `#trigger/test`. |
-| The session's server runs the latest build | The toolkit was built at 2026-11-08T09:32:45Z. The session's server process was then ended, and the host started process 33088 at 2026-11-08T09:33:59Z on the next tool call, `lab_echo`, after the build. |
-| An opening route | `open_interface_lab` with `route` set to `lab/tools.list` opened the page on that route. Trigger mode rendered with the navigation 机制 / 端到端测试 / 规则与记录 and the host identity "Claude Code 2.1.317". |
-| The 机制 (How it works) view | Read from the page on `#trigger/how`: the five steps carry the owners Agent, 宿主, Hostpane, Hostpane 和宿主 and Agent 和宿主, in that order. |
-| The session's tool list | Claude Code 2.1.317 keeps a session's MCP tool list from the server's first connection. After the session's stdio server process was replaced, the host restarted it on the next tool call, and the new process registered 9 tools: `show_graph`, `inspect_graph`, `watch_graph`, `open_interface_lab`, `lab_echo`, `lab_triggers`, `local_call`, `local_events` and `list_page_tools`. The session's connector status kept `tool_count: 8`, and the session tool list that the page's `tools.list` returned had no `lab_triggers`. A `notifications/tools/list_changed` notification sent by the server after initialization left the list unchanged. Consequence: after a plugin update within a session, the trigger views' `lab_triggers` calls are refused until the server is reconnected through `/mcp` or a new session starts, and the views say so. |
-
-The guidance, verbatim up to the rebuild sentence:
-
-```text
-Hostpane page trigger for plugin graph-skill-canvas: your last tool call changed or used files that its trigger rules watch. When the current change is finished, open each page below once, as the final presentation of the change, with exactly these arguments:
-1. Rule interface-lab.source (Interface Lab 源码), Edit wrote D:\coding\graph-skill-runtime-worktrees\toolkit-host-interfaces\src\graph_skill_toolkit\apps\interface_lab\ui\triggers.tsx: call open_interface_lab of the graph-skill-canvas MCP server with {}.
-Before opening: this plugin's pages are built from its source at D:\coding\graph-skill-runtime-worktrees\toolkit-host-interfaces\src\graph_skill_toolkit; run `npm run build` there first. …
-```
+[Hostpane's validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#interface-lab-in-hostpane-2026-11-09) records the lab's own observations of this candidate.
 
 ### Pending acceptance
 
-The following observations are pending for this candidate:
+The following observations are pending for the toolkit:
 
-- the lab's end-to-end trigger test passing in Claude Code, which the session above could not run because its tool list lacked `lab_triggers`;
-- every Codex Desktop observation, including the end-to-end trigger test.
+- the canvas presenting in the Browser pane of an interactive Claude Code session started after the install, with both Mods installed;
+- the Codex Desktop MCP App view of the canvas.
+
+[Hostpane's validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#interface-lab-in-hostpane-2026-11-09) records the lab's pending items.
+
+## Interface Lab and page-trigger validation
+
+The Interface Lab is Hostpane's test page, served by Hostpane's own plugin `hostpane-lab`, and Hostpane's validation ledger holds the dated validation of the lab and of the page triggers it tests: the sections [Page triggers, 2026-11-08 (toolkit record)](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#page-triggers-2026-11-08-toolkit-record) and [Current baseline: Plugin Base, local capabilities and Interface Lab, 2026-10-14](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14) in Hostpane's `docs/VALIDATION.md`.
 
 ## Plugin page guide and template redesign, 2026-11-07
 
@@ -120,7 +102,7 @@ The following observations are pending for this candidate:
 - the canvas at 1210 × 900, guide mode at a narrow width, and a narrow width of 390 pixels as the decision states it, each in light and dark theme;
 - any Codex Desktop observation of the redesigned pages.
 
-Native acceptance of all 22 operations in both hosts remains pending as stated in the 2026-10-14 baseline above.
+Native acceptance of all 22 operations in both hosts remains pending as stated in Hostpane's [2026-10-14 baseline](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14).
 
 ## Hostpane extraction candidate, 2026-11-07
 
@@ -166,155 +148,7 @@ Test count: 182 Hostpane tests + 81 toolkit tests = 263 = the baseline 255 at `9
 
 ### Pending acceptance
 
-Native observation in a loaded host is pending for this candidate: the extraction decision's final acceptance item, in which the rebuilt toolkit loads in a new Claude Code session, the Interface Lab page opens and one host interface call returns a result, has not been observed. Native acceptance of all 22 operations in both hosts remains pending as stated in the 2026-10-14 baseline below.
-
-## Current baseline: Plugin Base, local capabilities and Interface Lab, 2026-10-14
-
-The working source has one closed Plugin Base, a Graph Skill canvas app, a separate developer Interface Lab app and one composition root. The Plugin Base implements 17 host interfaces and 5 local capabilities. The [decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) owns design choices, acceptance criteria and open items. [Plugin Base usage](plugin_base/README.md) owns construction and the full 22-operation reference. [ADAPTER.md](ADAPTER.md) owns host identity, authority and route mappings. [ARCHITECTURE.md](ARCHITECTURE.md) owns the module map, process and lifecycle. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns native observation through the Interface Lab.
-
-### Source identity and implementation evidence
-
-The source sequence on branch `claude/toolkit-host-interfaces` is `f6dbba98` (decision), `3773e6f6` (module relocation), `29557f9b` (closed entries), `e1061429` (17 host interfaces, evidence and events) and `514ae7f5` (local capabilities, process runner, composition, Interface Lab and source-mode registration). These commit identities bind the reported implementation checks below. The documentation revision describes that implementation and preserves the historical ledger at its own candidate scopes.
-
-| Necessary result | Observation and judgment |
-| --- | --- |
-| Closed reusable foundation | **Source-checked and source-tested.** The four Plugin Base entries expose page runtime, page types, server runtime and Claude Mod registration. `tests/plugin_base/closure.test.mjs` checks both import directions. |
-| Distinct business pages | **Implemented and source-tested.** The canvas holds graph presentation, selection and host/version status. The separate Interface Lab has its own app, page, `open_interface_lab` tool and Skill. Its guide covers the 17 host interfaces and 5 local capabilities. |
-| Shared process and local effects | **Implemented and source-tested.** `servePlugin` composes one listener, host bridge and local executor. The local tests exercise file-scope checks, read-back evidence, change events and shell-free system launches. The protocol test checks the lab switch and page-only local tool route. |
-| Usage and navigation | **Documentation checked.** `plugin_base/README.md` is present, covers all 22 operations and plugin construction, and links to the owning adapter, architecture, page and observation documents. |
-| Native effects on both hosts | **Unverified for this candidate.** Native acceptance of all 22 operations has not been run in Claude Code Desktop or Codex Desktop. Fake-host results and a standalone browser render have their stated narrower scopes. |
-
-### Checks reported on 2026-10-14
-
-These results were measured against the content of `514ae7f5`. Documentation checks cover current links, operation coverage, fact ownership and preservation of historical ledger content.
-
-| Check | Observed result | Evidence scope |
-| --- | --- | --- |
-| `npm run typecheck` | Clean. | JavaScript/TypeScript source contract check. |
-| `npm run build` | Server, hook, canvas (696,330 bytes), Interface Lab (705,789 bytes) and installer built. | Build output only. |
-| `node --test` | 184 passed, 0 failed. Includes `tests/plugin_base/local.test.mjs`, `tests/interface_lab/guide.test.mjs` and `tests/integration/protocol.test.mjs`. | Source, simulated host behavior, and real MCP stdio/HTTP protocol tests. |
-| `uv run pytest src/graph_skill_toolkit/tests/installation` | 51 passed. Run from the repository root. | Installer tests. |
-| `claude.exe plugin validate dist/claude-mod` | “Validation passed” using Claude Desktop's bundled Claude Code 2.1.295 binary; warning “gating hook without .catch” for `command.run`. | Mod package validation; live loading and hook execution remain unverified. |
-| Built lab opened in a browser outside either host | Operation list, per-host guidance and argument presets displayed. | Standalone page rendering. |
-
-The JavaScript commands and Mod validation above run from the toolkit directory. The corresponding source checks live under [tests/](tests/), including [the closure test](tests/plugin_base/closure.test.mjs), [local capability tests](tests/plugin_base/local.test.mjs), [guide tests](tests/interface_lab/guide.test.mjs) and [protocol integration](tests/integration/protocol.test.mjs). Source tests establish the behavior exercised by their peers and fixtures. They leave actual host rendering, native effects and model consumption to native observation.
-
-### Configured source test mode and loaded-host boundary
-
-On 2026-10-14, `node bin/graph-skill.mjs mode test <toolkit>` selected this worktree for both hosts. `mode status` reported `configured` with no problems. Source test mode sets `GRAPH_SKILL_INTERFACE_LAB=1` in both MCP registrations and installs the `plugin-interface-lab` Skill. Installed release mode selects the canvas projection. [ARCHITECTURE.md](ARCHITECTURE.md#installation-and-source-selection) owns those registrations, and [README.md](README.md#switch-the-desktop-source-for-testing) gives the commands.
-
-Configuration is observed; loaded server and Mod identity after host reload remains unverified for this candidate. Native acceptance must bind the selected source, built assets, host version, actual process and page session before testing operations. The [manual procedure](MANUAL-TESTS.md) records each operation as matches, differs or not observed with evidence and a note, and checks the saved comparison files.
-
-### Documentation and repository checks, 2026-10-15 UTC
-
-The documentation pass checked 253 current relative Markdown links, including fragments, with every target resolving. It checked all 17 host-interface ids and all 5 local-capability ids against the usage reference. The required body-marker scan found zero hits after the declared quotation, revision-log and historical-ledger exclusions. UTF-8/LF byte read-back passed. The historical ledger bodies are byte-identical apart from the specified 2026-10-13 heading and its `a4e8cd50` qualification. These results establish the documentation responsibility at this scope.
-
-The following repository-root checks combine the writer's measured results with the repository coordinator's subsequent verification on 2026-10-15 UTC. A private temporary directory is a fresh directory owned by the test invocation.
-
-| Check | Current observed result and scope |
-| --- | --- |
-| `uv run ruff check src tests scripts tools` | Passed: “All checks passed!” The coordinator verified the current `src/graph_skill_toolkit/tests/installation/test_source_mode.py`, whose host-install destination paths use separate path components. |
-| `uv run pytest tests/test_doc_pointer_liveness.py src/graph_skill_toolkit/tests/installation --basetemp=<private directory>` | 66 passed in the coordinator's run. The source-document-pointer check and installer tests pass. |
-| `uv run mypy --strict src` | Passed over 149 source files. |
-| `uv run lint-imports` | Passed: nine contracts kept, zero broken. |
-| `uv run python scripts/validate_round28_manifest.py spec/features.yaml spec/source_file_map.yaml spec/contract_map.yaml` | Passed. |
-| `uv build --no-sources` | Built the runtime wheel and source distribution. This establishes build completion for that invocation; release-artifact acceptance is separate. |
-| `uv run pip-audit` | Reported no known vulnerabilities in resolved third-party distributions. The unpublished local `graph-skill-runtime` distribution was skipped. |
-| `uv run pytest -q -p no:cacheprovider --basetemp=<private directory>` | The coordinator's latest full run reported 16 failed, 1,797 passed and 1 skipped. The failing file set and comparative evidence are listed below. |
-
-The latest full-suite failures are:
-
-- `tests/application/test_host_native_handoff.py`: four tests.
-- `tests/core/test_cache_key_covers_the_compiler_identity.py`: two tests.
-- `tests/core/test_portable_gskill_v1.py`: two cache round-trip tests.
-- `tests/core/test_pr4_cache_roundtrip_red.py`: one test.
-- `tests/integration/skills/event_extraction/test_cognitive_flow_smoke.py`: three tests.
-- `tests/integration/skills/text_segmentation/test_cognitive_flow_smoke.py`: three tests.
-- `tests/test_round28_contract_manifests.py::test_task7_hash_lock_detects_mutated_schema_fixture`: one test. Its nested `uv run pytest tests/test_contract_hash_lock.py` invocation used the default temporary directory and reported four setup errors.
-
-Full-suite results vary between invocations. The coordinator's preceding run with the same private-directory command reported 15 failed, 1,798 passed and 1 skipped, with a different failing set. The writer's dated `uv run pytest --tb=short -q` run with private `TEMP`, `TMP` and `TMPDIR` reported 6 failed, 1,807 passed and 1 skipped in 144.32 seconds. Five of those failures were in `tests/test_import_boundary_contracts.py`, where wrapped report names prevented the test parser from reconciling contract totals. The source-document-pointer failure in that writer run is covered by the current 66-pass check above.
-
-The writer's default-temporary-directory run reported 2 failed, 1,000 passed, 1 skipped and 811 setup errors. The coordinator confirmed access denied, `PermissionError: [WinError 5]`, on the shared Windows temporary path `<Windows temporary directory>/pytest-of-test`. That shared-directory condition caused the 811 setup errors. Nested pytest commands require their own usable temporary-directory configuration.
-
-### Runtime-suite comparison with the branch base
-
-The repository coordinator compared both committed changes and working-tree changes with `a4e8cd50`. All changed files are under `src/graph_skill_toolkit/` or at `docs/design/plugin-base-and-interface-lab-2026-10-14.md`. Python runtime source, runtime tests and repository tooling are identical to that base.
-
-A separate checkout of `a4e8cd50`, tested with the same private-directory invocation on the then-failing selection, reported 10 failed and 67 passed. The comparison covered `test_portable_gskill_v1.py`, `test_pr4_cache_roundtrip_red.py`, both `test_cognitive_flow_smoke.py` files, `test_doc_pointer_liveness.py` and `test_round28_contract_manifests.py`. The same ten overlapping runtime failures reproduced on the base. The source-document-pointer test passed on the base and passes on this branch in the current focused run.
-
-The remaining runtime-suite failures are pre-existing or environment-dependent conditions of the Python runtime suite in this environment, independent of this branch's changes. They remain open repository items outside this toolkit candidate's scope. The base comparison directly covers the ten reproduced failures; diagnosis of the other varying runtime failures remains open. The 2026-10-14 implementation measurements retain their own source and invocation conditions.
-
-The documentation responsibility is **attained within the checks recorded here**. Current Ruff, mypy, import contracts, manifest validation, build and dependency-audit checks pass at their recorded scopes. The runtime pytest suite retains the environment-dependent failures above, so repository-wide runtime-suite acceptance remains open. The broader shared-graph goal is **partially attained**: current two-host loading, the 22-operation native run and delivery acceptance remain open. The decision's open items include the graph credential retained until process exit, Claude override correlation and unconfirmed host routes. This baseline supplies source evidence and configured selection; native operational acceptance and publication require their own results.
-
-### Native observation of the local capabilities on Claude Desktop, 2026-10-15
-
-**Scope and session identity.** The Plugin Interface Lab, the developer page for comparing operation results with actual effects, was open in Claude Desktop's Browser pane through its loopback HTTP route. Loopback HTTP serves the page from the same computer. The host used Claude Code engine `2.1.295` on Windows `10.0.26200`. The plugin server had started at session start from the build preceding commit `f58fd018` on branch `claude/toolkit-host-interfaces`. The observations below apply to that running build.
-
-The session's Claude Mod, the Claude-side plugin component loaded once at session start, predates commit `99787b80`. `open_interface_lab` returned structured data with host-info status `confirmed` and every host capability `unknown`; the reason indicated receipt of launch information and a wait for host connection confirmation. The Mod's hook reported “Unable to show Plugin Interface Lab: The tool returned no Interface Lab data.” Commit `99787b80` supplies the payload reader for the host's JSON text representation. Loading that Mod requires a new session. The page header showed the host connection as not ready, so the 17 host interfaces remain outside this session's native observation.
-
-**Saved comparison and operation evidence.** The saved file is `C:\Users\test\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\plugin-interface-lab\records\unknown-2026-10-15T14-31-48-926Z.json`. Its schema is `plugin-interface-lab.records.v1`, its `startedAt` is `2026-10-15T14:31:48.926Z`, and it contains five entries. The host id is `unknown` because the host connection was not ready. The page clock times below are local times. The file's SHA-256, a digest identifying its bytes at documentation review, is `0a6144b94eec4464bf34f742c81a7b25d120427ebdea5eac442222d7da2ef0b6`.
-
-| Operation and page time | Result and effect evidence | Recorded comparison |
-| --- | --- | --- |
-| `local.files.read`, `07:32:06` | `completed`; read 62 bytes from `sandbox/sample.txt`. | Verdict field is `null`. |
-| `local.files.watch`, `07:32:33` | `completed`; started watching the sample file. A later write delivered a `local.files.changed` event to the page. | Verdict field is `null`. |
-| `local.files.write`, `07:32:44` | `completed`; wrote 74 bytes, with `matchesSent: true` and zero temporary files left. An external read of the real file path found the same content, with SHA-256 beginning `b7db3f6684d62a71`. | Verdict field is `null`. |
-| `local.system.openExternal`, `07:33:09` | `accepted`; sent `C:\WINDOWS\System32\rundll32.exe url.dll,FileProtocolHandler https://example.com/`. The receipt reported pid `23128`, exit code `0`. The subsequent window list contained process `chrome` with title “Example Domain - Google Chrome”. | `matches`. |
-| `local.system.revealInFileManager`, `07:34:36` | `accepted`; sent `C:\WINDOWS\explorer.exe /select,"C:\Users\test\AppData\Local\plugin-interface-lab\sandbox\sample.txt"`. The receipt reported exit code `1`. Explorer started at the call time with generic title “文件资源管理器” (“File Explorer”). UI Automation, Windows' interface for inspecting application controls, found zero list items in that window. Explorer displayed its default view; the sandbox folder and selected sample file were absent. | `differs`. |
-
-The saved entries supply call arguments, statuses, receipts, evidence and comparisons. The file-change event, external file read, temporary-file check, window list and UI Automation inspection are supplemental observations reported with this native run. The saved record and current source were read directly during documentation review. The page header in this running build displayed the nominal state directory `C:\Users\test\AppData\Local\plugin-interface-lab`.
-
-**Filesystem redirection and cause.** A nominal path is the path requested by a process. A real path is the on-disk path returned by Node.js `fs.realpath`. Claude Desktop uses MSIX, the Windows packaged-app format. Windows filesystem redirection gives that packaged app and its descendant processes a private view of parts of the user profile. In this session, the plugin server's writes under `%LOCALAPPDATA%` reached `C:\Users\test\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\...`. Processes inside the package could use the nominal path. File Explorer, running outside that package view, required the package-directory path.
-
-The sample file's nominal path was `C:\Users\test\AppData\Local\plugin-interface-lab\sandbox\sample.txt`; its real path was `C:\Users\test\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\plugin-interface-lab\sandbox\sample.txt`. The capability's scope check compared real paths, while its file-manager command carried the nominal path. That path mismatch explains the failed reveal. Explorer's exit code is a process receipt; the window inspection establishes the visible mismatch.
-
-**Source-tested real-path behavior.** Commit `f58fd018` contains these changes:
-
-- [The local executor](plugin_base/local/node/index.mjs) resolves the reveal target with `fs.realpath` after the granted-root check and passes that real path to the file-manager command on every platform. When it differs from the requested path, the evidence includes `sent.realPath`.
-- [The lab state module](apps/interface_lab/server/state.mjs) owns `labStateDirectory` and `prepareLab`. Preparation creates the nominal state directory, resolves its real path, and returns `stateDirectory`, `sandbox`, `records` and `sampleFile` under the real directory. [The lab server app](apps/interface_lab/server/app.mjs) supplies those paths to the page and open-tool text. The header and comparison-file location therefore use the real directory.
-- [The local regression test](tests/plugin_base/local.test.mjs), “reveal hands the file manager the real path behind a redirected one”, checks the command arguments and `sent.realPath`. [The lab preparation test](tests/interface_lab/prepare.test.mjs), “the lab reports the real paths of its state directory”, checks all four returned paths. Both model redirection with a directory junction on Windows or a symbolic link on other systems.
-
-The implementation run after this change reported `npm test`: 187 passed, 0 failed; `npm run typecheck`: passed; and `claude plugin validate dist/claude-mod` using Desktop's engine `2.1.295`: passed. These are source-test, type-check and package-validation results. The tests model redirection; actual packaged-host behavior has its own native acceptance boundary.
-
-**Remaining native observation and judgment.** The five local capabilities have a first Claude Desktop observation at the running build's scope. Reading, watch startup, writing and the browser window have the evidence above; file-manager reveal has a demonstrated visible mismatch. The real-path implementation is source-tested. Native confirmation of that implementation requires a new Claude Desktop session: a repeat reveal at page time `07:37:40` still sent the nominal path from the running server's earlier code. The new session must also load the Mod from `99787b80` or a build containing it before observing the 17 host interfaces. All 22 operations on Codex Desktop remain unobserved. The broader goal remains **partially attained**; complete two-host native acceptance remains open.
-
-### Codex page observations and fresh-service verification, 2026-10-29
-
-This observation establishes which Codex operations have usable evidence and which effects still require acceptance, while preserving one shared UI and two host adapters.
-
-**Desktop page and saved record.** A real MCP App page reported `chatgpt` / Codex `26.1023.51421`, identity source `mcp-initialize`, and transport `mcp-app`. The page retained the earlier result-status UI and the earlier `skills.invoke` declaration. Its loaded bytes remain unbound to the fresh build below. The directly reviewed record is `C:/Users/test/AppData/Local/plugin-interface-lab/records/codex-2026-10-29T15-56-15-407Z.json`, schema `plugin-interface-lab.records.v1`, SHA-256 `e274771693feabac3cfa7bc5a940925151d46ce1ed4a36ae421536fa04c56aaf`. It contains 17 calls covering 16 operations: 9 `completed`, 2 `accepted`, 5 `unsupported` and 1 `rejected`. Only `events.subscribe` has comparison `matches`; the other comparison verdicts are `null`.
-
-| Desktop operation | Observation and evidence boundary |
-| --- | --- |
-| `host.getInfo`, `host.getCapabilities`, `host.getContext`, `tools.list`, `tools.call` | `completed`. The `lab_echo` input is exactly `接口测试 ✓`; the coordinator observed the same returned text. Host context includes declared UI facts. |
-| `events.subscribe` | `completed`; the coordinator observed two `host.contextChanged` events and cancelled the subscription. |
-| `context.update` | `completed` with an `updateId` receipt; the later empty-snapshot call also completed. Model consumption remains unverified. |
-| `views.requestDisplayMode` | `completed`; the coordinator observed returned mode `fullscreen`. Visible focus remains unverified. |
-| `files.openFile`, `conversation.submitMessage` | `accepted` for `D:/coding/graph-skill-runtime/README.md` and the context-repetition probe respectively. The file's visible opening and the model's reply remain unverified. |
-| `files.revealDirectory`, `skills.list`, `views.open`, `views.list`, `views.close` | `unsupported`; the saved host declarations are `unknown`, and the coordinator observed `data.capabilityState: "unknown"` in the raw results. |
-| `local.files.read` | The running server rejected the nominal sample path as outside its granted roots. The coordinator traced the sample's real path to `C:/Users/test/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local/plugin-interface-lab/sandbox/sample.txt` through Windows packaged-app redirection. A direct read through current source returned 62 bytes. |
-
-The saved JSON retains arguments, statuses and evidence fields. Raw result data, event delivery, the old page layout and cleanup observations above were supplied by the coordinator's same-run observation; the saved format omits the full result data and event log. The rejection establishes an older running server's result at that nominal path. The separate source read establishes current-source access to the sample at its tested path.
-
-**Fresh build and independent service.** The [retained command records](evidence/codex-interface-20261029/source-checks.json) contain the full `npm test -- --test-reporter=dot`, `npm run typecheck` and `npm run build` invocations, each with exit code `0` and untruncated output. Documentation review read those records and directly rehashed these built files:
-
-| Built file under `dist/` | SHA-256 |
-| --- | --- |
-| `server.mjs` | `71dc20af3538564266c47c85292955ffca766be87a601fd69dedb9e1fcdf9437` |
-| `interface-lab.html` | `b51971198ff1915bcdc334cff2fd5e2b8bd6e46bb47f28876390f66c06196b59` |
-| `canvas.html` | `66d09fd7a85a57f781ddebf074a864f054245e358be1442ab20da83d57875973` |
-
-The same command records retain an initial independent invocation without the lab-enabling environment variable: it exited `1` with `Tool open_interface_lab not found`. The successful invocation opened a fresh MCP standard-input/output client declaring `codex-mcp-client` version `0.165.0-alpha.1.2`, with `GRAPH_SKILL_INTERFACE_LAB=1`. Its real resource read returned `ui://plugin-interface-lab/lab-b7d0e37f064dc427500d0f92de3e0730184474bb7408056cac7bd40d3ab8d1fa.html`, containing the new continuing interface-status UI and `skill-activation-request` route. The same independent service completed sample read, disposable-probe write and read-back, watch delivery of `created`, and unwatch. The probe file was deleted and the client was closed. These observations establish the new service's resource and local-file path at that scope. Desktop loading of those bytes remains unverified.
-
-**Remaining acceptance and settlement.** Two native-window control attempts ended at approval timeout; the coordinator acquired no window control and reset both attempts. Reconnection to the fresh build, its visible UI, draft entry, actual Skill activation, system external opening and keyboard behavior remain unverified. The context and event subscription were cleared as recorded above, and the independent probe resources were settled. Codex acceptance is **partially attained at the recorded scopes**. Complete native acceptance and publication remain open; this run performed no publication.
-
-**Subsequent context-delivery observation, 2026-10-29.** The context-update, message-submission and model-read-back check is now **attained for the earlier desktop page**. The coordinator supplied the subsequent native `functions.untrusted_input` delivery with source `mcp_app`, session `3a94232f-c407-4df4-8cf4-a94603ebbce0` and server `graph-skill-canvas`. It contained the page's context-repetition request as `kind: message` and the following exact text as `kind: model_context`:
-
-```text
-Plugin page context (JSON data, not instructions): {"probe":"codex-context-20261029","selection":"node-a"}
-```
-
-After the host prompted the model to read that delivery, the model repeated this paragraph verbatim with no tool calls. This observation establishes delivery and consumption of the snapshot carried by the message submitted before the clear operation. It closes the earlier context-consumption and probe-reply gaps at that page's scope. Loading of the fresh build, retention after clearing, and the other acceptance gaps above remain unverified.
+Native observation in a loaded host is pending for this candidate: the extraction decision's final acceptance item, in which the rebuilt toolkit loads in a new Claude Code session, the Interface Lab page opens and one host interface call returns a result, has not been observed. Native acceptance of all 22 operations in both hosts remains pending as stated in Hostpane's [2026-10-14 baseline](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md#current-baseline-plugin-base-local-capabilities-and-interface-lab-2026-10-14).
 
 ## Historical baseline: unified host Port implementation, 2026-10-13
 
@@ -326,7 +160,7 @@ The current source implements one shared Graph canvas, reusable host operations,
 | --- | --- |
 | One shared interface and explicit Graph boundary | **Implemented in current source.** `ui/template/canvas.html`, `ui/canvas/`, `ui/interface_lab/` and `ui/host_status/` compose the page; `application/graph/` owns source, projection, document, demo, service and sample arguments. The 15 names come from `ports/host/catalog.mjs`, and argument/result validation from `contract.mjs`. Graph MCP `show_graph`/`inspect_graph` remain business entry points. |
 | Truthful connection authority and native routes | **Implemented and source-tested in bounded cases.** Startup chooses only transport. Factory/facade select a driver after connection identity and capability inspection. Codex uses official `App`/`PostMessageTransport`; Claude uses authenticated same-origin HTTP and Mod session/tool facts. Neither route uses an Agent request to stand in for a generic native file, directory or direct tool operation. Both report generic directory reveal unknown and generic view open/close unknown. Claude has a conditional complete-session route for `skills.list`; Codex has no confirmed equivalent. Graph presentation still has its separate host flow. |
-| Local verification | **The three added guards passed the full JavaScript suite:** `npm test` reported **168/168 passed** and related targeted tests **19/19 passed** after the Claude session API capability gate, Codex `-32603` uncertain-receipt guard and unexpected `{isError:true}` update-receipt regression; `npm run typecheck` and `npm run build` also passed after these changes. The [2026-10-14 execution report](evidence/prime-interface-20261013/summary.md) records Ruff, strict mypy over 149 source files, lint-imports, the manifest validator and the repository-wide Python suite (**1,813 passed, 1 skipped**); the full Python pass preceded the later JavaScript-only changes. `uv build --no-sources` produced the independent Python runtime's wheel and source distribution. `pip-audit` found no known vulnerabilities among resolved third-party distributions and skipped the unpublished local project. These are local source, simulated host protocol and build checks; native Desktop effects need separate evidence. |
+| Local verification | **The three added guards passed the full JavaScript suite:** `npm test` reported **168/168 passed** and related targeted tests **19/19 passed** after the Claude session API capability gate, Codex `-32603` uncertain-receipt guard and unexpected `{isError:true}` update-receipt regression; `npm run typecheck` and `npm run build` also passed after these changes. The [2026-10-14 execution report](https://github.com/SevenX77/hostpane/blob/main/evidence/prime-interface-20261013/summary.md) records Ruff, strict mypy over 149 source files, lint-imports, the manifest validator and the repository-wide Python suite (**1,813 passed, 1 skipped**); the full Python pass preceded the later JavaScript-only changes. `uv build --no-sources` produced the independent Python runtime's wheel and source distribution. `pip-audit` found no known vulnerabilities among resolved third-party distributions and skipped the unpublished local project. These are local source, simulated host protocol and build checks; native Desktop effects need separate evidence. |
 | Real hosts and distribution | **Unverified for this source.** Actual installed Desktop loading, all 15 native effects, retained document/current canvas after normal work, session isolation, release archives and publication need their own candidate-bound observations. Previous 0.3.4 native ledgers cannot supply those results for changed bytes. |
 
 The preceding source checkpoint passed 87 JavaScript cases and 1,813 Python cases with one skip; those results belong to its earlier working tree. In the current integration, an initial Python run encountered Windows temporary-path length and terminal-width failures. Focused reruns isolated those invocation conditions, and the full passing run used a short temporary root and an explicit terminal type; product code and test assertions were unchanged for that rerun. The passing local checks do not bind an installed Desktop, a release archive or a published candidate.
@@ -335,7 +169,7 @@ The preceding source checkpoint passed 87 JavaScript cases and 1,813 Python case
 
 The [catalog](ports/host/catalog.mjs) imports 15 shared definitions from [`host_interfaces/`](host_interfaces/). Each operation directory contains its shared `index.mjs` and both `codex.mjs` and `claude.mjs`. The [Codex registry](adapters/codex/driver/registry.mjs) and [Claude registry](adapters/claude/mod/operations/registry.mjs) each map all 15 names. The [contract test](tests/host/contract.test.mjs) checks that both registries match the catalog and that every generic sample validates without a Graph Skill root. [ADAPTER.md](ADAPTER.md#interface-contract) owns the individual input, effect, scope and host route.
 
-The table reports routes under representative *simulated* host declarations: Codex advertises file opening, `message.text`, the `openai/message` draft extension, `updateModelContext.structuredContent` and originating-server tools plus `fullscreen` display; Claude's Mod reports its session, file-pane, browser-tab and Skill tools. A different live connection may report `unavailable` when an advertised feature is absent. `Conditional` means the source can attempt the specified native route when its session requirements hold; it does not mean that a current Desktop has loaded the source or produced the effect. `Unknown` means the current adapter has no confirmed equivalent native route, not that the product permanently lacks one. The current `files.revealDirectory` effect locates a directory inside the host's own file browser; the earlier Codex Explorer observation measured a different effect. The [15 independent interface reports](evidence/prime-interface-20261013/summary.md) give each route's evidence and smallest remaining native check.
+The table reports routes under representative *simulated* host declarations: Codex advertises file opening, `message.text`, the `openai/message` draft extension, `updateModelContext.structuredContent` and originating-server tools plus `fullscreen` display; Claude's Mod reports its session, file-pane, browser-tab and Skill tools. A different live connection may report `unavailable` when an advertised feature is absent. `Conditional` means the source can attempt the specified native route when its session requirements hold; it does not mean that a current Desktop has loaded the source or produced the effect. `Unknown` means the current adapter has no confirmed equivalent native route, not that the product permanently lacks one. The current `files.revealDirectory` effect locates a directory inside the host's own file browser; the earlier Codex Explorer observation measured a different effect. The [15 independent interface reports](https://github.com/SevenX77/hostpane/blob/main/evidence/prime-interface-20261013/summary.md) give each route's evidence and smallest remaining native check.
 
 | Interface | Codex source route | Claude source route | Outstanding native observation |
 | --- | --- | --- | --- |
@@ -355,7 +189,7 @@ The table reports routes under representative *simulated* host declarations: Cod
 | `skills.list` | Unknown | Conditional when the current Mod session exposes `session.usage` | Confirm the Claude session usage summary is complete and its returned names match the current loaded session; establish a Codex native inventory route. |
 | `skills.invoke` | Unknown | Conditional | Verify Claude's direct Skill tool activation receipt separately from the Skill's business result. |
 
-This source inventory has **8 conditional and 7 unknown Codex routes**, and **11 conditional and 4 unknown Claude routes** when the simulated Claude session exposes `session.usage`. The [Claude registry](adapters/claude/mod/operations/registry.mjs) declares `skills.list` available only with that method on the current Mod session; an observed session without it is unavailable, and missing session API evidence is unknown. The [skills.list module](host_interfaces/skills/list/claude.mjs) reads `session.usage({breakdown:"summary"})` and returns names only when the host's Skill total, included count and frontmatter entry count are equal. The [skills.list source report](evidence/prime-interface-20261013/results/skills_list.md) records a read-only comparison of the then-current official Mod declarations with the saved early-access Claude Code `2.1.277` type snapshot; those declarations describe the API and listing's token budget. A token-budget-truncated list is `unsupported`; a malformed summary cannot become a complete inventory. The Skill invocation entry point alone does not list Skill names.
+This source inventory has **8 conditional and 7 unknown Codex routes**, and **11 conditional and 4 unknown Claude routes** when the simulated Claude session exposes `session.usage`. The [Claude registry](adapters/claude/mod/operations/registry.mjs) declares `skills.list` available only with that method on the current Mod session; an observed session without it is unavailable, and missing session API evidence is unknown. The [skills.list module](host_interfaces/skills/list/claude.mjs) reads `session.usage({breakdown:"summary"})` and returns names only when the host's Skill total, included count and frontmatter entry count are equal. The [skills.list source report](https://github.com/SevenX77/hostpane/blob/main/evidence/prime-interface-20261013/results/skills_list.md) records a read-only comparison of the then-current official Mod declarations with the saved early-access Claude Code `2.1.277` type snapshot; those declarations describe the API and listing's token budget. A token-budget-truncated list is `unsupported`; a malformed summary cannot become a complete inventory. The Skill invocation entry point alone does not list Skill names.
 
 The [Codex SDK bridge test](tests/host/sdk.test.mjs) exercises identity, advertised capabilities and direct `App.callServerTool` delivery. The [driver tests](tests/adapters/codex/driver.test.mjs) prove `tools.list` calls `list_canvas_tools` and rejects session scope. The [real MCP standard-input/output test](tests/integration/protocol.test.mjs) observes three registered tools and the two-item page-callable list (`inspect_graph`, `list_canvas_tools`). [Server registration](server/main.mjs) declares `list_canvas_tools` app-visible and read-only. Claude's [operations tests](tests/adapters/claude/operations.test.mjs) use a simulated Mod session and tools plus a real loopback HTTP bridge. The [interface tests](tests/host/interfaces/) exercise each mapping and negative boundary. These checks establish dispatch, validation and protocol behavior in their tested environments. Native Desktop effects require separate observation.
 

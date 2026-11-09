@@ -10,15 +10,15 @@ The following terms are used throughout:
 
 - **MCP** (Model Context Protocol) is the channel through which a host calls a plugin's tools and reads its resources. The toolkit's plugin process is an MCP server that the host starts and talks to over standard input and output.
 - An **MCP App** is an MCP resource containing an HTML page that the host renders in a sandboxed frame. Codex displays the canvas as an MCP App.
-- A **Claude Mod** is plugin code loaded into Claude Code's own session. It reads session facts, runs host tools and relays host events for the toolkit's pages.
+- A **Claude Mod** is plugin code loaded into Claude Code's own session. It reads session facts, runs host tools and relays host events for the canvas page.
 - **Loopback** is the local network address of the same computer, `127.0.0.1`. A loopback listener accepts connections only from programs on that computer.
 - **SSE** (Server-Sent Events) is an HTTP response that stays open and delivers successive data messages.
 - A **long poll** is a request the server holds open until new data exists or a time limit passes.
 - A **bearer credential** is a random token whose possession authorizes a defined scope of requests.
-- **Hostpane** is the toolkit's host-integration layer, a separately versioned package in the private GitHub repository [`SevenX77/hostpane`](https://github.com/SevenX77/hostpane): the page-side host adapter, the server-side process and presentation helpers, the Claude Mod hooks, the local capabilities and the page-trigger runner. Hostpane's own code calls this layer the Plugin Base, which is why its Mod entry is named `registerPluginBase` and its page snapshot element is `plugin-base-snapshot`.
-- A **commit pin** is a dependency declaration naming one exact 40-hexadecimal git commit, so every install reads the same bytes. The toolkit's [`package.json`](package.json) pins Hostpane as `"hostpane": "git+https://github.com/SevenX77/hostpane.git#1d656b42227fc68203807b93fa57383a6a8f6d0e"`; a Hostpane change reaches the toolkit only when that pin is updated.
+- **Hostpane** is the toolkit's host-integration layer, a separately versioned package in the private GitHub repository [`SevenX77/hostpane`](https://github.com/SevenX77/hostpane): the page-side host adapter, the server-side process and presentation helpers, the Claude Mod hooks, the local capabilities and the page-trigger runner. Hostpane's own code calls this layer the Plugin Base, which is why its Mod entry is named `registerPluginBase` and its page snapshot element is `plugin-base-snapshot`. Hostpane also holds its own test page, the Interface Lab, which its developer plugin `hostpane-lab` serves; [Hostpane's `docs/LAB.md`](https://github.com/SevenX77/hostpane/blob/main/docs/LAB.md) documents the lab and that plugin.
+- A **commit pin** is a dependency declaration naming one exact 40-hexadecimal git commit, so every install reads the same bytes. The toolkit's [`package.json`](package.json) pins Hostpane as `"hostpane": "git+https://github.com/SevenX77/hostpane.git#157141ef86f9fdc6aa67a479efe28a864a2267b4"`; a Hostpane change reaches the toolkit only when that pin is updated.
 - A **Port** is a host-neutral contract that an adapter implements through a particular system.
-- A **business app** is one unit of plugin functionality built on Hostpane. The toolkit has two: the Graph Skill canvas and the Plugin Interface Lab.
+- A **business app** is one unit of plugin functionality built on Hostpane. The toolkit has one: the Graph Skill canvas, in `apps/graph_canvas/`.
 
 The toolkit source sits at `src/graph_skill_toolkit/` beside `src/graph_skill_runtime/`, the separately packaged Python runtime. The runtime owns compilation and execution, and it is the single authority for gSkill validity and its messages. A compile diagnostic is one structured finding from the runtime command `compile --no-cache <root>`, carrying a code, severity, message, source path, line and field path. The toolkit draws only graphs the runtime accepts: its graph reader projects the root topology and phase kinds of an accepted graph for display. For a graph the runtime rejects, the toolkit shows the runtime's compile diagnostics verbatim. [The canvas diagnostics decision record](../../docs/design/canvas-runtime-diagnostics-2026-10-14.md) records this ownership, [the Plugin Base decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) records the division into a host-integration layer, business apps and composition root, and [the Hostpane extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) records why that layer is the separate package Hostpane and how the toolkit depends on it.
 
@@ -31,7 +31,7 @@ src/graph_skill_toolkit/
     triggers.mjs                   the toolkit's page-trigger declaration: page tools, rule files, source folder
     after_tool.mjs                 the PostToolUse hook entry, Hostpane's runTriggerHook with that declaration
     claude_mod/{.claude-plugin/plugin.json,hooks/hooks.json,hooks/register.js}
-                                   the one Claude Mod, presenting every app's page
+                                   the one Claude Mod, presenting the canvas page
   apps/graph_canvas/               the Graph Skill canvas app
     server/app.mjs                 show_graph, inspect_graph, watch_graph and the canvas resource
     app/{main.tsx,composition.mjs} page entry and pairing of host adapter with graph transport
@@ -50,20 +50,7 @@ src/graph_skill_toolkit/
     claude_mod/{page.js,payload.js}
                                    the canvas page as the Claude Mod presents it
     triggers.json                  the canvas's page-trigger rule graph-skill.root
-  apps/interface_lab/              the Plugin Interface Lab app (developer tool)
-    server/app.mjs                 open_interface_lab, lab_echo, lab_triggers and the lab resource
-    server/state.mjs               lab state directory location and preparation
-    server/triggers.mjs            trigger probe, lab openings that named a firing, read-only trigger views
-    triggers.json                  the lab's probe rule interface-lab.probe
-    app/main.tsx, ui/{index.tsx,template/lab.html}
-                                   lab page entry, UI and template
-    ui/triggers.tsx                the 触发 (Triggers) mode's three views
-    application/{guide.mjs,runner.mjs}
-                                   per-operation guidance and call runner
-    application/result_status/     captured host identity and display label for each lab call
-    application/connection_status/ one reading of the latest call for its record and its interface signal
-    claude_mod/page.js             the lab page as the Claude Mod presents it
-  skills/{graph-skill,graph-skill-canvas,plugin-interface-lab}/
+  skills/{graph-skill,graph-skill-canvas}/
                                    host instruction assets
   plugin.json, mcp.json, .claude-plugin/plugin.json, hooks/hooks.json
                                    plugin manifests: MCP server entry and page-trigger hook
@@ -74,12 +61,12 @@ src/graph_skill_toolkit/
                                    build, local preview host, Codex connection check, installer packaging
   bin/graph-skill.mjs              global command dispatch
   npm/                             lightweight npm entry
-  tests/{backend,graph,installation,integration,interface_lab,support}/
+  tests/{backend,graph,installation,integration,support}/
                                    tests grouped by the boundary they exercise; integration
                                    tests run the built dist/server.mjs over real stdio
 ```
 
-The toolkit consists of business apps (`apps/graph_canvas`, `apps/interface_lab`), the composition root (`composition/`), the installer, build and support scripts, host instruction assets and tests. It depends on Hostpane, installed under `node_modules/hostpane` from the commit pin, for the host-integration layer.
+The toolkit consists of one business app (`apps/graph_canvas`), the composition root (`composition/`), the installer, build and support scripts, host instruction assets and tests. It depends on Hostpane, installed under `node_modules/hostpane` from the commit pin, for the host-integration layer.
 
 Toolkit code reaches Hostpane only through the five package exports `hostpane/page`, `hostpane/page/types`, `hostpane/server`, `hostpane/claude-mod` and `hostpane/triggers` (Node only); for example [the composition root](composition/server.mjs) imports `servePlugin` from `hostpane/server`, and [the hook entry](composition/after_tool.mjs) imports `runTriggerHook` from `hostpane/triggers`. [Hostpane's closure rule](https://github.com/SevenX77/hostpane/blob/main/README.md#closure-rule) owns the entry boundary. [The toolkit boundary test](tests/graph/hostpane-boundary.test.mjs) enforces the toolkit side: production code imports only those five specifiers, and `package.json` pins Hostpane by a 40-hexadecimal commit. [Hostpane's closure test](https://github.com/SevenX77/hostpane/blob/main/tests/base/closure.test.mjs) enforces the package side.
 
@@ -87,7 +74,14 @@ The canvas page's [entry](apps/graph_canvas/app/main.tsx) calls [the page compos
 
 ## Plugin process and composition
 
-The toolkit runs exactly one plugin process per host MCP connection. [The composition root](composition/server.mjs) names that process `graph-skill-canvas`, so Claude Code exposes its tools as `mcp__graph-skill-canvas__<tool>`. It always serves the Graph Skill canvas app. It adds the Plugin Interface Lab app only when the environment variable `GRAPH_SKILL_INTERFACE_LAB` equals `1`; the installer sets that variable in source test mode only.
+The toolkit runs exactly one plugin process per host MCP connection. [The composition root](composition/server.mjs) names that process `graph-skill-canvas`, so Claude Code exposes its tools as `mcp__graph-skill-canvas__<tool>`. It serves the Graph Skill canvas app, the one entry of its app list:
+
+```js
+const apps = [graphCanvasApp];
+await servePlugin({ serverInfo: Object.freeze({ name: PLUGIN_NAME, version: packageInfo.version }), apps });
+```
+
+Here `PLUGIN_NAME` is `"graph-skill-canvas"`, exported by [`composition/triggers.mjs`](composition/triggers.mjs).
 
 [`servePlugin`](https://github.com/SevenX77/hostpane/blob/main/src/server/serve.mjs), imported from `hostpane/server`, builds the process in two scopes:
 
@@ -97,12 +91,17 @@ The toolkit runs exactly one plugin process per host MCP connection. [The compos
 The registered MCP tools and their visibility are:
 
 - Canvas: `show_graph` (model-visible; opens the canvas), `inspect_graph` (model- and page-visible; read-only graph read), `watch_graph` (page-only; long poll for graph changes).
-- Interface Lab, when enabled: `open_interface_lab` (model-visible; opens the lab; its optional inputs `route`, a lab route such as `trigger/test`, and `trigger_firing`, the id of the page-trigger firing that asked for the call, select the opening view and record the arrival), `lab_echo` (model- and page-visible; side-effect-free target for `tools.call`), `lab_triggers` (model- and page-visible; the trigger views' actions `state`, `prepare` and `evaluate`: the rules in effect, the latest firings, the probe and the lab openings that named a firing; probe preparation; and a dry run that writes no state).
 - Hostpane: `list_page_tools` (page-only; read-only), `local_call` and `local_events` (page-only; the Codex route to local capabilities).
 
-The canvas lists `inspect_graph` and `watch_graph` as page-callable tools; the lab lists `lab_echo` and `lab_triggers`. A page-only tool carries visibility `["app"]`, so the host never offers it to the model.
+The canvas lists `inspect_graph` and `watch_graph` as page-callable tools. A page-only tool carries visibility `["app"]`, so the host never offers it to the model.
 
-The Claude side has one Mod per installed toolkit. [Its registration](composition/claude_mod/hooks/register.js) calls `registerPluginBase` from `hostpane/claude-mod` with the Mod's own plugin name `graph-skill-canvas-mod`, the `name` in [its manifest](composition/claude_mod/.claude-plugin/plugin.json), and both page definitions: [the canvas page](apps/graph_canvas/claude_mod/page.js) for `show_graph` and [the lab page](apps/interface_lab/claude_mod/page.js) for `open_interface_lab`. For each page tool, the Mod's hooks supply the actual session root and confirmed session identity, request HTML presentation and guide the Browser-pane preview sequence; each page also registers a slash command that returns its latest HTML link.
+The Claude side has one Mod per installed toolkit. [Its registration](composition/claude_mod/hooks/register.js) calls `registerPluginBase` from `hostpane/claude-mod` with the Mod's own plugin name `graph-skill-canvas-mod`, the `name` in [its manifest](composition/claude_mod/.claude-plugin/plugin.json), and its one page definition, [the canvas page](apps/graph_canvas/claude_mod/page.js) for `show_graph`:
+
+```js
+registerPluginBase(on, { pluginName: 'graph-skill-canvas-mod', pages: [canvasPage] });
+```
+
+For the page tool, the Mod's hooks supply the actual session root and confirmed session identity, request HTML presentation and guide the Browser-pane preview sequence; the page also registers a slash command that returns its latest HTML link.
 
 ## Loopback listener and route owners
 
@@ -157,18 +156,18 @@ The page's graph client cancels its current request when the selected root chang
 
 Process cleanup runs once, triggered by standard-input end or closure, `SIGINT` or `SIGTERM` in [`servePlugin`](https://github.com/SevenX77/hostpane/blob/main/src/server/serve.mjs). It proceeds in this order:
 
-1. Every app owner closes. The canvas closes its graph relay, then its graph backend, which clears every graph credential, ends every graph stream and closes the live source with all its watchers and timers; it then removes the exact temporary preview entries it merged into a project's `.claude/launch.json`. The lab removes its own preview entries.
+1. Every app owner closes. The canvas closes its graph relay, then its graph backend, which clears every graph credential, ends every graph stream and closes the live source with all its watchers and timers; it then removes the exact temporary preview entries it merged into a project's `.claude/launch.json`.
 2. The local capabilities close every page connection, removing its credential, stopping its file watches and releasing its waiting event requests.
 3. The Claude host bridge settles every outstanding action receipt: an action already delivered to the Mod is reported `pending` with an unknown outcome, and an undelivered action is reported `error`. It then clears its credentials and pages.
 4. The listener closes and drops every open connection. On a signal, the MCP standard-input/output transport also closes.
 
 ## Local capabilities in the process
 
-`servePlugin` creates one local-capability executor in the plugin's Node.js process and one connection per MCP session. Each app's `register` receives that same session connection. The canvas adds each selected skill root to its grants; the lab adds its state directory. All pages in the session therefore use the combined grants. The architecture's isolation unit is the MCP session. [Hostpane's local capability reference](https://github.com/SevenX77/hostpane/blob/main/README.md#local-capability-reference) owns file-scope checks, operation arguments, limits, evidence and platform commands.
+`servePlugin` creates one local-capability executor in the plugin's Node.js process and one connection per MCP session. Each app's `register` receives that same session connection. The canvas adds each selected skill root to the session connection's grants, so every canvas page of the session uses those grants. The architecture's isolation unit is the MCP session. [Hostpane's local capability reference](https://github.com/SevenX77/hostpane/blob/main/README.md#local-capability-reference) owns file-scope checks, operation arguments, limits, evidence and platform commands.
 
 The page snapshot declares a local route. Claude uses authenticated loopback HTTP, and Codex uses page-only MCP tools. [Hostpane's adapter architecture](https://github.com/SevenX77/hostpane/blob/main/docs/ADAPTER.md#local-capability-transports) owns these transports. The canvas's graph reading and watching stays in the server app's business logic through Node.js directly.
 
-The page local client's `dispose()` clears its listeners. The server connection owns watches and credentials until `stop()`/`close()` or process cleanup; page-client disposal alone leaves server watches active. Process cleanup closes every local connection. The [manual procedure](MANUAL-TESTS.md#settlement-and-reporting) includes explicit subscription and watch settlement.
+The page local client's `dispose()` clears its listeners. The server connection owns watches and credentials until `stop()`/`close()` or process cleanup; page-client disposal alone leaves server watches active. Process cleanup closes every local connection. [Hostpane's manual procedure](https://github.com/SevenX77/hostpane/blob/main/docs/MANUAL-TESTS.md#settlement-and-reporting) includes explicit subscription and watch settlement on the Interface Lab.
 
 ## Host operations and presentation
 
@@ -176,15 +175,19 @@ The page reaches its host through Hostpane's host adapter. Startup data chooses 
 
 `show_graph` selects the root, returns graph diagnostics and provides the host-specific presentation. In Codex the presentation is the MCP App view attached to the tool result; [Hostpane's Codex session module](https://github.com/SevenX77/hostpane/blob/main/src/adapters/codex/presentation/session/index.mjs) reuses one view per root. In Claude Code the presentation is the owned loopback HTTP page shown in the Browser pane: [Hostpane's preview configuration](https://github.com/SevenX77/hostpane/blob/main/src/adapters/claude/presentation/preview_configuration/index.mjs) merges one temporary attach entry for the listener's origin into the session project's `.claude/launch.json`, and the Mod's guidance drives `preview_start`, navigation and tab selection. `inspect_graph` performs an explicit read of a root already selected with `show_graph` in the same session. The generic `views.*` host interfaces are a separate function from this graph display flow.
 
-The Plugin Interface Lab is a developer page served only in source test mode. `open_interface_lab` opens it as an MCP App in Codex and as a loopback HTTP page in Claude Code; the developer chooses each operation to run and compares its evidence with the actual effect, and its 触发 (Triggers) mode explains and tests page triggers. [PROTOTYPE.md](PROTOTYPE.md#plugin-interface-lab-page) owns the lab's visible behavior and state locations. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns its native procedure.
-
 ### Page triggers
 
 A page trigger is Hostpane's third interface kind, acting in the direction host activity → page: after a host tool call that changes or uses files a page presents, the toolkit's PostToolUse hook returns guidance asking the agent to call that page's tool. [Hostpane's page-trigger reference](https://github.com/SevenX77/hostpane/blob/main/README.md#page-triggers) owns the rule format, the firing reasons, the ignore list, the state and the guidance text; this section owns the toolkit's declaration and rules.
 
-**The hook entry.** [`composition/after_tool.mjs`](composition/after_tool.mjs), bundled to `dist/after-tool.mjs`, runs Hostpane's `runTriggerHook` with `toolkitTriggersAt(<folder of the bundle>)`. The toolkit installer registers it as the PostToolUse command in `~/.claude/settings.json` for Claude Code and in `~/.codex/hooks.json` for Codex. [`composition/triggers.mjs`](composition/triggers.mjs) builds the declaration for that folder: the plugin name `graph-skill-canvas`, the page tools, the rule files, the ignore list `open_skill_folder` and `open_in_codex`, and the source folder. The composition root passes the same declaration to the lab app, so the lab shows the rules the hook uses.
+**The hook entry.** [`composition/after_tool.mjs`](composition/after_tool.mjs), bundled to `dist/after-tool.mjs`, runs Hostpane's `runTriggerHook` with `toolkitTriggersAt(<folder of the bundle>)`. The toolkit installer registers it as the PostToolUse command in `~/.claude/settings.json` for Claude Code and in `~/.codex/hooks.json` for Codex. [`composition/triggers.mjs`](composition/triggers.mjs) builds the declaration for that folder from the canvas rule file:
 
-**The canvas rule.** [`apps/graph_canvas/triggers.json`](apps/graph_canvas/triggers.json) holds the rule `graph-skill.root`:
+```js
+return { name: PLUGIN_NAME, pageTools, ignoreTools: ["open_skill_folder", "open_in_codex"], rules, source };
+```
+
+Here `name` is `graph-skill-canvas`, `pageTools` is `["show_graph"]`, `rules` holds the one rule of `apps/graph_canvas/triggers.json` and `source` is the rebuild step described below, or `null` in an installed release.
+
+**The canvas rule.** [`apps/graph_canvas/triggers.json`](apps/graph_canvas/triggers.json) holds the rule `graph-skill.root`, labelled `Graph Skill 画布` ("Graph Skill canvas"):
 
 ```json
 {
@@ -199,41 +202,59 @@ A page trigger is Hostpane's third interface kind, acting in the direction host 
 
 A Graph Skill root is the nearest folder holding both `SKILL.md` and `graph.yaml`. An `Edit` of `examples/hello-world/graph.yaml` therefore asks for `show_graph` with `skill_root` set to the absolute path of `examples/hello-world`; an `mcp__gskill__compile` call naming that root, or a shell command starting `gskill` inside it, asks for the same call without a file change. Reading or listing a skill's files fires nothing. The business `SKILL.md` remains user-owned and is reachable on request through the host's file tools.
 
-**The lab's probe rule.** [`apps/interface_lab/triggers.json`](apps/interface_lab/triggers.json) holds `interface-lab.probe`, whose root is a folder holding `TRIGGER-PROBE.md` and whose page call is `open_interface_lab` with `{ "route": "trigger/test" }` and `trigger_firing` set to the firing's id. The rule and the page tool `open_interface_lab` belong to the declaration only when `interface-lab.html` lies beside the bundle, which is true of a source build and false of the installed release. The lab's end-to-end trigger test asks the agent to edit the probe file `probe.txt` in that folder; [PROTOTYPE.md](PROTOTYPE.md#trigger-mode) describes it.
+**The rebuild step.** When the folder above the bundle holds the toolkit's `package.json` (name `graph-skill-toolkit`, with a `build` script), the declaration's source is that folder with the command `npm run build`. A firing whose root or files lie inside it, or whose root contains it, makes the guidance ask the agent to run `npm run build` there first. In this checkout the source is `{ root: "<repository root>/src/graph_skill_toolkit", build: "npm run build" }`, because the bundle folder is `src/graph_skill_toolkit/dist/`. An installed release has no source folder and no rebuild step.
 
-**The rebuild step.** When the folder above the bundle holds the toolkit's `package.json` (name `graph-skill-toolkit`, with a `build` script), the declaration's source is that folder with the command `npm run build`. A firing whose root or files lie inside it, or whose root contains it, makes the guidance ask the agent to run `npm run build` there first. An installed release has no source folder and no rebuild step.
+**The repository's project rules.** This repository declares, in [`.hostpane/triggers.json`](../../.hostpane/triggers.json) at its root, which of its files the canvas presents:
 
-**The repository's project rules.** This repository declares, in `.hostpane/triggers.json` at its root, which of its files the toolkit's pages present. Each rule has the `paths` scope, relative to the repository root:
+```json
+{
+  "schema": "hostpane.triggers.v1",
+  "rules": [
+    {
+      "id": "graph-canvas.source",
+      "label": "画布源码",
+      "plugin": "graph-skill-canvas",
+      "scope": { "kind": "paths", "include": ["src/graph_skill_toolkit/apps/graph_canvas/**"] },
+      "pages": [{ "tool": "show_graph", "pathArguments": { "skill_root": "examples/hello-world" } }]
+    },
+    {
+      "id": "toolkit.shared",
+      "label": "组装与构建",
+      "plugin": "graph-skill-canvas",
+      "scope": { "kind": "paths", "include": [
+        "src/graph_skill_toolkit/composition/**",
+        "src/graph_skill_toolkit/scripts/build/**",
+        "src/graph_skill_toolkit/package.json",
+        "vendor/ui-ux-template/core/**"
+      ] },
+      "pages": [{ "tool": "show_graph", "pathArguments": { "skill_root": "examples/hello-world" } }]
+    }
+  ]
+}
+```
 
-| Rule | Files | Page calls |
-| --- | --- | --- |
-| `interface-lab.source` (Interface Lab 源码) | `src/graph_skill_toolkit/apps/interface_lab/**` | `open_interface_lab {}` |
-| `graph-canvas.source` (画布源码) | `src/graph_skill_toolkit/apps/graph_canvas/**` | `show_graph` with `skill_root` set to `examples/hello-world` |
-| `toolkit.shared` (两个页面共用的部分) | `src/graph_skill_toolkit/composition/**`, `src/graph_skill_toolkit/scripts/build/**`, `src/graph_skill_toolkit/package.json`, `vendor/ui-ux-template/core/**` | `open_interface_lab {}` and `show_graph` with `skill_root` set to `examples/hello-world` |
+The label `画布源码` reads "canvas source" and `组装与构建` reads "assembly and build". Each rule has the `paths` scope, relative to the repository root, and both rules open the canvas on `examples/hello-world`. `graph-canvas.source` covers the canvas app's own source; `toolkit.shared` covers the composition root, the build script, the toolkit's `package.json` and the template core, which every build of the canvas includes. The root of these rules is the repository root, which contains the toolkit source folder, so each of their firings in a source build carries the rebuild step. For example, an `Edit` of `src/graph_skill_toolkit/apps/graph_canvas/ui/workbench/index.tsx` fires `graph-canvas.source`; its guidance names `Rule graph-canvas.source (画布源码), Edit wrote …: call show_graph of the graph-skill-canvas MCP server with {"skill_root":"<repository root>/examples/hello-world"}` and asks the agent to run `npm run build` in `src/graph_skill_toolkit` first, as [the built-hook test](tests/graph/graph-and-hook.test.mjs) asserts. A Hostpane change reaches the canvas by moving the commit pin in `src/graph_skill_toolkit/package.json`, which fires `toolkit.shared`.
 
-The root of these rules is the repository root, which contains the toolkit source folder, so each of their firings in a source build carries the rebuild step. A Hostpane change reaches the pages by moving the commit pin in `src/graph_skill_toolkit/package.json`, which fires `toolkit.shared`. In a build without the lab, `open_interface_lab` is no page tool, so the rules `interface-lab.source` and `toolkit.shared` are invalid in that build and skipped. The hook reports nothing about them; `evaluateTriggers` lists them in its `projectProblems`, which only the lab's 规则与记录 view shows, so a build without the lab has no place where an agent or developer sees them.
-
-**Where firings are logged.** The hook appends each firing to `firings.jsonl` in Hostpane's trigger state directory for `graph-skill-canvas`: `%LOCALAPPDATA%\hostpane\triggers\graph-skill-canvas` on Windows, `~/Library/Application Support/hostpane/triggers/graph-skill-canvas` on macOS, and otherwise `$XDG_STATE_HOME/hostpane/triggers/graph-skill-canvas` or `~/.local/state/hostpane/triggers/graph-skill-canvas`. The lab's 规则与记录 (Rules and log) view shows the latest 20.
+**Where firings are logged.** The hook appends each firing to `firings.jsonl` in Hostpane's trigger state directory for `graph-skill-canvas`: `%LOCALAPPDATA%\hostpane\triggers\graph-skill-canvas` on Windows, `~/Library/Application Support/hostpane/triggers/graph-skill-canvas` on macOS, and otherwise `$XDG_STATE_HOME/hostpane/triggers/graph-skill-canvas` or `~/.local/state/hostpane/triggers/graph-skill-canvas`. Hostpane's `readFirings`, exported by `hostpane/triggers`, returns the logged firings newest first.
 
 ## Build outputs
 
 [The build script](scripts/build/main.mjs) (`npm run build`) uses esbuild to produce every runtime file under `dist/`:
 
-- `dist/server.mjs`: the plugin process, bundled from [`composition/server.mjs`](composition/server.mjs) for Node.js 22, including both business apps and the Hostpane modules they import.
+- `dist/server.mjs`: the plugin process, bundled from [`composition/server.mjs`](composition/server.mjs) for Node.js 22, including the canvas app and the Hostpane modules it imports.
 - `dist/canvas.html`: the canvas page, one self-contained HTML file with its script bundle inlined into [the canvas template](apps/graph_canvas/ui/template/canvas.html).
-- `dist/interface-lab.html`: the lab page, built the same way from [the lab template](apps/interface_lab/ui/template/lab.html).
 - `dist/claude-mod/`: the Claude Mod, with `hooks/register.js` bundled from [the Mod registration](composition/claude_mod/hooks/register.js) and its `hooks.json` and `.claude-plugin/plugin.json` copied from `composition/claude_mod/`.
 - `dist/after-tool.mjs`: the page-trigger hook, bundled from [`composition/after_tool.mjs`](composition/after_tool.mjs) with the rule files and the Hostpane trigger modules it imports.
 - `dist/installer.mjs`: the npm installer entry, bundled for Node.js 18.
 
-Each enabled app reads its page HTML beside the bundled server through Hostpane's `createPageFile`, once at module load and again on each page open whose file has a different size or modification time. A rebuilt page therefore shows on its next open without restarting the server; a change to server code takes effect in a new server process. The canvas requires `dist/canvas.html`; enabling the lab also requires `dist/interface-lab.html` there. Source builds produce both files; the installed release bundle contains the canvas page and enables the canvas app. The plugin manifests [`mcp.json`](mcp.json) and [`hooks/hooks.json`](hooks/hooks.json) point hosts at `dist/server.mjs` and `dist/after-tool.mjs`.
+The canvas app reads its page HTML `dist/canvas.html` beside the bundled server through Hostpane's `createPageFile` (`createPageFile(new URL("./canvas.html", import.meta.url))` in [`apps/graph_canvas/server/app.mjs`](apps/graph_canvas/server/app.mjs)), once at module load and again on each page open whose file has a different size or modification time. A rebuilt page therefore shows on its next open without restarting the server; a change to server code takes effect in a new server process. Source builds and the installed release bundle both carry `dist/canvas.html`. The plugin manifests [`mcp.json`](mcp.json) and [`hooks/hooks.json`](hooks/hooks.json) point hosts at `dist/server.mjs` and `dist/after-tool.mjs`.
 
 ## Installation and source selection
 
 The installer is separate from the pages and the plugin process. `installer/download/`, `archive/`, `discovery/`, `hosts/`, `ownership/`, `locking/`, `runtime_layout/`, `runtime_payload/`, `install/`, `entry/`, `bundle/` and `verify_bundle/` own release acquisition, host projection, state ownership and archive assembly. [Bundle assembly](installer/bundle/__init__.py) packs the release payload: `dist/server.mjs`, `dist/after-tool.mjs`, `dist/canvas.html`, `dist/installer.mjs`, the built `claude-mod/` files and the `graph-skill` and `graph-skill-canvas` Skills.
 
-The [mode selector](installer/mode/__init__.py) changes which toolkit payload the installed user profiles reference. [Command dispatch](bin/graph-skill.mjs) builds a selected source for test mode and launches the mode entry with the installed private Python runtime. [Host projections](installer/hosts/__init__.py) render the plugin server, page-trigger hook, Skills and Claude Mod paths for either payload. In source test mode only, the projections also set `GRAPH_SKILL_INTERFACE_LAB=1` in both hosts' MCP server entries and install the `plugin-interface-lab` Skill; installed release mode serves neither. [The installation planner](installer/install/__init__.py) verifies the immutable release and managed resources, and the selector records `source_mode`, the test root and hashes of the built assets, the source command and the Skills' Markdown in the installation manifest. The command applies configuration and manifest changes under the installer lock, and a repeated selection with matching hashes and owned resources returns `unchanged` without writing. The installed release supplies private Node.js and Python and the command launchers. A source path, a built payload, a configured host profile and a loaded host process are separate identities; selection and source tests do not establish a host session's behavior, and a host loads a selected server and Mod only after it reloads.
+The [mode selector](installer/mode/__init__.py) changes which toolkit payload the installed user profiles reference. [Command dispatch](bin/graph-skill.mjs) builds a selected source for test mode and launches the mode entry with the installed private Python runtime. [Host projections](installer/hosts/__init__.py) render the plugin server, page-trigger hook, Skills and Claude Mod paths for either payload. Source test mode selects the built toolkit source checkout, and the projections install the Skills `graph-skill` and `graph-skill-canvas` from it (`skill_ids = ("graph-skill", "graph-skill-canvas")` in `installer/hosts/__init__.py`); installed release mode installs the same two Skills from the active release. In both modes the MCP server entry's environment is `{"NODE_OPTIONS": "", "NODE_PATH": ""}`. [The installation planner](installer/install/__init__.py) verifies the immutable release and managed resources, and the selector records `source_mode`, the test root and hashes of the built assets, the source command and the Skills' Markdown in the installation manifest. The command applies configuration and manifest changes under the installer lock, and a repeated selection with matching hashes and owned resources returns `unchanged` without writing. The installed release supplies private Node.js and Python and the command launchers. A source path, a built payload, a configured host profile and a loaded host process are separate identities; selection and source tests do not establish a host session's behavior, and a host loads a selected server and Mod only after it reloads.
 
 ## Design and acceptance references
 
-The [Plugin Base decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) owns the rationale, user rulings, acceptance criteria and open design items of the division into host-integration layer, business apps and composition root. [The Hostpane extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) owns the package boundary, the commit pin and the division of tests and documents between the toolkit and Hostpane. Hostpane's own gates are recorded in [its validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md). [VALIDATION.md](VALIDATION.md#hostpane-extraction-candidate-2026-11-07) owns measured source, build and installation checks, beginning with the candidate that depends on Hostpane. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns observation of the loaded candidate in both hosts. A selected source, a built payload, a configured profile and a loaded host process are separate evidence identities.
+The [Plugin Base decision record](../../docs/design/plugin-base-and-interface-lab-2026-10-14.md) owns the rationale, user rulings, acceptance criteria and open design items of the division into host-integration layer, business apps and composition root. [The Hostpane extraction decision](../../docs/design/hostpane-extraction-2026-11-07.md) owns the package boundary, the commit pin and the division of tests and documents between the toolkit and Hostpane. [Hostpane's decision that the Interface Lab is its test page](https://github.com/SevenX77/hostpane/blob/main/docs/design/interface-lab-in-hostpane-2026-11-09.md) owns the toolkit's keeping only the canvas, and the place of the lab's documents and evidence in Hostpane. Hostpane's own gates are recorded in [its validation ledger](https://github.com/SevenX77/hostpane/blob/main/docs/VALIDATION.md). [VALIDATION.md](VALIDATION.md#hostpane-extraction-candidate-2026-11-07) owns measured source, build and installation checks, beginning with the candidate that depends on Hostpane. [MANUAL-TESTS.md](MANUAL-TESTS.md) owns observation of the loaded candidate in both hosts. A selected source, a built payload, a configured profile and a loaded host process are separate evidence identities.

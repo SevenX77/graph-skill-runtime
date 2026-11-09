@@ -150,3 +150,5 @@ All facts below were observed on 2026-11-07.
 ## Application state
 
 Applied on 2026-11-07 on branch `claude/toolkit-host-interfaces`, except the two acceptance items still unticked: the browser renders still missing and the observation of the redesigned build in a live Claude Code session.
+
+Since 2026-11-09 the Interface Lab is Hostpane's test page ([Hostpane decision](https://github.com/SevenX77/hostpane/blob/main/docs/design/interface-lab-in-hostpane-2026-11-09.md)). Where this record places the lab in the toolkit, it describes the layout of its date.

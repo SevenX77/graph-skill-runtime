@@ -166,6 +166,8 @@ The bundled canvas and Interface Lab pages grow from 696582 to 818051 bytes and 
 
 Decided 2026-11-07 on the owner's request to package the module as a new project and to create its repository under `D:/coding/`. Applied on 2026-11-07: every acceptance item above is observed except native observation of the Interface Lab page in an interactive Claude Code session.
 
+Since 2026-11-09 the Interface Lab is Hostpane's test page ([Hostpane decision](https://github.com/SevenX77/hostpane/blob/main/docs/design/interface-lab-in-hostpane-2026-11-09.md)). Where this record places the lab in the toolkit, it describes the layout of its date.
+
 Owner records:
 
 - 「把mcp 插件接口的模块单独打包成一个新的项目， 帮我起一个名字」 (gloss: "Package the MCP plugin interface module separately as a new project, and give it a name.")
